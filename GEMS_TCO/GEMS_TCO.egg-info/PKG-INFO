@@ -1,0 +1,6 @@
+Metadata-Version: 2.1
+Name: GEMS-TCO
+Version: 0.1
+Requires-Dist: numpy==2.1.1
+Requires-Dist: requests
+Requires-Dist: tqdm

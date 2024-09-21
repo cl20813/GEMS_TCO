@@ -1,0 +1,6 @@
+setup.py
+GEMS_TCO.egg-info/PKG-INFO
+GEMS_TCO.egg-info/SOURCES.txt
+GEMS_TCO.egg-info/dependency_links.txt
+GEMS_TCO.egg-info/requires.txt
+GEMS_TCO.egg-info/top_level.txt
