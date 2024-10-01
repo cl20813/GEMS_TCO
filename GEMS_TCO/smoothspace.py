@@ -10,7 +10,7 @@ from sklearn.neighbors import BallTree # for space_center function
 
 
 
-class space_avg:
+class space_avgerage:
     '''
     input
     df: pandas data frame
