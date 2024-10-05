@@ -1,0 +1,8 @@
+
+
+### Copy data into Amarel HPC (high-performance computing) cluster. 
+
+ssh jl2815@amarel.rutgers.edu
+
+# dfd
+cd /home/jl2815
