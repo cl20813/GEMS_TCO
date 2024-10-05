@@ -8,5 +8,8 @@
 
 ## Exercise using Amarel Rutgers Cluster
 
-[Fit nugget parameter in simple Matern Model](fit_nugget)
+[Fit nugget parameter in a simple Matern Model](fit_nugget)
+
+In this example, we can see how srun and sbatch work in Amarel HPC. 
+
 
