@@ -1,0 +1,93 @@
+### Test srun (worked on 2024-10-05)
+
+shh jl2815@amarel.rutgers.edu
+module use /projects/community/modulefiles            # without this, I can't load 2024.06-ts840
+module load anaconda/2024.06-ts840 
+conda activate gems_tco
+srun --cpus-per-task=5 --mem=8G --time=00:05:00 python /home/jl2815/GEMS/fit_nuggets.py            # default memory doesnt work!
+
+
+### Test sbatch
+
+# Step 1: Copy the file I want to run
+
+scp "C:\Users\joonw\TCO\newpipeline\fit_nuggets.py" jl2815@amarel.rutgers.edu:/home/jl2815/GEMS
+
+
+# step 2: Create the Slurm Batch Script
+Now log back to 
+ssh jl2815@amarel.rutgers.edu
+
+
+nano myjob.sh
+
+'''
+#!/bin/bash
+#SBATCH --job-name=python_test_job        # Job name
+#SBATCH --output=/home/jl2815/GEMS/output_%j.out            # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/GEMS/error_%j.err              # Standard error file (%j = JobID)
+#SBATCH --time=00:05:00                   # Maximum time (5 minutes)
+#SBATCH --ntasks=1                        # Number of tasks
+#SBATCH --cpus-per-task=5                 # Number of CPU cores per task
+#SBATCH --mem=8G                          # Memory per node
+#SBATCH --partition=main               # Partition to submit to
+
+# Load the Anaconda module to use srun 
+
+module use /projects/community/modulefiles                  # without this, I can't load 2024.06-ts840
+module load anaconda/2024.06-ts840 
+
+# Source the Conda setup script to ensure activation works        ## I added this part to make sure conda is loaded!
+source /opt/anaconda3/etc/profile.d/conda.sh
+conda activate gems_tco
+
+# Add the package to PYTHONPATH (if necessary)
+export PYTHONPATH=$PYTHONPATH:/cache/home/jl2815/tco/GEMS_TCO
+
+# Run the Python script
+srun python /home/jl2815/GEMS/fit_nuggets.py
+'''
+
+# step 3.
+
+conda init bash
+sbatch myjob.sh        # for lightweight work, maybe I can do srun directly such as  srun --cpus-per-task=5 --mem=4G --time=00:05:00 python /home/jl2815/GEMS/fit_nuggets.py
+
+
+
+
+# test sbtach
+
+
+
+
+
+
+
+
+
+```  skip this part
+# check my conda source
+module use /projects/community/modulefiles
+module avail (look for anaconda)
+module show anaconda/2024.06-ts840 # This will show source of the anaconda but You will not use the source directly. 
+
+
+
+
+# check file  
+ls /home/jl2815/tco/data/data_N3035_E100110/data_24_07_0130_N3035_E100110.csv
+```
+
+
+
+
+
+
+ 
+
+
+
+
+
+
