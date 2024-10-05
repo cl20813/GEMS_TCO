@@ -1,4 +1,4 @@
-# GEMS_Total Column Ozone project
+# GEMS_Total Column Ozone project (Package)
 
 ## Set up
 
