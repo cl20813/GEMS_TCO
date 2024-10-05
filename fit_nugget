@@ -5,21 +5,17 @@ module use /projects/community/modulefiles            # without this, I can't lo
 module load anaconda/2024.06-ts840 
 conda activate gems_tco
 srun --cpus-per-task=5 --mem=8G --time=00:05:00 python /home/jl2815/GEMS/fit_nuggets.py            # default memory doesnt work!
+------------------------------------------------------------------------------------------------------------------------------------------------
 
-
-### Test sbatch
+### Test sbatch (worked on 2024-10-05 but I need to connect anaconda and my environment first)
 
 # Step 1: Copy the file I want to run
-
 scp "C:\Users\joonw\TCO\newpipeline\fit_nuggets.py" jl2815@amarel.rutgers.edu:/home/jl2815/GEMS
 
-
 # step 2: Create the Slurm Batch Script
-Now log back to 
-ssh jl2815@amarel.rutgers.edu
+ssh jl2815@amarel.rutgers.edu   # Now log back to amarel
 
-
-nano myjob.sh
+nano myjob.sh                  # open a new text editor
 
 '''
 #!/bin/bash
@@ -38,7 +34,7 @@ module use /projects/community/modulefiles                  # without this, I ca
 module load anaconda/2024.06-ts840 
 
 # Source the Conda setup script to ensure activation works        ## I added this part to make sure conda is loaded!
-source /opt/anaconda3/etc/profile.d/conda.sh
+# source /opt/anaconda3/etc/profile.d/conda.sh cannot find this
 conda activate gems_tco
 
 # Add the package to PYTHONPATH (if necessary)
@@ -49,34 +45,31 @@ srun python /home/jl2815/GEMS/fit_nuggets.py
 '''
 
 # step 3.
+module use /projects/community/modulefiles 
+module load anaconda/2024.06-ts840
+conda activate gems_tco
 
-conda init bash
 sbatch myjob.sh        # for lightweight work, maybe I can do srun directly such as  srun --cpus-per-task=5 --mem=4G --time=00:05:00 python /home/jl2815/GEMS/fit_nuggets.py
-
-
+------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 # Check the output
-
-cat output_<jobID>.out         #actual job i d
-cat output_38868525.out # I got the result
+cd ./GEMS            ## ../GEMS when GEMS is inside the parent directory. This is located one level up from the current directory. 
+cat output_<jobID>.out         #actual job id
 cat error_38868490.err
 
 # copy output files to my computer
-scp jl2815@amarel.rutgers.edu:/home/jl2815/output_38868525.out C:/Users/joonw/Downloads/
+scp jl2815@amarel.rutgers.edu:/home/jl2815/GEMS/output_38868525.out C:/Users/joonw/Downloads/
 
 
 
-```  skip this part
+```  REFERENCE
 # check my conda source
 module use /projects/community/modulefiles
 module avail (look for anaconda)
 module show anaconda/2024.06-ts840 # This will show source of the anaconda but You will not use the source directly. 
 
-
-
-
-# check file  
+# check file exists
 ls /home/jl2815/tco/data/data_N3035_E100110/data_24_07_0130_N3035_E100110.csv
 ```
 
