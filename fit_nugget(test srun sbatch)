@@ -56,13 +56,14 @@ sbatch myjob.sh        # for lightweight work, maybe I can do srun directly such
 
 
 
-# test sbtach
+# Check the output
 
+cat output_<jobID>.out         #actual job i d
+cat output_38868525.out # I got the result
+cat error_38868490.err
 
-
-
-
-
+# copy output files to my computer
+scp jl2815@amarel.rutgers.edu:/home/jl2815/output_38868525.out C:/Users/joonw/Downloads/
 
 
 
