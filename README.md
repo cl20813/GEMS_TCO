@@ -8,5 +8,5 @@
 
 ## Exercise using Amarel Rutgers Cluster
 
-[Fit nugget parameter in simple Matern Model](fit_nugget(test srun sbatch))
-[Fit nugget parameter in simple Matern Model](fit_nugget(test srun sbatch))
+[Fit nugget parameter in simple Matern Model](fit_nugget)
+
