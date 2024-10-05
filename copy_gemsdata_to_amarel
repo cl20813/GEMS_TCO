@@ -19,10 +19,3 @@ scp "C:\Users\joonw\TCO\data_engineering\data_24_01_0130_N3035_E100110.csv" jl28
 scp "C:\Users\joonw\TCO\data_engineering\data_23_07_0130_N3035_E100110.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E100110
 scp "C:\Users\joonw\TCO\data_engineering\data_23_04_0130_N3035_E100110.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E100110
 scp "C:\Users\joonw\TCO\data_engineering\data_23_01_0130_N3035_E100110.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E100110
-
-## Install packages
-
-### copy my package
-scp -r "C:\Users\joonw\anaconda3\envs\jl2815\Lib\site-packages\GEMS_TCO" jl2815@amarel.rutgers.edu:/home/jl2815/tco
-
-ssh jl2815@amarel.rutgers.edu
