@@ -1,0 +1,98 @@
+
+
+# Step 1: Copy the file I want to run
+
+scp "C:\Users\joonw\TCO\newpipeline\fit_nuggets.py" jl2815@amarel.rutgers.edu:/home/jl2815/GEMS
+
+
+# check my conda source
+module use /projects/community/modulefiles
+module avail (look for anaconda)
+module show anaconda/2024.06-ts840 # This will show source of the anaconda but You will not use the source directly. 
+
+
+# step 2: Create the Slurm Batch Script
+Now log back to 
+ssh jl2815@amarel.rutgers.edu
+
+
+
+nano myjob.sh
+
+'''
+#!/bin/bash
+#SBATCH --job-name=python_test_job        # Job name
+#SBATCH --output=/home/jl2815/GEMS/output_%j.out            # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/GEMS/error_%j.err              # Standard error file (%j = JobID)
+#SBATCH --time=00:05:00                   # Maximum time (5 minutes)
+#SBATCH --ntasks=1                        # Number of tasks
+#SBATCH --cpus-per-task=5                 # Number of CPU cores per task
+#SBATCH --mem=4G                          # Memory per node
+#SBATCH --partition=main               # Partition to submit to
+
+
+# Load the Anaconda module
+
+module use /projects/community/modulefiles  #without this, I can't load 2024.06-ts840
+module load anaconda/2024.06-ts840 
+
+# Source the Conda setup script to ensure activation works        ## I added this part to make sure conda is loaded!
+source /opt/anaconda3/etc/profile.d/conda.sh
+conda activate gems_tco
+
+# Add the package to PYTHONPATH (if necessary)
+export PYTHONPATH=$PYTHONPATH:/cache/home/jl2815/tco/GEMS_TCO
+
+# Run the Python script
+srun python /home/jl2815/GEMS/fit_nuggets.py
+'''
+
+
+# step 3.
+
+sbatch myjob.sh        # for lightweight work, maybe I can do srun directly such as  srun --cpus-per-task=5 --mem=4G --time=00:05:00 python /home/jl2815/GEMS/fit_nuggets.py
+
+
+```  skip this part
+# Fixing error:
+1) ModuleNotFoundError: No module named 'matplotlib'
+srun: error: slepner086: task 0: Exited with exit code 1
+
+module load anaconda/2024.06-ts840
+conda activate gems_tco                
+conda list matplotlib       # Okay, after this it seems like matplotlib is correctly installed in my gems_tco environment.  I should have added   'conda activate gems_tco'
+# second error:
+cannot find 'skgstat'
+
+conda list skgstat   # it seems there is no skgstat
+pip install skgstat didnt work
+pip install git+https://github.com/mmaelicke/scikit-gstat.git
+
+# check file  
+ls /home/jl2815/tco/data/data_N3035_E100110/data_24_07_0130_N3035_E100110.csv
+```
+
+# third error, cannot find gems_tco, my package:
+conda activate gems_tco  # After activation, the environment should use .conda/envs/gems_tco as the location for packages.
+cd /home/jl2815/tco/GEMS_TCO
+pip install -e .
+pip list | grep GEMS_TCO           # Verify installation
+pip show GEMS_TCO
+
+srun python /home/jl2815/GEMS/fit_nuggets.py
+# fourth error:
+It looks like you successfully installed GEMS_TCO using pip, but when you run your script (fit_nuggets.py) via srun, 
+it's unable to find the GEMS_TCO package. This could be due to the fact that the SLURM job environment doesn't automatically include your Python package's location in its PYTHONPATH.
+
+srun python /home/jl2815/GEMS/fit_nuggets.py
+
+ #note:
+module use /projects/community/modulefiles  #without this, I can't load 2024.06-ts840
+module load anaconda/2024.06-ts840 
+conda activate gems_tco
+after I do this, I could get the job done.
+
+
+
+
+
