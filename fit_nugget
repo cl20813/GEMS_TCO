@@ -1,12 +1,9 @@
+
+
 # Step 1: Copy the file I want to run
 
 scp "C:\Users\joonw\TCO\newpipeline\fit_nuggets.py" jl2815@amarel.rutgers.edu:/home/jl2815/GEMS
 
-
-# check my conda source
-module use /projects/community/modulefiles
-module avail (look for anaconda)
-module show anaconda/2024.06-ts840 # This will show source of the anaconda but You will not use the source directly. 
 
 # step 2: Create the Slurm Batch Script
 Now log back to 
@@ -23,7 +20,7 @@ nano myjob.sh
 #SBATCH --time=00:05:00                   # Maximum time (5 minutes)
 #SBATCH --ntasks=1                        # Number of tasks
 #SBATCH --cpus-per-task=5                 # Number of CPU cores per task
-#SBATCH --mem=4G                          # Memory per node
+#SBATCH --mem=8G                          # Memory per node
 #SBATCH --partition=main               # Partition to submit to
 
 # Load the Anaconda module to use srun 
@@ -44,16 +41,21 @@ srun python /home/jl2815/GEMS/fit_nuggets.py
 
 # step 3.
 
+conda init bash
 sbatch myjob.sh        # for lightweight work, maybe I can do srun directly such as  srun --cpus-per-task=5 --mem=4G --time=00:05:00 python /home/jl2815/GEMS/fit_nuggets.py
 
 
 
 
 
+# test srun (worked on 2024-10-05)
+shh jl2815@amarel.rutgers.edu
+module use /projects/community/modulefiles        
+module load anaconda/2024.06-ts840 
+conda activate gems_tco
+srun --cpus-per-task=5 --mem=8G --time=00:05:00 python /home/jl2815/GEMS/fit_nuggets.py            # default memory doesnt work!
 
-
-
-
+# test sbtach
 
 
 
@@ -66,6 +68,12 @@ sbatch myjob.sh        # for lightweight work, maybe I can do srun directly such
 
 
 ```  skip this part
+# check my conda source
+module use /projects/community/modulefiles
+module avail (look for anaconda)
+module show anaconda/2024.06-ts840 # This will show source of the anaconda but You will not use the source directly. 
+
+
 # Fixing error:
 1) ModuleNotFoundError: No module named 'matplotlib'
 srun: error: slepner086: task 0: Exited with exit code 1
