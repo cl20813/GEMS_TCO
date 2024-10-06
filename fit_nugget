@@ -46,7 +46,9 @@ export PYTHONPATH=$PYTHONPATH:/cache/home/jl2815/tco/GEMS_TCO
 srun python /home/jl2815/GEMS/fit_nuggets.py
 '''
 
-# step 3.
+# step 3. (summary)
+#   scp "C:\Users\joonw\TCO\newpipeline\fit_nuggets.py" jl2815@amarel.rutgers.edu:/home/jl2815/GEMS
+#   srun --cpus-per-task=5 --mem=2G --time=01:00:00 python /home/jl2815/GEMS/fit_nuggets_04.py
 module use /projects/community/modulefiles 
 module load anaconda/2024.06-ts840
 conda activate gems_tco
