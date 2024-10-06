@@ -39,6 +39,9 @@ eval "$(conda shell.bash hook)"                  # Initialize Conda for SLURM en
 
 conda activate gems_tco
 
+# Add the GEMS_TCO package directory to PYTHONPATH
+export PYTHONPATH=$PYTHONPATH:/cache/home/jl2815/tco/GEMS_TCO
+
 # Run the Python script
 srun python /home/jl2815/GEMS/fit_nuggets.py
 '''
@@ -64,7 +67,12 @@ cat error_38868490.err
 # copy output files to my computer
 scp jl2815@amarel.rutgers.edu:/home/jl2815/GEMS/output_38868525.out C:/Users/joonw/Downloads/
 
+# when my environment can't find GEMS_TCO, do this:
+import sys
+sys.path.append("/cache/home/jl2815/tco")
 
+# Now you can import your package
+from GEMS_TCO import orbitmap
 
 ```  REFERENCE
 # check my conda source
