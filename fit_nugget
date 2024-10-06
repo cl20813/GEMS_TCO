@@ -60,6 +60,7 @@ sinfo --Node --long     # View all available node
 sstat -j 38879656       # Check whether the job has initialized 
 scontrol show job 38880272  # Show job details
 sprio -j <jobID>            #  job scheduling priority
+scancel 38886671
 
 # Check the output
 cd ./GEMS            ## ../GEMS when GEMS is inside the parent directory. This is located one level up from the current directory. 
