@@ -1,7 +1,7 @@
 ### Test srun (worked on 2024-10-05)
 
 shh jl2815@amarel.rutgers.edu
-module use /projects/community/modulefiles            # without this, I can't load 2024.06-ts840
+module use /projects/community/modulefiles            # # Ensure the module path is added. Without this, I can't load 2024.06-ts840
 module load anaconda/2024.06-ts840 
 conda activate gems_tco
 srun --cpus-per-task=5 --mem=8G --time=00:05:00 python /home/jl2815/GEMS/fit_nuggets.py            # default memory doesnt work!
@@ -34,8 +34,9 @@ module purge                                     # unload every other environmen
 module use /projects/community/modulefiles                  # without this, I can't load 2024.06-ts840
 module load anaconda/2024.06-ts840 
 
-# Source the Conda setup script to ensure activation works        ## I added this part to make sure conda is loaded!
-# source /opt/anaconda3/etc/profile.d/conda.sh cannot find this
+# Initialize Conda
+eval "$(conda shell.bash hook)"                  # Initialize Conda for SLURM environment
+
 conda activate gems_tco
 
 # Run the Python script
