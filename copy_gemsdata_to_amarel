@@ -19,3 +19,13 @@ scp "C:\Users\joonw\TCO\data_engineering\data_24_01_0130_N3035_E100110.csv" jl28
 scp "C:\Users\joonw\TCO\data_engineering\data_23_07_0130_N3035_E100110.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E100110
 scp "C:\Users\joonw\TCO\data_engineering\data_23_04_0130_N3035_E100110.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E100110
 scp "C:\Users\joonw\TCO\data_engineering\data_23_01_0130_N3035_E100110.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E100110
+
+
+##
+
+scp "C:\Users\joonw\TCO\data_engineering\data_24_04_0130_N3035_E110120.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E110120
+scp "C:\Users\joonw\TCO\data_engineering\data_24_07_0130_N3035_E110120.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E110120
+
+
+scp "C:\Users\joonw\TCO\data_engineering\data_23_04_0130_N3035_E110120.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E110120
+scp "C:\Users\joonw\TCO\data_engineering\data_23_07_0130_N3035_E110120.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E110120
