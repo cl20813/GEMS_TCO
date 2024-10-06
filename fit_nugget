@@ -38,9 +38,6 @@ module load anaconda/2024.06-ts840
 # source /opt/anaconda3/etc/profile.d/conda.sh cannot find this
 conda activate gems_tco
 
-# Add the package to PYTHONPATH (if necessary)
-export PYTHONPATH=$PYTHONPATH:/cache/home/jl2815/tco/GEMS_TCO
-
 # Run the Python script
 srun python /home/jl2815/GEMS/fit_nuggets.py
 '''
@@ -55,7 +52,7 @@ sbatch myjob.sh        # for lightweight work, maybe I can do srun directly such
 squeue -u jl2815        # Status of my job
 sinfo --Node --long     # View all available node
 sstat -j 38879656       # Check whether the job has initialized 
-scontrol show job 38879656 # Show job details
+scontrol show job 38880272  # Show job details
 sprio -j <jobID>            #  job scheduling priority
 
 # Check the output
