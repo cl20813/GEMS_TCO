@@ -18,3 +18,4 @@ pip install -e /home/jl2815/tco/     # this will install my package 'GEMS_TCO'
 # verify installation
 pip list | grep GEMS_TCO           # Verify installation
 python -c "import GEMS_TCO; print('GEMS_TCO imported successfully')" 
+pip show GEMS_TCO
