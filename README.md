@@ -13,3 +13,12 @@
 In this example, we demonstrate how srun and sbatch work on Amarel HPC. 
 
 
+
+## Exploratory Data Analysis
+[Exercise 1](GEMS_TCO_EDA/timeseries_statistics.ipynb)
+
+I present time series of semivariograms, variances, cross-periodograms, and cross-variograms.
+
+[Exercise 2](GEMS_TCO_EDA/TCO_VS_Staratoshere.ipynb)
+
+I compared total column ozone with stratospheric ozone, and analyzed the time series of means and variances of ozone values over time.
