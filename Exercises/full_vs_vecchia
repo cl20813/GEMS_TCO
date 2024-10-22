@@ -1,11 +1,17 @@
 # Full likelihood vs Vecchia approximation
 
+### Update my packages
+scp -r "C:\Users\joonw\anaconda3\envs\jl2815\Lib\site-packages\GEMS_TCO" jl2815@amarel.rutgers.edu:/home/jl2815/tco
+
+For significant updates or installations, use pip install --force-reinstall or python setup.py install after copying the files.
+
 ### copy ozone data and python file to Amarel HPC
 
 scp "C:\\Users\\joonw\\TCO\\data_engineering\\data_24_07_0130_N2530_E95110.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N2530_E95110
 
 scp "C:\Users\joonw\TCO\newpipeline\Exercises\full_vs_vecchia.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise
 
+### Run this part
 shh jl2815@amarel.rutgers.edu
 module use /projects/community/modulefiles            # # Ensure the module path is added. Without this, I can't load 2024.06-ts840
 module load anaconda/2024.06-ts840 
