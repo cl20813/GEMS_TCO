@@ -1,6 +1,5 @@
 # GEMS_Total Column Ozone project (Package)
 [Link to ondemand HPC](http://ondemand.hpc.rutgers.edu )    
-http://ondemand.hpc.rutgers.edu 
 
 ## Set up
 
