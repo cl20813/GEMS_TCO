@@ -13,6 +13,8 @@
 
 In this example, we demonstrate how srun and sbatch work on Amarel HPC. 
 
+[Compare full likelihood vs Vecchia approximation ](Exercises/full_vs_vecchia) 
+
 
 
 ## Exploratory Data Analysis
