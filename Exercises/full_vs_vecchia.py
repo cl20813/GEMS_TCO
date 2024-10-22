@@ -32,13 +32,8 @@ from GEMS_TCO import orbitmap
 # from GEMS_TCO import smoothspace
 from GEMS_TCO.smoothspace import space_average
 
-df = pd.read_csv("C:\\Users\\joonw\\TCO\\data_engineering\\data_24_07_0130_N2530_E95110.csv")
+import argparse
 
-instance = orbitmap.MakeOrbitdata(df,0.4,0.4,10,20,120,135)
-orbit_map24_7 = instance.makeorbitmap()
-
-# instance24_7 = orbitmap.MakeOrbitdata(df,10,20,120,135)
-sparse_map_24_7 = instance.make_sparsemap(orbit_map24_7, 0.4)
 
 def maxmin_naive(dist: np.ndarray, first: np.intp) -> tuple[np.ndarray, np.ndarray]:
     """
@@ -120,6 +115,27 @@ def find_nns_naive(
         nn_res = nn.query(locs[[i], :], k=k, return_distance=False)
         nns[i, :k] = nn_res
     return nns
+
+def matern_cov_spat(sigmasq: float = 1, range_: float = 1, v: float = 0.5, input_df: pd.DataFrame = None) -> pd.DataFrame:
+    x = input_df['Longitude'].values
+    y = input_df['Latitude'].values
+    d = np.sqrt((x[:, np.newaxis] - x)**2 + (y[:, np.newaxis] - y)**2)
+    abs_d = np.abs(d)
+    
+    # Initialize the covariance matrix with zeros
+    out = np.zeros_like(d)
+    
+    # Compute the covariance for non-zero distances
+    non_zero_indices = abs_d != 0
+    if np.any(non_zero_indices):
+        out[non_zero_indices] = (sigmasq * (2**(1-v)) / math.gamma(v) *
+                                 (abs_d[non_zero_indices] / range_)**v *
+                                 kv(v, abs_d[non_zero_indices] / range_))
+    
+    # Fill the diagonal with sigmasq (variance term)
+    np.fill_diagonal(out, sigmasq)
+    return pd.DataFrame(out)
+
 
 def gneiting_xy(a, c, tau, alpha,gamma,sigma, beta, x_df=None, y_df2= None)-> pd.DataFrame:
     
@@ -349,13 +365,43 @@ def neg_ll_nugget(params, input_df, mm_cond_number):
 #### run
 
 
-data = sparse_map_24_7['y24m07day01_1']
-params = 0.1
-mm_cond_number = 30
-out = neg_ll_nugget(params, data, mm_cond_number)
+## param1 (resolution)
+## param2 nugget size
+## param3  (number of conditning number in vecchia approximation)
+
+def main():
+    # Argument parser
+    parser = argparse.ArgumentParser(description="Full vs Vecchia Comparison")
+    
+    # Define the parameters you want to change at runtime
+    parser.add_argument('--resolution', type=float, default=0.4, help="Resolution parameter")
+    parser.add_argument('--nugget', type=float, default=30, help="Nugget parameter")
+    parser.add_argument('--mm_cond_number', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
+    
+    # Parse the arguments
+    args = parser.parse_args()
+    
+    # Use args.param1, args.param2 in your script
+    resolution = args.resolution
+    nugget = args.nugget
+    mm_cond_number = args.mm_cond_number
+
+    # Example usage of your functions
+    df = pd.read_csv('/home/jl2815/tco/data/data_N2530_E95110/data_24_07_0130_N2530_E95110.csv')
+
+    instance = orbitmap.MakeOrbitdata(df, resolution, resolution,10,20,120,135)
+    orbit_map24_7 = instance.makeorbitmap()
+    # instance24_7 = orbitmap.MakeOrbitdata(df,10,20,120,135)
+    sparse_map_24_7 = instance.make_sparsemap(orbit_map24_7, resolution)
+
+    data = sparse_map_24_7['y24m07day01_1']
+
+    mm_cond_number = mm_cond_number
+    out = neg_ll_nugget(nugget, data, mm_cond_number)
+
+    print(f'Full likelihood using nugget size {nugget} is {neg_log_likelihood_nugget(nugget, data, data['ColumnAmountO3'])}')
+    print(f'Vecchia approximation likelihood using condition size {mm_cond_number}, nugget size {nugget} is {out}')
 
 
-print(f'full likelihood using nuggetsize {params} is {neg_log_likelihood_nugget(params, data, data['ColumnAmountO3'])}')
-print(f'Vecchia approximation likelihood using nuggetsize {params} is {out}')
-
-
+if __name__ == '__main__':
+    main()
