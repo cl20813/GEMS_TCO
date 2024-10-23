@@ -33,6 +33,7 @@ from GEMS_TCO import orbitmap
 from GEMS_TCO.smoothspace import space_average
 
 import argparse
+import concurrent.futures
 
 
 def maxmin_naive(dist: np.ndarray, first: np.intp) -> tuple[np.ndarray, np.ndarray]:
@@ -258,7 +259,8 @@ def neg_log_likelihood_nugget(params, input_df, y):
     
     return neg_log_lik
 
-def neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map):
+def neg_ll_nugget(params:float, input_df:pd.DataFrame, mm_cond_number:int, ord:np.ndarray, nns_map:np.ndarray):   
+   
     """
     Compute negative log likelihood function of matern model using Vecchia approximation
 
@@ -287,12 +289,16 @@ def neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map):
 
 
     reordered_df = input_df.iloc[ord,:]
+        # Construct nearest neighboring set
+    
+
     # Centering data
     reordered_df['ColumnAmountO3'] = reordered_df['ColumnAmountO3']-np.mean(reordered_df['ColumnAmountO3'])
 
     # initialize negative log-likelihood value
     neg_log_lik = 0
 
+    
     ## likelihood for the first 30 observations
     smallset = reordered_df.iloc[:31,:]
     neg_log_lik += neg_log_likelihood_nugget(params, smallset, smallset['ColumnAmountO3'])
@@ -318,10 +324,8 @@ def neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map):
         cov_xx = cov_matrix.iloc[1:,1:].reset_index(drop=True)
         cov_yx = cov_matrix.iloc[0,1:]
 
-
         # get mean
         locs = np.array(df[['Latitude','Longitude']])
-
         tmp1 = np.dot(locs.T, np.linalg.solve(cov_matrix, locs))
         tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y_and_neighbors))
         beta = np.linalg.solve(tmp1, tmp2)
@@ -329,7 +333,7 @@ def neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map):
         mu = np.dot(locs, beta)
         mu_current = mu[0]
         mu_neighbors = mu[1:]
-        
+
         # mean and variance of y|x
         sigma = cov_matrix.iloc[0,0]
         cov_ygivenx = sigma - np.dot(cov_yx.T,np.linalg.solve(cov_xx, cov_yx))
@@ -342,10 +346,7 @@ def neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map):
         # Compute the negative log-likelihood
 
         neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
-      
-
-    return neg_log_lik
-
+        return float(neg_log_lik)
 
 #### run
 
@@ -354,34 +355,56 @@ def neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map):
 ## param2 nugget size
 ## param3  (number of conditning number in vecchia approximation)
 
+
+def neg_log_likelihood_nugget_parallel(key,bounds, initial_params, input_df, mm_cond_number, ord_, nns_map):
+    try:
+        cur_data = input_df
+        y = cur_data['ColumnAmountO3']
+        result = minimize(
+            neg_ll_nugget, 
+            initial_params, 
+            args=(input_df, mm_cond_number, ord_, nns_map),  # neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map)
+            bounds=bounds,
+            method='L-BFGS-B'
+        )
+        jitter = result.x
+        return f"estimated nugget on {key}: {jitter}, bounds={bounds}"
+    except Exception as e:
+        print(f"Error occurred on {key}: {str(e)}")
+        return f"Error occurred on {key}"
+    
+    
+
 def main():
     # Argument parser
     parser = argparse.ArgumentParser(description="Full vs Vecchia Comparison")
     
     # Define the parameters you want to change at runtime
-    parser.add_argument('--resolution', type=float, default=0.4, help="Resolution parameter")
-    parser.add_argument('--nugget', type=float, default=30, help="Nugget parameter")
+    parser.add_argument('--initial_params', type=float, default=0.4, help="Initial parameters")
     parser.add_argument('--mm_cond_number', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
-    
+    parser.add_argument('--bounds', type=float, nargs=2, default=[0.05, 10], help="Bounds for the nugget parameter")
+    parser.add_argument('--resolution', type=float, default=0.4, help="Resolution parameter")
+
     # Parse the arguments
     args = parser.parse_args()
     
     # Use args.param1, args.param2 in your script
-    resolution = args.resolution
-    nugget = args.nugget
+    initial_params= args.initial_params
+    
+    bounds = [tuple(args.bounds)]   ## list of tuples
     mm_cond_number = args.mm_cond_number
+    resolution = args.resolution
 
     # Example usage of your functions
+    # df = pd.read_csv('/home/jl2815/tco/data/data_N2530_E95110/data_24_07_0130_N2530_E95100.csv')
     df = pd.read_csv('/home/jl2815/tco/data/data_N2530_E95110/data_24_07_0130_N2530_E95110.csv')
-
-    instance = orbitmap.MakeOrbitdata(df, resolution, resolution,10,20,120,135)
+    instance = orbitmap.MakeOrbitdata(df, resolution, resolution,25,30, 95,110)  # 10,20,120,135
     orbit_map24_7 = instance.makeorbitmap()
-    # instance24_7 = orbitmap.MakeOrbitdata(df,10,20,120,135)
     sparse_map_24_7 = instance.make_sparsemap(orbit_map24_7, resolution)
 
-    data = sparse_map_24_7['y24m07day01_1']
-    mm_cond_number = mm_cond_number
 
+    # share same locations
+    data = sparse_map_24_7['y24m07day01_1']
     # Extract values
     x1 = data['Longitude'].values
     y1 = data['Latitude'].values 
@@ -389,17 +412,30 @@ def main():
     # Calculate spatial distances using cdist
     s_dist = cdist(coords1, coords1, 'euclidean')
     # reorder data using maxmin
-    ord, _ = maxmin_naive(s_dist, 0)
- 
+    ord_, _ = maxmin_naive(s_dist, 0)
     # Construct nearest neighboring set
     nns_map = find_nns_naive(locs= coords1, dist_fun= 'euclidean', max_nn= mm_cond_number)
 
 
-    out = neg_ll_nugget(nugget, data, mm_cond_number, ord, nns_map)
+    # Now use concurrent.futures for parallel processing
 
-    print(f'Full likelihood using nugget size {nugget} is {neg_log_likelihood_nugget(nugget, data, data['ColumnAmountO3'])}')
-    print(f'Vecchia approximation likelihood using condition size {mm_cond_number}, nugget size {nugget} is {out}')
-
+    days = range(1, 1)
+    orbits = range(1, 2)
+    keys= sorted(sparse_map_24_7)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [
+            executor.submit(
+                neg_log_likelihood_nugget_parallel,
+                day, orbit, bounds, initial_params, sparse_map_24_7[key], 
+                mm_cond_number, ord_, nns_map
+                # sparse_map_24_7[f'y24m07day{day:02d}_{i}']  # Pass only the relevant DataFrame
+                  # Pass only the relevant DataFrame
+            )
+            for key in keys
+        ]
+        
+        for future in concurrent.futures.as_completed(futures):
+            print(future.result())
 
 if __name__ == '__main__':
     main()
