@@ -13,7 +13,7 @@ OR
 scp "C:\\Users\\joonw\\TCO\\data_engineering\\data_24_07_0130_N2530_E95100.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N2530_E95110
 
 
-scp "C:\Users\joonw\TCO\newpipeline\Exercises\fitting_nugget_vecchia_entiredata.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise
+scp "C:\Users\joonw\TCO\newpipeline\Exercises\fitting_nugget_vecchia.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise
 
 ### Quick run using srun
 
