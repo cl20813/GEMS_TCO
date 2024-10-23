@@ -17,7 +17,7 @@ In this example, we demonstrate how srun and sbatch work on Amarel HPC.
 
 Now, we can try fitting nugget parameter using entire dataset and Vecchia approximation.
 
-[Fitting nugget parameter using entire dataset and Vecchia approximation](Exercises/fitting_nugget_vecchia_entiredata) 
+[Fitting nugget parameter using entire dataset and Vecchia approximation](Exercises/fitting_nugget_vecchia) 
 
 
 ## Exploratory Data Analysis
