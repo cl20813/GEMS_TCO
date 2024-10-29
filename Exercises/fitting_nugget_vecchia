@@ -1,4 +1,6 @@
 # fit_nugget_vecchia
+# tested srun on 2024-10-20 and sbatch on 2024-10-20 (but the file has to be in ./jl2815/GEMS
+
 
 ### Update my packages
 scp -r "C:\Users\joonw\anaconda3\envs\jl2815\Lib\site-packages\GEMS_TCO" jl2815@amarel.rutgers.edu:/home/jl2815/tco
