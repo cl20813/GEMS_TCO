@@ -21,7 +21,7 @@ ssh jl2815@amarel.rutgers.edu
 module use /projects/community/modulefiles            # # Ensure the module path is added. Without this, I can't load 2024.06-ts840
 module load anaconda/2024.06-ts840 
 conda activate gems_tco
-srun python /home/jl2815/GEMS/fitting_nugget_vecchia.py --initial_params 0.2 --bounds 0.05 60 --mm_cond_number 10
+srun --cpus-per-task=5 --mem=16G --time=01:00:00 python /home/jl2815/GEMS/fitting_nugget_vecchia.py --initial_params 0.2 --bounds 0.05 60 --mm_cond_number 10
 
 ## note that bounds = [tuple(args.bounds)] has to be of this form to be used in scipy.minimize()
 
