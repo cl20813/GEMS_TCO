@@ -1,4 +1,4 @@
-### Test srun (worked on 2024-10-05)
+### Test srun (worked on 2024-10-05) tested sbatch (worked on 2024-10-29)
 
 shh jl2815@amarel.rutgers.edu
 module use /projects/community/modulefiles            # # Ensure the module path is added. Without this, I can't load 2024.06-ts840
