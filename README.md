@@ -20,6 +20,10 @@ Now, we can try fitting nugget parameter using entire dataset and Vecchia approx
 [Fitting nugget parameter using Vecchia approximation](Exercises/fitting_nugget_vecchia) 
 
 
+[Fit spatio-temporal model](Exercises/fit_spatio-temporal_1027) 
+
+
+
 ## Exploratory Data Analysis
 [EDA 1](GEMS_TCO_EDA/timeseries_statistics.ipynb)
 
