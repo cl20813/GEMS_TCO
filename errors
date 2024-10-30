@@ -1,0 +1,5 @@
+# Cannot find GEMS_TCO package
+
+when using sbatch, I need to add sys.path.append("/cache/home/jl2815/tco/") in .py file otherwise it cannot read GEMS package
+
+# 
