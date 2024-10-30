@@ -1,4 +1,3 @@
-# fit_nugget_vecchia
 # tested srun on 2024-10-20 and sbatch on 2024-10-20 (but the file has to be in ./jl2815/GEMS
 ### when using sbatch, I need to add sys.path.append("/cache/home/jl2815/tco/") in .py file otherwise it cannot read GEMS package
 
@@ -7,14 +6,11 @@ scp -r "C:\Users\joonw\anaconda3\envs\jl2815\Lib\site-packages\GEMS_TCO" jl2815@
 
 For significant updates or installations, use pip install --force-reinstall or python setup.py install after copying the files.
 
-### copy ozone data and python file to Amarel HPC
-
+### copy ozone data to Amarel HPC 
 scp "C:\\Users\\joonw\\TCO\\data_engineering\\data_24_07_0130_N2530_E95110.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N2530_E95110
-OR
-
 scp "C:\\Users\\joonw\\TCO\\data_engineering\\data_24_07_0130_N2530_E95100.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N2530_E95110
 
-
+### Copy python file to Amarel HPC
 scp "C:\Users\joonw\TCO\newpipeline\Exercises\fitting_nugget_vecchia.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise
 
 ### Quick run using srun
