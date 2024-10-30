@@ -13,3 +13,6 @@ conda activate gems_tco
 conda list | grep skgstat 
 
 If this gives you nothing, then there is no skgstat module installed. 
+
+conda install -c conda-forge scikit-gstat
+
