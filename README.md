@@ -1,7 +1,7 @@
 # GEMS_Total Column Ozone project (Package)
 [Link to ondemand HPC](http://ondemand.hpc.rutgers.edu )    
 
-[Common errorsC](errors )  
+[Common errors](errors)  
 
 ## Set up
 
