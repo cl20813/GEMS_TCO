@@ -38,11 +38,17 @@ module load anaconda/2024.06-ts840
 
 # Initialize Conda
 eval "$(conda shell.bash hook)"                  # Initialize Conda for SLURM environment
-
 conda activate gems_tco
 
+# Ensure skgstat module is installed
+python -c "import skgstat; print('skgstat module is installed')"             # print 'skgstat module is installed'  if skgstat is installed 
+
+# Verify environment variables and paths
+echo "PYTHONPATH: $PYTHONPATH"                                                      # Ensures your directoreis are set. 
+echo "Conda env: $(conda info --envs)"                                              # Lists your Conda environments and there should be * next to gems_tco because it is activated. 
+
 # Add the GEMS_TCO package directory to PYTHONPATH
-export PYTHONPATH=$PYTHONPATH:/cache/home/jl2815/tco/GEMS_TCO
+export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 
 # Run the Python script
 srun python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --resolution 0.4 --smooth 0.5 --initial_params 0.5 0.5 0.5 0.5 --bounds 0.05 60 
