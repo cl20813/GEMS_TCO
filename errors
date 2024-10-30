@@ -20,5 +20,21 @@ If this gives you nothing, then there is no skgstat module installed. Then
 conda install -c conda-forge scikit-gstat       # This worked on 2024-10-29
 
 
+# object type is not subscriptable 
+def maxmin_naive(dist: np.ndarray, first: np.intp) -> tuple[np.ndarray, np.ndarray]:
+
+from typing import Tuple           
+first: np.intp --> first:np.int     
+tuple --> Tuple
+
+# The error "unsupported operand type(s) for |: '_variadicGenericAlias' and 'type'" suggests that the type annotation is incorrect.
+
+def find_nns_naive(locs: np.ndarray, dist_fun: Callable | str = "euclidean", max_nn: int = 10, **kwargs) -> np.ndarray:   
+def find_nns_naive(locs: np.ndarray, dist_fun: Union[Callable, str] = "euclidean", max_nn: int = 10, **kwargs) -> np.ndarray:  
+
+1) from typing import Callable, Union   
+2) Callable | str = "euclidean", max_nn: int = 10, **kwargs --> Union[Callable, str] = "euclidean", max_nn: int = 10, **kwargs    (worked on 2024-10-29)    
+
+
 
 
