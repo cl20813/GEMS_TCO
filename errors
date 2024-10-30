@@ -10,9 +10,15 @@ Note that bounds = [tuple(args.bounds)] has to be of this form to be used in sci
 module use /projects/community/modulefiles      
 module load anaconda/2024.06-ts840 
 conda activate gems_tco
-conda list | grep skgstat 
 
-If this gives you nothing, then there is no skgstat module installed. 
+# Ensure skgstat module is installed
+conda list | grep skgstat
+python -c "import skgstat; print('skgstat module is installed')"
 
-conda install -c conda-forge scikit-gstat
+If this gives you nothing, then there is no skgstat module installed. Then 
+
+conda install -c conda-forge scikit-gstat       # This worked on 2024-10-29
+
+
+
 
