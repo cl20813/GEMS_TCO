@@ -12,7 +12,7 @@ ssh jl2815@amarel.rutgers.edu
 module use /projects/community/modulefiles            # # Ensure the module path is added. Without this, I can't load 2024.06-ts840
 module load anaconda/2024.06-ts840 
 conda activate gems_tco
-srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --resolution 0.4 --smooth 0.5 --initial_params 0.5 0.5 0.5 0.5 --bounds 0.05 60 
+srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --resolution 0.4 --smooth 0.5 --initial_params 0.5 0.5 0.5 0.5 --bounds 0.05 60 
 
 
 ## sbatch 
