@@ -49,6 +49,25 @@ eval "$(conda shell.bash hook)"                  # Initialize Conda for SLURM en
 
 conda activate gems_tco
 
+# Ensure skgstat module is installed
+python -c "import skgstat; print('skgstat module is installed')"             # print 'skgstat module is installed'  if skgstat is installed 
+
+# Verify environment variables and paths
+echo "PYTHONPATH: $PYTHONPATH"                                                      # Ensures your directoreis are set. 
+echo "Conda env: $(conda info --envs)"                                              # Lists your Conda environments and there should be * next to gems_tco because it is activated. 
+
+# Add the GEMS_TCO package directory to PYTHONPATH
+export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
+
+# Run the Python script using srun
+srun --cpus-per-task=5 --mem=16G --time=01:00:00 python /home/jl2815/tco/exercise/fitting_nugget_vecchia.py --initial_params 0.2 --bounds 0.05 60 --mm_cond_number 10
+
+
+
+
+
+
+
 # Add the GEMS_TCO package directory to PYTHONPATH
 export PYTHONPATH=$PYTHONPATH:/cache/home/jl2815/tco/GEMS_TCO
 
