@@ -2,4 +2,14 @@
 
 when using sbatch, I need to add sys.path.append("/cache/home/jl2815/tco/") in .py file otherwise it cannot read GEMS package
 
-# 
+# Error when using scipy minimize function
+Note that bounds = [tuple(args.bounds)] has to be of this form to be used in scipy.minimize()
+
+# Cannot find skgstat package
+
+module use /projects/community/modulefiles      
+module load anaconda/2024.06-ts840 
+conda activate gems_tco
+conda list | grep skgstat 
+
+If this gives you nothing, then there is no skgstat module installed. 
