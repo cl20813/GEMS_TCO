@@ -1,0 +1,14 @@
+
+
+### Copy python file to Amarel HPC
+scp "C:\Users\joonw\TCO\newpipeline\Exercises\fit_matern_vecchia.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise
+### Copy python from Amarel HPC to my computer
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise/fit_matern_vecchia.py "C:\Users\joonw\TCO\newpipeline\Exercises"
+
+
+# Quick srun
+ssh jl2815@amarel.rutgers.edu
+module use /projects/community/modulefiles            # # Ensure the module path is added. Without this, I can't load 2024.06-ts840
+module load anaconda/2024.06-ts840 
+conda activate gems_tco
+srun --cpus-per-task=16 --mem=16G --time=01:00:00 python /home/jl2815/tco/exercise/fit_matern_vecchia.py --initial_params 0.5 0.5 0.5 --bounds 0.05 60 --mm_cond_number 10 --resolution 0.4
