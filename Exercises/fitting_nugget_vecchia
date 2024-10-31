@@ -60,21 +60,8 @@ echo "Conda env: $(conda info --envs)"                                          
 export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 
 # Run the Python script using srun
-srun --cpus-per-task=5 --mem=16G --time=01:00:00 python /home/jl2815/tco/exercise/fitting_nugget_vecchia.py --initial_params 0.2 --bounds 0.05 60 --mm_cond_number 10
-
-
-
-
-
-
-
-# Add the GEMS_TCO package directory to PYTHONPATH
-export PYTHONPATH=$PYTHONPATH:/cache/home/jl2815/tco/GEMS_TCO
-
-# Run the Python script
 srun python /home/jl2815/tco/exercise/fitting_nugget_vecchia.py --initial_params 0.2 --bounds 0.05 60 --mm_cond_number 10
-
-'''
+```
 
 # step 3 
 module use /projects/community/modulefiles 
