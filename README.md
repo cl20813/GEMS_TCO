@@ -21,8 +21,10 @@ Now, we can try fitting nugget parameter using entire dataset and Vecchia approx
 
 [Fitting nugget parameter using Vecchia approximation](Exercises/fitting_nugget_vecchia) 
 
+[Fit matern](Exercises/fit_matern)
 
 [Fit spatio-temporal model](Exercises/fit_spatio-temporal_1027) 
+
 
 
 
