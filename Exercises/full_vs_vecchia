@@ -6,14 +6,69 @@ scp -r "C:\Users\joonw\anaconda3\envs\jl2815\Lib\site-packages\GEMS_TCO" jl2815@
 For significant updates or installations, use pip install --force-reinstall or python setup.py install after copying the files.
 
 ### copy ozone data and python file to Amarel HPC
-
 scp "C:\\Users\\joonw\\TCO\\data_engineering\\data_24_07_0130_N2530_E95110.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N2530_E95110
-
 scp "C:\Users\joonw\TCO\newpipeline\Exercises\full_vs_vecchia.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise
+
+### Copy python from Amarel HPC to my computer
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise/full_vs_vecchia.py "C:\Users\joonw\TCO\newpipeline\Exercises"
+
 
 ### Run this part
 ssh jl2815@amarel.rutgers.edu
 module use /projects/community/modulefiles            # # Ensure the module path is added. Without this, I can't load 2024.06-ts840
 module load anaconda/2024.06-ts840 
 conda activate gems_tco
-srun --cpus-per-task=5 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --resolution 0.4 --nugget 0.1 --mm_cond_number 30
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 0 --params 60 8.25 0.55 --resolution 0.4 --nugget 5 --mm_cond_number 30
+
+## sbatch 
+
+nano full_vs_vecc1.sh                  # open a new text editor
+
+'''
+#!/bin/bash
+#SBATCH --job-name=compare_full_vs_vecchia       # Job name
+#SBATCH --output=/home/jl2815/GEMS/output_%j.out            # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/GEMS/error_%j.err              # Standard error file (%j = JobID)
+#SBATCH --time=24:00:00                   # Maximum time (5 minutes)
+#SBATCH --ntasks=1                        # Number of tasks
+#SBATCH --cpus-per-task=16                 # Number of CPU cores per task
+#SBATCH --mem=200G                          # Memory per node
+#SBATCH --partition=main               # Partition to submit to
+
+# Load the Anaconda module to use srun 
+
+module purge                                     # unload every other environment to avoid conflict
+module use /projects/community/modulefiles                  # without this, I can't load 2024.06-ts840
+module load anaconda/2024.06-ts840 
+
+# Initialize Conda
+eval "$(conda shell.bash hook)"                  # Initialize Conda for SLURM environment
+
+conda activate gems_tco
+
+# Ensure skgstat module is installed
+python -c "import skgstat; print('skgstat module is installed')"             # print 'skgstat module is installed'  if skgstat is installed 
+
+# Verify environment variables and paths
+echo "PYTHONPATH: $PYTHONPATH"                                                      # Ensures your directoreis are set. 
+echo "Conda env: $(conda info --envs)"                                              # Lists your Conda environments and there should be * next to gems_tco because it is activated. 
+
+# Add the GEMS_TCO package directory to PYTHONPATH
+export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
+
+# Run the Python script using srun
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 0 --params 60 8.25 0.55 --resolution 0.4 --nugget 5 --mm_cond_number 30
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 0 --params 59 8.25 0.55 --resolution 0.4 --nugget 5 --mm_cond_number 30
+
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 1 --params 60 3.63 0.75 --resolution 0.4 --nugget 5 --mm_cond_number 30
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 1 --params 59 3.63 0.75 --resolution 0.4 --nugget 5 --mm_cond_number 30
+
+
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 3 --params 52 2.26 1.126 --resolution 0.4 --nugget 5 --mm_cond_number 30
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 3 --params 51 2.26 1.126 --resolution 0.4 --nugget 5 --mm_cond_number 30
+
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 4 --params 54 1.979 1.618 --resolution 0.4 --nugget 5 --mm_cond_number 30
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 4 --params 53 1.979 1.618 --resolution 0.4 --nugget 5 --mm_cond_number 30
+```
+
+sbatch full_vs_vecc1.sh
