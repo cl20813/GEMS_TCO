@@ -1,4 +1,6 @@
-# Full likelihood vs Vecchia approximation
+# Summary: Full likelihood vs Vecchia approximation
+When 1) used data_24_07_0130_N2530_E95110.csv, 2) data has same order, with 3) params 60 8.25 0.55 --resolution 0.4, full and vecchia were almost similar. 
+**** If use wrong parameters, so if we play around the wrong parameter space, there may be some discrepancy between likelihoods. 
 
 ### Update my packages
 scp -r "C:\Users\joonw\anaconda3\envs\jl2815\Lib\site-packages\GEMS_TCO" jl2815@amarel.rutgers.edu:/home/jl2815/tco
