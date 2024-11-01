@@ -57,18 +57,18 @@ echo "Conda env: $(conda info --envs)"                                          
 export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 
 # Run the Python script using srun
-srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 0 --params 60 8.25 0.55 --resolution 0.4 --nugget 5 --mm_cond_number 30
-srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 0 --params 59 8.25 0.55 --resolution 0.4 --nugget 5 --mm_cond_number 30
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 0 --params 60 8.25 0.55 5 --resolution 0.4  --mm_cond_number 30
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 0 --params 59 8.25 0.55 5 --resolution 0.4  --mm_cond_number 30
 
-srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 1 --params 60 3.63 0.75 --resolution 0.4 --nugget 5 --mm_cond_number 30
-srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 1 --params 59 3.63 0.75 --resolution 0.4 --nugget 5 --mm_cond_number 30
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 1 --params 60 3.63 0.75 5 --resolution 0.4  --mm_cond_number 30
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 1 --params 59 3.63 0.75 5 --resolution 0.4  --mm_cond_number 30
 
 
-srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 3 --params 52 2.26 1.126 --resolution 0.4 --nugget 5 --mm_cond_number 30
-srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 3 --params 51 2.26 1.126 --resolution 0.4 --nugget 5 --mm_cond_number 30
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 3 --params 52 2.26 1.126 5 --resolution 0.4 --mm_cond_number 30
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 3 --params 51 2.26 1.126 5 --resolution 0.4 --mm_cond_number 30
 
-srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 4 --params 54 1.979 1.618 --resolution 0.4 --nugget 5 --mm_cond_number 30
-srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 4 --params 53 1.979 1.618 --resolution 0.4 --nugget 5 --mm_cond_number 30
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 4 --params 54 1.979 1.618 5 --resolution 0.4 --mm_cond_number 30
+srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 4 --params 53 1.979 1.618 5 --resolution 0.4 --mm_cond_number 30
 ```
 
 sbatch full_vs_vecc1.sh
