@@ -49,6 +49,7 @@ SyntaxError: f-string: unmatched '['
 
 make '' to "" to match nested quotations. Use data["ColumnAmountO3"]
 
-
+# full vs vecchia likelihood discrepancy
+It happens when I reorder data for vecchia approximation. Obviously, the order affects the conditioning set.
 
 
