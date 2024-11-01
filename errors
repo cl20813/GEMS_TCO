@@ -44,6 +44,11 @@ use int or np.int64 instead
 conda list | grep scipy
 python -c "import scipy; print('scipy module is installed')"
 
+# print(f'Full likelihood using {params} is {neg_log_likelihood(params, data, data['ColumnAmountO3'] ) }')                                                                                   ^^^^^^^^^^^^^^
+SyntaxError: f-string: unmatched '['    
+
+make '' to "" to match nested quotations. Use data["ColumnAmountO3"]
+
 
 
 
