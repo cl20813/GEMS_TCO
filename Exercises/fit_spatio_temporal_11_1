@@ -11,8 +11,7 @@ ssh jl2815@amarel.rutgers.edu
 module use /projects/community/modulefiles            # # Ensure the module path is added. Without this, I can't load 2024.06-ts840
 module load anaconda/2024.06-ts840 
 conda activate gems_tco
-srun --cpus-per-task=32 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 1 --resolution 0.2 --params 60 8.25 0.55 1 5 --mm_cond_number 30 --nugget 5
-
+srun --cpus-per-task=32 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 1 --resolution 0.4 --params 100 100 100 100 100 0.8 --mm_cond_number 30 --nugget 5 --bounds 0.05 300
 ## sbatch 
 
 nano fit_st_model1.sh                  # open a new text editor
@@ -45,12 +44,16 @@ python -c "import skgstat; print('skgstat module is installed')"             # p
 echo "PYTHONPATH: $PYTHONPATH"                                                      # Ensures your directoreis are set. 
 echo "Conda env: $(conda info --envs)"                                              # Lists your Conda environments and there should be * next to gems_tco because it is activated. 
 
+echo 'fit_st_model1.sh resolution 0.4'
+
+
+
 # Add the GEMS_TCO package directory to PYTHONPATH
 export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 
 echo "fit non-separable spatio temporal model1"
 # Run the Python script
-srun python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 1 --resolution 0.4 --params 60 8.25 0.55 1 5 --mm_cond_number 30 --nugget 5
+srun python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 1 --resolution 0.4 --params 100 100 100 100 100 0.8 --mm_cond_number 30 --nugget 5 --bounds 0.05 300
 
 ```
 sbatch fit_st_model1.sh
