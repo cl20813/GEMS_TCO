@@ -11,7 +11,7 @@ ssh jl2815@amarel.rutgers.edu
 module use /projects/community/modulefiles            # # Ensure the module path is added. Without this, I can't load 2024.06-ts840
 module load anaconda/2024.06-ts840 
 conda activate gems_tco
-srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 1 --resolution 0.4 --params 60 8.25 0.55 1 5 --mm_cond_number 30 --nugget 5
+srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 1 --resolution 0.2 --params 60 8.25 0.55 1 5 --mm_cond_number 30 --nugget 5
 
 ## sbatch 
 
@@ -49,17 +49,9 @@ echo "Conda env: $(conda info --envs)"                                          
 export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 
 # Run the Python script
-srun python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 0 --resolution 0.4 --params 60 8.25 0.55 1 5 --mm_cond_number 30 --nugget 5
+srun python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 1 --resolution 0.2 --params 60 8.25 0.55 1 5 --mm_cond_number 30 --nugget 5
 
 ```
-sbatch fit_st_model1.sh
-
-# step 3 
-module use /projects/community/modulefiles 
-module load anaconda/2024.06-ts840
-conda activate gems_tco
-srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 0 --resolution 0.4 --params 60 8.25 0.55 1 5 --mm_cond_number 30 --nugget 5
-
 sbatch fit_st_model1.sh
 
 
@@ -116,15 +108,10 @@ echo "Conda env: $(conda info --envs)"                                          
 export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 
 # Run the Python script                # here key decides number of day I want to fit
-srun python /home/jl2815/tco/exercise/fit_spatio_temporal_11_small.py --key 1 --resolution 0.4 --params 60 8.25 0.55 1 5 --mm_cond_number 10 --nugget 5
+srun python /home/jl2815/tco/exercise/fit_spatio_temporal_11_small.py --key 1 --resolution 0.2 --params 60 8.25 0.55 1 5 --mm_cond_number 10 --nugget 5
 
 ```
 sbatch fit_st_model2.sh
 
-# step 3 
-module use /projects/community/modulefiles 
-module load anaconda/2024.06-ts840
-conda activate gems_tco
-srun python /home/jl2815/tco/exercise/fit_spatio_temporal_11_small.py --key 1 --resolution 0.4 --params 60 8.25 0.55 1 5 --mm_cond_number 10 --nugget 5
 
 
