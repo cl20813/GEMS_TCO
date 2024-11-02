@@ -48,6 +48,7 @@ echo "Conda env: $(conda info --envs)"                                          
 # Add the GEMS_TCO package directory to PYTHONPATH
 export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 
+echo "fit non-separable spatio temporal model1"
 # Run the Python script
 srun python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 1 --resolution 0.2 --params 60 8.25 0.55 1 5 --mm_cond_number 30 --nugget 5
 
@@ -107,6 +108,7 @@ echo "Conda env: $(conda info --envs)"                                          
 # Add the GEMS_TCO package directory to PYTHONPATH
 export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 
+echo "fit non-separable spatio temporal model2"
 # Run the Python script                # here key decides number of day I want to fit
 srun python /home/jl2815/tco/exercise/fit_spatio_temporal_11_small.py --key 1 --resolution 0.2 --params 60 8.25 0.55 1 5 --mm_cond_number 10 --nugget 5
 
