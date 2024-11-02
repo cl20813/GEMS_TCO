@@ -1,9 +1,10 @@
 
 ### copy ozone data and python file to Amarel HPC
+scp "C:\\Users\\joonw\\TCO\\data_engineering\\data_24_07_0130_N510_E110120.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N510_E110120
+scp "C:\Users\joonw\TCO\newpipeline\Exercises\full_vecchia_spatio_temporal.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise
 
-scp "C:\\Users\\joonw\\TCO\\data_engineering\\data_24_07_0130_N2530_E95100.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N2530_E95110
-
-scp "C:\Users\joonw\TCO\newpipeline\Exercises\fit_spatio_temporal_10_27.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise
+### Copy python from Amarel HPC to my computer
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py "C:\Users\joonw\TCO\newpipeline\Exercises"
 
 
 ### Quick run using srun
@@ -12,7 +13,8 @@ ssh jl2815@amarel.rutgers.edu
 module use /projects/community/modulefiles            # # Ensure the module path is added. Without this, I can't load 2024.06-ts840
 module load anaconda/2024.06-ts840 
 conda activate gems_tco
-srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --resolution 0.4 --smooth 0.5 --initial_params 0.5 0.5 0.5 0.5 --bounds 0.05 60 
+srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 60 8.25 0.55 5 --mm_cond_number 30
+
 
 
 ## sbatch 
@@ -27,7 +29,7 @@ nano st_model1.sh                  # open a new text editor
 #SBATCH --time=48:00:00                   # Maximum time (5 minutes)
 #SBATCH --ntasks=1                        # Number of tasks
 #SBATCH --cpus-per-task=16                 # Number of CPU cores per task
-#SBATCH --mem=200G                          # Memory per node
+#SBATCH --mem=100G                          # Memory per node
 #SBATCH --partition=main               # Partition to submit to
 
 # Load the Anaconda module to use srun 
@@ -53,7 +55,18 @@ export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 # Run the Python script
 srun python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --resolution 0.4 --smooth 0.5 --initial_params 0.5 0.5 0.5 0.5 --bounds 0.05 60 
 
-'''
+# Run the Python script using srun
+srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 60 8.25 0.55 5 --mm_cond_number 10
+srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 60 8.25 0.55 5 --mm_cond_number 10
+
+srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 1 --resolution 0.4 --params 20 8.25 0.55 5 --mm_cond_number 10
+srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 1 --resolution 0.4 --params 21 8.25 0.55 5 --mm_cond_number 10
+
+srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 3 --resolution 0.4 --params 40 8.25 0.55 5 --mm_cond_number 10
+srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 3 --resolution 0.4 --params 41 8.25 0.55 5 --mm_cond_number 10
+```
+
+
 
 # step 3 
 module use /projects/community/modulefiles 
