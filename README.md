@@ -11,16 +11,10 @@
 
 ## Exercise using Amarel Rutgers Cluster
 
-[Fit nugget parameter in a simple Matern Model using full averaged data](fit_nugget)
-
-In this example, we demonstrate how srun and sbatch work on Amarel HPC. 
-
 [Compare full likelihood vs Vecchia approximation, simple spatial model ](Exercises/full_vs_vecchia)                
-[Compare full likelihood vs Vecchia approximation, spatio-temporal model ](Exercises/full_vs_vecchia_spatio_temporal)            
-              
+[Compare full likelihood vs Vecchia approximation, spatio-temporal model ](Exercises/full_vs_vecchia_spatio_temporal)  
 
-
-Now, we can try fitting nugget parameter using entire dataset and Vecchia approximation.
+[Fit nugget parameter in a simple Matern Model using full averaged data](fit_nugget)           
 
 [Fitting nugget parameter in matern model using Vecchia approximation](Exercises/fitting_nugget_vecchia) 
 
