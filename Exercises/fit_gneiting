@@ -1,0 +1,58 @@
+### copy ozone data and python file to Amarel HPC
+scp "C:\\Users\\joonw\\TCO\\data_engineering\\data_24_07_0130_N510_E110120.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N510_E110120
+scp "C:\Users\joonw\TCO\newpipeline\Exercises\fit_st_gneiting.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise
+
+### Copy python from Amarel HPC to my computer
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise/fit_st_gneiting.py "C:\Users\joonw\TCO\newpipeline\Exercises"
+
+### Quick run using srun
+
+ssh jl2815@amarel.rutgers.edu
+module use /projects/community/modulefiles            # # Ensure the module path is added. Without this, I can't load 2024.06-ts840
+module load anaconda/2024.06-ts840 
+conda activate gems_tco
+srun --cpus-per-task=32 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/fit_st_gneiting.py --key 1 --resolution 0.4 --params 1 1 1 1 1 1 1 --mm_cond_number 30 --nugget 5 --bounds 0.05 600
+## sbatch 
+
+nano fit_st_gneiting.sh                  # open a new text editor
+
+'''
+#!/bin/bash
+#SBATCH --job-name=python_test_job        # Job name
+#SBATCH --output=/home/jl2815/GEMS/output_%j.out            # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/GEMS/error_%j.err              # Standard error file (%j = JobID)
+#SBATCH --time=72:00:00                   # Maximum time 
+#SBATCH --ntasks=1                        # Number of tasks
+#SBATCH --cpus-per-task=32                 # Number of CPU cores per task
+#SBATCH --mem=200G                          # Memory per node
+#SBATCH --partition=main               # Partition to submit to
+
+# Load the Anaconda module to use srun 
+
+module purge                                     # unload every other environment to avoid conflict
+module use /projects/community/modulefiles                  # without this, I can't load 2024.06-ts840
+module load anaconda/2024.06-ts840 
+
+# Initialize Conda
+eval "$(conda shell.bash hook)"                  # Initialize Conda for SLURM environment
+conda activate gems_tco
+
+# Ensure skgstat module is installed
+python -c "import skgstat; print('skgstat module is installed')"             # print 'skgstat module is installed'  if skgstat is installed 
+
+# Verify environment variables and paths
+echo "PYTHONPATH: $PYTHONPATH"                                                      # Ensures your directoreis are set. 
+echo "Conda env: $(conda info --envs)"                                              # Lists your Conda environments and there should be * next to gems_tco because it is activated. 
+
+echo 'fit_st_gneiting.sh --key 1 --resolution 0.4 --params 1 1 1 1 1 1 1 --mm_cond_number 30 --nugget 5 --bounds 0.05 300'
+
+
+# Add the GEMS_TCO package directory to PYTHONPATH
+export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
+
+echo "fit non-separable spatio temporal model1"
+# Run the Python script
+srun python /home/jl2815/tco/exercise/fit_st_gneiting.py --key 1 --resolution 0.4 --params 1 1 1 1 1 1 1 --mm_cond_number 30 --nugget 5 --bounds 0.05 300
+```
+
+sbatch fit_st_gneiting.sh
