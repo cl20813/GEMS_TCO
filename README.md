@@ -26,7 +26,7 @@ Now, we can try fitting nugget parameter using entire dataset and Vecchia approx
 
 [Fit scale, range, smooth in matern model using Vecchia](Exercises/fit_matern)
 
-[Fit spatio-temporal model](Exercises/fit_spatio_temporal_11_1) 
+[Fit non separable spatio-temporal model](Exercises/fit_spatio_temporal_11_1) 
 
 
 
