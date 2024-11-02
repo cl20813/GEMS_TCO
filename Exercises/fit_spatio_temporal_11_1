@@ -11,7 +11,7 @@ ssh jl2815@amarel.rutgers.edu
 module use /projects/community/modulefiles            # # Ensure the module path is added. Without this, I can't load 2024.06-ts840
 module load anaconda/2024.06-ts840 
 conda activate gems_tco
-srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 1 --resolution 0.2 --params 60 8.25 0.55 1 5 --mm_cond_number 30 --nugget 5
+srun --cpus-per-task=32 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 1 --resolution 0.2 --params 60 8.25 0.55 1 5 --mm_cond_number 30 --nugget 5
 
 ## sbatch 
 
@@ -22,9 +22,9 @@ nano fit_st_model1.sh                  # open a new text editor
 #SBATCH --job-name=python_test_job        # Job name
 #SBATCH --output=/home/jl2815/GEMS/output_%j.out            # Standard output file (%j = JobID)
 #SBATCH --error=/home/jl2815/GEMS/error_%j.err              # Standard error file (%j = JobID)
-#SBATCH --time=48:00:00                   # Maximum time 
+#SBATCH --time=72:00:00                   # Maximum time 
 #SBATCH --ntasks=1                        # Number of tasks
-#SBATCH --cpus-per-task=16                 # Number of CPU cores per task
+#SBATCH --cpus-per-task=32                 # Number of CPU cores per task
 #SBATCH --mem=100G                          # Memory per node
 #SBATCH --partition=main               # Partition to submit to
 
@@ -50,7 +50,7 @@ export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 
 echo "fit non-separable spatio temporal model1"
 # Run the Python script
-srun python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 1 --resolution 0.2 --params 60 8.25 0.55 1 5 --mm_cond_number 30 --nugget 5
+srun python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 1 --resolution 0.4 --params 60 8.25 0.55 1 5 --mm_cond_number 30 --nugget 5
 
 ```
 sbatch fit_st_model1.sh
