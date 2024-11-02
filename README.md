@@ -15,7 +15,6 @@
 [Compare full likelihood vs Vecchia approximation, spatio-temporal model ](Exercises/full_vs_vecchia_spatio_temporal)  
 
 [Fit nugget parameter in a simple Matern Model using full averaged data](fit_nugget)           
-
 [Fitting nugget parameter in matern model using Vecchia approximation](Exercises/fitting_nugget_vecchia) 
 
 [Fit scale, range, smooth in matern model using Vecchia](Exercises/fit_matern)
