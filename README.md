@@ -11,7 +11,7 @@
 
 ## Exercise using Amarel Rutgers Cluster
 
-[Fit nugget parameter in a simple Matern Model using sparse data](fit_nugget)
+[Fit nugget parameter in a simple Matern Model using full averaged data](fit_nugget)
 
 In this example, we demonstrate how srun and sbatch work on Amarel HPC. 
 
