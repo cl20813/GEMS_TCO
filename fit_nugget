@@ -7,10 +7,15 @@ conda activate gems_tco
 srun --cpus-per-task=5 --mem=8G --time=00:05:00 python /home/jl2815/GEMS/fit_nuggets.py            # default memory doesnt work!
 ------------------------------------------------------------------------------------------------------------------------------------------------
 
+
 ### Test sbatch (worked on 2024-10-05 but I need to connect anaconda and my environment first)
 
 # Step 1: Copy the file I want to run
 scp "C:\Users\joonw\TCO\newpipeline\fit_nuggets.py" jl2815@amarel.rutgers.edu:/home/jl2815/GEMS
+
+### Copy python from Amarel HPC to my computer
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise/fit_nuggets.py "C:\Users\joonw\TCO\newpipeline\Exercises"
+
 
 # step 2: Create the Slurm Batch Script
 ssh jl2815@amarel.rutgers.edu   # Now log back to amarel
