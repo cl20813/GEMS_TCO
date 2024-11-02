@@ -22,9 +22,9 @@ In this example, we demonstrate how srun and sbatch work on Amarel HPC.
 
 Now, we can try fitting nugget parameter using entire dataset and Vecchia approximation.
 
-[Fitting nugget parameter using Vecchia approximation](Exercises/fitting_nugget_vecchia) 
+[Fitting nugget parameter in matern model using Vecchia approximation](Exercises/fitting_nugget_vecchia) 
 
-[Fit matern using Vecchia](Exercises/fit_matern)
+[Fit scale, range, smooth in matern model using Vecchia](Exercises/fit_matern)
 
 [Fit spatio-temporal model](Exercises/fit_spatio_temporal_11_1) 
 
