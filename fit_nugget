@@ -14,7 +14,10 @@ srun --cpus-per-task=5 --mem=8G --time=00:05:00 python /home/jl2815/GEMS/fit_nug
 scp "C:\Users\joonw\TCO\newpipeline\fit_nuggets.py" jl2815@amarel.rutgers.edu:/home/jl2815/GEMS
 
 ### Copy python from Amarel HPC to my computer
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise/fit_nuggets.py "C:\Users\joonw\TCO\newpipeline\Exercises"
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise/fit_nuggets_04.py "C:\Users\joonw\TCO\newpipeline\Exercises"
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise/fit_nuggets_ori.py "C:\Users\joonw\TCO\newpipeline\Exercises"
+
+
 
 
 # step 2: Create the Slurm Batch Script
