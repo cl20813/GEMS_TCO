@@ -1,3 +1,11 @@
+# sbatch preempted:
+add this line into nano file:
+sacct --units=G --format=MaxRSS,MaxDiskRead,MaxDiskWrite,Elapsed,NodeList -j $SLURM_JOBID
+It will capture the peak RAM usage and some other useful info about your job
+
+Also you can use:
+sstat --format=MaxRSS,MaxDiskRead,MaxDiskWrite -j 39534244
+
 # Cannot find GEMS_TCO package
 
 when using sbatch, I need to add sys.path.append("/cache/home/jl2815/tco/") in .py file otherwise it cannot read GEMS package
