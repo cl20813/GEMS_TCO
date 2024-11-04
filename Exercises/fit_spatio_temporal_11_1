@@ -23,11 +23,11 @@ conda activate gems_tco
 srun --cpus-per-task=32 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 1 --resolution 0.4 --params 100 100 100 100 0.8 --mm_cond_number 30 --nugget 5 --bounds 0.05 300
 ## sbatch 
 
-nano fit_st_model1.sh                  # open a new text editor
+nano fit_st_model_res0.2.sh                  # open a new text editor
 
 '''
 #!/bin/bash
-#SBATCH --job-name=fit_st_res0.2        # Job name
+#SBATCH --job-name=st_r02        # Job name
 #SBATCH --output=/home/jl2815/GEMS/fit_spatio_temporal_output_%j.out            # Standard output file (%j = JobID)
 #SBATCH --error=/home/jl2815/GEMS/fit_spatio_temporal_error_%j.err              # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                   # Maximum time 
@@ -53,6 +53,8 @@ echo "PYTHONPATH: $PYTHONPATH"                                                  
 echo "Conda env: $(conda info --envs)"                                              # Lists your Conda environments and there should be * next to gems_tco because it is activated. 
 echo 'fit_st_model1.sh --key 5 --resolution 0.2 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 30 --nugget 5 --bounds 0.05 600'
 
+export OMP_NUM_THREADS=1
+
 # Run the Python script
 srun python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 5 --resolution 0.2 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 30 --nugget 5 --bounds 0.05 600
 # Store the job ID in a variable
@@ -60,8 +62,9 @@ JOBID=$SLURM_JOBID
 
 # Run sacct to get resource usage details
 sacct --units=G --format=MaxRSS,MaxDiskRead,MaxDiskWrite,Elapsed,NodeList -j $JOBID
+
 ```
-sbatch fit_st_model1.sh
+sbatch fit_st_model_res0.2.sh
 
 
 ---------------------------------------------------------------------------------------
@@ -70,7 +73,7 @@ nano fit_st_model_res0.4.sh                  # open a new text editor
 
 '''
 #!/bin/bash
-#SBATCH --job-name=fit_st_res0.4        # Job name
+#SBATCH --job-name=st_r04        # Job name
 #SBATCH --output=/home/jl2815/GEMS/fit_st_res0.4_output_%j.out            # Standard output file (%j = JobID)
 #SBATCH --error=/home/jl2815/GEMS/fit_st_res0.4_error_%j.err              # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                   # Maximum time 
@@ -96,13 +99,16 @@ echo "PYTHONPATH: $PYTHONPATH"                                                  
 echo "Conda env: $(conda info --envs)"                                              # Lists your Conda environments and there should be * next to gems_tco because it is activated. 
 echo 'fit_st_model_res0.4.sh --key 5 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 5 --bounds 0.05 600'
 
+export OMP_NUM_THREADS=1
 # Run the Python script
 srun python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 5 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 5 --bounds 0.05 600
+
 # Store the job ID in a variable
 JOBID=$SLURM_JOBID
 
 # Run sacct to get resource usage details
 sacct --units=G --format=MaxRSS,MaxDiskRead,MaxDiskWrite,Elapsed,NodeList -j $JOBID
+
 ```
 sbatch fit_st_model_res0.4.sh  
 
