@@ -3,6 +3,8 @@
 
 [Common errors](errors)  
 
+[Amrel_guide](Amrel_guide)
+
 ## Set up
 
 [Copy dataset to Amarel HPC](copy_gemsdata_to_amarel)
