@@ -1,3 +1,6 @@
+# Ensure skgstat module is installed
+python -c "import skgstat; print('skgstat module is installed')"             # print 'skgstat module is installed'  if skgstat is installed 
+
 # sbatch preempted:
 add this line into nano file:
 sacct --units=G --format=MaxRSS,MaxDiskRead,MaxDiskWrite,Elapsed,NodeList -j $SLURM_JOBID
