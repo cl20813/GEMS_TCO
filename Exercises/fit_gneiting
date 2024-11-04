@@ -14,11 +14,11 @@ conda activate gems_tco
 srun --cpus-per-task=32 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/fit_st_gneiting.py --key 1 --resolution 0.4 --params 1 1 1 1 1 1 1 --mm_cond_number 30 --nugget 5 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
 ## sbatch 
 
-nano fit_st_gneiting.sh                  # open a new text editor
+nano fit_st_gne_res0.2.sh                  # open a new text editor
 
 '''
 #!/bin/bash
-#SBATCH --job-name= fit_gne0.4        # Job name                                
+#SBATCH --job-name=fit_gne0.2        # Job name                                
 #SBATCH --output=/home/jl2815/GEMS/fit_st_gneiting_output_%j.out            # Standard output file (%j = JobID)
 #SBATCH --error=/home/jl2815/GEMS/fit_st_gneiting_error_%j.err              # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                   # Maximum time
@@ -42,7 +42,7 @@ conda activate gems_tco
 echo "PYTHONPATH: $PYTHONPATH"                                                      # Ensures your directoreis are set. 
 echo "Conda env: $(conda info --envs)"                                              # Lists your Conda environments and there should be * next to gems_tco because it is activated. 
 
-echo 'fit_st_gneiting.sh --key 1 --resolution 0.4 --params 1 1 1 1 1 1 1 --mm_cond_number 30 --nugget 5 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1'
+echo 'fit_st_gne_res0.2.sh --key 5 --resolution 0.2 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --nugget 5 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1'
 
 
 # Add the GEMS_TCO package directory to PYTHONPATH
@@ -53,14 +53,72 @@ echo "fit non-separable gneiting model1"
 export OMP_NUM_THREADS=1
 
 # Run the Python script
-srun python /home/jl2815/tco/exercise/fit_st_gneiting.py --key 1 --resolution 0.4 --params 1 1 1 1 1 1 1 --mm_cond_number 30 --nugget 5 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
+srun python /home/jl2815/tco/exercise/fit_st_gneiting.py --key 5 --resolution 0.2 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --nugget 5 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
 
 # Store the job ID in a variable
 JOBID=$SLURM_JOBID
 
 # Run sacct to get resource usage details
 sacct --units=G --format=MaxRSS,MaxDiskRead,MaxDiskWrite,Elapsed,NodeList -j $JOBID
-
 ```
+sbatch fit_st_gne_res0.2.sh
 
-sbatch fit_st_gneiting.sh
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+nano fit_st_gne_res0.4.sh                  # open a new text editor
+
+'''
+#!/bin/bash
+#SBATCH --job-name=fit_gne0.4        # Job name                                
+#SBATCH --output=/home/jl2815/GEMS/fit_st_gneiting_output_%j.out            # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/GEMS/fit_st_gneiting_error_%j.err              # Standard error file (%j = JobID)
+#SBATCH --time=72:00:00                   # Maximum time
+#SBATCH --ntasks=1                        # Number of tasks
+#SBATCH --cpus-per-task=32                 # Number of CPU cores per task
+#SBATCH --mem=500G                          # Memory per node
+#SBATCH --partition=mem               # Partition to submit to        
+
+
+# Load the Anaconda module to use srun 
+
+module purge                                     # unload every other environment to avoid conflict
+module use /projects/community/modulefiles                  # without this, I can't load 2024.06-ts840
+module load anaconda/2024.06-ts840 
+
+# Initialize Conda
+eval "$(conda shell.bash hook)"                  # Initialize Conda for SLURM environment
+conda activate gems_tco
+
+# Verify environment variables and paths
+echo "PYTHONPATH: $PYTHONPATH"                                                      # Ensures your directoreis are set. 
+echo "Conda env: $(conda info --envs)"                                              # Lists your Conda environments and there should be * next to gems_tco because it is activated. 
+
+echo 'fit_st_gne_res0.4.sh   --key 5 --resolution 0.4 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --nugget 5 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1'
+
+
+# Add the GEMS_TCO package directory to PYTHONPATH
+export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
+
+echo "fit non-separable gneiting model1"
+
+export OMP_NUM_THREADS=1
+
+# Run the Python script
+srun python /home/jl2815/tco/exercise/fit_st_gneiting.py --key 5 --resolution 0.4 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --nugget 5 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
+
+# Store the job ID in a variable
+JOBID=$SLURM_JOBID
+
+# Run sacct to get resource usage details
+sacct --units=G --format=MaxRSS,MaxDiskRead,MaxDiskWrite,Elapsed,NodeList -j $JOBID
+```
+sbatch fit_st_gne_res0.4.sh  
+
