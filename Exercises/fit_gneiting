@@ -48,7 +48,7 @@ echo 'fit_st_gneiting.sh --key 1 --resolution 0.4 --params 1 1 1 1 1 1 1 --mm_co
 # Add the GEMS_TCO package directory to PYTHONPATH
 export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 
-echo "fit non-separable spatio temporal model1"
+echo "fit non-separable gneiting model1"
 
 export OMP_NUM_THREADS=1
 
