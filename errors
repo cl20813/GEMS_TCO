@@ -1,3 +1,8 @@
+Even though export OMP_NUM_THREADS=1 showed "command not found", the rest of your code continues to run. But to ensure proper thread control, you can add this line directly in your Python script:
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+
+
 # Ensure skgstat module is installed
 python -c "import skgstat; print('skgstat module is installed')"             # print 'skgstat module is installed'  if skgstat is installed 
 
