@@ -18,14 +18,15 @@ nano fit_st_gneiting.sh                  # open a new text editor
 
 '''
 #!/bin/bash
-#SBATCH --job-name=python_test_job        # Job name
-#SBATCH --output=/home/jl2815/GEMS/output_%j.out            # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/GEMS/error_%j.err              # Standard error file (%j = JobID)
-#SBATCH --time=72:00:00                   # Maximum time 
+#SBATCH --job-name= fit_st_gneiting        # Job name                                
+#SBATCH --output=/home/jl2815/GEMS/fit_st_gneiting_output_%j.out            # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/GEMS/fit_st_gneiting_error_%j.err              # Standard error file (%j = JobID)
+#SBATCH --time=72:00:00                   # Maximum time
 #SBATCH --ntasks=1                        # Number of tasks
 #SBATCH --cpus-per-task=32                 # Number of CPU cores per task
-#SBATCH --mem=200G                          # Memory per node
-#SBATCH --partition=main               # Partition to submit to
+#SBATCH --mem=500G                          # Memory per node
+#SBATCH --partition=mem               # Partition to submit to        
+
 
 # Load the Anaconda module to use srun 
 
@@ -36,9 +37,6 @@ module load anaconda/2024.06-ts840
 # Initialize Conda
 eval "$(conda shell.bash hook)"                  # Initialize Conda for SLURM environment
 conda activate gems_tco
-
-# Ensure skgstat module is installed
-python -c "import skgstat; print('skgstat module is installed')"             # print 'skgstat module is installed'  if skgstat is installed 
 
 # Verify environment variables and paths
 echo "PYTHONPATH: $PYTHONPATH"                                                      # Ensures your directoreis are set. 
@@ -51,8 +49,18 @@ echo 'fit_st_gneiting.sh --key 1 --resolution 0.4 --params 1 1 1 1 1 1 1 --mm_co
 export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 
 echo "fit non-separable spatio temporal model1"
+
+export OMP_NUM_THREADS=1
+
 # Run the Python script
 srun python /home/jl2815/tco/exercise/fit_st_gneiting.py --key 1 --resolution 0.4 --params 1 1 1 1 1 1 1 --mm_cond_number 30 --nugget 5 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
+
+# Store the job ID in a variable
+JOBID=$SLURM_JOBID
+
+# Run sacct to get resource usage details
+sacct --units=G --format=MaxRSS,MaxDiskRead,MaxDiskWrite,Elapsed,NodeList -j $JOBID
+
 ```
 
 sbatch fit_st_gneiting.sh
