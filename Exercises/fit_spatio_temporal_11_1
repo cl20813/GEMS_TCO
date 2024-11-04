@@ -1,3 +1,12 @@
+log:
+resolution 0.4 day 1 estimates : 300 8.92 7.6 8.923 0.1456  bounds on 0.05,300
+Another resolution not known
+day3: 100 28 100 100 0.8055 bounds on 0.05 100   
+day2: 100 80.53 100 100 0.1756 bounds on 0.05 100   
+day1: 100 100 100 100 0.15679 bounds on 0.05 100    
+Another resolution not known
+day1 100 100 100 100 0.12644857 bounds on 0.05 100
+
 ### copy ozone data and python file to Amarel HPC
 scp "C:\\Users\\joonw\\TCO\\data_engineering\\data_24_07_0130_N510_E110120.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N510_E110120
 scp "C:\Users\joonw\TCO\newpipeline\Exercises\fit_spatio_temporal_10_27.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise
