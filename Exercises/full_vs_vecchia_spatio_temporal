@@ -13,22 +13,22 @@ ssh jl2815@amarel.rutgers.edu
 module use /projects/community/modulefiles            # # Ensure the module path is added. Without this, I can't load 2024.06-ts840
 module load anaconda/2024.06-ts840 
 conda activate gems_tco
-srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 60 8.25 0.55 5 --mm_cond_number 10
+srun --cpus-per-task=32 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 5 --bounds 0.05 400
 
 
 
 ## sbatch 
 
-nano st_model1.sh                  # open a new text editor
+nano st_full_vs_vecc.sh                  # open a new text editor
 
 '''
 #!/bin/bash
-#SBATCH --job-name=python_test_job        # Job name
-#SBATCH --output=/home/jl2815/GEMS/output_%j.out            # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/GEMS/error_%j.err              # Standard error file (%j = JobID)
+#SBATCH --job-name=ful_vec        # Job name
+#SBATCH --output=/home/jl2815/GEMS/ful_vec_output_%j.out            # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/GEMS/ful_vec_error_%j.err              # Standard error file (%j = JobID)
 #SBATCH --time=48:00:00                   # Maximum time (5 minutes)
 #SBATCH --ntasks=1                        # Number of tasks
-#SBATCH --cpus-per-task=16                 # Number of CPU cores per task
+#SBATCH --cpus-per-task=32                 # Number of CPU cores per task
 #SBATCH --mem=100G                          # Memory per node
 #SBATCH --partition=main               # Partition to submit to
 
@@ -41,36 +41,34 @@ module load anaconda/2024.06-ts840
 # Initialize Conda
 eval "$(conda shell.bash hook)"                  # Initialize Conda for SLURM environment
 conda activate gems_tco
+# Add the GEMS_TCO package directory to PYTHONPATH
+export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 
-# Ensure skgstat module is installed
-python -c "import skgstat; print('skgstat module is installed')"             # print 'skgstat module is installed'  if skgstat is installed 
 
 # Verify environment variables and paths
 echo "PYTHONPATH: $PYTHONPATH"                                                      # Ensures your directoreis are set. 
 echo "Conda env: $(conda info --envs)"                                              # Lists your Conda environments and there should be * next to gems_tco because it is activated. 
+echo 'full_Vs_vecchia --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 30 --nugget 5 --bounds 0.05 600'
 
-# Add the GEMS_TCO package directory to PYTHONPATH
-export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
-
-# Run the Python script
-srun python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --resolution 0.4 --smooth 0.5 --initial_params 0.5 0.5 0.5 0.5 --bounds 0.05 60 
 
 # Run the Python script using srun
-srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 60 8.25 0.55 5 --mm_cond_number 10
-srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 60 8.25 0.55 5 --mm_cond_number 10
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 40 --nugget 5 
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 299 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 5 
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 0 
 
-srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 1 --resolution 0.4 --params 20 8.25 0.55 5 --mm_cond_number 10
-srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 1 --resolution 0.4 --params 21 8.25 0.55 5 --mm_cond_number 10
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.2 --params 100 100 100 100 0.15679 --mm_cond_number 20 --nugget 5 
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.2 --params 99 100 100 100 0.15679 --mm_cond_number 20 --nugget 5 
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.2 --params 100 100 100 100 0.15679 --mm_cond_number 20 --nugget 0
 
-srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 3 --resolution 0.4 --params 40 8.25 0.55 5 --mm_cond_number 10
-srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 3 --resolution 0.4 --params 41 8.25 0.55 5 --mm_cond_number 10
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 2 --resolution 0.4 --params 100 28 100 100 0.8055 --mm_cond_number 40 --nugget 5 
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 2 --resolution 0.4 --params 100 28 100 100 0.8055 --mm_cond_number 20 --nugget 5 
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 2 --resolution 0.4 --params 100 28 100 100 0.8055 --mm_cond_number 20 --nugget 0 
+
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 2 --resolution 0.2 --params 100 28 100 100 0.8055 --mm_cond_number 20 --nugget 5 
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 2 --resolution 0.2 --params 100 28 100 100 0.8055 --mm_cond_number 20 --nugget 5 
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 2 --resolution 0.2 --params 100 28 100 100 0.8055 --mm_cond_number 20 --nugget 0
+
 ```
+sbatch st_full_vs_vecc.sh
 
 
-
-# step 3 
-module use /projects/community/modulefiles 
-module load anaconda/2024.06-ts840
-conda activate gems_tco
-
-sbatch st_model1.sh     
