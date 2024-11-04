@@ -18,7 +18,7 @@ nano fit_st_gne_res0.2.sh                  # open a new text editor
 
 '''
 #!/bin/bash
-#SBATCH --job-name=gne0.2        # Job name                                
+#SBATCH --job-name=gne02        # Job name                                
 #SBATCH --output=/home/jl2815/GEMS/fit_st_gneiting_output_%j.out            # Standard output file (%j = JobID)
 #SBATCH --error=/home/jl2815/GEMS/fit_st_gneiting_error_%j.err              # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                   # Maximum time
@@ -77,7 +77,7 @@ nano fit_st_gne_res0.4.sh                  # open a new text editor
 
 '''
 #!/bin/bash
-#SBATCH --job-name=gne0.4        # Job name                                
+#SBATCH --job-name=gne04        # Job name                                
 #SBATCH --output=/home/jl2815/GEMS/fit_st_gneiting_output_%j.out            # Standard output file (%j = JobID)
 #SBATCH --error=/home/jl2815/GEMS/fit_st_gneiting_error_%j.err              # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                   # Maximum time
