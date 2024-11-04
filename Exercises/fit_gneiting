@@ -18,7 +18,7 @@ nano fit_st_gneiting.sh                  # open a new text editor
 
 '''
 #!/bin/bash
-#SBATCH --job-name= fit_st_gneiting        # Job name                                
+#SBATCH --job-name= fit_gne0.4        # Job name                                
 #SBATCH --output=/home/jl2815/GEMS/fit_st_gneiting_output_%j.out            # Standard output file (%j = JobID)
 #SBATCH --error=/home/jl2815/GEMS/fit_st_gneiting_error_%j.err              # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                   # Maximum time
