@@ -52,9 +52,15 @@ echo 'full_Vs_vecchia --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.145
 
 
 # Run the Python script using srun
-srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 40 --nugget 5 
-srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 299 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 5 
-srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 0 
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 100
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 125
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 150
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 175
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 200
+
+```
+
+
 
 srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.2 --params 100 100 100 100 0.15679 --mm_cond_number 20 --nugget 5 
 srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.2 --params 99 100 100 100 0.15679 --mm_cond_number 20 --nugget 5 
@@ -68,7 +74,6 @@ srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 2 --
 srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 2 --resolution 0.2 --params 100 28 100 100 0.8055 --mm_cond_number 20 --nugget 5 
 srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 2 --resolution 0.2 --params 100 28 100 100 0.8055 --mm_cond_number 20 --nugget 0
 
-```
 sbatch st_full_vs_vecc.sh
 
 
