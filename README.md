@@ -5,6 +5,9 @@
 
 [Amrel_guide](Amrel_guide)
 
+[Domian knowledge](references_domain_knowledge)
+
+
 ## Set up
 
 [Copy dataset to Amarel HPC](copy_gemsdata_to_amarel)
