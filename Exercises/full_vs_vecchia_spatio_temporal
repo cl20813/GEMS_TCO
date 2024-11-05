@@ -52,11 +52,18 @@ echo 'full_Vs_vecchia --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.145
 
 
 # Run the Python script using srun
-srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 100
-srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 125
-srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 150
-srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 175
-srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 0 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 200
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 3 --resolution 0.4 --params 0.05 300 100 100 0.1 --mm_cond_number 20 --nugget 60
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 3 --resolution 0.4 --params 1.05 100 100 0.1 --mm_cond_number 20 --nugget 60
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 3 --resolution 0.4 --params 1.05 100 100 0.5 --mm_cond_number 20 --nugget 60
+
+
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 4 --resolution 0.4 --params 300 84.19 86.93 95.58 0.1161 --mm_cond_number 20 --nugget 60
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 4 --resolution 0.4 --params 299 84.19 86.93 95.58 0.1161 --mm_cond_number 20 --nugget 60
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 4 --resolution 0.4 --params 299 84.19 86.93 95.58 0.5 --mm_cond_number 20 --nugget 60
+
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 4 --resolution 0.4 --params 400 384 491 426 0.0757 --mm_cond_number 20 --nugget 60
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 4 --resolution 0.4 --params 399 384 491 426 0.0757 --mm_cond_number 20 --nugget 60
+srun python /home/jl2815/tco/exercise/full_vecchia_spatio_temporal.py --key 4 --resolution 0.4 --params 399 384 491 426 0.5 --mm_cond_number 20 --nugget 60
 
 ```
 
