@@ -1,6 +1,7 @@
 Even though export OMP_NUM_THREADS=1 showed "command not found", the rest of your code continues to run. But to ensure proper thread control, you can add this line directly in your Python script:
-import os
-os.environ["OMP_NUM_THREADS"] = "1"
+
+To see the error, do   cat -v fit_st_model_res0.2.sh to see the added hidden characters when I copy paste the line. Remove it and re-type it wihtout copy-paste.
+
 
 
 # Ensure skgstat module is installed
