@@ -1,6 +1,6 @@
 ### copy ozone data and python file to Amarel HPC
 scp "C:\\Users\\joonw\\TCO\\data_engineering\\data_24_07_0130_N510_E110120.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N510_E110120
-scp "C:\Users\joonw\TCO\newpipeline\Exercises\full_vecchia_spatio_temporal.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise
+scp "C:\Users\joonw\TCO\newpipeline\Exercises\full_vecchia_gneiting.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise
 
 ### Copy python from Amarel HPC to my computer
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise/full_vecchia_gneiting.py "C:\Users\joonw\TCO\newpipeline\Exercises"
