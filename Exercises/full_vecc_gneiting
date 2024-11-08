@@ -39,7 +39,7 @@ echo "Conda env: $(conda info --envs)"                                          
 
 # Run the Python script using srun
 
-srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 0 --resolution 0.4 --params 0.231 2.299 1.523 0.457 0.538 43.32 0--mm_cond_number 30 --nugget 60
+srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 0 --resolution 0.4 --params 0.231 2.299 1.523 0.457 0.538 43.32 0 --mm_cond_number 30 --nugget 60
 
 srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 1 --resolution 0.4 --params 0.05 0.05 1.5 1 0.315 220 0 --mm_cond_number 30 --nugget 60
 
