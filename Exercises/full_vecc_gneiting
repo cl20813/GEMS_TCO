@@ -45,3 +45,5 @@ srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 1 --resolut
 
 srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 2 --resolution 0.4 --params 0.05 0.055 1.5 1 0.0827 97.5 0 -mm_cond_number 30 --nugget 60
 ```
+
+sbatch full_vs_vecc_gneit04.sh
