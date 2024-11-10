@@ -43,7 +43,7 @@ echo "PYTHONPATH: $PYTHONPATH"                                                  
 echo "Conda env: $(conda info --envs)"                                              # Lists your Conda environments and there should be * next to gems_tco because it is activated. 
 
 echo 'fit_st_gne_res0.2.sh --key 5 --resolution 0.2 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --nugget 5 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1'
-
+echo "Current date and time: $(date)"
 
 # Add the GEMS_TCO package directory to PYTHONPATH
 export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
@@ -104,6 +104,7 @@ echo "Conda env: $(conda info --envs)"                                          
 export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 
 echo 'fit_st_gne_res0.4.sh   --key 5 --resolution 0.4 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --nugget 5 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1'
+echo "Current date and time: $(date)"
 
 export OMP_NUM_THREADS=1
 
