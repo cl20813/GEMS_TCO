@@ -12,8 +12,8 @@ nano full_vs_vecc_gneit04.sh                  # open a new text editor
 '''
 #!/bin/bash
 #SBATCH --job-name=fv04_gne       # Job name
-#SBATCH --output=/home/jl2815/GEMS/ful_vec_output_%j.out            # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/GEMS/ful_vec_error_%j.err              # Standard error file (%j = JobID)
+#SBATCH --output=/home/jl2815/GEMS/fv04_gne_output_%j.out            # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/GEMS/fv04_gne_error_%j.err              # Standard error file (%j = JobID)
 #SBATCH --time=48:00:00                   # Maximum time (5 minutes)
 #SBATCH --ntasks=1                        # Number of tasks
 #SBATCH --cpus-per-task=32                 # Number of CPU cores per task
@@ -39,11 +39,20 @@ echo "Conda env: $(conda info --envs)"                                          
 
 # Run the Python script using srun
 
-srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 0 --resolution 0.4 --params 0.231 2.299 1.523 0.457 0.538 43.32 0 --mm_cond_number 30 --nugget 60
+srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 0 --resolution 0.4 --params 8.8038 0.1463 2.8719 0 0.9927 206.68 0.9901 0 --mm_cond_number 20 --nugget 40
+srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 0 --resolution 0.4 --params 8.8038 0.1463 2.8719 0 0.9927 205.68 0.9901 0 --mm_cond_number 20 --nugget 40
 
-srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 1 --resolution 0.4 --params 0.05 0.05 1.5 1 0.315 220 0 --mm_cond_number 30 --nugget 60
+srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 1 --resolution 0.4 --params 7.904 0.005 1.5 0 1 136.85 1 --mm_cond_number 20 --nugget 40
+srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 1 --resolution 0.4 --params 7.904 0.005 1.5 0 1 135.85 1 --mm_cond_number 20 --nugget 40
 
-srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 2 --resolution 0.4 --params 0.05 0.055 1.5 1 0.0827 97.5 0 -mm_cond_number 30 --nugget 60
+srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 2 --resolution 0.4 --params 8.879 0.5175 2.6415 0 0.9854 178.41 0.947 -mm_cond_number 20 --nugget 40
+srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 2 --resolution 0.4 --params 8.879 0.5175 2.6415 0 0.9854 177.41 0.947 -mm_cond_number 20 --nugget 40
+
+srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 3 --resolution 0.4 --params 8.195 0.515 2.102 0 1 48.05 0.9468 -mm_cond_number 20 --nugget 40
+srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 3 --resolution 0.4 --params 8.195 0.515 2.102 0 1 47.05 0.9468 -mm_cond_number 20 --nugget 40
+
+srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 4 --resolution 0.4 --params 3.8446 0.05 2.19097 0 0.910 26.9011 1 -mm_cond_number 20 --nugget 40
+srun python /home/jl2815/tco/exercise/full_vecchia_gneiting.py --key 4 --resolution 0.4 --params 3.8446 0.05 2.19097 0 0.910 25.9011 1 -mm_cond_number 20 --nugget 40
 ```
 
 sbatch full_vs_vecc_gneit04.sh
