@@ -53,15 +53,14 @@ conda activate gems_tco
 # Add the GEMS_TCO package directory to PYTHONPATH
 export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 
-# Verify environment variables and paths
-echo "PYTHONPATH: $PYTHONPATH"                                                      # Ensures your directoreis are set. 
-echo "Conda env: $(conda info --envs)"                                              # Lists your Conda environments and there should be * next to gems_tco because it is activated. 
-echo "fit_st_resolution 0.2 --key 1 --resolution 0.2 2024-11-04"
+#
 echo "Current date and time: $(date)"
 # export OMP_NUM_THREADS=1
 
 # Run the Python script
+echo "--key 5 --resolution 0.2 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 5 --bounds 0.5 600"
 srun python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 5 --resolution 0.2 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 5 --bounds 0.5 600
+
 # Store the job ID in a variable
 JOBID=$SLURM_JOBID
 
@@ -102,12 +101,15 @@ export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 # Verify environment variables and paths
 echo "PYTHONPATH: $PYTHONPATH"                                                      # Ensures your directoreis are set. 
 echo "Conda env: $(conda info --envs)"                                              # Lists your Conda environments and there should be * next to gems_tco because it is activated. 
-echo 'fit_st_model_res0.4.sh --key 5 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 5 --bounds 0.05 600'
 echo "Current date and time: $(date)"
+# export OMP_NUM_THREADS=1
 
-export OMP_NUM_THREADS=1
 # Run the Python script
-srun python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 5 --resolution 0.4 --params 300 8.92 7.6 8.923 0.1456 --mm_cond_number 20 --nugget 5 --bounds 0.05 600
+
+echo 'fit_st_model_res0.4.sh --key 5 --resolution 0.4 --params 100 100 100 100 0.15679 --mm_cond_number 20 --nugget 30 --bounds 0.05 600'
+srun python /home/jl2815/tco/exercise/fit_spatio_temporal_10_27.py --key 5 --resolution 0.4 --params 100 100 100 100 0.15679 --mm_cond_number 20 --nugget 30 --bounds 0.05 600
+
+
 
 # Store the job ID in a variable
 JOBID=$SLURM_JOBID
