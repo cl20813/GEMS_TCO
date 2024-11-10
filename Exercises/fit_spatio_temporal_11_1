@@ -1,5 +1,5 @@
 log:
-resolution 0.4 day 1 estimates : 300 8.92 7.6 8.923 0.1456  bounds on 0.05,300
+resolution 0.4 day 1 estimates : 300 8.92 7.6 8.923 0.1456  bounds on 0.05,300   --> after data cleansing, starting with this parameter give non positive definite
 Another resolution not known
 day3: 100 28 100 100 0.8055 bounds on 0.05 100   
 day2: 100 80.53 100 100 0.1756 bounds on 0.05 100   
