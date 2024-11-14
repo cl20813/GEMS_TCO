@@ -12,7 +12,7 @@
 
 [Copy dataset to Amarel HPC](copy_gemsdata_to_amarel)
 
-[Install the GEMS_TCO package on Amarel HPC](install_mypackage_in_amarel)
+[Install and updates the GEMS_TCO package on Amarel HPC](install_mypackage_in_amarel)
 
 ## Exercise using Amarel Rutgers Cluster
 
