@@ -19,3 +19,10 @@ pip install -e /home/jl2815/tco/     # this will install my package 'GEMS_TCO'
 pip list | grep GEMS_TCO           # Verify installation
 python -c "import GEMS_TCO; print('GEMS_TCO imported successfully')" 
 pip show GEMS_TCO
+
+
+
+### Update a signle .py file
+
+# 2024-11-14 Update a function to generate coarse set
+scp "C:\Users\joonw\anaconda3\envs\jl2815\Lib\site-packages\GEMS_TCO\orbitmap.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO
