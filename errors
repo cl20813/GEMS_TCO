@@ -1,3 +1,8 @@
+# vecchia poor performance
+1. don't apply reordering twice! (once in .py file once in likelihood function) it will change the order again!   
+2. when reordering, don't forget to add  .reset_index(drop=True)     
+
+# export OMP_NUM_THREADS=1 showed "command not found"
 Even though export OMP_NUM_THREADS=1 showed "command not found", the rest of your code continues to run. But to ensure proper thread control, you can add this line directly in your Python script:
 
 To see the error, do   cat -v fit_st_model_res0.2.sh to see the added hidden characters when I copy paste the line. Remove it and re-type it wihtout copy-paste.
