@@ -48,8 +48,8 @@ echo "Current date and time: $(date)"
 # rho:observations 2:7432 4:1858, 5:1190, 6:826, 7:607, 8:465
 # Run the Python script
 
-echo "srun --cpus-per-task=32 --mem=100G --time=05:00:00 python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --rho 8 --v 0.5 --params 10 10 10 10 5 --mm_cond_number 20 --bounds 0.05 600 0.05 600 -200 200 0.05 600 0.05 600 "
-srun --cpus-per-task=32 --mem=100G --time=05:00:00 python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --rho 8 --v 0.5 --params 10 10 10 10 5 --mm_cond_number 20 --bounds 0.05 600 0.05 600 -200 200 0.05 600 0.05 600
+echo "python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --rho 8 --v 0.5 --params 10 10 10 10 5 --mm_cond_number 10 --bounds 0.05 600 0.05 600 -200 200 0.05 600 0.05 600 "
+srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --rho 8 --v 0.5 --params 10 10 10 10 5 --mm_cond_number 10 --bounds 0.05 600 0.05 600 -200 200 0.05 600 0.05 600
 
 echo "srun --cpus-per-task=32 --mem=100G --time=05:00:00 python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --rho 8 --v 1 --params 10 10 10 10 5 --mm_cond_number 20 --bounds 0.05 600 0.05 600 -200 200 0.05 600 0.05 600 --resolution 0.4"
 srun --cpus-per-task=32 --mem=100G --time=05:00:00 python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --rho 8 --v 0.5 --params 10 10 10 10 5 --mm_cond_number 20 --bounds 0.05 600 0.05 600 -200 200 0.05 600 0.05 600
