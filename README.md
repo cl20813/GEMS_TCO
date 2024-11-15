@@ -29,6 +29,7 @@
 [Fit non separable spatio-temporal model](Exercises/fit_spatio_temporal_11_1)        
 [Fit non separable gneiting model](Exercises/fit_gneiting)                  
 
+[Fit non separable spatio-temporal](Exercises/fit_st_11_14) 
 
 
 
