@@ -12,7 +12,7 @@ module use /projects/community/modulefiles            # # Ensure the module path
 module load anaconda/2024.06-ts840 
 conda activate gems_tco             #sigmasq (0.05,600), range_ (0.05,600), advec (-200,200), beta (0,600), nugget (0,600)
 
-srun --cpus-per-task=32 --mem=100G --time=05:00:00 python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --rho 8 --v 1 --params 10 10 10 10 5 --mm_cond_number 20 --bounds 0.05 600 0.05 600 -200 200 0.05 600 0.05 600  
+srun --cpus-per-task=32 --mem=100G --time=05:00:00 python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --rho 8 --v 1 --params 10 10 10 10 5 --mm_cond_number 10 --bounds 0.05 600 0.05 600 -200 200 0.05 600 0.05 600  
 
 ## sbatch 
 
@@ -89,8 +89,8 @@ module use /projects/community/modulefiles            # # Ensure the module path
 module load anaconda/2024.06-ts840 
 conda activate gems_tco             #sigmasq (0.05,600), range_ (0.05,600), advec (-200,200), beta (0,600), nugget (0,600)
 
-## Note that key 1 means I ran only 0 day data (up to k-1 days) and key2 can take 5,6,7,8,9 so that it means I take a slice of latitude between 5 and 5+1
-srun --cpus-per-task=32 --mem=150G --time=05:00:00 python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --key2 5 --rho 8 --v 1 --params 10 10 10 10 5 --mm_cond_number 20 --bounds 0.05 600 0.05 600 -200 200 0.05 600 0.05 600  
+## Note that key 1 means I ran only 0 day data (up to k-1 days) and key2 can take 5,6,7,8,9 so that it means I take a slice of latitude between 5 and 5+1    # --params 33.43 1.46 -200 600 0.5
+srun --cpus-per-task=32 --mem=150G --time=05:00:00 python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --key2 5 --rho 8 --v 0.5 --mm_cond_number 10 --bounds 0.05 60 0.05 60 -200 200 0.05 600 0.05 10 
 
 
 
