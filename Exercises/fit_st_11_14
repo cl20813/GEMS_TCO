@@ -1,0 +1,78 @@
+### copy ozone data and python file to Amarel HPC
+scp "C:\\Users\\joonw\\TCO\\data_engineering\\data_24_07_0130_N510_E110120.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N510_E110120
+scp "C:\Users\joonw\TCO\newpipeline\Exercises\fit_st_11_14.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise
+
+### Copy python from Amarel HPC to my computer
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise/fit_st_11_14.py "C:\Users\joonw\TCO\newpipeline\Exercises"
+
+### Quick run using srun
+
+ssh jl2815@amarel.rutgers.edu
+module use /projects/community/modulefiles            # # Ensure the module path is added. Without this, I can't load 2024.06-ts840
+module load anaconda/2024.06-ts840 
+conda activate gems_tco
+srun --cpus-per-task=32 --mem=100G --time=05:00:00 python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --rho 8 --v 0.5 --params 100 100 100 100 5 --mm_cond_number 20 --bounds -600 600 --resolution 0.4  
+## sbatch 
+
+nano fit_st_11_res04.sh                  # open a new text editor
+
+'''
+#!/bin/bash
+#SBATCH --job-name=fit_st_11_res04        # Job name
+#SBATCH --output=/home/jl2815/GEMS/fit_st_11_res04_%j.out            # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/GEMS/fit_st_11_res04_%j.err              # Standard error file (%j = JobID)
+#SBATCH --time=72:00:00                   # Maximum time 
+#SBATCH --ntasks=1                        # Number of tasks
+#SBATCH --cpus-per-task=32                 # Number of CPU cores per task
+#SBATCH --mem=220G                          # Memory per node
+#SBATCH --partition=main               # Partition to submit to
+
+# Load the Anaconda module to use srun 
+
+module purge                                     # unload every other environment to avoid conflict
+module use /projects/community/modulefiles                  # without this, I can't load 2024.06-ts840
+module load anaconda/2024.06-ts840 
+
+# Initialize Conda
+eval "$(conda shell.bash hook)"                  # Initialize Conda for SLURM environment
+conda activate gems_tco
+# Add the GEMS_TCO package directory to PYTHONPATH
+export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
+
+#
+echo "Current date and time: $(date)"
+# export OMP_NUM_THREADS=1
+
+# rho:observations 2:7432 4:1858, 5:1190, 6:826, 7:607, 8:465
+# Run the Python script
+echo 'srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 5 --rho 8 --v 0.5 --params 100 100 100 100 0.15679 --mm_cond_number 20 --bounds -600 600 --resolution 0.4'
+srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --rho 8 --v 0.5 --params 100 100 100 100 5 --mm_cond_number 20 --bounds -600 600 --resolution 0.4  
+
+echo 'srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 5 --rho 8 --v 1 --params 100 100 100 100 0.15679 --mm_cond_number 20 --bounds -600 600 --resolution 0.4'
+srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --rho 8 --v 1 --params 100 100 100 100 5 --mm_cond_number 20 --bounds -600 600 --resolution 0.4  
+
+echo 'srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 5 --rho 8 --v 1.5 --params 100 100 100 100 0.15679 --mm_cond_number 20 --bounds -600 600 --resolution 0.4'
+srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --rho 8 --v 1.5 --params 100 100 100 100 5 --mm_cond_number 20 --bounds -600 600 --resolution 0.4
+
+echo 'srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 5 --rho 6 --v 0.5 --params 100 100 100 100 0.15679 --mm_cond_number 20 --bounds -600 600 --resolution 0.4'
+srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --rho 6 --v 0.5 --params 100 100 100 100 5 --mm_cond_number 20 --bounds -600 600 --resolution 0.4  
+
+echo 'srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 5 --rho 6 --v 1 --params 100 100 100 100 0.15679 --mm_cond_number 20 --bounds -600 600 --resolution 0.4'
+srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --rho 6 --v 1 --params 100 100 100 100 5 --mm_cond_number 20 --bounds -600 600 --resolution 0.4  
+
+echo 'srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 5 --rho 6 --v 1.5 --params 100 100 100 100 0.15679 --mm_cond_number 20 --bounds -600 600 --resolution 0.4'
+srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --rho 6 --v 1.5 --params 100 100 100 100 5 --mm_cond_number 20 --bounds -600 600 --resolution 0.4
+
+
+# Store the job ID in a variable
+JOBID=$SLURM_JOBID
+
+# Run sacct to get resource usage details
+sacct --units=G --format=MaxRSS,MaxDiskRead,MaxDiskWrite,Elapsed,NodeList -j $JOBID
+
+```
+sbatch fit_st_11_res04.sh
+
+
+---------------------------------------------------------------------------------------
+
