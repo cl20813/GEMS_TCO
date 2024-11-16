@@ -1,3 +1,7 @@
+#  "can only concatenate str (not int) to str" when doing f'{key+1}' where  key is a string 
+
+# float is not interable: this could happen when parameter size changes ex) I did --params 0 1 1 1 1 1  where my function only requires 3. 
+
 # vecchia poor performance
 1. don't apply reordering twice! (once in .py file once in likelihood function) it will change the order again!   
 2. when reordering, don't forget to add  .reset_index(drop=True)     
