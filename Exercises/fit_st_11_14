@@ -118,11 +118,11 @@ echo "Current date and time: $(date)"
 
 # This is to study if a fitting process is too smooth that enforcing sigmasq and beta to goes up
 echo "lat_idx 5,6,7,8,9 --key 1 --lat_idx 5 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10"
-srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py.py --key 1 --lat_idx 5 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 
-srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py.py --key 1 --lat_idx 6 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
-srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py.py --key 1 --lat_idx 7 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
-srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py.py --key 1 --lat_idx 8 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
-srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py.py --key 1 --lat_idx 9 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 5 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 6 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 7 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 8 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 9 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
 
 # Store the job ID in a variable
 JOBID=$SLURM_JOBID
