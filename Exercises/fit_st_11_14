@@ -186,8 +186,8 @@ echo "Current date and time: $(date)"
 # Run the Python script
 
 # space matern
-echo "/home/jl2815/tco/exercise/fit_spacematern.py --key 1 --lat_idx 5 --rho 4 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 "
-srun python /home/jl2815/tco/exercise/fit_spacematern.py --key 1 --lat_idx 5 --rho 4 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 
+echo "python /home/jl2815/tco/exercise/fit_spacematern.py --key 1 --rho 4 --params 42.8 16.4 1 1 --mm_cond_number 10 --bounds 0.05 100 0.05 100 0.05 20 0.05 20"
+srun python /home/jl2815/tco/exercise/fit_spacematern.py --key 1 --rho 4 --params 42.8 16.4 1 1 --mm_cond_number 10 --bounds 0.05 100 0.05 100 0.05 20 0.05 20 
 
 echo "/home/jl2815/tco/exercise/fit_st_11_16.py --key 1 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 "
 srun python /home/jl2815/tco/exercise/fit_st_11_16.py --key 1 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 
