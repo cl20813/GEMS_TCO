@@ -79,7 +79,9 @@ sbatch fit_st_11_res04.sh
 
 
 
-#################################################
+##################################################################################################
+##################################################################################################
+
 <by latitude>
 
 scp "C:\Users\joonw\TCO\newpipeline\Exercises\fit_st_bylat_11_14.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise
@@ -90,7 +92,7 @@ module load anaconda/2024.06-ts840
 conda activate gems_tco             #sigmasq (0.05,600), range_ (0.05,600), advec (-200,200), beta (0,600), nugget (0,600)
 
 ## Note that key 1 means I ran only 0 day data (up to k-1 days) and key2 can take 5,6,7,8,9 so that it means I take a slice of latitude between 5 and 5+1    # --params 33.43 1.46 -200 600 0.5
-srun --cpus-per-task=32 --mem=150G --time=05:00:00 python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --key2 5 --rho 8 --v 0.5 --mm_cond_number 10 --bounds 0.05 60 0.05 60 -200 200 0.05 600 0.05 10 
+srun --cpus-per-task=32 --mem=150G --time=05:00:00 python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --keyy 5 --rho 8 --v 0.5 --mm_cond_number 10 --bounds 0.05 60 0.05 60 -200 200 0.05 600 0.05 10 
 
 
 
@@ -123,16 +125,15 @@ export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 echo "Current date and time: $(date)"
 # export OMP_NUM_THREADS=1
 
-# rho:observations 2:7432 4:1858, 5:1190, 6:826, 7:607, 8:465
+# rho 1: 20000 4: 1250 5: 800 6:556 7:409 8:313
 # Run the Python script
 
-echo "srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --key2 5 --rho 8 --v 0.5 --params 10 10 10 10 5 --mm_cond_number 20 --bounds 0.05 600 0.05 600 -200 200 0.05 600 0.05 600"
+echo "keyy 5,6,7,8 --key 1 --keyy 5 --rho 8 --v 0.5 --params 33.43 1.46 -200 600 0.5 --mm_cond_number 10 --bounds 0.05 50 0.05 50 -50 50 0.05 60 0.05 10"
+srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --lat_idx 5 --rho 8 --v 0.5 --params 33.43 1.46 -200 600 0.5 --mm_cond_number 10 --bounds 0.05 50 0.05 50 -50 50 0.05 60 0.05 10 
+srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --lat_idx 6 --rho 8 --v 0.5 --params 33.43 1.46 -200 600 0.5 --mm_cond_number 10 --bounds 0.05 50 0.05 50 -50 50 0.05 60 0.05 10 
+srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --lat_idx 7 --rho 8 --v 0.5 --params 33.43 1.46 -200 600 0.5 --mm_cond_number 10 --bounds 0.05 50 0.05 50 -50 50 0.05 60 0.05 10 
+srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --lat_idx 8 --rho 8 --v 0.5 --params 33.43 1.46 -200 600 0.5 --mm_cond_number 10 --bounds 0.05 50 0.05 50 -50 50 0.05 60 0.05 10 
 
-srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --key2 5 --rho 8 --v 0.5 --params 10 10 10 10 5 --mm_cond_number 20 --bounds 0.05 600 0.05 600 -200 200 0.05 600 0.05 600  
-srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --key2 6 --rho 8 --v 0.5 --params 10 10 10 10 5 --mm_cond_number 20 --bounds 0.05 600 0.05 600 -200 200 0.05 600 0.05 600
-srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --key2 7 --rho 8 --v 0.5 --params 10 10 10 10 5 --mm_cond_number 20 --bounds 0.05 600 0.05 600 -200 200 0.05 600 0.05 600
-srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --key2 8 --rho 8 --v 0.5 --params 10 10 10 10 5 --mm_cond_number 20 --bounds 0.05 600 0.05 600 -200 200 0.05 600 0.05 600
-srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --key2 9 --rho 8 --v 0.5 --params 10 10 10 10 5 --mm_cond_number 20 --bounds 0.05 600 0.05 600 -200 200 0.05 600 0.05 600
 
 # Store the job ID in a variable
 JOBID=$SLURM_JOBID
