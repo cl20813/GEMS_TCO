@@ -185,9 +185,9 @@ echo "Current date and time: $(date)"
 # rho 1: 20000 4: 1250 5: 800 6:556 7:409 8:313
 # Run the Python script
 
-# This is to study if a fitting process is too smooth that enforcing sigmasq and beta to goes up
-echo "/home/jl2815/tco/exercise/fit_spacematern.py --key 1 --lat_idx 5 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 "
-srun python /home/jl2815/tco/exercise/fit_spacematern.py --key 1 --lat_idx 5 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 
+# space matern
+echo "/home/jl2815/tco/exercise/fit_spacematern.py --key 1 --lat_idx 5 --rho 4 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 "
+srun python /home/jl2815/tco/exercise/fit_spacematern.py --key 1 --lat_idx 5 --rho 4 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 
 
 echo "/home/jl2815/tco/exercise/fit_st_11_16.py --key 1 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 "
 srun python /home/jl2815/tco/exercise/fit_st_11_16.py --key 1 --rho 4 --v 0.2 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 
