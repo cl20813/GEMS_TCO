@@ -26,3 +26,5 @@ pip show GEMS_TCO
 
 # 2024-11-14 Update a function to generate coarse set
 scp "C:\Users\joonw\anaconda3\envs\jl2815\Lib\site-packages\GEMS_TCO\orbitmap.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO
+
+scp "C:\Users\joonw\anaconda3\envs\jl2815\Lib\site-packages\GEMS_TCO\kernels.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO
