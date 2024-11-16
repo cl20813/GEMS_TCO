@@ -45,12 +45,13 @@ export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 echo "Current date and time: $(date)"
 # export OMP_NUM_THREADS=1
 
-# rho:observations 2:7432 4:1858, 5:1190, 6:826, 7:607, 8:465
+# rho 1: 20000 4: 1250 5: 800 6:556 7:409 8:313
 # Run the Python script
 
-echo "python /home/jl2815/tco/exercise/fit_st_11_14.py --key 5 --rho 8 --v 0.5 --params 33.43 1.46 -200 600 0.5 --mm_cond_number 10 --bounds 0.05 100 0.05 100 -100 100 0.05 100 0.05 10"
-srun python /home/jl2815/tco/exercise/fit_st_11_14.py --key 5 --rho 8 --v 0.5 --params 33.43 1.46 -200 600 0.5 --mm_cond_number 10 --bounds 0.05 50 0.05 50 -50 50 0.05 60 0.05 10  
- 
+echo "rho 10 then 8 python /home/jl2815/tco/exercise/fit_st_11_14.py --key 1 --rho 8 --v 0.5 --params 50 5.19 -200 600 0.5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10"
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_14.py --key 1 --rho 10 --v 0.5 --params 50 5.19 -200 600 0.5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_14.py --key 1 --rho 8 --v 0.5 --params 50 5.19 -200 600 0.5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
+
 
 # Store the job ID in a variable
 JOBID=$SLURM_JOBID
