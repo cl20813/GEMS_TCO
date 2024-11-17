@@ -89,20 +89,25 @@ echo "Current date and time: $(date)"
 # rho 1: 20000 4: 1250 5: 800 6:556 7:409 8:313
 
 # 
-echo "lat_idx 5,6,7 --key 1 --rho 4 --v 0.5 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10"
-srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 5 --rho 4 --v 0.5 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 
-srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 6 --rho 4 --v 0.5 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
-srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 7 --rho 4 --v 0.5 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
+echo "lat_idx 5,6,7 --key 2 --rho 3 --v 1 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10"
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 5 --rho 3 --v 1 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 6 --rho 3 --v 1 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 7 --rho 3 --v 1 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
 
-echo "lat_idx 5,6,7 --key 1 --rho 6 --v 0.5"
-srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 5 --rho 6 --v 0.5 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 
-srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 6 --rho 6 --v 0.5 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
-srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 7 --rho 6 --v 0.5 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
+echo "lat_idx 5,6,7 --key 2 --rho 4 --v 1 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10"
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 5 --rho 4 --v 1 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 6 --rho 4 --v 1 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 7 --rho 4 --v 1 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
 
-echo "lat_idx 5,6,7 --key 1 --rho 8 --v 0.5"
-srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 5 --rho 8 --v 0.5 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 
-srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 6 --rho 8 --v 0.5 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
-srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 7 --rho 8 --v 0.5 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
+echo "lat_idx 5,6,7 --key 2 --rho 6 --v 1"
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 5 --rho 6 --v 1 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 6 --rho 6 --v 1 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 7 --rho 6 --v 1 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
+
+echo "lat_idx 5,6,7 --key 2 --rho 8 --v 1"
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 5 --rho 8 --v 1 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10 
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 6 --rho 8 --v 1 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
+srun python /home/jl2815/tco/exercise/fit_st_bylat_11_16.py --key 1 --lat_idx 7 --rho 8 --v 1 --params 42.8 16.4 10 10 5 --mm_cond_number 10 --bounds 0.05 800 0.05 50 -250 250 0.05 800 0.05 10
 
 ```
 
