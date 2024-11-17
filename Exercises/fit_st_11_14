@@ -199,8 +199,9 @@ conda activate gems_tco
 # Add the GEMS_TCO package directory to PYTHONPATH
 export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 
-echo "Current date and time: $(date)"
+echo "Current date and time: $(date)"         
 
+## note that without nugget, singular problem
 echo "fixing nugget 5 --key 1 --lat_idx 5,6,7 --rho 4 --params 1 1 1 1 1 1 1 --mm_cond_number 10 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1"
 srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 5 --rho 4 --params 1 1 1 1 1 1 1 --mm_cond_number 10 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
 srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 6 --rho 4 --params 1 1 1 1 1 1 1 --mm_cond_number 10 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
