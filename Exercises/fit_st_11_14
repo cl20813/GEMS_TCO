@@ -162,10 +162,10 @@ echo "Current date and time: $(date)"
 # space matern
 echo "rho 8 6 4 2  --key 1 --params params 81 1 8 4 --mm_cond_number 10 --bounds 0.05 100 0.05 100 0.05 20 0.05 20" 
 
-srun python /home/jl2815/tco/exercise/fit_spacematern.py --key 1 --rho 8 --params 81 1 8 4 --mm_cond_number 10 --bounds 0.05 100 0.05 100 0.05 20 0.05 20 
-srun python /home/jl2815/tco/exercise/fit_spacematern.py --key 1 --rho 6 --params 81 1 8 4 --mm_cond_number 10 --bounds 0.05 100 0.05 100 0.05 20 0.05 20
-srun python /home/jl2815/tco/exercise/fit_spacematern.py --key 1 --rho 4 --params 81 1 8 4 --mm_cond_number 10 --bounds 0.05 100 0.05 100 0.05 20 0.05 20
-srun python /home/jl2815/tco/exercise/fit_spacematern.py --key 1 --rho 2 --params 81 1 8 4 --mm_cond_number 10 --bounds 0.05 100 0.05 100 0.05 20 0.05 20
+srun python /home/jl2815/tco/exercise/fit_spacematern.py --key 3 --rho 8 --params 81 1 8 4 --mm_cond_number 30 --bounds 0.05 100 0.05 100 0.05 20 0.05 20 
+srun python /home/jl2815/tco/exercise/fit_spacematern.py --key 3 --rho 6 --params 81 1 8 4 --mm_cond_number 30 --bounds 0.05 100 0.05 100 0.05 20 0.05 20
+srun python /home/jl2815/tco/exercise/fit_spacematern.py --key 3 --rho 4 --params 81 1 8 4 --mm_cond_number 30 --bounds 0.05 100 0.05 100 0.05 20 0.05 20
+srun python /home/jl2815/tco/exercise/fit_spacematern.py --key 3 --rho 2 --params 81 1 8 4 --mm_cond_number 30 --bounds 0.05 100 0.05 100 0.05 20 0.05 20
 ```
 
 sbatch purespace.sh 
@@ -176,13 +176,13 @@ sbatch purespace.sh
 #########################
 #########################
 <Fit gneiting>
-nano testing3.sh               # open a new text editor
+nano gneiting1.sh               # open a new text editor
 
 '''
 #!/bin/bash
-#SBATCH --job-name=testing3       # Job name
-#SBATCH --output=/home/jl2815/GEMS/testing3_%j.out            # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/GEMS/testing3%j.err              # Standard error file (%j = JobID)
+#SBATCH --job-name=gneiting1      # Job name
+#SBATCH --output=/home/jl2815/GEMS/gneiting1_%j.out            # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/GEMS/gneiting1_%j.err              # Standard error file (%j = JobID)
 #SBATCH --time=24:00:00                   # Maximum time 
 #SBATCH --ntasks=1                        # Number of tasks
 #SBATCH --cpus-per-task=32                 # Number of CPU cores per task
@@ -202,20 +202,25 @@ export PYTHONPATH=$PYTHONPATH:/home/jl2815/tco/GEMS_TCO
 echo "Current date and time: $(date)"         
 
 ## note that without nugget, singular problem
-echo "fixing nugget 5 --key 1 --lat_idx 5,6,7 --rho 4 --params 1 1 1 1 1 1 1 --mm_cond_number 10 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1"
-srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 5 --rho 4 --params 1 1 1 1 1 1 1 --mm_cond_number 10 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
-srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 6 --rho 4 --params 1 1 1 1 1 1 1 --mm_cond_number 10 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
-srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 7 --rho 4 --params 1 1 1 1 1 1 1 --mm_cond_number 10 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
+echo "fixing nugget 5 --key 1 --lat_idx 5,6,7 --rho 2 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1"
+srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 5 --rho 2 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
+srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 6 --rho 2 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
+srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 7 --rho 2 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
+
+echo "fixing nugget 5 --key 1 --lat_idx 5,6,7 --rho 4 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1"
+srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 5 --rho 4 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
+srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 6 --rho 4 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
+srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 7 --rho 4 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
 
 echo "fixing nugget 5 --key 1 --lat_idx 5,6,7 --rho 6"
-srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 5 --rho 6 --params 1 1 1 1 1 1 1 --mm_cond_number 10 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
-srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 6 --rho 6 --params 1 1 1 1 1 1 1 --mm_cond_number 10 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
-srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 7 --rho 6 --params 1 1 1 1 1 1 1 --mm_cond_number 10 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
+srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 5 --rho 6 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
+srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 6 --rho 6 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
+srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 7 --rho 6 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
 
 echo "fixing nugget 5 --key 1 --lat_idx 5,6,7 --rho 8"
-srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 5 --rho 8 --params 1 1 1 1 1 1 1 --mm_cond_number 10 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
-srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 6 --rho 8 --params 1 1 1 1 1 1 1 --mm_cond_number 10 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
-srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 7 --rho 8 --params 1 1 1 1 1 1 1 --mm_cond_number 10 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
+srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 5 --rho 8 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
+srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 6 --rho 8 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
+srun python /home/jl2815/tco/exercise/fit_gneiting_bylag_11_16.py --key 1 --lat_idx 7 --rho 8 --params 1 1 1 1 1 1 1 --mm_cond_number 20 --bounds 0.05 10 0.05 10 1.5 5 0 1 0 1 0.05 500 0 1
 
 
 # Store the job ID in a variable
@@ -225,4 +230,4 @@ JOBID=$SLURM_JOBID
 sacct --units=G --format=MaxRSS,MaxDiskRead,MaxDiskWrite,Elapsed,NodeList -j $JOBID
 ```
 
-sbatch testing3.sh
+sbatch gneiting1.sh
