@@ -187,7 +187,7 @@ nano gneiting1.sh               # open a new text editor
 #SBATCH --ntasks=1                        # Number of tasks
 #SBATCH --cpus-per-task=32                 # Number of CPU cores per task
 #SBATCH --mem=200G                          # Memory per node
-#SBATCH --partition=main               # Partition to submit to
+#SBATCH --partition=mem               # Partition to submit to
 
 module purge                                     # unload every other environment to avoid conflict
 module use /projects/community/modulefiles                  # without this, I can't load 2024.06-ts840
