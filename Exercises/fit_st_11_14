@@ -124,11 +124,11 @@ scp "C:\Users\joonw\anaconda3\envs\jl2815\Lib\site-packages\GEMS_TCO\orbitmap.py
 
 scp "C:\Users\joonw\anaconda3\envs\jl2815\Lib\site-packages\GEMS_TCO\kernels.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO
 
-scp "C:\Users\joonw\TCO\newpipeline\Exercises\fit_spacematern.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise             # worked on 11/16   testing2
+scp "C:\Users\joonw\TCO\newpipeline\Exercises\fit_spacematern.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise             # worked on 11/16   purespace
 
-scp "C:\Users\joonw\TCO\newpipeline\Exercises\fit_st_11_16.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise                  
+scp "C:\Users\joonw\TCO\newpipeline\Exercises\fit_st_11_16.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise                 # worked on 11/16   testing 2                
 
-scp "C:\Users\joonw\TCO\newpipeline\Exercises\fit_gneiting_bylag_11_16.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise
+scp "C:\Users\joonw\TCO\newpipeline\Exercises\fit_gneiting_bylag_11_16.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise      # worked on 11/16   gneiting1
 
 
 
