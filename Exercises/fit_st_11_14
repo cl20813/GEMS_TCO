@@ -112,7 +112,7 @@ sbatch fit_st_11_lat1.sh
 
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise/fit_st_bylat_11_16.py "C:\Users\joonw\TCO\newpipeline\Exercises"          # worked on 11/16   fit_st_11_lat1.sh
 
-
+<Fit pure space>
 testing2  
 
 scp "C:\Users\joonw\anaconda3\envs\jl2815\Lib\site-packages\GEMS_TCO\orbitmap.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO
@@ -174,7 +174,7 @@ sbatch testing2
 
 #########################
 #########################
-
+<Fit gneiting>
 nano testing3.sh               # open a new text editor
 
 '''
