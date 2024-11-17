@@ -10,7 +10,7 @@ from sklearn.neighbors import BallTree # for space_center function
 
 
 
-class space_avgerage:
+class space_average:
     '''
     input
     df: pandas data frame
@@ -22,22 +22,23 @@ class space_avgerage:
     lon_min, lon_max
     '''
 
-    def __init__(self, df, lat_resolution, lon_resolution, lat_start, lon_start):
+    def __init__(self, df, lat_resolution, lon_resolution, lat_s,lat_e, lon_s,lon_e ):
         self.df = df
    
         self.lat_resolution = lat_resolution
         self.lon_resolution = lon_resolution
-        self.lat_start = lat_start
-        self.lon_start = lon_start
-        
+        self.lat_s = lat_s
+        self.lat_e = lat_e
+        self.lon_s = lon_s
+        self.lon_e = lon_e
 
     def space_avg(self):
         self.latitudes = np.array(self.df['Latitude'])
         self.longitudes =  np.array(self.df['Longitude'])
         self.values =  np.array( self.df['ColumnAmountO3'])
 
-        lat_min, lat_max = self.lat_start, (self.lat_start+5)
-        lon_min, lon_max = self.lon_start, (self.lon_start+10)
+        lat_min, lat_max = self.lat_s, self.lat_e
+        lon_min, lon_max = self.lon_s, self.lon_e
         # lat_resolution = 0.1
         # lon_resolution = 0.1
 
@@ -103,8 +104,8 @@ class space_avgerage:
 
     def space_center(df: pd.DataFrame) -> np.ndarray:
         locs = np.array( df[['Latitude','Longitude']] )
-        lat_min, lat_max = 30, 35
-        lon_min, lon_max = 100, 110
+        lat_min, lat_max = self.lat_s, self.lat_e
+        lon_min, lon_max = self.lon_s, self.lon_e
 
         lat_center = (lat_min + lat_max) / 2
         lon_center = (lon_min + lon_max) / 2
