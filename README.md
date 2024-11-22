@@ -30,7 +30,7 @@
 [Fit non separable gneiting model](Exercises/fit_gneiting)                  
 
 [Fit non separable spatio-temporal Nov.16.2024](Exercises/fit_st_11_14) 
-
+[testing_algorithm_11_22](Exercises/testing_alg) 
 
 
 
