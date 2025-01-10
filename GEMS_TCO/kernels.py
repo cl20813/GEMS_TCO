@@ -16,6 +16,7 @@ from sklearn.neighbors import BallTree
 from scipy.spatial.distance import cdist  # For space and time distance
 from scipy.special import gamma, kv  # Bessel function and gamma function
 from scipy.optimize import minimize
+from scipy.optimize import basinhopping, minimize
 
 # Type hints
 from typing import Callable, Union, Tuple
@@ -34,13 +35,14 @@ class matern_st_11:               #sigmasq range advec beta  nugget
         
     # Custom distance function for cdist
     def custom_distance(self,u, v):
-        spatial_diff = np.linalg.norm(u[:2] - v[:2])  # Distance between x1,x2 (2D)
+        d = np.dot(self.sqrt_range_mat, u[:2] - v[:2] ) # Distance between x1,x2 (2D)
+        spatial_diff = np.linalg.norm(d)  # Distance between x1,x2 (2D)
         temporal_diff = np.abs(u[2] - v[2])           # Distance between y1 and y2
         return np.sqrt(spatial_diff**2 + temporal_diff**2)
     
-    def matern_cov_yx(self,params: Tuple[float,float,float,float,float], y_df, x_df) -> pd.DataFrame:
+    def matern_cov_yx(self,params: Tuple[float,float,float,float,float,float], y_df, x_df) -> pd.DataFrame:
     
-        sigmasq, range_, advec, beta, nugget  = params
+        sigmasq, range_lon, range_lat, advec, beta, nugget  = params
             
         # Validate inputs
         if y_df is None or x_df is None:
@@ -49,7 +51,7 @@ class matern_st_11:               #sigmasq range advec beta  nugget
         x1 = x_df['Longitude'].values
         y1 = x_df['Latitude'].values
         t1 = x_df['Hours_elapsed'].values
-
+ 
         x2 = y_df['Longitude'].values
         y2 = y_df['Latitude'].values
         t2 = y_df['Hours_elapsed'].values
@@ -60,17 +62,20 @@ class matern_st_11:               #sigmasq range advec beta  nugget
         coords1 = np.hstack ((spat_coord1, (beta * t1).reshape(-1,1) ))
         coords2 = np.hstack ((spat_coord2, (beta * t2).reshape(-1,1) ))
 
+        sqrt_range_mat = np.diag([ 1/range_lon**0.5, 1/range_lat**0.5])
+        self.sqrt_range_mat = sqrt_range_mat
+
         distance = cdist(coords1,coords2, metric = self.custom_distance)
 
         # Initialize the covariance matrix with zeros
-        out = np.zeros_like(distance)
+        out = distance
         
         # Compute the covariance for non-zero distances
         non_zero_indices = distance != 0
         if np.any(non_zero_indices):
             out[non_zero_indices] = (sigmasq * (2**(1-self.smooth)) / gamma(self.smooth) *
-                                    (distance[non_zero_indices] / range_)**self.smooth *
-                                    kv(self.smooth, distance[non_zero_indices] / range_))
+                                    (distance[non_zero_indices] )**self.smooth *
+                                    kv(self.smooth, distance[non_zero_indices]))
         out[~non_zero_indices] = sigmasq
 
         # Add a small jitter term to the diagonal for numerical stability
@@ -78,7 +83,7 @@ class matern_st_11:               #sigmasq range advec beta  nugget
 
         return pd.DataFrame(out)
     
-    def full_likelihood(self, params: Tuple[float,float,float,float,float], input_df, y):
+    def full_likelihood(self, params: Tuple[float,float,float,float,float,float], input_df, y):
   
         # Compute the covariance matrix from the matern function
         cov_matrix = self.matern_cov_yx(params=params, y_df = input_df, x_df = input_df)
@@ -104,7 +109,7 @@ class matern_st_11:               #sigmasq range advec beta  nugget
         
         return neg_log_lik
     
-    def vecchia_likelihood(self, params: Tuple[float,float,float,float,float], input_df, mm_cond_number, baseset_from_maxmin, nns_map):
+    def vecchia_likelihood(self, params: Tuple[float,float,float,float,float,float], input_df, mm_cond_number, baseset_from_maxmin, nns_map):
         # initialize negative log-likelihood value
         neg_log_lik = 0
         ## likelihood for the first 30 observations
@@ -218,10 +223,16 @@ class matern_st_11:               #sigmasq range advec beta  nugget
     
 class matern_spatial:
     def __init__(self):
-        pass            
+        pass     
+      
+    def custom_distance(self,u, v):
 
-    def matern_cov_yx(self, params: Tuple[float,float,float,float], y_df= None, x_df=None)-> pd.DataFrame:
-        sigmasq, range_, smooth, nugget = params 
+        d = np.dot(self.sqrt_range_mat, u-v)
+        out = np.linalg.norm(d)
+        return (out)
+    
+    def matern_cov_yx(self, params: Tuple[float,float,float,float,float], y_df= None, x_df=None)-> pd.DataFrame:
+        sigmasq, range_lat, range_lon, smooth, nugget = params 
         # Validate inputs
         if y_df is None or x_df is None:
             raise ValueError("Both y and x_df must be provided.")
@@ -237,24 +248,27 @@ class matern_spatial:
         coords2 = np.stack((x2, y2), axis=-1)
 
         # Calculate spatial distances using cdist
-        s_dist = cdist(coords1, coords2, 'euclidean')
-        
+
+        sqrt_range_mat = np.diag([ 1/range_lon**0.5, 1/range_lat**0.5])
+        self.sqrt_range_mat = sqrt_range_mat
+
+        s_dist = cdist(coords1, coords2, self.custom_distance)
+         
         # Initialize the covariance matrix with zeros
-        out = np.zeros_like(s_dist)
+        out = s_dist
         
         # Compute the covariance for non-zero distances
         non_zero_indices = s_dist != 0
         if np.any(non_zero_indices):
             out[non_zero_indices] = (sigmasq * (2**(1-smooth)) / gamma(smooth) *
-                                    (s_dist[non_zero_indices] / range_)**smooth *
-                                    kv(smooth, s_dist[non_zero_indices] / range_))
+                                    (s_dist[non_zero_indices] )**smooth *
+                                    kv(smooth, s_dist[non_zero_indices] ))
         out[~non_zero_indices] = sigmasq
         # Add a small jitter term to the diagonal for numerical stability
         out += np.eye(out.shape[0]) * nugget
-        
         return pd.DataFrame(out)
-    
-    def full_likelihood(self, params: Tuple[float,float,float,float], input_df, y):
+        
+    def full_likelihood(self, params: Tuple[float,float,float,float,float], input_df, y):
         # Compute the covariance matrix from the matern function
         cov_matrix = self.matern_cov_yx(params=params, y_df = input_df, x_df = input_df)
         # Compute the Cholesky decomposition
@@ -278,7 +292,7 @@ class matern_spatial:
         neg_log_lik = 0.5 * (n * np.log(2 * np.pi) + log_det + quad_form)
         return neg_log_lik
     
-    def vecchia_likelihood(self,params: Tuple[float,float,float, float],input_df, mm_cond_number, nns_map):
+    def vecchia_likelihood(self,params: Tuple[float,float,float, float,float],input_df, mm_cond_number, nns_map):
 
         # reordered_df['ColumnAmountO3'] = reordered_df['ColumnAmountO3']-np.mean(reordered_df['ColumnAmountO3'])
         neg_log_lik = 0
@@ -330,8 +344,8 @@ class matern_spatial:
                            
     def mle_parallel(self, key, bounds, initial_params, input_df, mm_cond_number, nns_map):
         try:
-            logging.info(f"fit_spatial_matern day {key}")
-            print(f"fit_st_bylat_11_14: day {key}")  # Debugging line
+            logging.info(f"fit_spatial_matern,L-BFGS-B, day {key}")
+            print(f"fit_purely_space, L-BFGS-B: day {key}")  # Debugging line
         
             result = minimize(
                 self.vecchia_likelihood, 
@@ -348,6 +362,75 @@ class matern_spatial:
             print(f"Error occurred on {key}: {str(e)}")
             logging.error(f"Error occurred on {key}: {str(e)}")
             return f"Error occurred on {key}"
+        
+    def mle_parallel_basin(self, key, bounds, initial_params, input_df, mm_cond_number, nns_map, niter=150):
+        try:
+            logging.info(f"Starting basinhopping optimization for day {key}")
+            print(f"Starting basinhopping optimization for day {key}")  # Debugging line
+
+            result = basinhopping(
+                func=self.vecchia_likelihood,
+                x0=initial_params,
+                minimizer_kwargs={
+                    'method': 'L-BFGS-B',
+                    'bounds': bounds,  # Use dynamic bounds
+                    'args': (input_df, mm_cond_number, nns_map)
+                },
+                niter=niter
+            )
+            optimized_params = result.x
+            logging.info(
+                f"Estimated parameters on {key}: {optimized_params}, "
+                f"cond {mm_cond_number}, bounds={bounds}"
+            )
+            return f"Estimated parameters on {key}: {optimized_params}, cond {mm_cond_number}, bounds={bounds}"
+        except Exception as e:
+            logging.error(f"Error occurred on {key}: {str(e)}", exc_info=True)
+            return f"Error occurred on {key}"
+        
+    def mle_parallel_nelder_mead(self, key, bounds, initial_params, input_df, mm_cond_number, nns_map):
+        try:
+            logging.info(f"Starting Nelder-Mead optimization for day {key}")
+            print(f"Starting Nelder-Mead optimization for day {key}")  # Debugging line
+
+            # Define a wrapper to handle bounds for Nelder-Mead
+            def constrained_vecchia_likelihood(params, input_df, mm_cond_number, nns_map):
+                # Apply manual bounds handling
+                for i, (low, high) in enumerate(bounds):
+                    if not (low <= params[i] <= high):
+                        logging.warning(f"Parameter out of bounds: {params}")
+                        return float('inf')  # Penalize out-of-bound values heavily
+                # Call the actual likelihood function
+                return self.vecchia_likelihood(params, input_df, mm_cond_number, nns_map)
+
+            # Perform optimization with Nelder-Mead
+            result = minimize(
+                fun=constrained_vecchia_likelihood,
+                x0=initial_params,
+                args=(input_df, mm_cond_number, nns_map),
+                method='Nelder-Mead',
+                options={'maxiter': 1500, 'disp': True, 'adaptive': True}  # Enable adaptive step sizes
+            )
+
+            # Extract and log results
+            optimized_params = result.x
+            if result.success:
+                logging.info(
+                    f"Optimization succeeded for day {key}. "
+                    f"Parameters: {optimized_params}, "
+                    f"Bounds: {bounds}, Condition number: {mm_cond_number}"
+                )
+                return f"Optimization succeeded for day {key}. Parameters: {optimized_params}, Bounds: {bounds}"
+            else:
+                logging.warning(f"Optimization failed for day {key}. Message: {result.message}")
+                return f"Optimization failed for day {key}. Message: {result.message}"
+
+        except Exception as e:
+            logging.error(f"An error occurred for day {key}: {str(e)}", exc_info=True)
+            return f"An error occurred for day {key}: {str(e)}"
+
+
+
 
 class gneiting:
     def __init__(self):
@@ -355,7 +438,7 @@ class gneiting:
 
     def my_gneiting(self, params: Tuple[float,float,float,float,float,float,float], input_df=None)->pd.DataFrame: 
         a, c, tau, alpha,gamma,sigma, beta = params
-        nugget = 5
+        nugget = 1
         
         # Convert DataFrame columns into numpy arrays
         x = input_df['Longitude'].values
