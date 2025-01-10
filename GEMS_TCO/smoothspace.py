@@ -24,7 +24,6 @@ class space_average:
 
     def __init__(self, df, lat_resolution, lon_resolution, lat_s,lat_e, lon_s,lon_e ):
         self.df = df
-   
         self.lat_resolution = lat_resolution
         self.lon_resolution = lon_resolution
         self.lat_s = lat_s
