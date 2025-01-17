@@ -16,15 +16,11 @@
 -[Link to ondemand HPC](http://ondemand.hpc.rutgers.edu )    
 
 ## Research Proposal and Exploratory Data Analysis
-[Research Proposal](GEMS_TCO_EDA/Spatio_temporal_modeling.pdf) Main goal of the project is to develop tools that can help modeling spatio-temporal Ozone process.
+[Research Proposal](GEMS_TCO_EDA/Spatio_temporal_modeling.pdf): Main goal of the project is to develop tools that can help modeling spatio-temporal Ozone process.
 
-[EDA 1](GEMS_TCO_EDA/timeseries_statistics.ipynb)
+[EDA 1](GEMS_TCO_EDA/timeseries_statistics.ipynb): I present time series of semivariograms, variances, cross-periodograms, and cross-variograms.
 
-I present time series of semivariograms, variances, cross-periodograms, and cross-variograms.
-
-[EDA 2](GEMS_TCO_EDA/TCO_VS_Staratoshere.ipynb)
-
-I compared total column ozone with stratospheric ozone, and analyzed the time series of means and variances of ozone values over time.
+[EDA 2](GEMS_TCO_EDA/TCO_VS_Staratoshere.ipynb): I compared total column ozone with stratospheric ozone, and analyzed the time series of means and variances of ozone values over time.
 
 ## Exercise using Amarel Rutgers Cluster
 
