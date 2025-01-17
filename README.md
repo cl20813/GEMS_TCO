@@ -15,7 +15,7 @@
 
 -[Link to ondemand HPC](http://ondemand.hpc.rutgers.edu )    
 
-## Proposal and Exploratory Data Analysis
+## Research Proposal and Exploratory Data Analysis
 [Research Proposal](GEMS_TCO_EDA/Spatio_temporal_modeling.pdf)   
 
 [EDA 1](GEMS_TCO_EDA/timeseries_statistics.ipynb)
