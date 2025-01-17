@@ -16,9 +16,9 @@
             
 -[Install mypackage on Amarel](https://github.com/cl20813/Softwares_Setup/blob/main/install_mypackage_amarel.md)      
 
-[Copy dataset to Amarel HPC](copy_gemsdata_to_amarel)
+-[Copy dataset to Amarel HPC](copy_gemsdata_to_amarel)
 
-[Install and updates the GEMS_TCO package on Amarel HPC](install_mypackage_in_amarel)
+-[Install and updates the GEMS_TCO package on Amarel HPC](install_mypackage_in_amarel)
 
 ## Exercise using Amarel Rutgers Cluster
 
