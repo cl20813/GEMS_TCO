@@ -55,3 +55,11 @@ Remove it and ```re-type it wihtout copy-paste.```
 It happens when I reorder data for vecchia approximation. Obviously, the order affects the conditioning set.
 
 
+## sbatch preempted: 
+add this line into nano file:  
+```sacct --units=G --format=MaxRSS,MaxDiskRead,MaxDiskWrite,Elapsed,NodeList -j $SLURM_JOBID```  
+
+It will capture the peak RAM usage and some other useful info about your job  
+
+Also you can use:   
+```sstat --format=MaxRSS,MaxDiskRead,MaxDiskWrite -j 39534244```  
