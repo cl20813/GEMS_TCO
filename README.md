@@ -1,6 +1,6 @@
-# GEMS Total Column Ozone project (Package)
+# GEMS Total Column Ozone Project (Package)
 
-## Set up and short cuts
+## Set up and Short Cuts
 -[Make and share environment on local computer](https://github.com/cl20813/Softwares_Setup/blob/main/install_python.md)        
 
 -[Create an environment on Rutgers Amarel](https://github.com/cl20813/Softwares_Setup/blob/main/amarel_environment.md)
