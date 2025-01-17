@@ -1,15 +1,8 @@
 # mismatch python and conda
-This happens when I can find package using 'conda list torch" but not find in
-python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
-
-"which python" should return /home/jl2815/.conda/envs/gems_tco/bin/python
-
-TRY
-/home/jl2815/.conda/envs/gems_tco/bin/python -m pip list | grep torch 
-I see there exists torch so I just need to adjust path
-
-export PATH="/home/jl2815/.conda/envs/gems_tco/bin:$PATH"
-which python
+This happens when I can find package using ```conda list torch``` but cannot find the package in python from         
+```python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"```            
+```which python``` should return ```/home/jl2815/.conda/envs/gems_tco/bin/python```                
+Problem is solved. See -[Install mypackage on Amarel](install_mypackage_amarel.md)            
 
 #  "can only concatenate str (not int) to str" when doing f'{key+1}' where  key is a string 
 
