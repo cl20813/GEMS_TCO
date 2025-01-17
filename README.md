@@ -1,12 +1,12 @@
 # GEMS_Total Column Ozone project (Package)
 
-[Link to ondemand HPC](http://ondemand.hpc.rutgers.edu )    
+-[Link to ondemand HPC](http://ondemand.hpc.rutgers.edu )    
 
-[Common errors](errors)  
+-[Common errors](errors)  
 
-[Amrel_guide](Amrel_guide)
+-[Amrel_guide](Amrel_guide)
 
-[Domian knowledge](references_domain_knowledge)
+-[Domian knowledge](references_domain_knowledge)
 
 
 ## Set up
@@ -14,11 +14,9 @@
 
 -[Create an environment on Rutgers Amarel](https://github.com/cl20813/Softwares_Setup/blob/main/amarel_environment.md)
             
--[Install mypackage on Amarel](https://github.com/cl20813/Softwares_Setup/blob/main/install_mypackage_amarel.md)      
+-[Install gems_tco package on Amarel](https://github.com/cl20813/Softwares_Setup/blob/main/install_mypackage_amarel.md)      
 
 -[Copy dataset to Amarel HPC](copy_gemsdata_to_amarel)
-
--[Install and updates the GEMS_TCO package on Amarel HPC](install_mypackage_in_amarel)
 
 ## Exercise using Amarel Rutgers Cluster
 
