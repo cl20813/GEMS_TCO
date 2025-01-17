@@ -45,7 +45,7 @@ I compared total column ozone with stratospheric ozone, and analyzed the time se
 
 ## Debugging errors 
 
--[Common errors](errors) 
+-[Common errors](errors.md) 
 
 
 
