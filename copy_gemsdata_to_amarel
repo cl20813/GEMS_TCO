@@ -6,26 +6,11 @@ ssh jl2815@amarel.rutgers.edu
 
 ### Create the new folder
 cd /home/jl2815
-mkdir -p /tco/data/data_N3035_E100110     # -p option allows mkdir command to create paraent directories as needed. 
+mkdir -p /tco/data/pickle_data     # -p option allows mkdir command to create paraent directories as needed. 
 
 But -p permission was denied so make tco and then data directories.
 
 ### exit amarel and then copy the files
 
-scp "C:\Users\joonw\TCO\data_engineering\data_24_07_0130_N3035_E100110.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E100110  # use scp to copy individual files and scp -r (stands for recursive) to copy entire directories
-scp "C:\Users\joonw\TCO\data_engineering\data_24_04_0130_N3035_E100110.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E100110
-scp "C:\Users\joonw\TCO\data_engineering\data_24_01_0130_N3035_E100110.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E100110
-
-scp "C:\Users\joonw\TCO\data_engineering\data_23_07_0130_N3035_E100110.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E100110
-scp "C:\Users\joonw\TCO\data_engineering\data_23_04_0130_N3035_E100110.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E100110
-scp "C:\Users\joonw\TCO\data_engineering\data_23_01_0130_N3035_E100110.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E100110
-
-
-##
-
-scp "C:\Users\joonw\TCO\data_engineering\data_24_04_0130_N3035_E110120.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E110120
-scp "C:\Users\joonw\TCO\data_engineering\data_24_07_0130_N3035_E110120.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E110120
-
-
-scp "C:\Users\joonw\TCO\data_engineering\data_23_04_0130_N3035_E110120.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E110120
-scp "C:\Users\joonw\TCO\data_engineering\data_23_07_0130_N3035_E110120.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_N3035_E110120
+scp -r "C:\\Users\\joonw\\TCO\\data_engineering\\data_2023" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_data
+scp -r "C:\\Users\\joonw\\TCO\\data_engineering\\data_2024" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_data
