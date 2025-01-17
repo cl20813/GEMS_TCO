@@ -1,4 +1,5 @@
 # GEMS_Total Column Ozone project (Package)
+
 [Link to ondemand HPC](http://ondemand.hpc.rutgers.edu )    
 
 [Common errors](errors)  
@@ -9,6 +10,11 @@
 
 
 ## Set up
+-[Make and share environment](https://github.com/cl20813/Softwares_Setup/blob/main/install_python.md)        
+
+-[Create an environment on Rutgers Amarel](https://github.com/cl20813/Softwares_Setup/blob/main/amarel_environment.md)
+            
+-[Install mypackage on Amarel](https://github.com/cl20813/Softwares_Setup/blob/main/install_mypackage_amarel.md)      
 
 [Copy dataset to Amarel HPC](copy_gemsdata_to_amarel)
 
