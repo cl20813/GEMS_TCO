@@ -16,15 +16,16 @@
 -[Link to ondemand HPC](http://ondemand.hpc.rutgers.edu )    
 
 ## Research Proposal and Exploratory Data Analysis
-[Research Proposal](GEMS_TCO_EDA/Spatio_temporal_modeling.pdf): Main goal of the project is to develop tools that can help modeling spatio-temporal Ozone process.
+-[Research Proposal](GEMS_TCO_EDA/Spatio_temporal_modeling.pdf): Main goal of the project is to develop tools that can help modeling spatio-temporal Ozone process.
 
-[EDA 1](GEMS_TCO_EDA/timeseries_statistics.ipynb): I present time series of semivariograms, variances, cross-periodograms, and cross-variograms.
+-[EDA 1](GEMS_TCO_EDA/timeseries_statistics.ipynb): I present time series of semivariograms, variances, cross-periodograms, and cross-variograms.
 
-[EDA 2](GEMS_TCO_EDA/TCO_VS_Staratoshere.ipynb): I compared total column ozone with stratospheric ozone, and analyzed the time series of means and variances of ozone values over time.
+-[EDA 2](GEMS_TCO_EDA/TCO_VS_Staratoshere.ipynb): I compared total column ozone with stratospheric ozone, and analyzed the time series of means and variances of ozone values over time.
 
 ## Exercise using Amarel Rutgers Cluster
 
-[Relevant Gaussian Process related exercises can be found here. ](https://github.com/cl20813/Gaussian_Process_Exercises)        
+-[Relevant Gaussian Process related exercises can be found here. ](https://github.com/cl20813/Gaussian_Process_Exercises)        
+
 [Compare full likelihood vs Vecchia approximation, simple spatial model ](Exercises/full_vs_vecchia)                
 [Compare full likelihood vs Vecchia approximation, spatio-temporal model ](Exercises/full_vs_vecchia_spatio_temporal)  
 [Compare full likelihood vs Vecchia approximation, gneiting model ](Exercises/full_vecc_gneiting)  
