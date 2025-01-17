@@ -24,6 +24,7 @@
 
 ## Exercise using Amarel Rutgers Cluster
 
+[Relevant Gaussian Process related exercises can be found here. ](https://github.com/cl20813/Gaussian_Process_Exercises)        
 [Compare full likelihood vs Vecchia approximation, simple spatial model ](Exercises/full_vs_vecchia)                
 [Compare full likelihood vs Vecchia approximation, spatio-temporal model ](Exercises/full_vs_vecchia_spatio_temporal)  
 [Compare full likelihood vs Vecchia approximation, gneiting model ](Exercises/full_vecc_gneiting)  
