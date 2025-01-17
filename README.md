@@ -11,7 +11,7 @@
 
 -[Amrel_guide](Amrel_guide)
 
--[Domian knowledge](references_domain_knowledge)
+-[Domain knowledge](references_domain_knowledge)
 
 -[Link to ondemand HPC](http://ondemand.hpc.rutgers.edu )    
 
