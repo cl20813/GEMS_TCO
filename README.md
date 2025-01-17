@@ -15,9 +15,14 @@
 
 -[Link to ondemand HPC](http://ondemand.hpc.rutgers.edu )    
 
-## debugging errors 
+## Exploratory Data Analysis
+[EDA 1](GEMS_TCO_EDA/timeseries_statistics.ipynb)
 
--[Common errors](errors)  
+I present time series of semivariograms, variances, cross-periodograms, and cross-variograms.
+
+[EDA 2](GEMS_TCO_EDA/TCO_VS_Staratoshere.ipynb)
+
+I compared total column ozone with stratospheric ozone, and analyzed the time series of means and variances of ozone values over time.
 
 ## Exercise using Amarel Rutgers Cluster
 
@@ -38,13 +43,10 @@
 
 [testing_algorithm_11_22](Exercises/testing_alg) 
 
+## Debugging errors 
+
+-[Common errors](errors) 
 
 
-## Exploratory Data Analysis
-[EDA 1](GEMS_TCO_EDA/timeseries_statistics.ipynb)
 
-I present time series of semivariograms, variances, cross-periodograms, and cross-variograms.
 
-[EDA 2](GEMS_TCO_EDA/TCO_VS_Staratoshere.ipynb)
-
-I compared total column ozone with stratospheric ozone, and analyzed the time series of means and variances of ozone values over time.
