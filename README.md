@@ -16,7 +16,7 @@
 -[Link to ondemand HPC](http://ondemand.hpc.rutgers.edu )    
 
 ## Research Proposal and Exploratory Data Analysis
-[Research Proposal](GEMS_TCO_EDA/Spatio_temporal_modeling.pdf)   
+[Research Proposal](GEMS_TCO_EDA/Spatio_temporal_modeling.pdf) Main goal of the project is to develop tools that can help modeling spatio-temporal Ozone process.
 
 [EDA 1](GEMS_TCO_EDA/timeseries_statistics.ipynb)
 
