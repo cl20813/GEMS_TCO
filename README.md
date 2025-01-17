@@ -15,7 +15,9 @@
 
 -[Link to ondemand HPC](http://ondemand.hpc.rutgers.edu )    
 
-## Exploratory Data Analysis
+## Proposal and Exploratory Data Analysis
+[Research Proposal](GEMS_TCO_EDA/Spatio_temporal_modeling.pdf)   
+
 [EDA 1](GEMS_TCO_EDA/timeseries_statistics.ipynb)
 
 I present time series of semivariograms, variances, cross-periodograms, and cross-variograms.
