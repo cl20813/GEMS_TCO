@@ -1,3 +1,16 @@
+# mismatch python and conda
+This happens when I can find package using 'conda list torch" but not find in
+python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
+
+"which python" should return /home/jl2815/.conda/envs/gems_tco/bin/python
+
+TRY
+/home/jl2815/.conda/envs/gems_tco/bin/python -m pip list | grep torch 
+I see there exists torch so I just need to adjust path
+
+export PATH="/home/jl2815/.conda/envs/gems_tco/bin:$PATH"
+which python
+
 #  "can only concatenate str (not int) to str" when doing f'{key+1}' where  key is a string 
 
 # float is not interable: this could happen when parameter size changes ex) I did --params 0 1 1 1 1 1  where my function only requires 3. 
@@ -10,7 +23,6 @@
 Even though export OMP_NUM_THREADS=1 showed "command not found", the rest of your code continues to run. But to ensure proper thread control, you can add this line directly in your Python script:
 
 To see the error, do   cat -v fit_st_model_res0.2.sh to see the added hidden characters when I copy paste the line. Remove it and re-type it wihtout copy-paste.
-
 
 
 # Ensure skgstat module is installed
