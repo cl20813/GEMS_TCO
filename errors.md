@@ -1,12 +1,12 @@
-# mismatch python and conda
+#### mismatch python and conda
 This happens when I can find package using ```conda list torch``` but cannot find the package in python from         
 ```python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"```            
 ```which python``` should return ```/home/jl2815/.conda/envs/gems_tco/bin/python```                
 Problem is solved. See -[Install mypackage on Amarel](install_mypackage_amarel.md)            
 
-#  "can only concatenate str (not int) to str" when doing f'{key+1}' where  key is a string 
+####  "can only concatenate str (not int) to str" when doing f'{key+1}' where  key is a string 
 
-# float is not interable: this could happen when parameter size changes ex) I did --params 0 1 1 1 1 1  where my function only requires 3. 
+#### float is not interable: this could happen when parameter size changes ex) I did --params 0 1 1 1 1 1  where my function only requires 3. 
 
 # vecchia poor performance
 1. don't apply reordering twice! (once in .py file once in likelihood function) it will change the order again!   
