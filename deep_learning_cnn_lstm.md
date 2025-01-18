@@ -43,7 +43,6 @@ echo "Current date and time: $(date)"
 echo "testing cnn_lstm 1"
 
 srun python /home/jl2815/tco/exercise_25/deep_learning_cnn_lstm.py
-
 ```
-
+cd ./jobscript/tco/dl
 sbatch cnn_lstm1.sh  
