@@ -20,7 +20,7 @@
 
 -[EDA 1](GEMS_TCO_EDA/timeseries_statistics.ipynb): I present time series of semivariograms, and variances.
 
--[EDA 1-2](GEMS_TCO_EDA/2years_mean_var_sem.ipynb): Presented time series of means, variances and semivariograms per hour from January 2023 to December 2024.
+-[EDA 1-2](GEMS_TCO_EDA/2years_mean_var_sem.ipynb): Presented time series of means, variances and semivariograms per hour from January 2023 to December 2024. The plots show not only short term cycles but also long-term cycles. 
 
 -[EDA 2](GEMS_TCO_EDA/TCO_VS_Staratoshere.ipynb): I compared total column ozone with stratospheric ozone, and analyzed the time series of means and variances of ozone values over time.
 
