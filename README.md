@@ -1,24 +1,24 @@
 # GEMS Total Column Ozone Project (Package)
 
-## Set up and Short Cuts
--[Make and share environment on local computer](https://github.com/cl20813/Softwares_Setup/blob/main/install_python.md)        
+## Setup and Shortcuts
+-[Creeate and share environment on a local computer](https://github.com/cl20813/Softwares_Setup/blob/main/install_python.md)        
 
 -[Create an environment on Rutgers Amarel](https://github.com/cl20813/Softwares_Setup/blob/main/amarel_environment.md)
             
--[Install gems_tco package on Amarel](https://github.com/cl20813/Softwares_Setup/blob/main/install_mypackage_amarel.md)      
+-[Install ```gems_tco``` package on Amarel](https://github.com/cl20813/Softwares_Setup/blob/main/install_mypackage_amarel.md)      
 
--[Copy dataset to Amarel HPC](copy_gemsdata_to_amarel)
+-[Copy the dataset to Amarel HPC](copy_gemsdata_to_amarel)
 
 -[Amrel_guide](Amrel_guide)
 
 -[Domain knowledge](references_domain_knowledge)
 
--[Link to ondemand HPC](http://ondemand.hpc.rutgers.edu )    
+-[Link to OnDemand HPC](http://ondemand.hpc.rutgers.edu )    
 
 ## Research Proposal and Exploratory Data Analysis
--[Research Proposal](GEMS_TCO_EDA/Spatio_temporal_modeling.pdf): Main goal of the project is to develop tools that can help modeling spatio-temporal Ozone process.
+-[Research Proposal](GEMS_TCO_EDA/Spatio_temporal_modeling.pdf): The main goal of the project is to develop tools that can help in modeling the spatio-temporal Ozone process.
 
--[EDA 1](GEMS_TCO_EDA/timeseries_statistics.ipynb): I present time series of semivariograms, variances, cross-periodograms, and cross-variograms.
+-[EDA 1](GEMS_TCO_EDA/timeseries_statistics.ipynb): I present time series of semivariograms, and variances.
 
 -[EDA 2](GEMS_TCO_EDA/TCO_VS_Staratoshere.ipynb): I compared total column ozone with stratospheric ozone, and analyzed the time series of means and variances of ozone values over time.
 
