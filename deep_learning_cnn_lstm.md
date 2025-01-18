@@ -30,7 +30,7 @@ nano cnn_lstm1.sh                # open a new text editor
 #SBATCH --mem=200G                          
 #SBATCH --partition=gpu                     
 
-# Load the Anaconda module to use srun 
+#### Load the Anaconda module to use srun 
 module purge                                              
 module use /projects/community/modulefiles                 
 module load anaconda/2024.06-ts840 
@@ -38,7 +38,7 @@ conda activate gems_tco
 
 echo "Current date and time: $(date)"
 
-# Run the Python script
+#### Run the Python script
 
 echo "testing cnn_lstm 1"
 
