@@ -48,19 +48,6 @@ class MakeOrbitdata(space_average):
         
         super().__init__(df, lat_resolution, lon_resolution, lat_s, lat_e, lon_s, lon_e)
 
-    def makeorbitmap(self):
-        orbit_map = {}  
-        self.df['Orbit'] = self.df['Time'].str[0:16]
-        orbits = self.df['Orbit'].unique()
-
-        p=0
-        for orbit in orbits:
-            p+=1
-            hour = (p % 8) if (p % 8) != 0 else 8
-            orbit_key = f'y{orbit[2:4]}m{int(orbit[5:7]):02d}day{ int(orbit[8:10]):02d}_{hour}'
-            orbit_map[orbit_key] = self.df.loc[self.df['Orbit'] == orbit].reset_index(drop=True)
-        return orbit_map
-    
     def group_data_by_orbits(self):
         """
         Groups data into a dictionary based on unique orbit timestamps.
@@ -77,7 +64,8 @@ class MakeOrbitdata(space_average):
             orbit_map[orbit_key] = self.df.loc[self.df['Orbit'] == orbit].reset_index(drop=True)
         return orbit_map
     
-        
+    
+    # make_coarse map by aggregating data
     def make_sparsemap(self, orbit_map, sparsity):
         assert isinstance(orbit_map, dict), "orbit_map must be a dict"
         sparse_map = {}
@@ -248,7 +236,6 @@ class MakeOrbitdata(space_average):
             Returns an n x max_nn array holding the indices of the nearest neighbors
             preceding in the ordering where -1 indicates missing neighbors.
         """
-
         n = locs.shape[0]
         nns = np.zeros((n, max_nn), dtype=np.int64) - 1
         for i in range(1, n):
@@ -339,17 +326,6 @@ class databyday_24July:
         return coarse_map, nns_map
 
 
-
-
-
-'''
-class difference_data:
-    def __init__(self,df: pd.DataFrame):
-        self.df = df
-    
-    def diff_day_to_day(self):
-
-'''
 
 
 
