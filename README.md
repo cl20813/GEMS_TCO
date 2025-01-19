@@ -18,9 +18,11 @@
 ## Research Proposal and Exploratory Data Analysis
 -[Research Proposal](GEMS_TCO_EDA/Spatio_temporal_modeling.pdf): The main goal of the project is to develop tools that can help in modeling the spatio-temporal Ozone process.
 
--[EDA 1](GEMS_TCO_EDA/var_sem_timeseries_foronemonth.ipynb): I present time series of semivariograms, and variances.
+-[Yearly scale EDA](GEMS_TCO_EDA/2years_mean_var_sem.ipynb): Presented time series of means, variances and semivariograms per hour from January 2023 to December 2024. The plots show not only short term cycles but also long-term cycles.
 
--[EDA 1-2](GEMS_TCO_EDA/2years_mean_var_sem.ipynb): Presented time series of means, variances and semivariograms per hour from January 2023 to December 2024. The plots show not only short term cycles but also long-term cycles.  
+-[Monthly scale EDA ](GEMS_TCO_EDA/var_sem_timeseries_foronemonth.ipynb): I present time series of semivariograms, and variances.
+
+  
 
 
 
