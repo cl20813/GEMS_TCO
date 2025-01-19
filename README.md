@@ -20,9 +20,11 @@
 
 -[Yearly scale EDA](GEMS_TCO_EDA/2years_mean_var_sem.ipynb): Presented time series of means, variances and semivariograms per hour from January 2023 to December 2024. The plots show not only short term cycles but also long-term cycles.
 
--[Monthly scale EDA ](GEMS_TCO_EDA/var_sem_timeseries_foronemonth.ipynb): I present time series of semivariograms, and variances.
+-[Monthly scale EDA ](GEMS_TCO_EDA/var_sem_timeseries_foronemonth.ipynb): We present time series of semivariograms, and variances.
 
-  
+-[Hourly scale EDA ](GEMS_TCO_EDA/sem_crossvario_houlryeda.ipynb): We explored data on an hourly scale. ```The cyclic pattern``` shown in the ```semivariograms``` indicates that we should fit the data with a model that can explain this cyclic pattern. Secondly, ```asymmetric cross-variograms``` on some days imply that there is ```space and time interaction```, hence we should consider a non-separable model. Lastly, ```latitude-sliced``` data shows ```spatial non-stationarity```. I plan to ```detrend for 5x10 spatial points``` in the N5N10 E110E120 region. 
+
+   
 
 
 
