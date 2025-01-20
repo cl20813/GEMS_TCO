@@ -3,12 +3,12 @@
 This happens when I try to open a pkl file using pandas. This error is in python 311\Lib\pickle.py file.
 My environments where I created and loaded the pickle file were different. I used the exact same dependency version on both environments, still getting the issue.
 
-Check in my local computer:
+Check in my local computer:          
 ```print(pd.__version__)```   
 ```print(np.__version__)```   
-Then in Amarel Rutgers 
-python -c "import pandas as pd; print(pd.__version__)"      
-python -c "import numpy as np; print(np.__version__)"    
+Then in Amarel Rutgers               
+```python -c "import pandas as pd; print(pd.__version__)"```        
+```python -c "import numpy as np; print(np.__version__)"```         
 
  Maybe I should askthe creator to use the pandas version which my project is using.
  
