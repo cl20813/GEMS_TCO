@@ -5,7 +5,12 @@ Below includes: original csv files by month, dictionary map for original data, a
 ```scp -r "C:\\Users\\joonw\\TCO\\data_engineering\\data_2023" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_data```   
 ```scp -r "C:\\Users\\joonw\\TCO\\data_engineering\\data_2024" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_data```         
 
+I found errors when I try to load pickle files in Amarel that are created from my local computer. Hence I upload csv files and then
+remake pickle files in Amaral HPC.
+```scp "C:\Users\joonw\TCO\GEMS_TCO-1\data_preprocessing\groupdata_by_center.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/pipeline```        
+```srun --cpus-per-task=4 --partition main --mem=20G --time=05:00:00 python /home/jl2815/tco/pipeline/groupdata_by_center.py```                 
 ```scp "C:\Users\joonw\TCO\pipeline_2025\job_scripts\deep_learning_cnn_lstm.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25```
+
 
 ### Run
 
