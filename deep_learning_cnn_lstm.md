@@ -13,7 +13,7 @@ Below includes: original csv files by month, dictionary map for original data, a
 ```module use /projects/community/modulefiles```     
 ```module load anaconda/2024.06-ts840```     
 ```conda activate gems_tco```     
-```srun --cpus-per-task=4 --partition gpu --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise_25/deep_learning_cnn_lstm.py```       
+```srun --cpus-per-task=4 --partition main --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise_25/deep_learning_cnn_lstm.py```       
 
 
 cd ./jobscript/tco/dl
