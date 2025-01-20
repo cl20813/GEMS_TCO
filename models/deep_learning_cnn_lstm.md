@@ -33,7 +33,7 @@ srun --cpus-per-task=4 --partition main --mem=20G --time=05:00:00 python /home/j
 cd ./jobscript/tco/dl
 nano cnn_lstm1.sh                # open a new text editor
 
-'''
+```
 #!/bin/bash
 #SBATCH --job-name=cnn_lstm1                                       # Job name
 #SBATCH --output=/home/jl2815/GEMS/cnn_lstm1_%j.out            # Standard output file (%j = JobID)
@@ -60,6 +60,7 @@ echo "testing cnn_lstm 1"
 
 srun python /home/jl2815/tco/exercise_25/deep_learning_cnn_lstm.py
 ```
+
 cd ./jobscript/tco/dl
 sbatch cnn_lstm1.sh
 
@@ -69,7 +70,7 @@ sbatch cnn_lstm1.sh
 cd ./jobscript/tco/dl
 nano tmp_dataprocess.sh                # open a new text editor
 
-'''
+```
 #!/bin/bash
 #SBATCH --job-name=cnn_lstm1                                       # Job name
 #SBATCH --output=/home/jl2815/GEMS/cnn_lstm1_%j.out            # Standard output file (%j = JobID)
@@ -95,7 +96,6 @@ echo "Current date and time: $(date)"
 
 
 srun python /home/jl2815/tco/pipeline/tmp.py
-
 ```
 cd ./jobscript/tco/dl
 
