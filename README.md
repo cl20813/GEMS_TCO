@@ -30,7 +30,7 @@
 
 -[EDA 2](GEMS_TCO_EDA/TCO_VS_Staratoshere.ipynb): I compared total column ozone with stratospheric ozone, and analyzed the time series of means and variances of ozone values over time.
 
-## Exercise using Amarel Rutgers Cluster
+## Job orders for Amarel Rutgers Cluster
 
 -[Relevant Gaussian Process related exercises can be found here. ](https://github.com/cl20813/Gaussian_Process_Exercises)        
 
