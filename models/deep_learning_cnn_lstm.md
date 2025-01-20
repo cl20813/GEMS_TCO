@@ -48,6 +48,9 @@ nano cnn_lstm1.sh                # open a new text editor
 module purge                                              
 module use /projects/community/modulefiles                 
 module load anaconda/2024.06-ts840 
+
+#### Initialize conda for the current shell session if not already done for the current shell session.
+eval "$(conda shell.bash hook)"
 conda activate gems_tco
 
 echo "Current date and time: $(date)"
@@ -80,7 +83,10 @@ nano tmp_dataprocess.sh                # open a new text editor
 #### Load the Anaconda module to use srun 
 module purge                                              
 module use /projects/community/modulefiles                 
-module load anaconda/2024.06-ts840 
+module load anaconda/2024.06-ts840
+
+#### Initialize conda for the current shell session if not already done for the current shell session.
+eval "$(conda shell.bash hook)"
 conda activate gems_tco
 
 echo "Current date and time: $(date)"
