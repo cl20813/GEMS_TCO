@@ -24,7 +24,7 @@ def main():
     instance = orbitmap.MakeOrbitdata(df, 5,10,110,120)
 
     # Load the one dictionary to set spaital coordinates
-    filepath = "/home/jl2815/tco/data/pickle_data/data_2024/sparse_cen_map24_01.pkl"
+    filepath = "/home/jl2815/tco/data/pickle_data/pickle_2023/coarse_cen_map23_01.pkl"
 
     with open(filepath, 'rb') as pickle_file:
         coarse_dict_24_1 = pickle.load(pickle_file)
