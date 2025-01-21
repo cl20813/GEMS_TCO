@@ -29,7 +29,12 @@ def main():
     with open(filepath, 'rb') as pickle_file:
         coarse_dict_24_1 = pickle.load(pickle_file)
 
+    print(coarse_dict_24_1.keys())
     sample_df = coarse_dict_24_1['y24m01day01_hm02:12']
+
+    sample_key = coarse_dict_24_1.get('y24m01day01_hm02:12')
+    if sample_key is None:
+        print("Key 'y24m01day01_hm02:12' not found in the dictionary.")
 
     rho_lat = 20
     rho_lon = 20
