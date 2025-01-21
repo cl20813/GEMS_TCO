@@ -227,5 +227,7 @@ def main():
             total_loss += loss.item()
         print(f"Epoch {epoch + 1}/{epochs}, Loss: {total_loss / len(dataloader):.4f}")
 
+    print(f'predictions {predictions}')
+    print(f'y:{y}')
 if __name__ == '__main__':
     main()
