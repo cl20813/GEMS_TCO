@@ -2,6 +2,7 @@
 import pandas as pd
 import pickle
 import numpy as np 
+import time  # Add this import statement
 
 import torch
 import torch.nn as nn
@@ -195,36 +196,35 @@ def main():
     # model = MultiScaleLSTM(cnn_channels, cnn_output_size, lstm_hidden_size)
     # model.train()
 
-    # Set the device
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # Initialize model
     model = MultiScaleLSTM(cnn_channels, cnn_output_size, lstm_hidden_size)
+    model.train()
 
+    # Move model to GPU
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
 
     # Loss and optimizer
-    # criterion = nn.MSELoss()
-    criterion = nn.MSELoss().to(device)
+    criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     # Training loop
     epochs = 20
     for epoch in range(epochs):
         total_loss = 0.0
+        start_time = time.time()  # Start time for the epoch
         for X_daily, X_monthly, X_three_month, y in dataloader:
             # Move data to GPU
-            X_daily = X_daily.to(device)
-            X_monthly = X_monthly.to(device)
-            X_three_month = X_three_month.to(device)
-            y = y.to(device)
-
-            # Forward pass
+            X_daily, X_monthly, X_three_month, y = X_daily.to(device), X_monthly.to(device), X_three_month.to(device), y.to(device)
+            
             optimizer.zero_grad()
             predictions = model(X_daily, X_monthly, X_three_month)
-            loss = criterion(predictions,   y)
-
-            # Backward pass and optimization
+            loss = criterion(predictions, y)
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
+        end_time = time.time()  # End time for the epoch
+        epoch_duration = end_time - start_time  # Calculate duration
         print(f"Epoch {epoch + 1}/{epochs}, Loss: {total_loss / len(dataloader):.4f}")
 
     print(f'predictions {predictions}')
