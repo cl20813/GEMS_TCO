@@ -28,13 +28,15 @@ remake pickle files in Amaral HPC. Hence, transfer csv files first and then proc
 ```
 #!/bin/bash
 #SBATCH --job-name=cnn_lstm1                                       # Job name
-#SBATCH --output=/home/jl2815/tco/model_output/cnn_lstm1_%j.out            # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/model_output/cnn_lstm1_%j.err              # Standard error file (%j = JobID)
-#SBATCH --time=72:00:00                
-#SBATCH --ntasks=1                       
-#SBATCH --cpus-per-task=8                 
-#SBATCH --mem=200G                          
-#SBATCH --partition=gpu                     
+#SBATCH --output=/home/jl2815/tco/model_output/cnn_lstm1_%j.out    # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/model_output/cnn_lstm1_%j.err     # Standard error file (%j = JobID)
+#SBATCH --time=72:00:00                                            # Time limit
+#SBATCH --ntasks=1                                                 # Number of tasks
+#SBATCH --cpus-per-task=8                                          # Number of CPU cores per task
+#SBATCH --mem=200G                                                 # Memory per node
+#SBATCH --partition=gpu                                            # Partition name
+#SBATCH --gres=gpu:1                                               # Number of GPUs per node
+
 
 #### Load the Anaconda module to use srun 
 module purge                                              
