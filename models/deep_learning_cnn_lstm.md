@@ -30,10 +30,10 @@ srun --cpus-per-task=4 --partition main --mem=20G --time=05:00:00 python /home/j
 ```srun --cpus-per-task=4 --partition main --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise_25/deep_learning_cnn_lstm.py```       
 
 
-cd ./jobscript/tco/dl
-nano cnn_lstm1.sh                # open a new text editor
+cd ./jobscript/tco/dl           
+nano cnn_lstm1.sh                # open a new text editor              
 
-'''
+```
 #!/bin/bash
 #SBATCH --job-name=cnn_lstm1                                       # Job name
 #SBATCH --output=/home/jl2815/GEMS/cnn_lstm1_%j.out            # Standard output file (%j = JobID)
@@ -48,6 +48,9 @@ nano cnn_lstm1.sh                # open a new text editor
 module purge                                              
 module use /projects/community/modulefiles                 
 module load anaconda/2024.06-ts840 
+
+#### Initialize conda for the current shell session if not already done for the current shell session.
+eval "$(conda shell.bash hook)"
 conda activate gems_tco
 
 echo "Current date and time: $(date)"
@@ -57,16 +60,17 @@ echo "testing cnn_lstm 1"
 
 srun python /home/jl2815/tco/exercise_25/deep_learning_cnn_lstm.py
 ```
-cd ./jobscript/tco/dl
-sbatch cnn_lstm1.sh
+
+cd ./jobscript/tco/dl       
+sbatch cnn_lstm1.sh         
 
 ############################
 
 
-cd ./jobscript/tco/dl
-nano tmp_dataprocess.sh                # open a new text editor
+cd ./jobscript/tco/dl          
+nano tmp_dataprocess.sh                # open a new text editor         
 
-'''
+```
 #!/bin/bash
 #SBATCH --job-name=cnn_lstm1                                       # Job name
 #SBATCH --output=/home/jl2815/GEMS/cnn_lstm1_%j.out            # Standard output file (%j = JobID)
@@ -80,7 +84,10 @@ nano tmp_dataprocess.sh                # open a new text editor
 #### Load the Anaconda module to use srun 
 module purge                                              
 module use /projects/community/modulefiles                 
-module load anaconda/2024.06-ts840 
+module load anaconda/2024.06-ts840
+
+#### Initialize conda for the current shell session if not already done for the current shell session.
+eval "$(conda shell.bash hook)"
 conda activate gems_tco
 
 echo "Current date and time: $(date)"
@@ -89,7 +96,6 @@ echo "Current date and time: $(date)"
 
 
 srun python /home/jl2815/tco/pipeline/tmp.py
-
 ```
 cd ./jobscript/tco/dl
 
