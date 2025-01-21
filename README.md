@@ -26,6 +26,8 @@
 
 -[Ozone distribution analysis](GEMS_TCO_EDA/TCO_VS_Staratoshere.ipynb): I compared ```total column ozone``` with ```stratospheric ozone``` and analyzed the time series of means and variances of ozone values over time to confirm that most of the ozone is located in the stratosphere. 
 
+## Models
+
 -[CNN integrated with LSTM](models/fit_deep_learning.ipynb): Still working on it. It seems CNN does not capture high resolution spatial information. Maybe I should replace it with Gaussian Process followed by LSTM. 
 
 
