@@ -47,7 +47,7 @@ def main():
     years = ['2023','2024']
     for year in years:
         for month in range(1, 13):  # Iterate over all months
-            filepath = f"/home/jl2815/tco/data/pickle_data/pickle_{year}\\coarse_cen_map{year[2:]}_{month:02d}.pkl"
+            filepath = f"/home/jl2815/tco/data/pickle_data/pickle_{year}/coarse_cen_map{year[2:]}_{month:02d}.pkl"
             with open(filepath, 'rb') as pickle_file:
                 loaded_map = pickle.load(pickle_file)
                 for key in loaded_map:
