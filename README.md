@@ -31,6 +31,7 @@
 -[CNN integrated with LSTM](models/fit_deep_learning.ipynb): Still working on it. It seems CNN does not capture high resolution spatial information. Maybe I should replace it with Gaussian Process followed by LSTM. 
 
 
+# Reference
 ## Job orders for Amarel Rutgers Cluster
 
 -[Relevant Gaussian Process related exercises can be found here. ](https://github.com/cl20813/Gaussian_Process_Exercises)        
