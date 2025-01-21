@@ -31,7 +31,7 @@ remake pickle files in Amaral HPC. Hence, transfer csv files first and then proc
 #SBATCH --output=/home/jl2815/tco/model_output/cnn_lstm1_%j.out    # Standard output file (%j = JobID)
 #SBATCH --error=/home/jl2815/tco/model_output/cnn_lstm1_%j.err     # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
-#SBATCH --ntasks=1                                                 # Number of tasks
+#SBATCH --ntasks=2                                                 # Number of tasks
 #SBATCH --cpus-per-task=8                                          # Number of CPU cores per task
 #SBATCH --mem=200G                                                 # Memory per node
 #SBATCH --partition=gpu                                            # Partition name
@@ -53,6 +53,7 @@ echo "Current date and time: $(date)"
 echo "testing cnn_lstm 1"
 
 srun python /home/jl2815/tco/models/deep_learning_cnn_lstm.py
+srun python /home/jl2815/tco/models/deep_learning_cnn_lstm_cpu.py
 ```
 
 cd ./jobscript/tco/dl       
