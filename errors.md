@@ -10,7 +10,8 @@ Then in Amarel Rutgers
 ```python -c "import pandas as pd; print(pd.__version__)"```        
 ```python -c "import numpy as np; print(np.__version__)"```         
 
- Maybe I should askthe creator to use the pandas version which my project is using.
+ Maybe I should ask the creator to use the pandas version which my project is using. 
+ I just sent csv files to Amarel, then made pickle files in there again. 
  
 ## 1. Mismatch python and conda
 This happens when I can find package using ```conda list torch``` but cannot find the package in python from         
