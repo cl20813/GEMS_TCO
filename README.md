@@ -30,6 +30,8 @@
 
 -[CNN integrated with LSTM](models/fit_deep_learning.ipynb): Still working on it. It seems CNN does not capture high resolution spatial information. Maybe I should replace it with Gaussian Process followed by LSTM. 
 
+-[SLURM job order to HPC](models/deep_learning_cnn_lstm_slurm.md)
+
 
 # Reference
 ## Job orders for Amarel Rutgers Cluster
