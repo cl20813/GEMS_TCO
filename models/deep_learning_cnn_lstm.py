@@ -22,7 +22,7 @@ print("Device Name:", torch.cuda.get_device_name(0) if torch.cuda.is_available()
 
 def main():
     parser = argparse.ArgumentParser(description="Fit spatio-temporal model")
-    parser.add_argument('--space', type=float,nargs='+', default=[20,20], help="spatial resolution")
+    parser.add_argument('--space', type=int,nargs='+', default=[20,20], help="spatial resolution")
 
 
     # Parse the arguments
