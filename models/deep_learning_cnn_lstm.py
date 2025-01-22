@@ -3,6 +3,7 @@ import pandas as pd
 import pickle
 import numpy as np 
 import time  # Add this import statement
+import argparse # Argument parsing
 
 import torch
 import torch.nn as nn
@@ -20,6 +21,15 @@ print("Device Name:", torch.cuda.get_device_name(0) if torch.cuda.is_available()
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Fit spatio-temporal model")
+    parser.add_argument('--space', type=float,nargs='+', default=[20,20], help="spatial resolution")
+
+
+    # Parse the arguments
+    args = parser.parse_args()
+    lat_lon_resolution = args.space 
+
+
     df = pd.read_csv('/home/jl2815/tco/data/pickle_data/data_2024/data_24_07_0131_N510_E110120.csv')
     # df = pd.read_csv("C:\\Users\\joonw\\TCO\\data_engineering\\data_2024\\data_24_07_0131_N510_E110120.csv")
     instance = orbitmap.MakeOrbitdata(df, 5,10,110,120)
@@ -37,10 +47,14 @@ def main():
     if sample_key is None:
         print("Key 'y23m01day01_hm02:12' not found in the dictionary.")
 
-    rho_lat = 20
-    rho_lon = 20
+    # { (20,20):(5,1), (5,5):(20,40) }
+    rho_lat = lat_lon_resolution[0]          # 
+    rho_lon = lat_lon_resolution[1]
     lat_n = sample_df['Latitude'].unique()[::rho_lat]
     lon_n = sample_df['Longitude'].unique()[::rho_lon]
+
+    lat_number = len(lat_n)
+    lon_number = len(lon_n)
 
     # Set spatial coordinates for each dataset
     coarse_dicts = {}
@@ -60,12 +74,16 @@ def main():
 
     # now aggregate data into a single dataframe
 
-    df_list = []
-
-    for key in coarse_dicts:
-        df_list.append(coarse_dicts[key])
-
-    df_entire = pd.concat(df_list, axis=0, ignore_index=True)
+    key_list = list(coarse_dicts.keys())
+    train_set = []
+    test_set = []
+    for i in range(len(coarse_dicts)):
+        if i<= 4539:
+            train_set.append(coarse_dicts[key_list[i]]) 
+        else:
+            test_set.append(coarse_dicts[key_list[i]]) 
+    train_set = pd.concat(train_set, axis=0, ignore_index=True)
+    test_set = pd.concat(test_set, axis=0, ignore_index=True)
 
 
     # CNN Model for Spatial Feature Extraction
@@ -75,7 +93,7 @@ def main():
             self.conv1 = nn.Conv2d(cnn_channels, 16, kernel_size=3, stride=1, padding=1)
             self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
             self.conv3 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
-            self.fc = nn.Linear(64 * 5 * 10, output_size)  # Adjust based on grid size (5x10 here)
+            self.fc = nn.Linear(64 * lat_number * lon_number, output_size)  # Adjust based on grid size (5x10 here)
 
         def forward(self, x):
             x = F.relu(self.conv1(x))
@@ -149,7 +167,7 @@ def main():
             self.lstm_monthly = nn.LSTM(cnn_output_size, lstm_hidden_size, num_layers=lstm_num_layers, dropout=lstm_dropout, batch_first=True)
             self.lstm_three_month = nn.LSTM(cnn_output_size, lstm_hidden_size, num_layers=lstm_num_layers, dropout=lstm_dropout, batch_first=True)
             # self.fc = nn.Linear(lstm_hidden_size * 3, 1)
-            self.fc = nn.Linear(lstm_hidden_size * 3, 5 * 10)
+            self.fc = nn.Linear(lstm_hidden_size * 3, lat_number * lon_number)
 
         def forward(self, X_daily, X_monthly, X_three_month):
             def extract_features(X_seq):
@@ -172,23 +190,26 @@ def main():
             combined_features = torch.cat((lstm_out_daily[:, -1, :], lstm_out_monthly[:, -1, :], lstm_out_three_month[:, -1, :]), dim=1)
 
             output = self.fc(combined_features)
-            output = output.view(-1, 5, 10)  # Reshape to grid dimensions
+            output = output.view(-1, lat_number, lon_number)  # Reshape to grid dimensions
 
             # Final prediction
             return output
 
     # Parameters
-    num_latitude = 5
-    num_longitude = 10
+    num_latitude = lat_number
+    num_longitude = lon_number
     cnn_channels = 1  # Grayscale-like input
-    cnn_output_size = 64  # Number of features extracted by CNN
+    if (lat_number*lon_number -64) < (lat_number*lon_number -128):
+        cnn_output_size = 64  # Number of features extracted by CNN
+    else:
+        cnn_output_size = 128
     daily_cycle_len = 8
     monthly_cycle_len = 24    #240
-    three_month_cycle_len = 60  # 720 tmp for week
-    lstm_hidden_size = 64 # 128
+    three_month_cycle_len = 50  # 720 tmp for week
+    lstm_hidden_size = 128 # 128
 
     # Load dataset (example)
-    data = df_entire
+    data = train_set
     dataset = OzoneDataset(data, num_latitude, num_longitude, daily_cycle_len, monthly_cycle_len, three_month_cycle_len)
     dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
     
@@ -199,6 +220,10 @@ def main():
     # Initialize model
     model = MultiScaleLSTM(cnn_channels, cnn_output_size, lstm_hidden_size)
     model.train()
+
+    # Save the model to a specific directory
+    model_path = f'/home/jl2815/tco/models/save_models/cnn_lstm_{lat_number}_{lon_number}1.pth'
+    torch.save(model.state_dict(), model_path)
 
     # Move model to GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -225,9 +250,9 @@ def main():
             total_loss += loss.item()
         end_time = time.time()  # End time for the epoch
         epoch_duration = end_time - start_time  # Calculate duration
-        print(f"Epoch {epoch + 1}/{epochs}, Loss: {total_loss / len(dataloader):.4f}")
+        print(f"Epoch {epoch + 1}/{epochs}, Loss: {total_loss / len(dataloader):.4f}, Time: {epoch_duration:.2f} seconds")
 
-    print(f'predictions {predictions}')
+    print(f'{lat_number}_{lon_number}predictions {predictions}')
     print(f'y:{y}')
 if __name__ == '__main__':
     main()

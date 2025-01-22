@@ -49,11 +49,11 @@ conda activate gems_tco
 
 echo "Current date and time: $(date)"
 
-#### Run the Python script
+#### Run the Python script { (20,20):(5,1), (5,5):(20,40) }
 echo "testing cnn_lstm 1"
 
-srun python /home/jl2815/tco/models/deep_learning_cnn_lstm.py
-srun python /home/jl2815/tco/models/deep_learning_cnn_lstm_cpu.py
+srun python /home/jl2815/tco/models/deep_learning_cnn_lstm.py --space 20 20 
+srun python /home/jl2815/tco/models/deep_learning_cnn_lstm.py --space 5 5
 ```
 
 cd ./jobscript/tco/dl       
@@ -88,9 +88,9 @@ conda activate gems_tco
 
 echo "Current date and time: $(date)"
 
-#### Run the Python script
-
-srun python /home/jl2815/tco/data_preprocessing/groupdata_by_center.py
+#### Run the Python script  
+srun python /home/jl2815/tco/data_preprocessing/groupdata_by_center.py 
+srun python /home/jl2815/tco/data_preprocessing/groupdata_by_center.py  
 ```
 cd ./jobscript/tco/dl
 sbath tmp_datapreprocess.sh
