@@ -52,8 +52,10 @@ echo "Current date and time: $(date)"
 #### Run the Python script { (20,20):(5,1), (5,5):(20,40) }
 echo "testing cnn_lstm 1"
 
-srun python /home/jl2815/tco/models/deep_learning_cnn_lstm.py --space 20 20 
-srun python /home/jl2815/tco/models/deep_learning_cnn_lstm.py --space 5 5
+srun python /home/jl2815/tco/models/deep_learning_cnn_lstm.py --space 5 5 
+srun python /home/jl2815/tco/models/deep_learning_cnn_lstm.py --space 4 4
+srun python /home/jl2815/tco/models/deep_learning_cnn_lstm.py --space 3 3
+srun python /home/jl2815/tco/models/deep_learning_cnn_lstm.py --space 2 2
 ```
 
 cd ./jobscript/tco/dl       
