@@ -225,7 +225,7 @@ def main():
     model.train()
 
     # Save the model to a specific directory
-    model_path = f'/home/jl2815/tco/models/save_models/cnn_lstm_{lat_number}_{lon_number}2.pth'
+    model_path = f'/home/jl2815/tco/models/save_models/cnn_lstm_{lat_number}_{lon_number}3.pth'
     torch.save(model.state_dict(), model_path)
 
     # Move model to GPU
