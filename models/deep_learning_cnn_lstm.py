@@ -209,11 +209,12 @@ def main():
     monthly_cycle_len = 24    #240
     three_month_cycle_len = 50  # 720 tmp for week
     lstm_hidden_size = 256 # 128
+    batch_size = lat_number*lon_number
 
     # Load dataset (example)
     data = train_set
     dataset = OzoneDataset(data, num_latitude, num_longitude, daily_cycle_len, monthly_cycle_len, three_month_cycle_len)
-    dataloader = DataLoader(dataset, batch_size=16, shuffle=False)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     
     # Initialize model
     # model = MultiScaleLSTM(cnn_channels, cnn_output_size, lstm_hidden_size)
