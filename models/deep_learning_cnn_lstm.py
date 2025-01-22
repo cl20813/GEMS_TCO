@@ -40,7 +40,6 @@ def main():
     with open(filepath, 'rb') as pickle_file:
         coarse_dict_24_1 = pickle.load(pickle_file)
 
-    print(coarse_dict_24_1.keys())  
     sample_df = coarse_dict_24_1['y23m01day01_hm02:12']
 
     sample_key = coarse_dict_24_1.get('y23m01day01_hm02:12')
@@ -70,7 +69,7 @@ def main():
                     coarse_filter = (tmp_df['Latitude'].isin(lat_n)) & (tmp_df['Longitude'].isin(lon_n))
                     coarse_dicts[f"{year}_{month:02d}_{key}"] = tmp_df[coarse_filter].reset_index(drop=True)
 
-            print(f"Finished processing {year} {month}.")
+            # print(f"Finished processing {year} {month}.")
 
     # now aggregate data into a single dataframe
 
@@ -203,15 +202,18 @@ def main():
         cnn_output_size = 64  # Number of features extracted by CNN
     else:
         cnn_output_size = 128
+
+    print(f'cnn_output_size:{cnn_output_size}')
+
     daily_cycle_len = 8
     monthly_cycle_len = 24    #240
     three_month_cycle_len = 50  # 720 tmp for week
-    lstm_hidden_size = 128 # 128
+    lstm_hidden_size = 256 # 128
 
     # Load dataset (example)
     data = train_set
     dataset = OzoneDataset(data, num_latitude, num_longitude, daily_cycle_len, monthly_cycle_len, three_month_cycle_len)
-    dataloader = DataLoader(dataset, batch_size=16, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=16, shuffle=False)
     
     # Initialize model
     # model = MultiScaleLSTM(cnn_channels, cnn_output_size, lstm_hidden_size)
@@ -222,7 +224,7 @@ def main():
     model.train()
 
     # Save the model to a specific directory
-    model_path = f'/home/jl2815/tco/models/save_models/cnn_lstm_{lat_number}_{lon_number}1.pth'
+    model_path = f'/home/jl2815/tco/models/save_models/cnn_lstm_{lat_number}_{lon_number}2.pth'
     torch.save(model.state_dict(), model_path)
 
     # Move model to GPU
@@ -250,9 +252,9 @@ def main():
             total_loss += loss.item()
         end_time = time.time()  # End time for the epoch
         epoch_duration = end_time - start_time  # Calculate duration
-        print(f"Epoch {epoch + 1}/{epochs}, Loss: {total_loss / len(dataloader):.4f}, Time: {epoch_duration:.2f} seconds")
+        print(f"{lat_number}_{lon_number}: Epoch {epoch + 1}/{epochs}, Loss: {total_loss / len(dataloader):.4f}, Time: {epoch_duration:.2f} seconds")
 
-    print(f'{lat_number}_{lon_number}predictions {predictions}')
-    print(f'y:{y}')
+    # print(f'{lat_number}_{lon_number}predictions {predictions}')
+    # print(f'y:{y}')
 if __name__ == '__main__':
     main()
