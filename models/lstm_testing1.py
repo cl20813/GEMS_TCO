@@ -24,7 +24,7 @@ def main():
     parser = argparse.ArgumentParser(description="Fit spatio-temporal model")
     parser.add_argument('--space', type=int,nargs='+', default=[20,20], help="spatial resolution")
     parser.add_argument('--cycles', type=int,nargs='+', default=[8,24,50], help="cycles")
-    parser.add_argument('--lr', type=int, default= 0.01, help="learning rate")
+    parser.add_argument('--lr', type=float, default= 0.01, help="learning rate")
     parser.add_argument('--batch_size', type=int, default= 16, help="batch_size")
 
     # batch_size = lat_number*lon_number
