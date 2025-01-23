@@ -198,7 +198,7 @@ def main():
     num_latitude = lat_number
     num_longitude = lon_number
     cnn_channels = 1  # Grayscale-like input
-    if (lat_number*lon_number -64) < (lat_number*lon_number -128):
+    if np.abs(lat_number*lon_number -64) < np.abs(lat_number*lon_number -128):
         cnn_output_size = 64  # Number of features extracted by CNN
     else:
         cnn_output_size = 128
@@ -208,7 +208,7 @@ def main():
     daily_cycle_len = 8
     monthly_cycle_len = 24    #240
     three_month_cycle_len = 50  # 720 tmp for week
-    lstm_hidden_size = 256 # 128
+    lstm_hidden_size = 128 # 
     batch_size = lat_number*lon_number
 
     # Load dataset (example)
@@ -222,11 +222,7 @@ def main():
 
     # Initialize model
     model = MultiScaleLSTM(cnn_channels, cnn_output_size, lstm_hidden_size)
-    model.train()
-
-    # Save the model to a specific directory
-    model_path = f'/home/jl2815/tco/models/save_models/cnn_lstm_{lat_number}_{lon_number}3.pth'
-    torch.save(model.state_dict(), model_path)
+    model.train() # Pytorch sets the model to training mode
 
     # Move model to GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -234,7 +230,9 @@ def main():
 
     # Loss and optimizer
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+    lr = 0.001 * (batch_size/16)
+    optimizer = optim.Adam(model.parameters(), lr=lr)
 
     # Training loop
     epochs = 20
@@ -254,6 +252,10 @@ def main():
         end_time = time.time()  # End time for the epoch
         epoch_duration = end_time - start_time  # Calculate duration
         print(f"{lat_number}_{lon_number}: Epoch {epoch + 1}/{epochs}, Loss: {total_loss / len(dataloader):.4f}, Time: {epoch_duration:.2f} seconds")
+
+    # Save the model to a specific directory
+    model_path = f'/home/jl2815/tco/models/save_models/cnn_lstm_{lat_number}_{lon_number}4.pth'
+    torch.save(model.state_dict(), model_path)
 
     # print(f'{lat_number}_{lon_number}predictions {predictions}')
     # print(f'y:{y}')
