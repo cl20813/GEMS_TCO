@@ -61,7 +61,45 @@ sbatch cnn_lstm4.sh
 
 #############################################################################################################
 
+```cd ./jobscript/tco/dl```                       
+```nano lstm_t1.sh```         (rm cnn_lstm1.sh)        # open a new text editor                      
 
+```
+#!/bin/bash
+#SBATCH --job-name=cnn_lstm_t1                                      # Job name
+#SBATCH --output=/home/jl2815/tco/model_output/lstmtest_%j.out    # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/model_output/lstmtest_%j.err     # Standard error file (%j = JobID)
+#SBATCH --time=72:00:00                                            # Time limit
+#SBATCH --ntasks=2                                                 # Number of tasks
+#SBATCH --cpus-per-task=8                                          # Number of CPU cores per task
+#SBATCH --mem=200G                                                 # Memory per node
+#SBATCH --partition=gpu                                            # Partition name
+#SBATCH --gres=gpu:1                                               # Number of GPUs per node
+
+
+#### Load the Anaconda module to use srun 
+module purge                                              
+module use /projects/community/modulefiles                 
+module load anaconda/2024.06-ts840 
+
+#### Initialize conda for the current shell session if not already done for the current shell session.
+eval "$(conda shell.bash hook)"
+conda activate gems_tco
+
+echo "Current date and time: $(date)"
+
+#### Run the Python script { (20,20):(5,1), (5,5):(20,40) }
+echo "testing cnn_lstm 1"
+
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 50 --lr 0.01 --batch_size 16
+
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 50 --lr 0.01 --batch_size 50
+
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 3 50 --lr 0.01 --batch_size 50
+```
+
+cd ./jobscript/tco/dl       
+sbatch cnn_lstm4.sh       
 
 
 
