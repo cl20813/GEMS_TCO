@@ -61,6 +61,8 @@ sbatch cnn_lstm4.sh
 
 #############################################################################################################
 
+```scp "C:\Users\joonw\TCO\GEMS_TCO-1\models\lstm_testing1.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/models```
+
 ```cd ./jobscript/tco/dl```                       
 ```nano lstm_t1.sh```         (rm cnn_lstm1.sh)        # open a new text editor                      
 

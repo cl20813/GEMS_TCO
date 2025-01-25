@@ -115,19 +115,22 @@ def main():
     test_set = pd.concat(test_set, axis=0, ignore_index=True)
 
 
-    # CNN Model for Spatial Feature Extraction
     class FeatureExtractorCNN(nn.Module):
-        def __init__(self, cnn_channels, output_size):
+        def __init__(self, cnn_channels, output_size, dropout_prob=0.2):
             super(FeatureExtractorCNN, self).__init__()
             self.conv1 = nn.Conv2d(cnn_channels, 16, kernel_size=3, stride=1, padding=1)
             self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
             self.conv3 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
+            self.dropout = nn.Dropout(dropout_prob)
             self.fc = nn.Linear(64 * lat_number * lon_number, output_size)  # Adjust based on grid size (5x10 here)
 
         def forward(self, x):
             x = F.relu(self.conv1(x))
+            x = self.dropout(x)
             x = F.relu(self.conv2(x))
+            x = self.dropout(x)
             x = F.relu(self.conv3(x))
+            x = self.dropout(x)
             x = x.view(x.size(0), -1)  # Flatten
             x = self.fc(x)
             return x
