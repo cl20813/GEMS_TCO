@@ -38,7 +38,7 @@
 
 -[Relevant Gaussian Process related exercises can be found here. ](https://github.com/cl20813/Gaussian_Process_Exercises)        
 
-[Compare full negative log likelihood vs Vecchia approximation, pure spatial model ](Exercises/full_vs_vecchia):
+[Compare full negative log likelihood vs Vecchia approximation, pure spatial model ](Exercises/likelihood_exercise/slurm_full_vs_vecchia_space):
 For this experiment, I choose data in July 2024, and used Matern model with fixed parameters: sigma 60, lon_range 8.25, lat_range 8.25, smooth 0.55, nugget 5. 
 When conditioned on 15 nearest neighbors after maxmin ordering, result was as below:
 ```20x40 gird: (1936.3855, 1936.4033)```, ```25x50 grid: (2830.9476,2831.7986)```, ```34x67 grid: (5155.1572,5155.5592)```, ```50x100 grid: (10637.5962,10637.4082)```.
