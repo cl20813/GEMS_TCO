@@ -35,71 +35,110 @@ from typing import Callable, Union, Tuple
 sys.path.append("/cache/home/jl2815/tco")
 
 # Custom imports
-from GEMS_TCO import orbitmap
-from GEMS_TCO import kernels
+from GEMS_TCO import orbitmap 
+from GEMS_TCO import kernels 
+from GEMS_TCO import smoothspace
 
+import pickle
 
 # Configure logging to a specific file path
-log_file_path = '/home/jl2815/GEMS/logs/fit_st_11_14.log'
+log_file_path = '/home/jl2815/tco/exercise_output/logs/fit_st1.log'
 
 logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(message)s')
 
 
 def main():
     # Argument parser
-    parser = argparse.ArgumentParser(description="Fit spatio-temporal model")
-    
-    
-    #sigmasq (0.05,600), range_ (0.05,600), advec (-200,200), beta (0,600), nugget (0,600)
-    parser.add_argument('--v', type=float, default=0.5, help="smooth")
-    parser.add_argument('--rho', type=int, default=8, help="Resolution for coarse set")
-    parser.add_argument('--bounds', type=float, nargs='+', default=[0.05, 600, 0.05, 600, -200, 200, 0.5, 600, 0.5, 600], help="Bounds for parameters" )    
-    parser.add_argument('--params', type=float,nargs='+', default=[0.5,0.5,0.5,0.5,0.5], help="sigmasq, range_, advec, beta, nugget ")
+    parser = argparse.ArgumentParser(description="Full vs Vecchia Comparison")
+    # Define the parameters you want to change at runtime
+    parser.add_argument('--space', type=int,nargs='+', default=[20,20], help="spatial resolution")
     parser.add_argument('--mm_cond_number', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
-    parser.add_argument('--key', type=int, default=1, help="Index for the datasets")
-  
+    parser.add_argument('--key', type=int, default=1, help="Index for the datasets.")
+    parser.add_argument('--params', type=float,nargs='+', default=[0.5,0.5,0.5,0.5, 0.5], help="Initial parameters")
     # Parse the arguments
     args = parser.parse_args()
-
-    v = args.v
-    rho = args.rho
-    bounds = [(args.bounds[i], args.bounds[i+1]) for i in range(0, len(args.bounds), 2)]
-    initial_params= args.params  
-    mm_cond_number = args.mm_cond_number
-    key= args.key
- 
-
-    # data
-    # df = pd.read_csv('/home/jl2815/tco/data/data_N2530_E95110/data_24_07_0130_N2530_E95110.csv')
-    df = pd.read_csv('/home/jl2815/tco/data/data_N510_E110120/data_24_07_0130_N510_E110120.csv')
-    # df = pd.read_csv('/home/jl2815/tco/data/data_N2530_E95110/data_24_07_0130_N2530_E95110.csv')
     
+    # Use args.param1, args.param2 in your script
+    lat_lon_resolution = args.space 
+    mm_cond_number = args.mm_cond_number
+    params= args.params
+    key_for_dict= args.key
 
-    # resolution does not affect coarse_map
-    instance = orbitmap.MakeOrbitdata(df,5,10,110,120)
-    orbit_map24_7 = instance.makeorbitmap()
-    resolution_uni = 0.05 
-    sparse_map_24_7 = instance.make_sparsemap(orbit_map24_7, resolution_uni)
-    # rho:observations  -->  1: 20000  3: 2223 4:1250, 5:1190, 6:556,, 8:313
-    coarse_map24_7 =  instance.make_coarsemap(sparse_map_24_7,rho) 
+    ############ 
 
-    # reorder data and initiate parallel computing functions
-    databyday_instance = orbitmap.databyday_24July()
-    grp, baseset_from_maxmin, nns_map  = databyday_instance.process_nolat(coarse_map24_7,mm_cond_number)
-    matern_st_11 = kernels.matern_st_11(v)
 
-    keys = sorted(grp)[0:key]
-    with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
-        futures = [
-            executor.submit(
-                matern_st_11.mle_parallel_nolat_cut,
-                key, bounds, initial_params, grp[key], mm_cond_number, baseset_from_maxmin, nns_map
-            )   
-            for key in keys
-        ]
+    # Load the one dictionary to set spaital coordinates
+    filepath = "/home/jl2815/tco/data/pickle_data/pickle_2023/coarse_cen_map23_01.pkl"
 
-        for future in concurrent.futures.as_completed(futures):
-            print(future.result())
+    with open(filepath, 'rb') as pickle_file:
+        coarse_dict_24_1 = pickle.load(pickle_file)
+
+    sample_df = coarse_dict_24_1['y23m01day01_hm02:12']
+
+    sample_key = coarse_dict_24_1.get('y23m01day01_hm02:12')
+    if sample_key is None:
+        print("Key 'y23m01day01_hm02:12' not found in the dictionary.")
+
+    # { (20,20):(5,1), (5,5):(20,40) }
+    rho_lat = lat_lon_resolution[0]          
+    rho_lon = lat_lon_resolution[1]
+    lat_n = sample_df['Latitude'].unique()[::rho_lat]
+    lon_n = sample_df['Longitude'].unique()[::rho_lon]
+
+    lat_number = len(lat_n)
+    lon_number = len(lon_n)
+
+    # Set spatial coordinates for each dataset
+    coarse_dicts = {}
+
+    years = ['2024']
+    for year in years:
+        for month in range(7, 8):  # Iterate over all months
+            filepath = f"/home/jl2815/tco/data/pickle_data/pickle_{year}/coarse_cen_map{year[2:]}_{month:02d}.pkl"
+            with open(filepath, 'rb') as pickle_file:
+                loaded_map = pickle.load(pickle_file)
+                for key in loaded_map:
+                    tmp_df = loaded_map[key]
+                    coarse_filter = (tmp_df['Latitude'].isin(lat_n)) & (tmp_df['Longitude'].isin(lon_n))
+                    coarse_dicts[f"{year}_{month:02d}_{key}"] = tmp_df[coarse_filter].reset_index(drop=True)
+
+    
+    key_idx = sorted(coarse_dicts)
+    if not key_idx:
+        raise ValueError("coarse_dicts is empty")
+
+    # extract first hour data because all data shares the same spatial grid
+    data_for_coord = coarse_dicts[key_idx[0]]
+    x1 = data_for_coord['Longitude'].values
+    y1 = data_for_coord['Latitude'].values 
+    coords1 = np.stack((x1, y1), axis=-1)
+
+    instance = orbitmap.MakeOrbitdata()
+    s_dist = cdist(coords1, coords1, 'euclidean')
+    ord_mm, _ = instance.maxmin_naive(s_dist, 0)
+
+    data_for_coord = data_for_coord.iloc[ord_mm].reset_index(drop=True)
+    coords1_reordered = np.stack((data_for_coord['Longitude'].values, data_for_coord['Latitude'].values), axis=-1)
+    nns_map = instance.find_nns_naive(locs=coords1_reordered, dist_fun='euclidean', max_nn=mm_cond_number)
+
+    aggregated_data = pd.DataFrame()
+    for i in range(len(key_idx)):
+        tmp = coarse_dicts[key_idx[i]]
+        tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
+        aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
+    
+    #####################################################################
+
+    instance = kernels.matern_spatial()
+    # data = data.iloc[ord,:]
+    out = instance.vecchia_likelihood(params, aggregated_data, mm_cond_number, nns_map)
+
+    print(f'Full likelihood using {params} is {instance.full_likelihood(params, aggregated_data, aggregated_data["ColumnAmountO3"])}')
+    print(f'Vecchia approximation likelihood using condition size {mm_cond_number}, {params} is {out}')
+
+
+
+
 
 if __name__ == '__main__':
     main()

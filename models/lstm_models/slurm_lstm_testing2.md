@@ -7,7 +7,7 @@ remake pickle files in Amaral HPC. Hence, transfer csv files first and then proc
 ```scp -r "C:\\Users\\joonw\\TCO\\data_engineering\\data_2024" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_data```         
 ```scp -r "C:\Users\joonw\TCO\GEMS_TCO-1\data_preprocessing" jl2815@amarel.rutgers.edu:/home/jl2815/tco```        
 
-```scp "C:\Users\joonw\TCO\GEMS_TCO-1\models\lstm_testing2.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/models```
+```scp "C:\Users\joonw\TCO\GEMS_TCO-1\models\lstm_models\lstm_testing2.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/models```
 
 ### Run deep_learning_cnn_lstm.py
 
@@ -35,7 +35,7 @@ remake pickle files in Amaral HPC. Hence, transfer csv files first and then proc
 #SBATCH --cpus-per-task=8                                          # Number of CPU cores per task
 #SBATCH --mem=200G                                                 # Memory per node
 #SBATCH --partition=gpu                                            # Partition name
-#SBATCH --gres=gpu:1                                               # Number of GPUs per node
+#SBATCH --gres=gpu:2                                              # Number of GPUs per node
 
 #### Load the Anaconda module to use srun 
 module purge                                              
