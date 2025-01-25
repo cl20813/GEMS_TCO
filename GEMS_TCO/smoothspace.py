@@ -29,7 +29,7 @@ class space_average:
         lon_e (float): End longitude for the spatial domain.
     """
 
-    def __init__(self, df, lat_resolution, lon_resolution, lat_s,lat_e, lon_s,lon_e ):
+    def __init__(self, df=None, lat_resolution=None, lon_resolution=None, lat_s=None,lat_e=None, lon_s=None,lon_e=None ):
         self.df = df
         self.lat_resolution = lat_resolution
         self.lon_resolution = lon_resolution

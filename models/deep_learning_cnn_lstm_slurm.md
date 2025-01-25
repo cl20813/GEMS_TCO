@@ -70,12 +70,11 @@ sbatch cnn_lstm4.sh
 #SBATCH --output=/home/jl2815/tco/model_output/lstmtest_%j.out    # Standard output file (%j = JobID)
 #SBATCH --error=/home/jl2815/tco/model_output/lstmtest_%j.err     # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
-#SBATCH --ntasks=2                                                 # Number of tasks
+#SBATCH --ntasks=10                                                # Number of tasks
 #SBATCH --cpus-per-task=8                                          # Number of CPU cores per task
 #SBATCH --mem=200G                                                 # Memory per node
 #SBATCH --partition=gpu                                            # Partition name
 #SBATCH --gres=gpu:1                                               # Number of GPUs per node
-
 
 #### Load the Anaconda module to use srun 
 module purge                                              
@@ -91,11 +90,22 @@ echo "Current date and time: $(date)"
 #### Run the Python script { (20,20):(5,1), (5,5):(20,40) }
 echo "testing cnn_lstm 1"
 
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 50 --lr 0.01 --batch_size 16
-
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 30 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 40 --lr 0.01 --batch_size 50
 srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 50 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 60 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 70 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 80 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 90 --lr 0.01 --batch_size 50
 
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 3 50 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 30 --lr 0.001 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 40 --lr 0.002 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 50 --lr 0.003 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 60 --lr 0.004 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 70 --lr 0.005 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 80 --lr 0.006 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 90 --lr 0.007 --batch_size 50
+
 ```
 
 cd ./jobscript/tco/dl       
