@@ -27,16 +27,17 @@ class MakeOrbitdata(space_average):
     """
     def __init__(
         self, 
-        df:pd.DataFrame, 
-        lat_s:int,
-        lat_e:int, 
-        lon_s:int,
-        lon_e:int, 
+        df:pd.DataFrame=None, 
+        lat_s:int =5,
+        lat_e:int =10, 
+        lon_s:int =110,
+        lon_e:int =120, 
         lat_resolution:float=None, 
         lon_resolution:float =None
     ):
         # Input validation
-        assert isinstance(df, pd.DataFrame), "df must be a pandas DataFrame"
+        if df is not None:
+            assert isinstance(df, pd.DataFrame), "df must be a pandas DataFrame"
         assert isinstance(lat_s, int), "lat_s must be int"
         assert isinstance(lat_e, int), "lat_e must be int"
         assert isinstance(lon_s, int), "lon_s must be int"
@@ -64,25 +65,6 @@ class MakeOrbitdata(space_average):
             orbit_map[orbit_key] = self.df.loc[self.df['Orbit'] == orbit].reset_index(drop=True)
         return orbit_map
     
-    
-    # make_coarse map by aggregating data
-    def make_sparsemap(self, orbit_map, sparsity):
-        assert isinstance(orbit_map, dict), "orbit_map must be a dict"
-        sparse_map = {}
-        key_list = sorted(orbit_map)
-        for i in range(len(key_list)):
-            cur = orbit_map[key_list[i]]   
-            instance =  space_average(cur, sparsity,sparsity,self.lat_s,self.lat_e, self.lon_s,self.lon_e) # 0.2 defines sparsity
-            cur = instance.space_avg()
-
-            mask = (cur['ColumnAmountO3'] < 200) | (cur['ColumnAmountO3'] > 500)
-            df = cur[~mask]
-            mean_value = np.mean(df['ColumnAmountO3'])
-            cur.loc[mask, 'ColumnAmountO3'] = mean_value
-
-            sparse_map[key_list[i]]  = cur.reset_index(drop=True)
-        return sparse_map
-
     def make_center_points(self, step:float=0.05) -> pd.DataFrame:
         assert isinstance(step, float), "step must be a float"
         # Create grid coordinates
@@ -131,40 +113,6 @@ class MakeOrbitdata(space_average):
 
         return sparse_map
 
-
-    # 2:7432 4:1858, 5:1190, 6:826, 7:607, 8:465
-    def coarse_fun(self,df:pd.DataFrame, rho:int)->pd.DataFrame:  # rho has to be integer
-        assert isinstance(df, pd.DataFrame), "df must be a pd.DataFrame"
-        assert isinstance(rho, int), "rho must be an integer"
-
-        # Sort by latitude, take every rho-th row
-        df_sorted_lat = df.sort_values(by='Latitude', ascending=False).iloc[::rho, :]
-        # Sort by longitude, take every rho-th row
-        df_sorted_lon = df_sorted_lat.sort_values(by='Longitude', ascending=False).iloc[::rho, :]
-
-        mask = df.index.isin(df_sorted_lon.index)
-        result = df.loc[mask, :].reset_index(drop=True)
-        return result
-    
-    def make_coarsemap(self,orbit_map:dict, rho:int)->dict:
-        assert isinstance(orbit_map, dict), "orbit_map must be a dict"
-        assert isinstance(rho, int), "rho must be an integer"
-        coarse_map = {}
-        key_list = sorted(orbit_map)
-        for key in key_list:
-
-            cur = orbit_map[key]
-            mask = (cur['ColumnAmountO3'] < 200) | (cur['ColumnAmountO3'] > 500)
-            df = cur[~mask]
-            mean_value = np.mean(df['ColumnAmountO3'])
-            cur.loc[mask, 'ColumnAmountO3'] = mean_value
-
-            instance = self.coarse_fun(cur,rho)
-
-            coarse_map[key] = instance 
-        return coarse_map
-        
-    
     def maxmin_naive(self,dist: np.ndarray, first: int) -> Tuple[np.ndarray, np.ndarray]:
         """
         Performs min-max ordering
@@ -245,6 +193,60 @@ class MakeOrbitdata(space_average):
             nns[i, :k] = nn_res
         return nns
 
+
+    ################################################### maybe remove below
+    ###################################################
+    
+        # make_coarse map by aggregating data
+    def make_sparsemap(self, orbit_map, sparsity):
+        assert isinstance(orbit_map, dict), "orbit_map must be a dict"
+        sparse_map = {}
+        key_list = sorted(orbit_map)
+        for i in range(len(key_list)):
+            cur = orbit_map[key_list[i]]   
+            instance =  space_average(cur, sparsity,sparsity,self.lat_s,self.lat_e, self.lon_s,self.lon_e) # 0.2 defines sparsity
+            cur = instance.space_avg()
+
+            mask = (cur['ColumnAmountO3'] < 200) | (cur['ColumnAmountO3'] > 500)
+            df = cur[~mask]
+            mean_value = np.mean(df['ColumnAmountO3'])
+            cur.loc[mask, 'ColumnAmountO3'] = mean_value
+
+            sparse_map[key_list[i]]  = cur.reset_index(drop=True)
+        return sparse_map
+
+
+    # 2:7432 4:1858, 5:1190, 6:826, 7:607, 8:465
+    def coarse_fun(self,df:pd.DataFrame, rho:int)->pd.DataFrame:  # rho has to be integer
+        assert isinstance(df, pd.DataFrame), "df must be a pd.DataFrame"
+        assert isinstance(rho, int), "rho must be an integer"
+
+        # Sort by latitude, take every rho-th row
+        df_sorted_lat = df.sort_values(by='Latitude', ascending=False).iloc[::rho, :]
+        # Sort by longitude, take every rho-th row
+        df_sorted_lon = df_sorted_lat.sort_values(by='Longitude', ascending=False).iloc[::rho, :]
+
+        mask = df.index.isin(df_sorted_lon.index)
+        result = df.loc[mask, :].reset_index(drop=True)
+        return result
+    
+    def make_coarsemap(self,orbit_map:dict, rho:int)->dict:
+        assert isinstance(orbit_map, dict), "orbit_map must be a dict"
+        assert isinstance(rho, int), "rho must be an integer"
+        coarse_map = {}
+        key_list = sorted(orbit_map)
+        for key in key_list:
+
+            cur = orbit_map[key]
+            mask = (cur['ColumnAmountO3'] < 200) | (cur['ColumnAmountO3'] > 500)
+            df = cur[~mask]
+            mean_value = np.mean(df['ColumnAmountO3'])
+            cur.loc[mask, 'ColumnAmountO3'] = mean_value
+
+            instance = self.coarse_fun(cur,rho)
+
+            coarse_map[key] = instance 
+        return coarse_map
 
 class databyday_24July:
     def __init__(self):
