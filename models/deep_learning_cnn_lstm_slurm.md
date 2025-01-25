@@ -92,10 +92,21 @@ echo "Current date and time: $(date)"
 #### Run the Python script { (20,20):(5,1), (5,5):(20,40) }
 echo "testing cnn_lstm 1"
 
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 50 --lr 0.005 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 1 24 50 --lr 0.005 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 1 50 0 --lr 0.005 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 1 24 0 --lr 0.005 --batch_size 50
+
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 1 0 0 --lr 0.005 --batch_size 10
+
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 1 0 0 --lr 0.005 --batch_size 20
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 1 0 0 --lr 0.005 --batch_size 30
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 1 0 0 --lr 0.005 --batch_size 40
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 1 0 0 --lr 0.005 --batch_size 50
+
+
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 5 5 --cycles 1 0 0 --lr 0.005 --batch_size 10
+
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 5 5 --cycles 1 0 0 --lr 0.005 --batch_size 20
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 5 5 --cycles 1 0 0 --lr 0.005 --batch_size 30
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 5 5 --cycles 1 0 0 --lr 0.005 --batch_size 40
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 5 5 --cycles 1 0 0 --lr 0.005 --batch_size 50
 
 
 
