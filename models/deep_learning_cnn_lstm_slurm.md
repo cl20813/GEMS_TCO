@@ -90,22 +90,23 @@ echo "Current date and time: $(date)"
 #### Run the Python script { (20,20):(5,1), (5,5):(20,40) }
 echo "testing cnn_lstm 1"
 
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 30 --lr 0.01 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 40 --lr 0.01 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 50 --lr 0.01 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 60 --lr 0.01 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 70 --lr 0.01 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 80 --lr 0.01 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 90 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 3 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 4 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 5 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 0 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 0 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 0 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 0 --lr 0.01 --batch_size 50
 
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 30 --lr 0.001 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 40 --lr 0.002 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 50 --lr 0.003 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 60 --lr 0.004 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 70 --lr 0.005 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 80 --lr 0.006 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 90 --lr 0.007 --batch_size 50
-
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 0 0 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 3 0 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 6 0 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 9 0 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 12 0 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 15 0 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 18 0 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 21 0 --lr 0.01 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 8 24 0 --lr 0.01 --batch_size 50
 ```
 
 cd ./jobscript/tco/dl       
