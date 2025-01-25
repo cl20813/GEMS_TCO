@@ -8,7 +8,7 @@ remake pickle files in Amaral HPC. Hence, transfer csv files first and then proc
 ```scp -r "C:\Users\joonw\TCO\GEMS_TCO-1\data_preprocessing" jl2815@amarel.rutgers.edu:/home/jl2815/tco```        
 
 ```srun --cpus-per-task=4 --partition main --mem=20G --time=05:00:00 python /home/jl2815/tco/data_preprocessing/groupdata_by_center.py```                     
-```scp "C:\Users\joonw\TCO\GEMS_TCO-1\models\deep_learning_cnn_lstm.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/models```
+```scp "C:\Users\joonw\TCO\GEMS_TCO-1\models\lstm_models\deep_learning_cnn_lstm.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/models```
 
 ### Run deep_learning_cnn_lstm.py
 
@@ -61,7 +61,7 @@ sbatch cnn_lstm4.sh
 
 #############################################################################################################
 
-```scp "C:\Users\joonw\TCO\GEMS_TCO-1\models\lstm_testing1.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/models```
+```scp "C:\Users\joonw\TCO\GEMS_TCO-1\models\lstm_models\lstm_testing1.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/models```
 
 ```cd ./jobscript/tco/dl```                       
 ```nano lstm_t1.sh```         (rm cnn_lstm1.sh)        # open a new text editor                      

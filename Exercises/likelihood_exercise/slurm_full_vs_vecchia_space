@@ -18,5 +18,5 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise/full_vs_vecchia_space.py
 
 ## space 5 5: 5x10, 4 4: 25x50, 2 2: 50x100
 
-```srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/full_vs_vecchia.py --key 0 --params 60 8.25 8.25 0.55 5 --space 5 5 --mm_cond_number 15```
+```srun --cpus-per-task=16 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise/likelihood_exercise/full_vs_vecchia.py --key 0 --params 60 8.25 8.25 0.55 5 --space 5 5 --mm_cond_number 15```
 
