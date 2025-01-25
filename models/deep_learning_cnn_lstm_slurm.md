@@ -79,7 +79,7 @@ sbatch cnn_lstm4.sh
 #### Load the Anaconda module to use srun 
 module purge                                              
 module use /projects/community/modulefiles                 
-module load anaconda/2024.06-ts840 
+module load anaconda/2024.06-ts840  
 
 #### Initialize conda for the current shell session if not already done for the current shell session.
 eval "$(conda shell.bash hook)"
@@ -104,6 +104,7 @@ srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 44 0
 srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 48 0 0 --lr 0.005 --batch_size 50
 srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 52 0 0 --lr 0.005 --batch_size 50
 srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 56 0 0 --lr 0.005 --batch_size 50
+
 
 ```
 
