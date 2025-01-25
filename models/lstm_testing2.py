@@ -58,7 +58,7 @@ def main():
     lr = args.lr
     batch_size = args.batch_size
 
-    print(f'cycles:{cycles_len}, lr:{lr}, batch_size:{batch_size}')
+    print(f'resolution: {lat_lon_resolution} cycles:{cycles_len}, lr:{lr}, batch_size:{batch_size}')
 
     df = pd.read_csv('/home/jl2815/tco/data/pickle_data/data_2024/data_24_07_0131_N510_E110120.csv')
     # df = pd.read_csv("C:\\Users\\joonw\\TCO\\data_engineering\\data_2024\\data_24_07_0131_N510_E110120.csv")
@@ -115,19 +115,22 @@ def main():
     test_set = pd.concat(test_set, axis=0, ignore_index=True)
 
 
-    # CNN Model for Spatial Feature Extraction
     class FeatureExtractorCNN(nn.Module):
-        def __init__(self, cnn_channels, output_size):
+        def __init__(self, cnn_channels, output_size, dropout_prob=0.2):
             super(FeatureExtractorCNN, self).__init__()
             self.conv1 = nn.Conv2d(cnn_channels, 16, kernel_size=3, stride=1, padding=1)
             self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
             self.conv3 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
+            self.dropout = nn.Dropout(dropout_prob)
             self.fc = nn.Linear(64 * lat_number * lon_number, output_size)  # Adjust based on grid size (5x10 here)
 
         def forward(self, x):
             x = F.relu(self.conv1(x))
+            x = self.dropout(x)
             x = F.relu(self.conv2(x))
+            x = self.dropout(x)
             x = F.relu(self.conv3(x))
+            x = self.dropout(x)
             x = x.view(x.size(0), -1)  # Flatten
             x = self.fc(x)
             return x
@@ -187,6 +190,18 @@ def main():
             X_daily, X_monthly, X_three_month, y = self.prepared_data
             return X_daily[idx], X_monthly[idx], X_three_month[idx], y[idx]
 
+
+    class Attention(nn.Module):
+        def __init__(self, hidden_size):
+            super(Attention, self).__init__()
+            self.attention = nn.Linear(hidden_size, 1, bias=False)
+
+        def forward(self, lstm_output):
+            attention_weights = F.softmax(self.attention(lstm_output), dim=1)
+            context_vector = torch.sum(attention_weights * lstm_output, dim=1)
+            return context_vector, attention_weights
+
+
     # Multi-Scale LSTM for Temporal Modeling
     class MultiScaleLSTM(nn.Module):
         def __init__(self, cnn_channels, cnn_output_size, lstm_hidden_size, lstm_num_layers=1, lstm_dropout=0.25):
@@ -196,6 +211,9 @@ def main():
             self.lstm_monthly = nn.LSTM(cnn_output_size, lstm_hidden_size, num_layers=lstm_num_layers, dropout=lstm_dropout, batch_first=True)
             self.lstm_three_month = nn.LSTM(cnn_output_size, lstm_hidden_size, num_layers=lstm_num_layers, dropout=lstm_dropout, batch_first=True)
             # self.fc = nn.Linear(lstm_hidden_size * 3, 1)
+            self.attention_daily = Attention(lstm_hidden_size)
+            self.attention_monthly = Attention(lstm_hidden_size)
+            self.attention_three_month = Attention(lstm_hidden_size)
             self.fc = nn.Linear(lstm_hidden_size * 3, lat_number * lon_number)
 
         def forward(self, X_daily, X_monthly, X_three_month):
@@ -215,9 +233,11 @@ def main():
             lstm_out_monthly, _ = self.lstm_monthly(monthly_features)
             lstm_out_three_month, _ = self.lstm_three_month(three_month_features)
 
-            # Concatenate the final outputs from each LSTM
-            combined_features = torch.cat((lstm_out_daily[:, -1, :], lstm_out_monthly[:, -1, :], lstm_out_three_month[:, -1, :]), dim=1)
+            context_daily, _ = self.attention_daily(lstm_out_daily)
+            context_monthly, _ = self.attention_monthly(lstm_out_monthly)
+            context_three_month, _ = self.attention_three_month(lstm_out_three_month)
 
+            combined_features = torch.cat((context_daily, context_monthly, context_three_month), dim=1)
             output = self.fc(combined_features)
             output = output.view(-1, lat_number, lon_number)  # Reshape to grid dimensions
 
@@ -287,3 +307,4 @@ def main():
     # print(f'y:{y}')
 if __name__ == '__main__':
     main()
+
