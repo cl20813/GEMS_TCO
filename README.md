@@ -43,8 +43,8 @@ For this experiment, I choose data in July 2024, and used Matern model with fixe
 When conditioned on 15 nearest neighbors after maxmin ordering, result was as below:
 ```20x40 gird: (1936.3855, 1936.4033)```, ```25x50 grid: (2830.9476,2831.7986)```, ```34x67 grid: (5155.1572,5155.5592)```, ```50x100 grid: (10637.5962,10637.4082)```.
 
-We can conclude that, for ```purely spatial model```, we can approximate likelihood by using ```Vecchia approximation with maxmin odering and 15 conditioning number```.
-
+We can conclude that, for ```purely spatial model```, we can approximate likelihood by using ```Vecchia approximation with maxmin odering and 15 conditioning number```.   
+Note that if the parameters are ```outside the parameter space```, then we vecchia fails to approximate the likelihood. Also it is important to ```approximate the likelihood even after changing the parameters.``` 
 
 
 [Compare full likelihood vs Vecchia approximation, spatio-temporal model ](Exercises/full_vs_vecchia_spatio_temporal)  
