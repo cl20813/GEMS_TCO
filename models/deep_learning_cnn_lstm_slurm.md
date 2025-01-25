@@ -93,14 +93,14 @@ echo "Current date and time: $(date)"
 echo "testing cnn_lstm 1"
 
 srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 1 0 0 --lr 0.005 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 2 0 0 --lr 0.005 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 3 0 0 --lr 0.005 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 4 0 0 --lr 0.005 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 1 2 0 --lr 0.005 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 1 3 0 --lr 0.005 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 20 20 --cycles 1 4 0 --lr 0.005 --batch_size 50
 
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 5 5 --cycles 1 0 0 --lr 0.005 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 5 5 --cycles 2 0 0 --lr 0.005 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 5 5 --cycles 3 0 0 --lr 0.005 --batch_size 50
-srun python /home/jl2815/tco/models/lstm_testing1.py --space 5 5 --cycles 4 0 0 --lr 0.005 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 5 5 --cycles 1 5 0 --lr 0.005 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 5 5 --cycles 1 6 0 --lr 0.005 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 5 5 --cycles 1 7 0 --lr 0.005 --batch_size 50
+srun python /home/jl2815/tco/models/lstm_testing1.py --space 5 5 --cycles 1 8 0 --lr 0.005 --batch_size 50
 
 ```
 
