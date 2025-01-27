@@ -29,10 +29,30 @@ sys.path.append("/cache/home/jl2815/tco")
 log_file_path = '/home/jl2815/GEMS/logs/fit_st_by_latitude_11_14.log'
 
 
-class matern_st_11:               #sigmasq range advec beta  nugget
-    def __init__(self, smooth):
+class matern_spatio_temporal:               #sigmasq range advec beta  nugget
+    def __init__(self, smooth, input_map, nns_map, mm_cond_number):
         self.smooth = smooth
+        self.input_map = input_map
+        self.key_list = sorted(input_map)
+        self.number_of_timestamps = len(self.key_list)
+
+        sample_df = input_map[self.key_list[0]]
+
+        self.size_per_hour = len(sample_df)
+        self.mm_cond_number = mm_cond_number
+        nns_map = list(nns_map) # nns_map is ndarray this allows to have sub array of diffrent lengths
+        for i in range(len(nns_map)):  
+            # Select elements up to mm_cond_number and remove -1
+            tmp = np.delete(nns_map[i][:self.mm_cond_number], np.where(nns_map[i][:self.mm_cond_number] == -1))
+            if tmp.size>0:
+                nns_map[i] = tmp
+            else:
+                nns_map[i] = []
+        self.nns_map = nns_map
+
+         
         
+
     # Custom distance function for cdist
     def custom_distance(self,u, v):
         d = np.dot(self.sqrt_range_mat, u[:2] - v[:2] ) # Distance between x1,x2 (2D)
@@ -42,7 +62,7 @@ class matern_st_11:               #sigmasq range advec beta  nugget
     
     def matern_cov_yx(self,params: Tuple[float,float,float,float,float,float], y_df, x_df) -> pd.DataFrame:
     
-        sigmasq, range_lon, range_lat, advec, beta, nugget  = params
+        sigmasq, range_lat, range_lon, advec, beta, nugget  = params
             
         # Validate inputs
         if y_df is None or x_df is None:
@@ -109,37 +129,40 @@ class matern_st_11:               #sigmasq range advec beta  nugget
         
         return neg_log_lik
     
-    def vecchia_likelihood(self, params: Tuple[float,float,float,float,float,float], input_df, mm_cond_number, baseset_from_maxmin, nns_map):
+    def vecchia_likelihood(self, params: Tuple[float,float,float,float,float,float]):
         # initialize negative log-likelihood value
         neg_log_lik = 0
+        prev_df = None
         ## likelihood for the first 30 observations
-        smallset = input_df.iloc[:31,:]
-        neg_log_lik += self.full_likelihood(params,smallset, smallset["ColumnAmountO3"])
+        for time_idx in range(self.number_of_timestamps):
+            current_df = self.input_map[self.key_list[time_idx]].reset_index(drop=True)
+            cur_heads = current_df.iloc[:31,:]
+            neg_log_lik += self.full_likelihood(params,cur_heads, cur_heads["ColumnAmountO3"])
 
-        orbits = input_df['Orbit'].unique()
-        orbit_num = len(orbits) 
-        obs_per_orbit = int(len(input_df)/orbit_num)
-        ''' 
-        I plant to group by 8 orbits for each dat so orbit_num 8 
-        '''
+            for index in range(31,self.size_per_hour):
 
-        for j in range(orbit_num):
-            p = j
-            for i in range( j*obs_per_orbit, (j+1) * obs_per_orbit ):
-                current_data = input_df.iloc[i:i+1,:]
-                current_y = current_data['ColumnAmountO3'].values[0]
+                current_row = current_df .iloc[index:index+1,:]
+                current_y = current_row['ColumnAmountO3'].values[0]
 
                 # construct conditioning set on time 0
                 
-                mm_past = nns_map[i%obs_per_orbit,:mm_cond_number]  # array
-                mm_past = mm_past[mm_past!=-1]
-                past = list(mm_past) + list( np.array(baseset_from_maxmin) + j*obs_per_orbit )    # adjust orbit_num
-                while (p<j):
-                    past +=  list( np.array(past) + obs_per_orbit)
-                    p += 1
+                mm_neighbors = self.nns_map[index]
 
-                conditioning_data = input_df.loc[past,: ]
-                df = pd.concat( (current_data, conditioning_data), axis=0)
+                past = list(mm_neighbors)
+
+                if past:
+                    conditioning_data = current_df.loc[past,: ]
+                else:
+                    conditioning_data = pd.DataFrame()
+
+                if time_idx >0:
+                    if past:
+                        past_conditioning_data = prev_df.loc[past,: ]
+                    else:
+                        past_conditioning_data = pd.DataFrame()
+                    conditioning_data = pd.concat((conditioning_data, past_conditioning_data),axis=0)
+
+                df = pd.concat( (current_row, conditioning_data), axis=0)
                 y_and_neighbors = df['ColumnAmountO3'].values
                 cov_matrix = self.matern_cov_yx(params=params, y_df = df, x_df = df)
 
@@ -172,7 +195,7 @@ class matern_st_11:               #sigmasq range advec beta  nugget
                 # Compute the negative log-likelihood
 
                 neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
-        
+            prev_df = current_df
         return neg_log_lik
     
     def mle_parallel(self, key,lat_idx, bounds, initial_params, input_df, mm_cond_number, baseset_from_maxmin, nns_map):

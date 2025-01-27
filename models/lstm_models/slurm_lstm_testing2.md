@@ -49,7 +49,7 @@ conda activate gems_tco
 echo "Current date and time: $(date)"
 
 #### Run the Python script { (20,20):(5,1), (5,5):(20,40) }
-echo "testing cnn_lstm 1"
+echo "testing cnn_lstm 2"
 
 
 srun python /home/jl2815/tco/models/lstm_testing2.py --space 20 20 --cycles 1 0 0 --lr 0.005 --batch_size 30
