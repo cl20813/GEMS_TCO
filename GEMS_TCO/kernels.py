@@ -136,10 +136,10 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
         ## likelihood for the first 30 observations
         for time_idx in range(self.number_of_timestamps):
             current_df = self.input_map[self.key_list[time_idx]].reset_index(drop=True)
-            cur_heads = current_df.iloc[:31,:]
-            neg_log_lik += self.full_likelihood(params,cur_heads, cur_heads["ColumnAmountO3"])
+            # cur_heads = current_df.iloc[:5,:]
+            # neg_log_lik += self.full_likelihood(params,cur_heads, cur_heads["ColumnAmountO3"])
 
-            for index in range(31,self.size_per_hour):
+            for index in range(0,self.size_per_hour):
 
                 current_row = current_df .iloc[index:index+1,:]
                 current_y = current_row['ColumnAmountO3'].values[0]
@@ -156,11 +156,29 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                     conditioning_data = pd.DataFrame()
 
                 if time_idx >0:
+                    last_hour_df = self.input_map[self.key_list[time_idx-1]].reset_index(drop=True)
                     if past:
-                        past_conditioning_data = prev_df.loc[past,: ]
+                        past_conditioning_data = last_hour_df.loc[ (past+[index]),: ]
                     else:
                         past_conditioning_data = pd.DataFrame()
                     conditioning_data = pd.concat((conditioning_data, past_conditioning_data),axis=0)
+
+    #            if time_idx >7:
+    #                yesterday_df = self.input_map[self.key_list[time_idx-8]].reset_index(drop=True)
+    #                if past:
+    #                    past_conditioning_data = yesterday_df.loc[ (past+[index]),: ]
+    #                else:
+    #                    past_conditioning_data = pd.DataFrame()
+    #                conditioning_data = pd.concat((conditioning_data, past_conditioning_data),axis=0)  
+
+    #            if time_idx > 23:
+    #                three_day_df = self.input_map[self.key_list[time_idx-24]].reset_index(drop=True)
+    #                if past:
+    #                    past_conditioning_data = three_day_df.loc[ (past+[index]),: ]
+    #                else:
+    #                    past_conditioning_data = pd.DataFrame()
+    #                conditioning_data = pd.concat((conditioning_data, past_conditioning_data),axis=0)  
+
 
                 df = pd.concat( (current_row, conditioning_data), axis=0)
                 y_and_neighbors = df['ColumnAmountO3'].values
@@ -195,7 +213,8 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                 # Compute the negative log-likelihood
 
                 neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
-            prev_df = current_df
+            # prev_prev_df = prev_df
+            # prev_df = current_df
         return neg_log_lik
     
     def mle_parallel(self, key,lat_idx, bounds, initial_params, input_df, mm_cond_number, baseset_from_maxmin, nns_map):
