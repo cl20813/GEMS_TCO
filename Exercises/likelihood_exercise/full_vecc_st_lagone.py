@@ -7,6 +7,7 @@ import math
 from collections import defaultdict
 import concurrent
 from concurrent.futures import ThreadPoolExecutor  # Importing specific executor for clarity
+import time
 
 # Data manipulation and analysis
 import pandas as pd
@@ -54,7 +55,7 @@ def main():
     parser.add_argument('--space', type=int,nargs='+', default=[20,20], help="spatial resolution")
     parser.add_argument('--mm_cond_number', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
     parser.add_argument('--key', type=int, default=1, help="Index for the datasets.")
-    parser.add_argument('--params', type=float,nargs='+', default=[0.5,0.5,0.5,0.5, 0.5], help="Initial parameters")
+    parser.add_argument('--params', type=float,nargs='+', default=[0.5,0.5,0.5,0.5,0.5, 0.5], help="Initial parameters")
     # Parse the arguments
     args = parser.parse_args()
     
@@ -121,24 +122,41 @@ def main():
     coords1_reordered = np.stack((data_for_coord['Longitude'].values, data_for_coord['Latitude'].values), axis=-1)
     nns_map = instance.find_nns_naive(locs=coords1_reordered, dist_fun='euclidean', max_nn=mm_cond_number)
 
+    print(f' {nns_map}', {nns_map.shape})
+
+    analysis_data_map = {}
+    for i in range(key_for_dict):
+        tmp = coarse_dicts[key_idx[i]]
+        tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
+        analysis_data_map[key_idx[i]] = tmp
+
     aggregated_data = pd.DataFrame()
-    for i in range(len(key_idx)):
+    for i in range((key_for_dict)):
         tmp = coarse_dicts[key_idx[i]]
         tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
         aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
     
+    
+    print(f'aggregated_data {aggregated_data.shape}')
     #####################################################################
 
-    instance = kernels.matern_spatial()
+    instance = kernels.matern_spatio_temporal(smooth = 0.5, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
     # data = data.iloc[ord,:]
-    out = instance.vecchia_likelihood(params, aggregated_data, mm_cond_number, nns_map)
+    out = instance.vecchia_likelihood(params)
+    start_time = time.time()
+
+
 
     print(f'Full likelihood using {params} is {instance.full_likelihood(params, aggregated_data, aggregated_data["ColumnAmountO3"])}')
+    end_time = time.time()  # Record the end time
+    iteration_time = end_time - start_time  # Calculate the time spent
+    print(f"full likelihood {i} took {iteration_time:.4f} seconds")
+
+    start_time = time.time()
     print(f'Vecchia approximation likelihood using condition size {mm_cond_number}, {params} is {out}')
-
-
-
-
+    end_time = time.time()  # Record the end time
+    iteration_time = end_time - start_time  # Calculate the time spent
+    print(f"vecchia {i} took {iteration_time:.4f} seconds")
 
 if __name__ == '__main__':
     main()
