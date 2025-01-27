@@ -35,8 +35,8 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/likelihood_exercise/f
 #SBATCH --error=/home/jl2815/tco/exercise_output/fv_onelag_%j.err     # Standard error file (%j = JobID)
 #SBATCH --time=48:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
-#SBATCH --cpus-per-task=8                                          # Number of CPU cores per task
-#SBATCH --mem=200G                                                 # Memory per node
+#SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
+#SBATCH --mem=300G                                                 # Memory per node
 #SBATCH --partition=main                                            # Partition name
 
 #### Load the Anaconda module to use srun 
