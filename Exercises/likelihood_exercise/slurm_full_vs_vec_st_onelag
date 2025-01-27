@@ -22,10 +22,11 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/likelihood_exercise/f
 
 `
 
-### Job Order SLURM: fv_onelag.py 
+### Job Order SLURM: fv_onelag.py    
+```mkdir -p ./jobscript/tco/gp_exercise```      
 
-```cd ./jobscript/tco/dl```                       
-```nano fv_onelag.sh```         (rm cnn_lstm1.sh)        # open a new text editor                      
+```cd ./jobscript/tco/gp_exercise```                          
+```nano fv_onelag.sh```         (rm cnn_lstm1.sh)        # open a new text editor                         
 
 ```
 #!/bin/bash
@@ -69,7 +70,7 @@ srun python /home/jl2815/tco/exercise_25/likelihood_exercise/full_vecc_st_lagone
 
 ```
 
-cd ./jobscript/tco/dl       
-sbatch fv_like_onelag.sh       
+```cd ./jobscript/tco/gp_exercise```                          
+```sbatch fv_onelag.sh```           
 
 ############################################################################################################# 
