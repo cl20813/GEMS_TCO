@@ -122,7 +122,7 @@ def main():
     coords1_reordered = np.stack((data_for_coord['Longitude'].values, data_for_coord['Latitude'].values), axis=-1)
     nns_map = instance.find_nns_naive(locs=coords1_reordered, dist_fun='euclidean', max_nn=mm_cond_number)
 
-    print(f' {nns_map}', {nns_map.shape})
+    
 
     analysis_data_map = {}
     for i in range(key_for_dict):
