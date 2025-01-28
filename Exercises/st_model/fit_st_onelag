@@ -1,0 +1,43 @@
+<Fit by latitude>
+### Copy python from my computer to HPC
+scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\fit_st_1_27.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_models
+
+
+### Copy python from Amarel HPC to my computer
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_models/fit_st_1_27.py "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model"
+
+```cd ./jobscript/tco/gp_exercise``` 
+nano est_st_onelag.sh                # open a new text editor
+
+
+'''
+#!/bin/bash
+#SBATCH --job-name= est_st_onelag       # Job name
+#SBATCH --output=/home/jl2815/GEMS/est_st_onelag_%j.out            # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/GEMS/est_st_onelag_%j.err              # Standard error file (%j = JobID)
+#SBATCH --time=72:00:00                
+#SBATCH --ntasks=1                       
+#SBATCH --cpus-per-task=40                 
+#SBATCH --mem=350G                          
+#SBATCH --partition=mem                     
+
+# Load the Anaconda module to use srun 
+module purge                                              
+module use /projects/community/modulefiles                 
+module load anaconda/2024.06-ts840 
+
+eval "$(conda shell.bash hook)"                           # Initialize Conda for SLURM environment
+conda activate gems_tco
+
+# export OMP_NUM_THREADS=1
+echo "Current date and time: $(date)"
+
+# Run the Python script
+
+
+srun python /home/jl2815/tco/exercise_25/st_models/fit_st_1_27.py --v 0.5 --space 20 20 --key=20 --mm_cond_number=10 --bounds 0.05 60 0.05 15 0.05 15 -15 15 0.05 20 0.05 1.5 
+```
+
+``` cd ./jobscript/tco/gp_exercise``` 
+``` sbatch est_st_onelag.sh```
+

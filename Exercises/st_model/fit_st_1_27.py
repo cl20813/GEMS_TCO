@@ -60,8 +60,7 @@ def main():
     parser.add_argument('--key', type=int, default=1, help="Index for the datasets.")
     parser.add_argument('--params', type=float,nargs='+', default=[0.5,0.5,0.5,0.5,0.5, 0.5], help="Initial parameters")
     parser.add_argument('--bounds', type=float, nargs='+', default=[0.05, 600, 0.05, 600, -200, 200, 0.5, 600, 0.5, 600, 0.5, 600], help="Bounds for parameters" )    
-    parser.add_argument('--params', type=float,nargs='+', default=[0.5,0.5,0.5,0.5,0.5], help="sigmasq, range_, advec, beta, nugget ")
-
+    
   
     # Parse the arguments
     args = parser.parse_args()
