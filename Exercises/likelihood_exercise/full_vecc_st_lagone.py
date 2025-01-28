@@ -148,16 +148,16 @@ def main():
 
 
 
-    print(f'Full likelihood using {params} is {instance.full_likelihood(params, aggregated_data, aggregated_data["ColumnAmountO3"])}')
+    print(f'grid {lat_number}*{lon_number}:Full likelihood using {params} is {instance.full_likelihood(params, aggregated_data, aggregated_data["ColumnAmountO3"])}')
     end_time = time.time()  # Record the end time
     iteration_time = end_time - start_time  # Calculate the time spent
-    print(f"full likelihood {i} took {iteration_time:.4f} seconds")
+    print(f"full likelihood {key_for_dict}time points took {iteration_time:.4f} seconds")
 
     start_time = time.time()
-    print(f'Vecchia approximation likelihood using condition size {mm_cond_number}, {params} is {out}')
+    print(f'grid {lat_number}*{lon_number}:Vecchia approximation likelihood using condition size {mm_cond_number}, {params} is {out}')
     end_time = time.time()  # Record the end time
     iteration_time = end_time - start_time  # Calculate the time spent
-    print(f"vecchia {i} took {iteration_time:.4f} seconds")
+    print(f"vecchia {key_for_dict}time points took {iteration_time:.4f} seconds")
 
 if __name__ == '__main__':
     main()

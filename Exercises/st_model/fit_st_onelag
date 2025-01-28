@@ -2,17 +2,27 @@
 ### Copy python from my computer to HPC
 scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\fit_st_1_27.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_models
 
+scp -r "C:\Users\joonw\TCO\GEMS_TCO-1\GEMS_TCO" jl2815@amarel.rutgers.edu:/home/jl2815/tco
+
 
 ### Copy python from Amarel HPC to my computer
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_models/fit_st_1_27.py "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model"
 
+
+# short run
+module purge                                              
+module use /projects/community/modulefiles                 
+module load anaconda/2024.06-ts840 
+srun --cpus-per-task=16 --mem=40G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_models/fit_st_1_27.py --v 0.5 --space 20 20 --key=20 --mm_cond_number=10 --bounds 0.05 60 0.05 15 0.05 15 -15 15 0.05 20 0.05 1.5 
+
+
+
 ```cd ./jobscript/tco/gp_exercise``` 
 nano est_st_onelag.sh                # open a new text editor
 
-
 '''
 #!/bin/bash
-#SBATCH --job-name= est_st_onelag       # Job name
+#SBATCH --job-name=est_st_onelag       # Job name
 #SBATCH --output=/home/jl2815/GEMS/est_st_onelag_%j.out            # Standard output file (%j = JobID)
 #SBATCH --error=/home/jl2815/GEMS/est_st_onelag_%j.err              # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                
@@ -35,7 +45,15 @@ echo "Current date and time: $(date)"
 # Run the Python script
 
 
-srun python /home/jl2815/tco/exercise_25/st_models/fit_st_1_27.py --v 0.5 --space 20 20 --key=20 --mm_cond_number=10 --bounds 0.05 60 0.05 15 0.05 15 -15 15 0.05 20 0.05 1.5 
+srun python /home/jl2815/tco/exercise_25/st_models/fit_st_1_27.py --v 0.5 --space 20 20 --key=8 --mm_cond_number=10 --bounds 0.05 60 0.05 15 0.05 15 -15 15 0.05 20 0.05 1.5 
+
+srun python /home/jl2815/tco/exercise_25/st_models/fit_st_1_27.py --v 0.5 --space 15 15 --key=8 --mm_cond_number=10 --bounds 0.05 60 0.05 15 0.05 15 -15 15 0.05 20 0.05 1.5 
+
+srun python /home/jl2815/tco/exercise_25/st_models/fit_st_1_27.py --v 0.5 --space 10 10 --key=8 --mm_cond_number=10 --bounds 0.05 60 0.05 15 0.05 15 -15 15 0.05 20 0.05 1.5 
+
+srun python /home/jl2815/tco/exercise_25/st_models/fit_st_1_27.py --v 0.5 --space 5 5 --key=8 --mm_cond_number=10 --bounds 0.05 60 0.05 15 0.05 15 -15 15 0.05 20 0.05 1.5 
+
+
 ```
 
 ``` cd ./jobscript/tco/gp_exercise``` 

@@ -147,14 +147,18 @@ def main():
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         futures = [
             executor.submit(
-                kernels.matern_spatio_temporal.mle_parallel2,
-                bounds, params
+                instance.mle_parallel2,
+                bounds=bounds, initial_params=params
             )   
             for key in keys
         ]
 
         for future in concurrent.futures.as_completed(futures):
             print(future.result())
+
+    end_time = time.time()  # Record the end time
+    estimation_time = end_time - start_time  # Calculate the time spent
+    print(f"estimation_time took {estimation_time:.4f} seconds")
 
 if __name__ == '__main__':
     main()
