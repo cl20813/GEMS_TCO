@@ -239,14 +239,14 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
             logging.error(f"Error occurred on {key}: {str(e)}")
             return f"Error occurred on {key}"
         
-    def mle_parallel2(self, bounds, initial_params ):
+    def mle_parallel2(self, bounds, params ):
         try:
             logging.info(f"fit_st_1_27")
             print(f"fit_st_1_27")  # Debugging line
         
             result = minimize(
                 self.vecchia_likelihood, 
-                initial_params, 
+                params, 
                 # neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map)
                 bounds=bounds,
                 method='L-BFGS-B'

@@ -12,7 +12,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/likelihood_exercise/f
 
 ### Run this part
 ```ssh jl2815@amarel.rutgers.edu```
-```module use /projects/community/modulefiles```            # # Ensure the module path is added. Without this, I can't load 2024.06-ts840
+```module use /projects/community/modulefiles```           
 ```module load anaconda/2024.06-ts840``` 
 ```conda activate gems_tco```
 

@@ -144,10 +144,8 @@ def main():
     instance = kernels.matern_spatio_temporal(smooth = 0.5, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
     # data = data.iloc[ord,:]
     out = instance.vecchia_likelihood(params)
+
     start_time = time.time()
-
-
-
     print(f'grid {lat_number}*{lon_number}:Full likelihood using {params} is {instance.full_likelihood(params, aggregated_data, aggregated_data["ColumnAmountO3"])}')
     end_time = time.time()  # Record the end time
     iteration_time = end_time - start_time  # Calculate the time spent

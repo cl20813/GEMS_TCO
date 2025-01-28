@@ -148,7 +148,7 @@ def main():
         futures = [
             executor.submit(
                 instance.mle_parallel2,
-                bounds=bounds, initial_params=params
+                bounds, params
             )   
             for key in keys
         ]
