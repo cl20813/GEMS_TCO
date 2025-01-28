@@ -23,8 +23,8 @@ nano est_st_onelag.sh                # open a new text editor
 '''
 #!/bin/bash
 #SBATCH --job-name=est_st_onelag       # Job name
-#SBATCH --output=/home/jl2815/GEMS/est_st_onelag_%j.out            # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/GEMS/est_st_onelag_%j.err              # Standard error file (%j = JobID)
+#SBATCH --output=/home/jl2815/tco/exercise_25/st_models/est_st_onelag_%j.out            # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_25/st_models/est_st_onelag_%j.err              # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                
 #SBATCH --ntasks=1                       
 #SBATCH --cpus-per-task=40                 
