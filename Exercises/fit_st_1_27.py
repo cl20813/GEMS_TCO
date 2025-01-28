@@ -7,7 +7,7 @@ import math
 from collections import defaultdict
 import concurrent
 from concurrent.futures import ThreadPoolExecutor  # Importing specific executor for clarity
-import time
+import time 
 
 # Data manipulation and analysis
 import pandas as pd
@@ -50,24 +50,32 @@ logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctim
 
 def main():
     # Argument parser
-    parser = argparse.ArgumentParser(description="Full vs Vecchia Comparison")
-    # Define the parameters you want to change at runtime
+    parser = argparse.ArgumentParser(description="Fit spatio-temporal model")
+    
+    
+    #sigmasq (0.05,600), range_ (0.05,600), advec (-200,200), beta (0,600), nugget (0,600)
+    parser.add_argument('--v', type=float, default=0.5, help="smooth")
     parser.add_argument('--space', type=int,nargs='+', default=[20,20], help="spatial resolution")
     parser.add_argument('--mm_cond_number', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
     parser.add_argument('--key', type=int, default=1, help="Index for the datasets.")
     parser.add_argument('--params', type=float,nargs='+', default=[0.5,0.5,0.5,0.5,0.5, 0.5], help="Initial parameters")
-   
+    parser.add_argument('--bounds', type=float, nargs='+', default=[0.05, 600, 0.05, 600, -200, 200, 0.5, 600, 0.5, 600, 0.5, 600], help="Bounds for parameters" )    
+    parser.add_argument('--params', type=float,nargs='+', default=[0.5,0.5,0.5,0.5,0.5], help="sigmasq, range_, advec, beta, nugget ")
+
+  
     # Parse the arguments
     args = parser.parse_args()
-    
+
     # Use args.param1, args.param2 in your script
     lat_lon_resolution = args.space 
     mm_cond_number = args.mm_cond_number
     params= args.params
+    bounds = [(args.bounds[i], args.bounds[i+1]) for i in range(0, len(args.bounds), 2)]
     key_for_dict= args.key
 
-    ############ 
-
+    v = args.v
+   
+    ############################## 
 
     # Load the one dictionary to set spaital coordinates
     filepath = "/home/jl2815/tco/data/pickle_data/pickle_2023/coarse_cen_map23_01.pkl"
@@ -104,7 +112,7 @@ def main():
                     coarse_filter = (tmp_df['Latitude'].isin(lat_n)) & (tmp_df['Longitude'].isin(lon_n))
                     coarse_dicts[f"{year}_{month:02d}_{key}"] = tmp_df[coarse_filter].reset_index(drop=True)
 
-    
+
     key_idx = sorted(coarse_dicts)
     if not key_idx:
         raise ValueError("coarse_dicts is empty")
@@ -123,41 +131,31 @@ def main():
     coords1_reordered = np.stack((data_for_coord['Longitude'].values, data_for_coord['Latitude'].values), axis=-1)
     nns_map = instance.find_nns_naive(locs=coords1_reordered, dist_fun='euclidean', max_nn=mm_cond_number)
 
-    
-
     analysis_data_map = {}
     for i in range(key_for_dict):
         tmp = coarse_dicts[key_idx[i]]
         tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
         analysis_data_map[key_idx[i]] = tmp
 
-    aggregated_data = pd.DataFrame()
-    for i in range((key_for_dict)):
-        tmp = coarse_dicts[key_idx[i]]
-        tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
-        aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
-    
-    
-    print(f'aggregated_data {aggregated_data.shape}')
-    #####################################################################
+#####################################################################
 
-    instance = kernels.matern_spatio_temporal(smooth = 0.5, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
+    instance = kernels.matern_spatio_temporal(smooth = v, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
     # data = data.iloc[ord,:]
-    out = instance.vecchia_likelihood(params)
-    start_time = time.time()
-
-
-
-    print(f'Full likelihood using {params} is {instance.full_likelihood(params, aggregated_data, aggregated_data["ColumnAmountO3"])}')
-    end_time = time.time()  # Record the end time
-    iteration_time = end_time - start_time  # Calculate the time spent
-    print(f"full likelihood {i} took {iteration_time:.4f} seconds")
 
     start_time = time.time()
-    print(f'Vecchia approximation likelihood using condition size {mm_cond_number}, {params} is {out}')
-    end_time = time.time()  # Record the end time
-    iteration_time = end_time - start_time  # Calculate the time spent
-    print(f"vecchia {i} took {iteration_time:.4f} seconds")
+
+    keys = sorted(analysis_data_map)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
+        futures = [
+            executor.submit(
+                kernels.matern_spatio_temporal.mle_parallel2,
+                bounds, params
+            )   
+            for key in keys
+        ]
+
+        for future in concurrent.futures.as_completed(futures):
+            print(future.result())
 
 if __name__ == '__main__':
     main()

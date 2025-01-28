@@ -3,6 +3,7 @@ import logging
 import math
 import sys
 from collections import defaultdict
+import time
 
 # Data manipulation and analysis
 import pandas as pd
@@ -219,7 +220,7 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
     
     def mle_parallel(self, key,lat_idx, bounds, initial_params, input_df, mm_cond_number, baseset_from_maxmin, nns_map):
         try:
-            logging.info(f"fit_st_bylat_11_16: day {key+1}")
+            logging.info(f"fit_s_bylat_11_16: day {key+1}")
             print(f"fit_st_bylat_11_16: day {key+1}")  # Debugging line
         
             result = minimize(
@@ -238,29 +239,26 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
             logging.error(f"Error occurred on {key}: {str(e)}")
             return f"Error occurred on {key}"
         
-    def mle_parallel_nolat_cut(self, key, bounds, initial_params, input_df, mm_cond_number, baseset_from_maxmin, nns_map):
+    def mle_parallel2(self, bounds, initial_params ):
         try:
-            logging.info(f"fit_st_nolat_cut_11_16: day {key}")
-            print(f"fit_st_nolat_cut_11_16: {key}")  # Debugging line
+            logging.info(f"fit_st_1_27")
+            print(f"fit_st_1_27")  # Debugging line
         
             result = minimize(
                 self.vecchia_likelihood, 
                 initial_params, 
-                args=(input_df, mm_cond_number, baseset_from_maxmin, nns_map),  # neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map)
+                # neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map)
                 bounds=bounds,
                 method='L-BFGS-B'
             )
             jitter = result.x
-            logging.info(f"Estimated parameters on day{key},  is : {jitter}, when cond {mm_cond_number}, bounds={bounds}, smooth={self.smooth}")
+            logging.info(f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}")
             
-            return f"Estimated parameters on day{key},  is : {jitter}, when cond {mm_cond_number},  bounds={bounds}, smooth={self.smooth}"
+            return f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}"
         except Exception as e:
-            print(f"Error occurred on {key}: {str(e)}")
-            logging.error(f"Error occurred on {key}: {str(e)}")
-            return f"Error occurred on {key}"
-        
-
-
+            error_message = f"Error occurred: {str(e)}"
+            print(error_message)
+            logging.error(error_message)
 
     
 class matern_spatial:
