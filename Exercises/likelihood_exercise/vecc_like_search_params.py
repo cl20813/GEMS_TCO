@@ -148,12 +148,12 @@ def main():
 
     # Define parameter ranges
     param_ranges = {
-        'param1': np.linspace(0.1, 1.0, 10, 50),
-        'param2': np.linspace(0.1, 1.0, 10, 50),
-        'param3': np.linspace(0.1, 1.0, 10, 50),
-        'param4': np.linspace(0.1, 1.0, 10),
-        'param5': np.linspace(0.1, 1.0, 10),
-        'param6': np.linspace(0.1, 1.0, 10)
+        'param1': np.linspace(0.1, 1.0, 10,20,30,40, 50,60),
+        'param2': np.linspace(0.1, 1.0, 2,4,6,8, 10, 12,14,16,18,20, 50),
+        'param3': np.linspace(0.1, 1.0, 2,4,6,8, 10, 12,14,16,18,20, 50),
+        'param4': np.arange(1,10),
+        'param5': np.arange(1,10),
+        'param6': np.arange(1,10)
     }
 
     # Initialize variables to store the best parameters and highest likelihood
