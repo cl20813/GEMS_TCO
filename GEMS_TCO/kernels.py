@@ -27,7 +27,7 @@ sys.path.append("/cache/home/jl2815/tco")
 
 # Custom imports
 # Configure logging to a specific file path
-log_file_path = '/home/jl2815/GEMS/logs/fit_st_by_latitude_11_14.log'
+log_file_path = '/home/jl2815/tco/exercise_25/st_models/log/fit_st_by_latitude_11_14.log'
 
 
 class matern_spatio_temporal:               #sigmasq range advec beta  nugget
