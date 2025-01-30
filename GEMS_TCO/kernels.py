@@ -137,10 +137,11 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
         ## likelihood for the first 30 observations
         for time_idx in range(self.number_of_timestamps):
             current_df = self.input_map[self.key_list[time_idx]].reset_index(drop=True)
-            # cur_heads = current_df.iloc[:5,:]
+
+            # cur_heads = current_df.iloc[:31,:]
             # neg_log_lik += self.full_likelihood(params,cur_heads, cur_heads["ColumnAmountO3"])
 
-            for index in range(0,self.size_per_hour):
+            for index in range(0, self.size_per_hour):
 
                 current_row = current_df .iloc[index:index+1,:]
                 current_y = current_row['ColumnAmountO3'].values[0]
@@ -337,10 +338,10 @@ class matern_spatial:
         # reordered_df['ColumnAmountO3'] = reordered_df['ColumnAmountO3']-np.mean(reordered_df['ColumnAmountO3'])
         neg_log_lik = 0
         ## likelihood for the first 30 observations
-        smallset = input_df.iloc[:31,:]
-        neg_log_lik += self.full_likelihood(params, smallset, smallset['ColumnAmountO3'])
+        # smallset = input_df.iloc[:31,:]
+        # neg_log_lik += self.full_likelihood(params, smallset, smallset['ColumnAmountO3'])
 
-        for i in range(31,len(input_df)):
+        for i in range(0,len(input_df)):
             # current_data and conditioning data
             current_data = input_df.iloc[i:i+1,:]
             current_y = current_data['ColumnAmountO3'].values[0]
@@ -535,67 +536,7 @@ class gneiting:
     
     
     def vecchia_likelihood(self, params: Tuple[float,float,float,float,float,float,float], input_df, mm_cond_number, baseset_from_maxmin, nns_map):
-        # initialize negative log-likelihood value
-        neg_log_lik = 0
-        ## likelihood for the first 30 observations
-        smallset = input_df.iloc[:31,:]
-        neg_log_lik += self.full_likelihood(params,smallset, smallset["ColumnAmountO3"])
-
-        orbits = input_df['Orbit'].unique()
-        orbit_num = len(orbits) 
-        obs_per_orbit = int(len(input_df)/orbit_num)
-        ''' 
-        I plant to group by 8 orbits for each dat so orbit_num 8 
-        '''
-
-        for j in range(orbit_num):
-            p = j
-            for i in range( j*obs_per_orbit, (j+1) * obs_per_orbit ):
-                current_data = input_df.iloc[i:i+1,:]
-                current_y = current_data['ColumnAmountO3'].values[0]
-
-                # construct conditioning set on time 0
-                
-                mm_past = nns_map[i%obs_per_orbit,:mm_cond_number]  # array
-                mm_past = mm_past[mm_past!=-1]
-                past = list(mm_past) + list( np.array(baseset_from_maxmin) + j*obs_per_orbit )    # adjust orbit_num
-                while (p<j):
-                    past +=  list( np.array(past) + obs_per_orbit)
-                    p += 1
-
-                conditioning_data = input_df.loc[past,: ]
-                df = pd.concat( (current_data, conditioning_data), axis=0)
-                y_and_neighbors = df['ColumnAmountO3'].values
-                cov_matrix = self.my_gneiting(params=params, input_df = df)
-                
-                cov_xx = cov_matrix.iloc[1:,1:].reset_index(drop=True)
-                cov_yx = cov_matrix.iloc[0,1:]
-
-                # get mean
-                locs = np.array(df[['Latitude','Longitude']])
-
-                tmp1 = np.dot(locs.T, np.linalg.solve(cov_matrix, locs))
-                tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y_and_neighbors))
-                beta = np.linalg.solve(tmp1, tmp2)
-
-                mu = np.dot(locs, beta)
-                mu_current = mu[0]
-                mu_neighbors = mu[1:]
-                
-                # mean and variance of y|x
-                sigma = cov_matrix.iloc[0,0]
-                cov_ygivenx = sigma - np.dot(cov_yx.T,np.linalg.solve(cov_xx, cov_yx))
-                cond_mean = mu_current + np.dot(cov_yx.T, np.linalg.solve( cov_xx, (y_and_neighbors[1:]-mu_neighbors) ))   # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
-                # print(f'cond_mean{mean_z}')
-
-                alpha = current_y - cond_mean
-                quad_form = alpha**2 *(1/cov_ygivenx)
-                log_det = np.log(cov_ygivenx)
-                # Compute the negative log-likelihood
-
-                neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
-        
-        return neg_log_lik
+        pass
     
     def mle_parallel(self, key,lat_idx, bounds, initial_params, input_df, mm_cond_number, baseset_from_maxmin, nns_map):
         try:
