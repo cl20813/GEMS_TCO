@@ -138,24 +138,26 @@ def main():
         aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
     
     
-    print(f'aggregated_data {aggregated_data.shape}')
+    print(f'Aggregated data shape: {aggregated_data.shape}')
+    print(aggregated_data.to_string())
     #####################################################################
 
-    instance = kernels.matern_spatio_temporal(smooth = 0.5, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
-    # data = data.iloc[ord,:]
+    instance = kernels.matern_spatio_temporal(smooth=0.5, input_map=analysis_data_map, nns_map=nns_map, mm_cond_number=mm_cond_number)
+    # data = data.iloc[ord, :]
     out = instance.vecchia_likelihood(params)
 
     start_time = time.time()
-    print(f'grid {lat_number}*{lon_number}:Full likelihood using {params} is {instance.full_likelihood(params, aggregated_data, aggregated_data["ColumnAmountO3"])}')
+    full_likelihood = instance.full_likelihood(params, aggregated_data, aggregated_data["ColumnAmountO3"])
+    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Full likelihood using params={params} is {full_likelihood}')
     end_time = time.time()  # Record the end time
     iteration_time = end_time - start_time  # Calculate the time spent
-    print(f"full likelihood {key_for_dict}time points took {iteration_time:.4f} seconds")
+    print(f"Full likelihood took {iteration_time:.4f} seconds")
 
-    start_time = time.time()
-    print(f'grid {lat_number}*{lon_number}:Vecchia approximation likelihood using condition size {mm_cond_number}, {params} is {out}')
-    end_time = time.time()  # Record the end time
-    iteration_time = end_time - start_time  # Calculate the time spent
-    print(f"vecchia {key_for_dict}time points took {iteration_time:.4f} seconds")
+    start_time2 = time.time()
+    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out}')
+    end_time2 = time.time()  # Record the end time
+    iteration_time2 = end_time2 - start_time2  # Calculate the time spent
+    print(f"Vecchia approximation took {iteration_time2:.4f} seconds")
 
 if __name__ == '__main__':
     main()

@@ -139,6 +139,10 @@ def main():
     
     
     print(f'aggregated_data {aggregated_data.shape}')
+
+ 
+
+    
     #####################################################################
 
     instance = kernels.matern_spatio_temporal(smooth = 0.5, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
@@ -148,9 +152,9 @@ def main():
 
     # Define parameter ranges
     param_ranges = {
-        'param1': np.linspace(0.1, 1.0, 10,20,30,40, 50,60),
-        'param2': np.linspace(0.1, 1.0, 2,4,6,8, 10, 12,14,16,18,20, 50),
-        'param3': np.linspace(0.1, 1.0, 2,4,6,8, 10, 12,14,16,18,20, 50),
+        'param1': np.linspace(0,60,7),
+        'param2': np.linspace(0,60,7),
+        'param3': np.linspace(0,60,7),
         'param4': np.arange(1,10),
         'param5': np.arange(1,10),
         'param6': np.arange(1,10)
