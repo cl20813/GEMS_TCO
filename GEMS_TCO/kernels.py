@@ -143,7 +143,7 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
 
             for index in range(0, self.size_per_hour):
 
-                current_row = current_df .iloc[index:index+1,:]
+                current_row = current_df.iloc[index:index+1,:]
                 current_y = current_row['ColumnAmountO3'].values[0]
 
                 # construct conditioning set on time 0
@@ -165,22 +165,23 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                         past_conditioning_data = pd.DataFrame()
                     conditioning_data = pd.concat((conditioning_data, past_conditioning_data),axis=0)
 
-    #            if time_idx >7:
-    #                yesterday_df = self.input_map[self.key_list[time_idx-8]].reset_index(drop=True)
-    #                if past:
-    #                    past_conditioning_data = yesterday_df.loc[ (past+[index]),: ]
-    #                else:
-    #                    past_conditioning_data = pd.DataFrame()
-    #                conditioning_data = pd.concat((conditioning_data, past_conditioning_data),axis=0)  
+                ''' When you want to condition on 8 hours, 24 hours
+                #            if time_idx >7:
+                #                yesterday_df = self.input_map[self.key_list[time_idx-8]].reset_index(drop=True)
+                #                if past:
+                #                    past_conditioning_data = yesterday_df.loc[ (past+[index]),: ]
+                #                else:
+                #                    past_conditioning_data = pd.DataFrame()
+                #                conditioning_data = pd.concat((conditioning_data, past_conditioning_data),axis=0)  
 
-    #            if time_idx > 23:
-    #                three_day_df = self.input_map[self.key_list[time_idx-24]].reset_index(drop=True)
-    #                if past:
-    #                    past_conditioning_data = three_day_df.loc[ (past+[index]),: ]
-    #                else:
-    #                    past_conditioning_data = pd.DataFrame()
-    #                conditioning_data = pd.concat((conditioning_data, past_conditioning_data),axis=0)  
-
+                #            if time_idx > 23:
+                #                three_day_df = self.input_map[self.key_list[time_idx-24]].reset_index(drop=True)
+                #                if past:
+                #                    past_conditioning_data = three_day_df.loc[ (past+[index]),: ]
+                #                else:
+                #                    past_conditioning_data = pd.DataFrame()
+                #                conditioning_data = pd.concat((conditioning_data, past_conditioning_data),axis=0)  
+                '''
 
                 df = pd.concat( (current_row, conditioning_data), axis=0)
                 y_and_neighbors = df['ColumnAmountO3'].values
@@ -219,6 +220,211 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
             # prev_df = current_df
         return neg_log_lik
     
+
+    ''' When you want to use Cholesky decomposition explicitly, but np.linalg.solve() already do this. 
+    L = np.linalg.cholesky(cov_matrix)
+    L11 = L[:1,:1]
+    L12 = np.zeros(L[:1,1:].shape)
+    L21 = L[1:,:1]
+    L22 = L[1:,1:]
+    L11_inv = np.linalg.inv(L11)
+    L22_inv = np.linalg.inv(L22)
+
+    # cov_xx = np.dot(L21, L21.T) + np.dot(L22,L22.T)      sanity check                  
+    # cov_yx = np.dot(L11, L21.T)
+
+    cov_xx = cov_matrix.iloc[1:,1:].reset_index(drop=True)
+    cov_yx = cov_matrix.iloc[0,1:].reset_index(drop=True)
+
+    L_inv = np.block([
+        [L11_inv, L12],
+        [- np.dot( np.dot(L22_inv,L21), L11_inv), L22_inv]
+    ])
+
+    tmp1 = np.dot(L_inv,locs)
+    tmp2 = np.dot( np.dot(L_inv, locs).T, np.dot(L_inv, y_and_neighbors))
+    beta = np.linalg.solve(np.dot(tmp1.T,tmp1) , tmp2)
+    '''
+
+    def vecchia_likelihood2(self, params: Tuple[float,float,float,float,float,float]):
+        # initialize negative log-likelihood value
+        neg_log_lik = 0
+    
+        ## likelihood for the first 30 observations
+        for time_idx in range(self.number_of_timestamps):
+            current_df = self.input_map[self.key_list[time_idx]].reset_index(drop=True)
+
+            if time_idx ==0:
+                for index in range(0, self.size_per_hour):
+
+                    current_row = current_df.iloc[index:index+1,:]
+                    current_y = current_row['ColumnAmountO3'].values[0]
+
+                    # construct conditioning set on time 0
+                    
+                    mm_neighbors = self.nns_map[index]
+
+                    past = list(mm_neighbors)
+
+                    if past:
+                        conditioning_data = current_df.loc[past,: ]
+                    else:
+                        conditioning_data = pd.DataFrame()
+
+                    df = pd.concat( (current_row, conditioning_data), axis=0)
+                    y_and_neighbors = df['ColumnAmountO3'].values
+                    cov_matrix = self.matern_cov_yx(params=params, y_df = df, x_df = df)
+
+                    # Regularization:   already did in covariance matrix
+                    # cov_matrix += nugget * np.eye(cov_matrix.shape[0])
+
+                    cov_xx = cov_matrix.iloc[1:,1:].reset_index(drop=True)
+                    cov_yx = cov_matrix.iloc[0,1:]
+
+                    # get mean
+                    locs = np.array(df[['Latitude','Longitude']])
+
+                    tmp1 = np.dot(locs.T, np.linalg.solve(cov_matrix, locs))
+                    tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y_and_neighbors))
+                    beta = np.linalg.solve(tmp1, tmp2)
+
+                    mu = np.dot(locs, beta)
+                    mu_current = mu[0]
+                    mu_neighbors = mu[1:]
+                    
+                    # mean and variance of y|x
+                    sigma = cov_matrix.iloc[0,0]
+                    cov_ygivenx = sigma - np.dot(cov_yx.T,np.linalg.solve(cov_xx, cov_yx))
+                    cond_mean = mu_current + np.dot(cov_yx.T, np.linalg.solve( cov_xx, (y_and_neighbors[1:]-mu_neighbors) ))   # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
+                    # print(f'cond_mean{mean_z}')
+
+                    alpha = current_y - cond_mean
+                    quad_form = alpha**2 *(1/cov_ygivenx)
+                    log_det = np.log(cov_ygivenx)
+                    # Compute the negative log-likelihood
+                
+                    neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
+                    
+
+
+            elif time_idx==1:
+                self.cov_map = defaultdict(list)
+                for index in range(0, self.size_per_hour):
+
+                    current_row = current_df.iloc[index:index+1,:]
+                    current_y = current_row['ColumnAmountO3'].values[0]
+
+                    # construct conditioning set on time 0
+                    mm_neighbors = self.nns_map[index]
+                    past = list(mm_neighbors)
+
+                    if past:
+                        conditioning_data = current_df.loc[past,: ]
+                    else:
+                        conditioning_data = pd.DataFrame()
+
+                    ## since time_idx >0 construct conditioning set on time t-1
+                    last_hour_df = self.input_map[self.key_list[time_idx-1]].reset_index(drop=True)
+                    if past:
+                        past_conditioning_data = last_hour_df.loc[ (past+[index]),: ]
+                    else:
+                        past_conditioning_data = pd.DataFrame()
+                    conditioning_data = pd.concat((conditioning_data, past_conditioning_data),axis=0)
+
+                    df = pd.concat( (current_row, conditioning_data), axis=0)
+                    y_and_neighbors = df['ColumnAmountO3'].values
+                    cov_matrix = self.matern_cov_yx(params=params, y_df = df, x_df = df)
+
+                    # Regularization:   already did in covariance matrix
+                    # cov_matrix += nugget * np.eye(cov_matrix.shape[0])
+
+                    cov_xx = cov_matrix.iloc[1:,1:].reset_index(drop=True)
+                    cov_yx = cov_matrix.iloc[0,1:]
+
+                    # get mean
+                    locs = np.array(df[['Latitude','Longitude']])
+
+                    tmp1 = np.dot(locs.T, np.linalg.solve(cov_matrix, locs))
+                    tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y_and_neighbors))
+                    beta = np.linalg.solve(tmp1, tmp2)
+
+                    mu = np.dot(locs, beta)
+                    mu_current = mu[0]
+                    mu_neighbors = mu[1:]
+                    
+                    # mean and variance of y|x
+                    sigma = cov_matrix.iloc[0,0]
+                    cov_ygivenx = sigma - np.dot(cov_yx.T,np.linalg.solve(cov_xx, cov_yx))
+                    cond_mean = mu_current + np.dot(cov_yx.T, np.linalg.solve( cov_xx, (y_and_neighbors[1:]-mu_neighbors) ))   # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
+                    # print(f'cond_mean{mean_z}')
+
+                    alpha = current_y - cond_mean
+                    quad_form = alpha**2 *(1/cov_ygivenx)
+                    log_det = np.log(cov_ygivenx)
+                    # Compute the negative log-likelihood
+
+                    neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
+                    
+                    numbers = {
+                        'beta': beta,
+                        'cov_ygivenx': cov_ygivenx,
+                        'cond_mean': cond_mean,
+                        'cov_matrix': cov_matrix
+                    }
+                    self.cov_map[index] = numbers
+
+
+
+            else:
+                for index in range(0, self.size_per_hour):
+
+                    current_row = current_df .iloc[index:index+1,:]
+                    current_y = current_row['ColumnAmountO3'].values[0]
+
+                    # construct conditioning set on time 0
+                    
+                    mm_neighbors = self.nns_map[index]
+
+                    past = list(mm_neighbors)
+
+                    last_hour_df = self.input_map[self.key_list[time_idx-1]].reset_index(drop=True)
+                    if past:
+                        past_conditioning_data = last_hour_df.loc[ (past+[index]),: ]
+                    else:
+                        past_conditioning_data = pd.DataFrame()
+                    conditioning_data = pd.concat((conditioning_data, past_conditioning_data),axis=0)
+                    
+                    if past:
+                        conditioning_data = current_df.loc[past,: ]
+                    else:
+                        conditioning_data = pd.DataFrame()
+
+                    df = pd.concat( (current_row, conditioning_data), axis=0)
+                    locs = np.array(df[['Latitude','Longitude']])
+
+                    y_and_neighbors = df['ColumnAmountO3'].values
+
+                    cov_matrix = self.cov_map[index]['cov_matrix']
+                    beta = self.cov_map[index]['beta']
+                    cov_ygivenx = self.cov_map[index]['cov_ygivenx']
+                    cond_mean =  self.cov_map[index]['cond_mean']
+
+                    mu = np.dot(locs, beta)
+                    mu_current = mu[0]
+                    mu_neighbors = mu[1:]
+                    
+                    alpha = current_y - cond_mean
+                    quad_form = alpha**2 *(1/cov_ygivenx)
+                    log_det = np.log(cov_ygivenx)
+                    # Compute the negative log-likelihood
+                
+                    neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
+                    
+
+            # prev_prev_df = prev_df
+            # prev_df = current_df
+        return neg_log_lik
+
     def mle_parallel(self, key,lat_idx, bounds, initial_params, input_df, mm_cond_number, baseset_from_maxmin, nns_map):
         try:
             logging.info(f"fit_s_bylat_11_16: day {key+1}")
