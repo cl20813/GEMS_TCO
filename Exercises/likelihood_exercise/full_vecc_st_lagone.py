@@ -171,7 +171,7 @@ def main():
     # Introduce a small delay for testing purposes
     time.sleep(0.01)  # Sleep for 10 milliseconds
 
-    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out}')
+    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out2}')
     end_time2 = time.time()  # Record the end time
     iteration_time2 = end_time2 - start_time2  # Calculate the time spent
     print(f"Vecchia approximation2 took {iteration_time2:.4f} seconds")

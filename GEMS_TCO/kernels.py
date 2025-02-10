@@ -133,7 +133,7 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
     def vecchia_likelihood(self, params: Tuple[float,float,float,float,float,float]):
         # initialize negative log-likelihood value
         neg_log_lik = 0
-        prev_df = None
+        
         ## likelihood for the first 30 observations
         for time_idx in range(self.number_of_timestamps):
             current_df = self.input_map[self.key_list[time_idx]].reset_index(drop=True)
@@ -183,6 +183,9 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
 
                 df = pd.concat( (current_row, conditioning_data), axis=0)
                 y_and_neighbors = df['ColumnAmountO3'].values
+                locs = np.array(df[['Latitude','Longitude']])
+
+
                 cov_matrix = self.matern_cov_yx(params=params, y_df = df, x_df = df)
 
                 # Regularization:   already did in covariance matrix
@@ -192,7 +195,7 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                 cov_yx = cov_matrix.iloc[0,1:]
 
                 # get mean
-                locs = np.array(df[['Latitude','Longitude']])
+                
 
                 tmp1 = np.dot(locs.T, np.linalg.solve(cov_matrix, locs))
                 tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y_and_neighbors))
@@ -281,9 +284,12 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
 
                 if time_idx > 1:
                     cov_matrix = self.cov_map[index]['cov_matrix']
-                    beta = self.cov_map[index]['beta']
+                    tmp1 = self.cov_map[index]['tmp1']
                     cov_ygivenx = self.cov_map[index]['cov_ygivenx']
                     cond_mean = self.cov_map[index]['cond_mean']
+
+                    tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y_and_neighbors))
+                    beta = np.linalg.solve(tmp1, tmp2)
 
                     mu = np.dot(locs, beta)
                     mu_current = mu[0]
@@ -297,7 +303,6 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                     neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
 
                     continue
-
 
                 cov_matrix = self.matern_cov_yx(params=params, y_df = df, x_df = df)
                 cov_xx = cov_matrix.iloc[1:,1:].reset_index(drop=True)
@@ -327,7 +332,7 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
 
                 if time_idx == 1:
                     self.cov_map[index] = {
-                        'beta': beta,
+                        'tmp1': tmp1,
                         'cov_ygivenx': cov_ygivenx,
                         'cond_mean': cond_mean,
                         'cov_matrix': cov_matrix
