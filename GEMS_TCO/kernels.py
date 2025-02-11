@@ -52,8 +52,6 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
         self.nns_map = nns_map
 
          
-        
-
     # Custom distance function for cdist
     def custom_distance(self,u, v):
         d = np.dot(self.sqrt_range_mat, u[:2] - v[:2] ) # Distance between x1,x2 (2D)
