@@ -136,6 +136,13 @@ def main():
         tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
         analysis_data_map[key_idx[i]] = tmp
 
+    aggregated_data = pd.DataFrame()
+    for i in range((key_for_dict)):
+        tmp = coarse_dicts[key_idx[i]]
+        tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
+        aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
+
+    print(f'data size per hour: {aggregated_data.shape[0]/key_for_dict}')
 #####################################################################
 
     instance = kernels.matern_spatio_temporal(smooth = v, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
@@ -143,14 +150,14 @@ def main():
 
     start_time = time.time()
 
-    keys = sorted(analysis_data_map)
+    # keys = sorted(analysis_data_map)
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         futures = [
             executor.submit(
                 instance.mle_parallel2,
                 bounds, params
             )   
-            for key in keys
+        
         ]
 
         for future in concurrent.futures.as_completed(futures):
