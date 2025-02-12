@@ -152,9 +152,9 @@ def main():
 
     # Define parameter ranges
     param_ranges = {
-        'param1': np.linspace(0,60,7),
-        'param2': np.linspace(0,60,7),
-        'param3': np.linspace(0,60,7),
+        'param1': np.linspace(1,60,7),
+        'param2': np.linspace(1,60,7),
+        'param3': np.linspace(1,60,7),
         'param4': np.arange(1,10),
         'param5': np.arange(1,10),
         'param6': np.arange(1,10)

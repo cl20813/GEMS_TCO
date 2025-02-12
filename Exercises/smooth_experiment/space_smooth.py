@@ -1,5 +1,3 @@
-# work environment: jl2815
-# Standard libraries
 import sys
 import logging
 import argparse # Argument parsing
@@ -50,13 +48,16 @@ logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctim
 
 def main():
     # Argument parser
-    parser = argparse.ArgumentParser(description="Full vs Vecchia Comparison")
+    parser = argparse.ArgumentParser(description="estimate smoothness")
     # Define the parameters you want to change at runtime
     parser.add_argument('--space', type=int,nargs='+', default=[20,20], help="spatial resolution")
     parser.add_argument('--mm_cond_number', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
     parser.add_argument('--key', type=int, default=1, help="Index for the datasets.")
     parser.add_argument('--params', type=float,nargs='+', default=[0.5,0.5,0.5,0.5,0.5, 0.5], help="Initial parameters")
-   
+    parser.add_argument('--bounds', type=float, nargs='+', default=[0.05, 600], help="Bounds for parameters" )    
+    parser.add_argument('--smooth', type=float, nargs='+', default=0.5, help="space smooth" )    
+    
+
     # Parse the arguments
     args = parser.parse_args()
     
@@ -64,10 +65,12 @@ def main():
     lat_lon_resolution = args.space 
     mm_cond_number = args.mm_cond_number
     params= args.params
+    bounds = [ (args.bounds[0], args.bounds[1]) ]
     key_for_dict= args.key
+    smooth = args.smooth
 
     ############ 
-    start_time_setup= time.time()
+
 
     # Load the one dictionary to set spaital coordinates
     filepath = "/home/jl2815/tco/data/pickle_data/pickle_2023/coarse_cen_map23_01.pkl"
@@ -124,7 +127,6 @@ def main():
     nns_map = instance.find_nns_naive(locs=coords1_reordered, dist_fun='euclidean', max_nn=mm_cond_number)
 
     
-
     analysis_data_map = {}
     for i in range(key_for_dict):
         tmp = coarse_dicts[key_idx[i]]
@@ -138,50 +140,33 @@ def main():
         aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
     
     
-    print(f'Aggregated data shape: {aggregated_data.shape}')
+    print(f'aggregated_data {aggregated_data.shape}')
 
-    end_time_setup= time.time()
-    iteration_time_setup = end_time_setup - start_time_setup  # Calculate the time spent
-    print(f"iteration_time_setup {iteration_time_setup:.4f} seconds")
-    # print(aggregated_data.to_string())
     #####################################################################
 
-    instance = kernels.matern_spatio_temporal(smooth=0.5, input_map=analysis_data_map, nns_map=nns_map, mm_cond_number=mm_cond_number)
-    # data = data.iloc[ord, :]
+    instance = kernels.space_smooth_experiment(smooth = smooth, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
+    # data = data.iloc[ord,:]
 
-    out = instance.vecchia_likelihood(params)
-    out2 = instance.vecchia_likelihood2(params)
-
+    sigmasq = 1
+    results = []
     start_time = time.time()
-    full_likelihood = instance.full_likelihood(params, aggregated_data, aggregated_data["ColumnAmountO3"])
-    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Full likelihood using params={params} is {full_likelihood}')
+
+    keys = sorted(analysis_data_map)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
+        futures = [
+            executor.submit(
+                instance.mle_parallel,
+                key, bounds, sigmasq, params, analysis_data_map[key], mm_cond_number, nns_map
+            )   
+            for key in keys
+        ]
+        for future in concurrent.futures.as_completed(futures):
+            results.append(future.result())
+            print(future.result())
+
     end_time = time.time()  # Record the end time
-    iteration_time = end_time - start_time  # Calculate the time spent
-    print(f"Full likelihood took {iteration_time:.4f} seconds")
-
-    start_time2 = time.time()
-
-    # Introduce a small delay for testing purposes
-    time.sleep(0.01)  # Sleep for 10 milliseconds
-
-    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out}')
-    end_time2 = time.time()  # Record the end time
-    iteration_time2 = end_time2 - start_time2  # Calculate the time spent
-    print(f"Vecchia approximation took {iteration_time2:.4f} seconds")
-
-
-    start_time2 = time.time()
-
-    # Introduce a small delay for testing purposes
-    time.sleep(0.01)  # Sleep for 10 milliseconds
-
-    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out2}')
-    end_time2 = time.time()  # Record the end time
-    iteration_time2 = end_time2 - start_time2  # Calculate the time spent
-    print(f"Vecchia approximation2 took {iteration_time2:.4f} seconds")
-
-
+    estimation_time = end_time - start_time  # Calculate the time spent
+    print(f"estimation_time took {estimation_time:.4f} seconds")
+    
 if __name__ == '__main__':
     main()
-   
- 

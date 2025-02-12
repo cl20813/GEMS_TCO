@@ -50,24 +50,16 @@ conda activate gems_tco
 
 echo "Current date and time: $(date)"
 
-#### Run the Python script { (20,20):(5,1), (5,5):(20,40) }
+#### Run the Python script { (20,20):(5,10), (5,5):(20,40) }
 echo "Parameter search using Vecchia approximation; one t lag"
 
-srun python /home/jl2815/tco/exercise_25/likelihood_exercise/vecc_like_search_params.py --key 50 --params 60 8.25 8.25 0.5 0.5 5 --space 20 20 --mm_cond_number 10
+srun python /home/jl2815/tco/exercise_25/likelihood_exercise/vecc_like_search_params.py --key 8 --params 60 8.25 8.25 0.5 0.5 5 --space 20 20 --mm_cond_number 10
 
-srun python /home/jl2815/tco/exercise_25/likelihood_exercise/vecc_like_search_params.py --key 50 --params 60 8.25 8.25 0.5 0.5 5 --space 15 15 --mm_cond_number 10
+srun python /home/jl2815/tco/exercise_25/likelihood_exercise/vecc_like_search_params.py --key 8 --params 60 8.25 8.25 0.5 0.5 5 --space 15 15 --mm_cond_number 10
 
-srun python /home/jl2815/tco/exercise_25/likelihood_exercise/vecc_like_search_params.py --key 50 --params 60 8.25 8.25 0.5 0.5 5 --space 10 10 --mm_cond_number 10
+srun python /home/jl2815/tco/exercise_25/likelihood_exercise/vecc_like_search_params.py --key 8 --params 60 8.25 8.25 0.5 0.5 5 --space 10 10 --mm_cond_number 10
 
-srun python /home/jl2815/tco/exercise_25/likelihood_exercise/vecc_like_search_params.py --key 50 --params 60 8.25 8.25 0.5 0.5 5 --space 5 5 --mm_cond_number 10
-
-srun python /home/jl2815/tco/exercise_25/likelihood_exercise/vecc_like_search_params.py --key 50 --params 60 8.25 8.25 0.5 0.5 5 --space 4 4 --mm_cond_number 10
-
-srun python /home/jl2815/tco/exercise_25/likelihood_exercise/vecc_like_search_params.py --key 50 --params 60 8.25 8.25 0.5 0.5 5 --space 3 3 --mm_cond_number 10
-
-srun python /home/jl2815/tco/exercise_25/likelihood_exercise/vecc_like_search_params.py --key 50 --params 60 8.25 8.25 0.5 0.5 5 --space 2 2 --mm_cond_number 10
-
-srun python /home/jl2815/tco/exercise_25/likelihood_exercise/vecc_like_search_params.py --key 50 --params 60 8.25 8.25 0.5 0.5 5 --space 1 1 --mm_cond_number 10
+srun python /home/jl2815/tco/exercise_25/likelihood_exercise/vecc_like_search_params.py --key 8 --params 60 8.25 8.25 0.5 0.5 5 --space 5 5 --mm_cond_number 10
 
 ```
 
