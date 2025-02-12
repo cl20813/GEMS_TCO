@@ -19,7 +19,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/smooth_experiment/spa
 
 ## space 5 5: 5x10, 4 4: 25x50, 2 2: 50x100
 
-```srun --cpus-per-task=8 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise_25/smooth_experiment/space_smooth.py --key 2 --params 60 8.25 8.25 0.5 0.5 5 --space 20 20 --mm_cond_number 10```
+```srun --cpus-per-task=8 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise_25/smooth_experiment/space_smooth.py --key 2 --smooth 1.0 --params 60 8.25 8.25 0.5 0.5 0.5 --space 20 20 --mm_cond_number 10 ```
 
 `
 
@@ -55,6 +55,23 @@ echo "Current date and time: $(date)"
 echo "Experiment space smoothness using Vecchia approximation"
 
 
+srun python /home/jl2815/tco/exercise_25/smooth_experiment/space_smooth.py --key 5 --smooth 0.5 --params 60 8.25 8.25 0.5 0.5 0.5 --space 20 20 --mm_cond_number 10
+srun python /home/jl2815/tco/exercise_25/smooth_experiment/space_smooth.py --key 5 --smooth 0.5 --params 60 8.25 8.25 0.5 0.5 0.5 --space 15 15 --mm_cond_number 10
+srun python /home/jl2815/tco/exercise_25/smooth_experiment/space_smooth.py --key 5 --smooth 0.5 --params 60 8.25 8.25 0.5 0.5 0.5 --space 10 10 --mm_cond_number 10
+srun python /home/jl2815/tco/exercise_25/smooth_experiment/space_smooth.py --key 5 --smooth 0.5 --params 60 8.25 8.25 0.5 0.5 0.5 --space 5 5 --mm_cond_number 10
+srun python /home/jl2815/tco/exercise_25/smooth_experiment/space_smooth.py --key 5 --smooth 0.5 --params 60 8.25 8.25 0.5 0.5 0.5 --space 2 2 --mm_cond_number 10
+
+
+
+srun python /home/jl2815/tco/exercise_25/smooth_experiment/space_smooth.py --key 5 --smooth 1.0 --params 60 8.25 8.25 0.5 0.5 0.5 --space 20 20 --mm_cond_number 10
+
+srun python /home/jl2815/tco/exercise_25/smooth_experiment/space_smooth.py --key 5 --smooth 1.0 --params 60 8.25 8.25 0.5 0.5 0.5 --space 15 15 --mm_cond_number 10
+
+srun python /home/jl2815/tco/exercise_25/smooth_experiment/space_smooth.py --key 5 --smooth 1.0 --params 60 8.25 8.25 0.5 0.5 0.5 --space 10 10 --mm_cond_number 10
+
+srun python /home/jl2815/tco/exercise_25/smooth_experiment/space_smooth.py --key 5 --smooth 1.0 --params 60 8.25 8.25 0.5 0.5 0.5 --space 5 5 --mm_cond_number 10
+
+srun python /home/jl2815/tco/exercise_25/smooth_experiment/space_smooth.py --key 5 --smooth 1.0 --params 60 8.25 8.25 0.5 0.5 0.5 --space 2 2 --mm_cond_number 10
 
 
 

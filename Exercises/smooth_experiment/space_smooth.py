@@ -55,7 +55,7 @@ def main():
     parser.add_argument('--key', type=int, default=1, help="Index for the datasets.")
     parser.add_argument('--params', type=float,nargs='+', default=[0.5,0.5,0.5,0.5,0.5, 0.5], help="Initial parameters")
     parser.add_argument('--bounds', type=float, nargs='+', default=[0.05, 600], help="Bounds for parameters" )    
-    parser.add_argument('--smooth', type=float, nargs='+', default=0.5, help="space smooth" )    
+    parser.add_argument('--smooth', type=float, default=0.5, help="space smooth" )    
     
 
     # Parse the arguments
@@ -147,9 +147,11 @@ def main():
     instance = kernels.space_smooth_experiment(smooth = smooth, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
     # data = data.iloc[ord,:]
 
-    sigmasq = 1
+    sigmasq = 1  #initial
     results = []
     start_time = time.time()
+
+    print(f'smooth parameter for this experiment: {smooth}')
 
     keys = sorted(analysis_data_map)
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
