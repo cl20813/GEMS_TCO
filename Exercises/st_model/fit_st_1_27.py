@@ -167,6 +167,26 @@ def main():
     estimation_time = end_time - start_time  # Calculate the time spent
     print(f"estimation_time took {estimation_time:.4f} seconds")
 
+
+    start_time = time.time()
+
+    # keys = sorted(analysis_data_map)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
+        futures = [
+            executor.submit(
+                instance.mle_parallel_full,
+                bounds, params, aggregated_data, aggregated_data['ColumnAmountO3']
+            )   
+        
+        ]
+
+        for future in concurrent.futures.as_completed(futures):
+            print(future.result())
+
+    end_time = time.time()  # Record the end time
+    estimation_time = end_time - start_time  # Calculate the time spent
+    print(f"estimation_time took {estimation_time:.4f} seconds")
+
 if __name__ == '__main__':
     main()
    

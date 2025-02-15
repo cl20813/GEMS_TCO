@@ -189,7 +189,7 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                 sigma = cov_matrix.iloc[0,0]
                 cov_ygivenx = sigma - np.dot(cov_yx.T,np.linalg.solve(cov_xx, cov_yx))
                 
-                cov_ygivenx = max(cov_ygivenx, 7)
+                # cov_ygivenx = max(cov_ygivenx, 7)
                 
                 cond_mean = mu_current + np.dot(cov_yx.T, np.linalg.solve( cov_xx, (y_and_neighbors[1:]-mu_neighbors) ))   # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
                 # print(f'cond_mean{mean_z}')
@@ -344,6 +344,11 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
             return f"Error occurred on {key}"
         
     def mle_parallel2(self, bounds, params ):
+        iteration_count = 0 
+        def callback(xk):
+            nonlocal iteration_count
+            iteration_count += 1
+
         try:
             logging.info(f"fit_st_1_27")
             print(f"fit_st_1_27")  # Debugging line
@@ -353,11 +358,44 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                 params, 
                 # neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map)
                 bounds=bounds,
-                method='L-BFGS-B'
+                method='L-BFGS-B',
+                callback= callback
             )
             jitter = result.x
             logging.info(f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}")
-            
+            logging.info(f"Total iterations: {iteration_count}")
+            print(f"Total iterations: {iteration_count}")
+
+            return f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}"
+        except Exception as e:
+            error_message = f"Error occurred: {str(e)}"
+            print(error_message)
+            logging.error(error_message)
+
+    def mle_parallel_full(self, bounds, params , input_df, y):
+        iteration_count = 0 
+        def callback(xk):
+            nonlocal iteration_count
+            iteration_count += 1
+
+        try:
+            logging.info(f"fit_st_1_27")
+            print(f"fit_st_1_27")  # Debugging line
+        
+            result = minimize(
+                self.full_likelihood, 
+                params, 
+                args = (input_df, y),
+                # neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map)
+                bounds=bounds,
+                method='L-BFGS-B',
+                callback= callback
+            )
+            jitter = result.x
+            logging.info(f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}")
+            logging.info(f"Total iterations: {iteration_count}")
+            print(f"Total iterations: {iteration_count}")
+
             return f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}"
         except Exception as e:
             error_message = f"Error occurred: {str(e)}"
