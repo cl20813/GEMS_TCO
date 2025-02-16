@@ -133,7 +133,9 @@ def main():
     analysis_data_map = {}
     for i in range(key_for_dict):
         tmp = coarse_dicts[key_idx[i]]
-        tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
+        # tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
+        tmp = tmp.iloc[ord_mm, :4].to_numpy()
+
         analysis_data_map[key_idx[i]] = tmp
 
     aggregated_data = pd.DataFrame()
@@ -141,6 +143,11 @@ def main():
         tmp = coarse_dicts[key_idx[i]]
         tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
         aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
+    
+    
+    aggregated_np = aggregated_data.iloc[:,:4].to_numpy()
+
+    # long, lat , ColumnAmount O3, Hour, time
 
     print(f'data size per hour: {aggregated_data.shape[0]/key_for_dict}')
 #####################################################################
@@ -165,19 +172,17 @@ def main():
 
     end_time = time.time()  # Record the end time
     estimation_time = end_time - start_time  # Calculate the time spent
-    print(f"estimation_time took {estimation_time:.4f} seconds")
+    print(f"Vecchia estimation_time took {estimation_time:.4f} seconds")
 
 
     start_time = time.time()
-
     # keys = sorted(analysis_data_map)
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         futures = [
             executor.submit(
                 instance.mle_parallel_full,
-                bounds, params, aggregated_data, aggregated_data['ColumnAmountO3']
+                bounds, params, aggregated_np, aggregated_np[:,2]
             )   
-        
         ]
 
         for future in concurrent.futures.as_completed(futures):
@@ -185,7 +190,28 @@ def main():
 
     end_time = time.time()  # Record the end time
     estimation_time = end_time - start_time  # Calculate the time spent
-    print(f"estimation_time took {estimation_time:.4f} seconds")
+    print(f"Full likelihood estimation_time took {estimation_time:.4f} seconds")
+
+    '''
+    start_time = time.time()
+    # keys = sorted(analysis_data_map)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
+        futures = [
+            executor.submit(
+                instance.mle_parallel_full_test,
+                bounds, params, aggregated_np, aggregated_np[:,2]
+            )   
+        ]
+
+        for future in concurrent.futures.as_completed(futures):
+            print(future.result())
+
+    end_time = time.time()  # Record the end time
+    estimation_time = end_time - start_time  # Calculate the time spent
+    print(f"Full likelihood test estimation_time took {estimation_time:.4f} seconds")
+    '''
+
+
 
 if __name__ == '__main__':
     main()

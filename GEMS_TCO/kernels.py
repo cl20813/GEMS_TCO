@@ -59,21 +59,61 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
         temporal_diff = np.abs(u[2] - v[2])           # Distance between y1 and y2
         return np.sqrt(spatial_diff**2 + temporal_diff**2)
     
-    def matern_cov_yx(self,params: Tuple[float,float,float,float,float,float], y_df, x_df) -> pd.DataFrame:
+    def matern_cov_yx_v05(self,params: Tuple[float,float,float,float,float,float], y: np.ndarray, x: np.ndarray) -> np.ndarray:
     
         sigmasq, range_lat, range_lon, advec, beta, nugget  = params
-            
         # Validate inputs
-        if y_df is None or x_df is None:
+        if y is None or x is None:
             raise ValueError("Both y and x_df must be provided.")
         # Extract values
-        x1 = x_df['Longitude'].values
-        y1 = x_df['Latitude'].values
-        t1 = x_df['Hours_elapsed'].values
- 
-        x2 = y_df['Longitude'].values
-        y2 = y_df['Latitude'].values
-        t2 = y_df['Hours_elapsed'].values
+        x1 = x[:, 0]
+        y1 = x[:, 1]
+        t1 = x[:, 3]
+
+        x2 = y[:, 0]
+        y2 = y[:, 1]
+        t2 = y[:, 3] # hour
+
+        spat_coord1 = np.stack((x1- advec*t1, y1 - advec*t1), axis=-1)
+        spat_coord2 = np.stack((x2- advec*t2, y2 - advec*t2), axis=-1)
+
+        coords1 = np.hstack ((spat_coord1, (beta * t1).reshape(-1,1) ))
+        coords2 = np.hstack ((spat_coord2, (beta * t2).reshape(-1,1) ))
+
+        sqrt_range_mat = np.diag([ 1/range_lon**0.5, 1/range_lat**0.5])
+        self.sqrt_range_mat = sqrt_range_mat
+
+        distance = cdist(coords1,coords2, metric = self.custom_distance)
+
+        # Initialize the covariance matrix with zeros
+        out = distance
+        
+        # Compute the covariance for non-zero distances
+        # Compute the covariance for non-zero distances
+        non_zero_indices = distance != 0
+        if np.any(non_zero_indices):
+            out[non_zero_indices] = sigmasq* np.exp(-distance[non_zero_indices])
+        out[~non_zero_indices] = sigmasq
+
+        # Add a small jitter term to the diagonal for numerical stability
+        out += np.eye(out.shape[0]) * nugget
+
+        return out
+    
+    def matern_cov_yx(self,params: Tuple[float,float,float,float,float,float], y: np.ndarray, x: np.ndarray) -> np.ndarray:
+    
+        sigmasq, range_lat, range_lon, advec, beta, nugget  = params
+        # Validate inputs
+        if y is None or x is None:
+            raise ValueError("Both y and x_df must be provided.")
+        # Extract values
+        x1 = x[:, 0]
+        y1 = x[:, 1]
+        t1 = x[:, 3]
+
+        x2 = y[:, 0]
+        y2 = y[:, 1]
+        t2 = y[:, 3] # hour
 
         spat_coord1 = np.stack((x1- advec*t1, y1 - advec*t1), axis=-1)
         spat_coord2 = np.stack((x2- advec*t2, y2 - advec*t2), axis=-1)
@@ -100,32 +140,75 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
         # Add a small jitter term to the diagonal for numerical stability
         out += np.eye(out.shape[0]) * nugget
 
-        return pd.DataFrame(out)
+        return out
     
-    def full_likelihood(self, params: Tuple[float,float,float,float,float,float], input_df, y):
+
+    def full_likelihood_test(self, params: Tuple[float,float,float,float,float,float], input_np, y):
   
         # Compute the covariance matrix from the matern function
-        cov_matrix = self.matern_cov_yx(params=params, y_df = input_df, x_df = input_df)
+            # Convert DataFrame to NumPy array with float64 dtype
+               
+        input_arr = input_np[:,:4]
+        y_arr = y
+        
+        cov_matrix = self.matern_cov_yx_v05(params=params, y = input_arr, x =input_arr)
+        
+        sign, log_det = np.linalg.slogdet(cov_matrix)
+
         # Compute the Cholesky decomposition
-        L = np.linalg.cholesky(cov_matrix)
+        # L = np.linalg.cholesky(cov_matrix)
         # Solve for the log determinant
-        log_det = 2 * np.sum(np.log(np.diagonal(L)))
-        locs = np.array(input_df[['Latitude','Longitude']])
-        
+        # log_det = 2 * np.sum(np.log(np.diagonal(L)))
+        locs = input_arr[:,:2]
+       
         tmp1 = np.dot(locs.T, np.linalg.solve(cov_matrix, locs))
-        tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y))
+        tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y_arr))
         beta = np.linalg.solve(tmp1, tmp2)
-        
+      
         mu = np.dot(locs, beta)
-        y_mu = y - mu
+        y_mu = y_arr - mu
     
-        alpha = np.linalg.solve(L, y_mu)
-        quad_form = np.dot(alpha.T, alpha)
-        
+        # alpha = np.linalg.solve(L, y_mu)
+        # quad_form = np.dot(alpha.T, alpha)
+        quad_form = np.dot( y_mu, np.linalg.solve(cov_matrix, y_mu))
         # Compute the negative log-likelihood
         n = len(y)
         neg_log_lik = 0.5 * (n * np.log(2 * np.pi) + log_det + quad_form)
+
+        return neg_log_lik
+    
+    def full_likelihood(self, params: Tuple[float,float,float,float,float,float], input_np, y):
+  
+        # Compute the covariance matrix from the matern function
+            # Convert DataFrame to NumPy array with float64 dtype
+               
+        input_arr = input_np[:,:4]
+        y_arr = y
         
+        cov_matrix = self.matern_cov_yx(params=params, y = input_arr, x =input_arr)
+        
+        sign, log_det = np.linalg.slogdet(cov_matrix)
+
+        # Compute the Cholesky decomposition
+        # L = np.linalg.cholesky(cov_matrix)
+        # Solve for the log determinant
+        # log_det = 2 * np.sum(np.log(np.diagonal(L)))
+        locs = input_arr[:,:2]
+       
+        tmp1 = np.dot(locs.T, np.linalg.solve(cov_matrix, locs))
+        tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y_arr))
+        beta = np.linalg.solve(tmp1, tmp2)
+      
+        mu = np.dot(locs, beta)
+        y_mu = y_arr - mu
+    
+        # alpha = np.linalg.solve(L, y_mu)
+        # quad_form = np.dot(alpha.T, alpha)
+        quad_form = np.dot( y_mu, np.linalg.solve(cov_matrix, y_mu))
+        # Compute the negative log-likelihood
+        n = len(y)
+        neg_log_lik = 0.5 * (n * np.log(2 * np.pi) + log_det + quad_form)
+
         return neg_log_lik
     
     def vecchia_likelihood(self, params: Tuple[float,float,float,float,float,float]):
@@ -203,7 +286,80 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
             # prev_prev_df = prev_df
             # prev_df = current_df
         return neg_log_lik
+    def vecchia_likelihood_test(self, params: Tuple[float,float,float,float,float,float]):
+        neg_log_lik = 0
     
+        for time_idx in range(self.number_of_timestamps):
+            current_np = self.input_map[self.key_list[time_idx]]
+
+            # cur_heads = current_df.iloc[:31,:]
+            # neg_log_lik += self.full_likelihood(params,cur_heads, cur_heads["ColumnAmountO3"])
+
+            for index in range(0, self.size_per_hour):
+
+                current_row = current_np[index]
+      
+                current_row = current_row.reshape(1,-1)
+                current_y = current_row[0][2]
+
+                # construct conditioning set on time 0
+                
+                mm_neighbors = self.nns_map[index]
+                past = list(mm_neighbors)
+                data_list = []
+
+
+                if past:
+                    data_list.append( current_np[past])
+            
+                if time_idx >0:
+                    last_hour_np = self.input_map[self.key_list[time_idx-1]]
+                   
+                    past_conditioning_data = last_hour_np[ (past+[index]),: ]
+                    data_list.append( past_conditioning_data)
+                
+
+                if data_list:
+                    conditioning_data = np.vstack(data_list)
+                else:
+                    conditioning_data = np.array([]).reshape(0, current_row.shape[1])
+
+
+                np_arr = np.vstack( (current_row, conditioning_data) )
+                y_and_neighbors = np_arr[:,2]
+                locs = np_arr[:,:2]
+
+                cov_matrix = self.matern_cov_yx_v05(params=params, y = np_arr, x = np_arr)
+          
+                cov_xx = cov_matrix[1:,1:]
+                cov_yx = cov_matrix[0,1:]
+                
+                tmp1 = np.dot(locs.T, np.linalg.solve(cov_matrix, locs))
+                tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y_and_neighbors))
+                beta = np.linalg.solve(tmp1, tmp2)
+
+                mu = np.dot(locs, beta)
+                mu_current = mu[0]
+                mu_neighbors = mu[1:]
+                
+                # mean and variance of y|x
+                sigma = cov_matrix[0][0]
+                cov_ygivenx = sigma - np.dot(cov_yx.T,np.linalg.solve(cov_xx, cov_yx))
+                
+                # cov_ygivenx = max(cov_ygivenx, 7)
+                
+                cond_mean = mu_current + np.dot(cov_yx.T, np.linalg.solve( cov_xx, (y_and_neighbors[1:]-mu_neighbors) ))   # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
+                # print(f'cond_mean{mean_z}')
+
+                alpha = current_y - cond_mean
+                quad_form = alpha**2 *(1/cov_ygivenx)
+                log_det = np.log(cov_ygivenx)
+                # Compute the negative log-likelihood
+
+                neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
+            # prev_prev_df = prev_df
+            # prev_df = current_df
+        return neg_log_lik
 
     ''' When you want to use Cholesky decomposition explicitly, but np.linalg.solve() already do this. 
     L = np.linalg.cholesky(cov_matrix)
@@ -230,7 +386,8 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
     beta = np.linalg.solve(np.dot(tmp1.T,tmp1) , tmp2)
     '''
 
-    def vecchia_likelihood2(self, params: Tuple[float,float,float,float,float,float]):
+    ## below lose temporal
+    def vecchia_likelihood2(self, params: Tuple[float,float,float,float,float,float]): 
         # initialize negative log-likelihood value
         neg_log_lik = 0
         self.cov_map = defaultdict(list)
@@ -354,7 +511,7 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
             print(f"fit_st_1_27")  # Debugging line
         
             result = minimize(
-                self.vecchia_likelihood, 
+                self.vecchia_likelihood_test, 
                 params, 
                 # neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map)
                 bounds=bounds,
@@ -384,6 +541,36 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
         
             result = minimize(
                 self.full_likelihood, 
+                params, 
+                args = (input_df, y),
+                # neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map)
+                bounds=bounds,
+                method='L-BFGS-B',
+                callback= callback
+            )
+            jitter = result.x
+            logging.info(f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}")
+            logging.info(f"Total iterations: {iteration_count}")
+            print(f"Total iterations: {iteration_count}")
+
+            return f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}"
+        except Exception as e:
+            error_message = f"Error occurred: {str(e)}"
+            print(error_message)
+            logging.error(error_message)
+
+    def mle_parallel_full_test(self, bounds, params , input_df, y):
+        iteration_count = 0 
+        def callback(xk):
+            nonlocal iteration_count
+            iteration_count += 1
+
+        try:
+            logging.info(f"fit_st_1_27")
+            print(f"fit_st_1_27")  # Debugging line
+        
+            result = minimize(
+                self.full_likelihood_test, 
                 params, 
                 args = (input_df, y),
                 # neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map)
