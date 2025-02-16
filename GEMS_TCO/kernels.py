@@ -226,7 +226,6 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                 current_y = current_row['ColumnAmountO3'].values[0]
 
                 # construct conditioning set on time 0
-                
                 mm_neighbors = self.nns_map[index]
                 past = list(mm_neighbors)
 
@@ -250,7 +249,7 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                 y_and_neighbors = df['ColumnAmountO3'].values
                 locs = np.array(df[['Latitude','Longitude']])
 
-                cov_matrix = self.matern_cov_yx(params=params, y_df = df, x_df = df)
+                cov_matrix = self.matern_cov_yx(params=params, y = df, x = df)
 
                 # Regularization:   already did in covariance matrix
                 # cov_matrix += nugget * np.eye(cov_matrix.shape[0])
@@ -308,7 +307,6 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                 past = list(mm_neighbors)
                 data_list = []
 
-
                 if past:
                     data_list.append( current_np[past])
             
@@ -347,7 +345,6 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                 cov_ygivenx = sigma - np.dot(cov_yx.T,np.linalg.solve(cov_xx, cov_yx))
                 
                 # cov_ygivenx = max(cov_ygivenx, 7)
-                
                 cond_mean = mu_current + np.dot(cov_yx.T, np.linalg.solve( cov_xx, (y_and_neighbors[1:]-mu_neighbors) ))   # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
                 # print(f'cond_mean{mean_z}')
 
