@@ -123,12 +123,12 @@ def main():
     coords1_reordered = np.stack((data_for_coord['Longitude'].values, data_for_coord['Latitude'].values), axis=-1)
     nns_map = instance.find_nns_naive(locs=coords1_reordered, dist_fun='euclidean', max_nn=mm_cond_number)
 
-    
 
     analysis_data_map = {}
     for i in range(key_for_dict):
         tmp = coarse_dicts[key_idx[i]]
-        tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
+        # tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
+        tmp = tmp.iloc[ord_mm, :4].to_numpy()
         analysis_data_map[key_idx[i]] = tmp
 
     aggregated_data = pd.DataFrame()
@@ -150,8 +150,8 @@ def main():
     instance = kernels.matern_spatio_temporal(smooth=0.5, input_map=analysis_data_map, nns_map=nns_map, mm_cond_number=mm_cond_number)
     # data = data.iloc[ord, :]
 
-    out = instance.vecchia_likelihood(params)
-    out2 = instance.vecchia_likelihood2(params)
+    # out = instance.vecchia_likelihood(params)
+    out2 = instance.vecchia_likelihood_test(params)
 
     start_time = time.time()
     full_likelihood = instance.full_likelihood(params, aggregated_np, aggregated_np[:,2])
@@ -160,17 +160,17 @@ def main():
     iteration_time = end_time - start_time  # Calculate the time spent
     print(f"Full likelihood took {iteration_time:.4f} seconds")
 
-    start_time2 = time.time()
 
+    '''
+    start_time2 = time.time()
     # Introduce a small delay for testing purposes
     time.sleep(0.01)  # Sleep for 10 milliseconds
-
     print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out}')
     end_time2 = time.time()  # Record the end time
     iteration_time2 = end_time2 - start_time2  # Calculate the time spent
     print(f"Vecchia approximation took {iteration_time2:.4f} seconds")
-
-
+    '''
+    
     start_time2 = time.time()
 
     # Introduce a small delay for testing purposes
