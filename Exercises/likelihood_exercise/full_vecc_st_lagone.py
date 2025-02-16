@@ -137,6 +137,7 @@ def main():
         tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
         aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
     
+    aggregated_np = aggregated_data.iloc[:,:4].to_numpy()
     
     print(f'Aggregated data shape: {aggregated_data.shape}')
 
@@ -153,7 +154,7 @@ def main():
     out2 = instance.vecchia_likelihood2(params)
 
     start_time = time.time()
-    full_likelihood = instance.full_likelihood(params, aggregated_data, aggregated_data["ColumnAmountO3"])
+    full_likelihood = instance.full_likelihood(params, aggregated_np, aggregated_np[:,2])
     print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Full likelihood using params={params} is {full_likelihood}')
     end_time = time.time()  # Record the end time
     iteration_time = end_time - start_time  # Calculate the time spent
