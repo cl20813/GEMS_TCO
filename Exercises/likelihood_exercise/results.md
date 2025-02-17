@@ -1,7 +1,7 @@
 
 # Full Likelihood V.S. Vecchia Approximated Likelihood
 
-### Data: ```GEMS July 1st, 2024```, Data size: ```1,250 x 8(hours)```, ```Model: Matern $\biggl(\sqrt{ ||x-vt||+ \beta^2 t^2} \biggr)$ ```.
+### Data: ```GEMS July 1st, 2024```, Data size: ```1,250 x 8(hours)```, ```Model: Matern $(\sqrt{ ||x-vt||+ \beta^2 t^2} \biggr)$ ```.
 
 Conditioning number: 10 (5 on current space, 5 on one lag space)
 
