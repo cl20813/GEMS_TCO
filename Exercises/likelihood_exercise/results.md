@@ -23,7 +23,7 @@ parameters (sigmasq, range_latitude, range_longitude, advection, beta and nugget
 ```Full Likelihood: 24443.6162``` (881 seconds).        
 ```Vecchia Approximation: 24266.6935``` (0.0101 seconds, this does not make sense)   
 
-### Same but ```2023 July```
+### Data: ```GEMS July 2023```, Data size: ```1,250 x 8(hours)```, Model: ```Matern($\sqrt{ ||x-vt||+\beta^2t^2}}$)```.
 
 Conditioning number: 10 (5 on current space, 5 on one lag space)
 
