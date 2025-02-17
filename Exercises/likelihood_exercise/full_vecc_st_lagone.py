@@ -93,7 +93,7 @@ def main():
     # Set spatial coordinates for each dataset
     coarse_dicts = {}
 
-    years = ['2024']
+    years = ['2023']
     for year in years:
         for month in range(7, 8):  # Iterate over all months
             filepath = f"/home/jl2815/tco/data/pickle_data/pickle_{year}/coarse_cen_map{year[2:]}_{month:02d}.pkl"
