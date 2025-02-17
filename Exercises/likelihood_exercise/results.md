@@ -23,10 +23,10 @@ parameters (sigmasq, range_latitude, range_longitude, advection, beta and nugget
 ```Full Likelihood: 24443.6162``` (881 seconds).        
 ```Vecchia Approximation: 24266.6935``` (0.0101 seconds, this does not make sense)   
 
-```Summary```:     
-Full likelihood change: 24274.6368-24443.6162 = -168.9794
-Vecchia likelihood change conditioning on 10:  24312.1206-24354.4574 =-42.3368
-Vecchia likelihood change conditioning on 20:  24312.1206-24266.6935 = 45.4271
+```Summary```       
+Full likelihood change: 24274.6368-24443.6162 = -168.9794         
+Vecchia likelihood change conditioning on 10:  24312.1206-24354.4574 =-42.3368       
+Vecchia likelihood change conditioning on 20:  24312.1206-24266.6935 = 45.4271           
 
 ### Data: ```GEMS July 1st, 2023```, Data size: ```1,250 x 8(hours)```, Model: ```Matern($\sqrt{ ||x-vt||+\beta^2t^2}}$)```.
 
@@ -50,10 +50,10 @@ parameters (sigmasq, range_latitude, range_longitude, advection, beta and nugget
 ```Full Likelihood: 25074.6417``` (996 seconds).            
 ```Vecchia Approximation: 25029.0841```       
 
-```Summary```:     
-Full likelihood change: 24513.3406- 25074.6417 = -561.3011
-Vecchia likelihood change conditioning on 10:  24519.9868-24937.278 = -417.2912
-Vecchia likelihood change conditioning on 20:  24506.5732- 25029.0841 = -522.5109
+```Summary```              
+Full likelihood change: 24513.3406- 25074.6417 = -561.3011       
+Vecchia likelihood change conditioning on 10:  24519.9868-24937.278 = -417.2912       
+Vecchia likelihood change conditioning on 20:  24506.5732- 25029.0841 = -522.5109           
 
 
 # Model Fitting
