@@ -16,11 +16,14 @@ parameters (sigmasq, range_latitude, range_longitude, advection, beta and nugget
 Conditioning number: 20 (10 on current space, 10 on one lag space)
 
 parameters (sigmasq, range_latitude, range_longitude, advection, beta and nugget): [60, 8.25, 8.25, 0.5, 0.5, 5.0]          
-```Full Likelihood: 24274.6368``` (826 seconds).     
+```Full Likelihood: 24274.6368``` (909 seconds).     
 ```Vecchia Approximation: 24312.1206``` (0.0101 seconds, this does not make sense)     
 
 parameters (sigmasq, range_latitude, range_longitude, advection, beta and nugget): [40, 5.25, 5.25, 0.5, 0.5, 0.5]           
 ```Full Likelihood: 24443.6162``` (881 seconds).        
-```Vecchia Approximation: 24390.4279``` (0.0101 seconds, this does not make sense)   
+```Vecchia Approximation: 24266.6935``` (0.0101 seconds, this does not make sense)   
+
+# Model Fitting
+
 
 
