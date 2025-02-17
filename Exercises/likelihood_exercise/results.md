@@ -71,10 +71,7 @@ Initial parameters ```(sigmasq, range_latitude, range_longitude, advection, beta
 Initial parameters (sigmasq, range_latitude, range_longitude, advection, beta and nugget): [40, 5.25, 5.25, 0.3, 0.3, 0.5],  bounds=[(0.05, 40.0), (0.05, 15.0), (0.05, 15.0), (-15.0, 15.0), (0.25, 20.0), (0.05, 0.5)], smooth=0.5        
 ```Estimates from Full Likelihood:          [24.88 6.83 8.33 0.0157 0.25 0.05]  385.65 seconds (34 iterations)```                        
 ```Estimates from Vecchia Approximation:    [16.20 2.78 7.55 -0.235 0.25 0.5 ] 164.55 seconds (51 iterations)```       
-    
- Conditioning number: 20 (10 on current space, 10 on one lag space)   
-Initial parameters (sigmasq, range_latitude, range_longitude, advection, beta and nugget): [40, 5.25, 5.25, 0.3, 0.3, 0.5],  bounds=[(0.05, 40.0), (0.05, 15.0), (0.05, 15.0), (-15.0, 15.0), (0.25, 20.0), (0.05, 0.5)], smooth=0.5     
-```Estimates from Full Likelihood:          [24.88 6.83 8.33 0.0157 0.25 0.05] 385.65 seconds (34 iterations)```                   
+ Conditioning number: 20 (10 on current space, 10 on one lag space)                 
 ```Estimates from Vecchia Approximation:    [20.17 4.27 6.58 -0.159 0.25 0.05]  355.72 seconds (36 iterations)```
 
 #### July 3rd 2024:  Conditioning number: 10 (5 on current space, 5 on one lag space)       
