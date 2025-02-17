@@ -322,7 +322,6 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                 else:
                     conditioning_data = np.array([]).reshape(0, current_row.shape[1])
 
-
                 np_arr = np.vstack( (current_row, conditioning_data) )
                 y_and_neighbors = np_arr[:,2]
                 locs = np_arr[:,:2]

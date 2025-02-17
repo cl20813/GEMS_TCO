@@ -57,7 +57,7 @@ def main():
     parser.add_argument('--v', type=float, default=0.5, help="smooth")
     parser.add_argument('--space', type=int,nargs='+', default=[20,20], help="spatial resolution")
     parser.add_argument('--mm_cond_number', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
-    parser.add_argument('--key', type=int, default=1, help="Index for the datasets.")
+    parser.add_argument('--keys', type=int, nargs='+', default=[0,8], help="Index for the datasets.")
     parser.add_argument('--params', type=float,nargs='+', default=[0.5,0.5,0.5,0.5,0.5, 0.5], help="Initial parameters")
     parser.add_argument('--bounds', type=float, nargs='+', default=[0.05, 600, 0.05, 600, -200, 200, 0.5, 600, 0.5, 600, 0.5, 600], help="Bounds for parameters" )    
     
@@ -70,7 +70,7 @@ def main():
     mm_cond_number = args.mm_cond_number
     params= args.params
     bounds = [(args.bounds[i], args.bounds[i+1]) for i in range(0, len(args.bounds), 2)]
-    key_for_dict= args.key
+    key_for_dict= args.keys
 
     v = args.v
    
@@ -131,7 +131,7 @@ def main():
     nns_map = instance.find_nns_naive(locs=coords1_reordered, dist_fun='euclidean', max_nn=mm_cond_number)
 
     analysis_data_map = {}
-    for i in range(key_for_dict):
+    for i in range(key_for_dict[0], key_for_dict[1]):
         tmp = coarse_dicts[key_idx[i]]
         # tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
         tmp = tmp.iloc[ord_mm, :4].to_numpy()
@@ -139,7 +139,7 @@ def main():
         analysis_data_map[key_idx[i]] = tmp
 
     aggregated_data = pd.DataFrame()
-    for i in range((key_for_dict)):
+    for i in range(key_for_dict[0], key_for_dict[1]):
         tmp = coarse_dicts[key_idx[i]]
         tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
         aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
@@ -148,8 +148,8 @@ def main():
     aggregated_np = aggregated_data.iloc[:,:4].to_numpy()
 
     # long, lat , ColumnAmount O3, Hour, time
-
-    print(f'data size per hour: {aggregated_data.shape[0]/key_for_dict}')
+    lenth_of_analysis = key_for_dict[1]-key_for_dict[0]
+    print(f'data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}')
 #####################################################################
 
     instance = kernels.matern_spatio_temporal(smooth = v, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
