@@ -21,6 +21,6 @@ parameters (sigmasq, range_latitude, range_longitude, advection, beta and nugget
 
 parameters (sigmasq, range_latitude, range_longitude, advection, beta and nugget): [40, 5.25, 5.25, 0.5, 0.5, 0.5]           
 ```Full Likelihood: 24443.6162``` (881 seconds).        
-```Vecchia Approximation: 24354.4574``` (0.0101 seconds, this does not make sense)   
+```Vecchia Approximation: 24390.4279``` (0.0101 seconds, this does not make sense)   
 
 
