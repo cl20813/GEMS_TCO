@@ -128,7 +128,8 @@ def main():
     analysis_data_map = {}
     for i in range(key_for_dict):
         tmp = coarse_dicts[key_idx[i]]
-        tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
+        # tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
+        tmp = tmp.iloc[ord_mm, :4].to_numpy()
         analysis_data_map[key_idx[i]] = tmp
 
     aggregated_data = pd.DataFrame()
@@ -137,11 +138,12 @@ def main():
         tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
         aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
     
+    aggregated_np = aggregated_data.iloc[:,:4].to_numpy()
     
-    print(f'aggregated_data {aggregated_data.shape}')
+    print(f'Aggregated data shape: {aggregated_data.shape}')
 
- 
-
+    # print(aggregated_data.to_string())
+    #####################################################################
     
     #####################################################################
 
@@ -152,12 +154,12 @@ def main():
 
     # Define parameter ranges
     param_ranges = {
-        'param1': np.linspace(1,60,7),
-        'param2': np.linspace(1,60,7),
-        'param3': np.linspace(1,60,7),
-        'param4': np.arange(1,10),
-        'param5': np.arange(1,10),
-        'param6': np.arange(1,10)
+        'param1': [1,10,20,30],
+        'param2': [1,5,10],
+        'param3': [1,5,10],
+        'param4': [0.1,0.5, 5],
+        'param5': [0.1,0.5, 5],
+        'param6': [0.01,0.05, 0.5]
     }
 
     # Initialize variables to store the best parameters and highest likelihood
@@ -173,7 +175,7 @@ def main():
                         for p6 in param_ranges['param6']:
                             params = (p1, p2, p3, p4, p5, p6)
                             start_time = time.time()
-                            likelihood = instance.vecchia_likelihood(params)
+                            likelihood = instance.vecchia_likelihood_test(params)
                             print(f'grid {lat_number}*{lon_number}:Vecchia approximation likelihood using condition size {mm_cond_number}, {params} is {likelihood}')
                             if likelihood < lowest_neg_likelihood:
                                 lowest_neg_likelihood = likelihood
