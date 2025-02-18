@@ -86,6 +86,10 @@ Data size: ```100 x 8(hours)```
 ```Estimates from Full Likelihood:          [22.27 3.96 3.06 -2.99e-03 0.25 0.5] 1477.67 seconds (44 iterations)```                      
 ```Estimates from Vecchia Approximation:    [6.95 0.05 0.05 -0.13 0.25 0.5] 508.41 seconds (67 iterations)```
 
+Data size: ```200 x 8(hours)```
+```Estimates from Full Likelihood:          [19.69 2.18 2.08 -0.02 0.25 0.5] 5325.9134 seconds (40 iterations)```                      
+```Estimates from Vecchia Approximation:    [5.68 0.05 0.05 5.05ㄷ-04 1.11 0.5] 981.91 seconds (51 iterations)```
+
 #### July 3rd 2024:  Conditioning number: 10 (5 on current space, 5 on one lag space)       
     
 ```Estimates from Full Likelihood:          [35.87 3.09 2.97 0.08 0.25 0.5  ] 365.65 seconds (40 iterations)```                           
@@ -94,6 +98,10 @@ Data size: ```100 x 8(hours)```
 Data size: ```100 x 8(hours)```
 ```Estimates from Full Likelihood:          [34.57 2.35 2.43 -0.10 0.25 0.5] 1068.67 seconds (32 iterations)```                      
 ```Estimates from Vecchia Approximation:    [12.75 0.05 0.05 -0.14 0.25 0.06 ] 300.90 seconds (36 iterations)```
+
+Data size: ```200 x 8(hours)```
+```Estimates from Full Likelihood:          [] seconds ( iterations)```                      
+```Estimates from Vecchia Approximation:    [] seconds ( iterations)```
  
 
 
