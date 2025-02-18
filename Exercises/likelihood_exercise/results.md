@@ -58,26 +58,42 @@ Vecchia likelihood change conditioning on 20:  24506.5732- 25029.0841 = ```-522.
 
 # Model Fitting
 
-### Data: ```GEMS July 2024```, Data size: ```50 x 8(hours)```, Model: ```Matern($\sqrt{ ||x-vt||+\beta^2t^2}}$)```.
+### Data: ```GEMS July 2024```, Model: ```Matern($\sqrt{ ||x-vt||+\beta^2t^2}}$)```.
+Initial parameters ```(sigmasq, range_latitude, range_longitude, advection, beta and nugget)```: [40, 5.25, 5.25, 0.3, 0.3, 0.5],  bounds=[(0.05, 40.0), (0.05, 15.0), (0.05, 15.0), (-15.0, 15.0), (0.25, 20.0), (0.05, 0.5)], smooth=0.5  
 
-
-
-#### July 1st 2024: Conditioning number: 10 (5 on current space, 5 on one lag space)         
-Initial parameters ```(sigmasq, range_latitude, range_longitude, advection, beta and nugget)```: [40, 5.25, 5.25, 0.3, 0.3, 0.5],  bounds=[(0.05, 40.0), (0.05, 15.0), (0.05, 15.0), (-15.0, 15.0), (0.25, 20.0), (0.05, 0.5)], smooth=0.5        
+#### July 1st 2024: Conditioning number: 10 (5 on current space, 5 on one lag space)    
+Data size: ```50 x 8(hours)```
 ```Estimates from Full Likelihood:          [31.38 4.61 3.36 9.26e-04 0.25 0.05] 390.75 seconds (40 iterations)```                      
-```Estimates from Vecchia Approximation:    [11.73 0.05 0.05 -0.10 0.25 0.055  ] 291.68 seconds (66 iterations)```          
+```Estimates from Vecchia Approximation:    [11.73 0.05 0.05 -0.10 0.25 0.055  ] 291.68 seconds (66 iterations)```     
+
+Data size: ```100 x 8(hours)```
+```Estimates from Full Likelihood:          [36.99 2.72 2.37 0.07 0.25 0.5] 892.48 seconds (28 iterations)```                      
+```Estimates from Vecchia Approximation:    [11.98 0.05 0.05 -0.02 0.95 0.5] 460.82 seconds (60 iterations)``` 
+
+Data size: ```200 x 8(hours)```
+```Estimates from Full Likelihood:          [28.55 1.68 1.58 -0.06 0.25 0.5] 5698.98 seconds (46 iterations)```                      
+```Estimates from Vecchia Approximation:    [8.98 0.05 0.05 -0.04 0.98 0.5] 913.02 seconds (58 iterations)```
+
          
 #### July 2nd 2024:  Conditioning number: 10 (5 on current space, 5 on one lag space)       
-Initial parameters (sigmasq, range_latitude, range_longitude, advection, beta and nugget): [40, 5.25, 5.25, 0.3, 0.3, 0.5],  bounds=[(0.05, 40.0), (0.05, 15.0), (0.05, 15.0), (-15.0, 15.0), (0.25, 20.0), (0.05, 0.5)], smooth=0.5        
+
 ```Estimates from Full Likelihood:          [24.88 6.83 8.33 0.016 0.25 0.05] 385.65 seconds (34 iterations)```                           
 ```Estimates from Vecchia Approximation:    [16.20 2.78 7.55 -0.24 0.25 0.5 ] 164.55 seconds (51 iterations)```          
  Conditioning number: 20 (10 on current space, 10 on one lag space)                 
 ```Estimates from Vecchia Approximation:    [20.17 4.27 6.58 -0.16 0.25 0.05] 355.72 seconds (36 iterations)```   
 
+Data size: ```100 x 8(hours)```
+```Estimates from Full Likelihood:          [22.27 3.96 3.06 -2.99e-03 0.25 0.5] 1477.67 seconds (44 iterations)```                      
+```Estimates from Vecchia Approximation:    [6.95 0.05 0.05 -0.13 0.25 0.5] 508.41 seconds (67 iterations)```
+
 #### July 3rd 2024:  Conditioning number: 10 (5 on current space, 5 on one lag space)       
-Initial parameters (sigmasq, range_latitude, range_longitude, advection, beta and nugget): [40, 5.25, 5.25, 0.3, 0.3, 0.5],  bounds=[(0.05, 40.0), (0.05, 15.0), (0.05, 15.0), (-15.0, 15.0), (0.25, 20.0), (0.05, 0.5)], smooth=0.5        
+    
 ```Estimates from Full Likelihood:          [35.87 3.09 2.97 0.08 0.25 0.5  ] 365.65 seconds (40 iterations)```                           
-```Estimates from Vecchia Approximation:    [13.81 0.05 0.05 0.02 0.79 0.06 ] 216.11 seconds (60 iterations)```       
+```Estimates from Vecchia Approximation:    [13.81 0.05 0.05 0.02 0.79 0.06 ] 216.11 seconds (60 iterations)``` 
+
+Data size: ```100 x 8(hours)```
+```Estimates from Full Likelihood:          [34.57 2.35 2.43 -0.10 0.25 0.5] 1068.67 seconds (32 iterations)```                      
+```Estimates from Vecchia Approximation:    [12.75 0.05 0.05 -0.14 0.25 0.06 ] 300.90 seconds (36 iterations)```
  
 
 
