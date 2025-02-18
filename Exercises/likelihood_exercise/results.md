@@ -100,8 +100,25 @@ Data size: ```100 x 8(hours)```
 ```Estimates from Vecchia Approximation:    [12.75 0.05 0.05 -0.14 0.25 0.06 ] 300.90 seconds (36 iterations)```
 
 Data size: ```200 x 8(hours)```
-```Estimates from Full Likelihood:          [] seconds ( iterations)```                      
-```Estimates from Vecchia Approximation:    [] seconds ( iterations)```
+```Estimates from Full Likelihood:          [32.52 1.85 1.47 -0.09 0.25 0.5] 4455.90 seconds (36 iterations)```                      
+```Estimates from Vecchia Approximation:    [10.67 0.05 0.05 -0.07 0.92 0.5] 801.82 seconds (47 iterations)```
+
+# Intial parameters search
+
+1 10 10 5 5 0.01 8175   
+1 10 10 5 5 0.5 3207   
+
+1 10 10 0.1 0.1 0.5 2810   
+
+20 1 1 0.5 0.1 0.01 1052.09   
+20 1 1 0.5 0.1 0.05 1052.192   
+20 1 1 0.5 0.1 0.5 1053   
+
+10 1 1 0.1 0.5 0.5 1038   
+
+20 1 1 0.1 0.5 0.5 1029   
+20 1 1 0.1 0.5 0.01 1026.73   
+
  
 
 
