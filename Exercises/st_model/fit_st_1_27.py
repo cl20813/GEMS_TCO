@@ -162,7 +162,7 @@ def main():
         futures = [
             executor.submit(
                 instance.mle_parallel_vecc,
-                bounds, params
+                bounds, params, instance.matern_cov_yx
             )   
         
         ]
@@ -181,7 +181,7 @@ def main():
         futures = [
             executor.submit(
                 instance.mle_parallel_full,
-                bounds, params, aggregated_np, aggregated_np[:,2]
+                bounds, params, aggregated_np, aggregated_np[:,2], instance.matern_cov_yx
             )   
         ]
 
