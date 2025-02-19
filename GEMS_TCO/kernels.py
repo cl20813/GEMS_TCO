@@ -332,7 +332,51 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
 
                 if past:
                     data_list.append( current_np[past])
-            
+
+                if time_idx > 1:
+                    cov_matrix = self.cov_map[index]['cov_matrix']
+                    tmp1 = self.cov_map[index]['tmp1']
+
+                
+                    last_hour_np = self.input_map[self.key_list[time_idx-1]]
+                   
+                    past_conditioning_data = last_hour_np[ (past+[index]),: ]
+                    data_list.append( past_conditioning_data)
+
+                    if data_list:
+                        conditioning_data = np.vstack(data_list)
+                    else:
+                        conditioning_data = np.array([]).reshape(0, current_row.shape[1])
+
+                    np_arr = np.vstack( (current_row, conditioning_data) )
+                    y_and_neighbors = np_arr[:,2]
+                    locs = np_arr[:,:2]
+
+                    cov_xx = cov_matrix[1:,1:]
+                    cov_yx = cov_matrix[0,1:]
+                    tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y_and_neighbors))
+                    beta = np.linalg.solve(tmp1, tmp2)
+
+                    mu = np.dot(locs, beta)
+                    mu_current = mu[0]
+                    mu_neighbors = mu[1:]
+                    
+                    # mean and variance of y|x
+                    sigma = cov_matrix[0][0]
+                    cov_ygivenx = sigma - np.dot(cov_yx.T,np.linalg.solve(cov_xx, cov_yx))
+                    
+                    # cov_ygivenx = max(cov_ygivenx, 7)
+                    cond_mean = mu_current + np.dot(cov_yx.T, np.linalg.solve( cov_xx, (y_and_neighbors[1:]-mu_neighbors) ))   # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
+                    # print(f'cond_mean{mean_z}')
+                    alpha = current_y - cond_mean
+                    quad_form = alpha**2 *(1/cov_ygivenx)
+                    log_det = np.log(cov_ygivenx)
+
+                    # Compute the negative log-likelihood
+                    neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
+
+                    continue
+
                 if time_idx >0:
                     last_hour_np = self.input_map[self.key_list[time_idx-1]]
                    
@@ -349,27 +393,6 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                 y_and_neighbors = np_arr[:,2]
                 locs = np_arr[:,:2]
 
-                if time_idx > 1:
-                    cov_matrix = self.cov_map[index]['cov_matrix']
-                    tmp1 = self.cov_map[index]['tmp1']
-                    cov_ygivenx = self.cov_map[index]['cov_ygivenx']
-                    cond_mean = self.cov_map[index]['cond_mean']
-
-                    tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y_and_neighbors))
-                    beta = np.linalg.solve(tmp1, tmp2)
-
-                    mu = np.dot(locs, beta)
-                    mu_current = mu[0]
-                    mu_neighbors = mu[1:]
-                    
-                    alpha = current_y - cond_mean
-                    quad_form = alpha**2 *(1/cov_ygivenx)
-                    log_det = np.log(cov_ygivenx)
-
-                    # Compute the negative log-likelihood
-                    neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
-
-                    continue
 
                 cov_matrix = covariance_function(params=params, y = np_arr, x = np_arr)
           
@@ -407,6 +430,134 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                         'cov_matrix': cov_matrix
                     }
         return neg_log_lik
+    def vecchia_likelihood3(self, params, covariance_function):
+        self.cov_map = defaultdict(list)
+        neg_log_lik = 0
+        print(self.size_per_hour)
+        for time_idx in range(self.number_of_timestamps):
+            current_np = self.input_map[self.key_list[time_idx]]
+            
+            cur_heads = current_np[:31,:]
+            neg_log_lik += self.full_likelihood(params,cur_heads, cur_heads[:,2],covariance_function)
+
+            for index in range(31, self.size_per_hour):
+
+                current_row = current_np[index]
+      
+                current_row = current_row.reshape(1,-1)
+                current_y = current_row[0][2]
+
+                # construct conditioning set on time 0
+                
+                mm_neighbors = self.nns_map[index]
+                past = list(mm_neighbors)
+                data_list = []
+
+                if past:
+                    data_list.append( current_np[past])
+
+                if time_idx > 1:
+                    cov_matrix = self.cov_map[index]['cov_matrix']
+                    tmp1 = self.cov_map[index]['tmp1']
+
+                
+                    last_hour_np = self.input_map[self.key_list[time_idx-1]]
+                   
+                    past_conditioning_data = last_hour_np[ (past+[index]),: ]
+                    data_list.append( past_conditioning_data)
+
+                    if data_list:
+                        conditioning_data = np.vstack(data_list)
+                    else:
+                        conditioning_data = np.array([]).reshape(0, current_row.shape[1])
+
+                    np_arr = np.vstack( (current_row, conditioning_data) )
+                    y_and_neighbors = np_arr[:,2]
+                    locs = np_arr[:,:2]
+
+                    cov_xx = cov_matrix[1:,1:]
+                    cov_yx = cov_matrix[0,1:]
+                    tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y_and_neighbors))
+                    beta = np.linalg.solve(tmp1, tmp2)
+
+                    mu = np.dot(locs, beta)
+                    mu_current = mu[0]
+                    mu_neighbors = mu[1:]
+                    
+                    # mean and variance of y|x
+                    sigma = cov_matrix[0][0]
+                    cov_ygivenx = sigma - np.dot(cov_yx.T,np.linalg.solve(cov_xx, cov_yx))
+                    
+                    # cov_ygivenx = max(cov_ygivenx, 7)
+                    cond_mean = mu_current + np.dot(cov_yx.T, np.linalg.solve( cov_xx, (y_and_neighbors[1:]-mu_neighbors) ))   # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
+                    # print(f'cond_mean{mean_z}')
+                    alpha = current_y - cond_mean
+                    quad_form = alpha**2 *(1/cov_ygivenx)
+                    log_det = np.log(cov_ygivenx)
+
+                    # Compute the negative log-likelihood
+                    neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
+
+                    continue
+
+                if time_idx >0:
+                    last_hour_np = self.input_map[self.key_list[time_idx-1]]
+                   
+                    past_conditioning_data = last_hour_np[ (past+[index]),: ]
+                    data_list.append( past_conditioning_data)
+                
+
+                if data_list:
+                    conditioning_data = np.vstack(data_list)
+                else:
+                    conditioning_data = np.array([]).reshape(0, current_row.shape[1])
+
+                np_arr = np.vstack( (current_row, conditioning_data) )
+                y_and_neighbors = np_arr[:,2]
+                locs = np_arr[:,:2]
+
+
+                cov_matrix = covariance_function(params=params, y = np_arr, x = np_arr)
+          
+                cov_xx = cov_matrix[1:,1:]
+                cov_yx = cov_matrix[0,1:]
+                
+                cov_matrix_inv = np.linalg.inv(cov_matrix)
+
+                tmp1 = np.dot(locs.T, np.dot(cov_matrix_inv, locs))
+                tmp2 = np.dot(locs.T, np.dot(cov_matrix_inv, y_and_neighbors))
+                beta = np.linalg.solve(tmp1, tmp2)
+
+                mu = np.dot(locs, beta)
+                mu_current = mu[0]
+                mu_neighbors = mu[1:]
+                
+                # mean and variance of y|x
+                sigma = cov_matrix[0][0]
+
+                cov_xx_inv = np.linalg.inv(cov_xx)
+                cov_ygivenx = sigma - np.dot(cov_yx.T,np.dot(cov_xx_inv, cov_yx))
+                
+                # cov_ygivenx = max(cov_ygivenx, 7)
+                cond_mean = mu_current + np.dot(cov_yx.T, np.dot( cov_xx_inv, (y_and_neighbors[1:]-mu_neighbors) ))   # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
+                # print(f'cond_mean{mean_z}')
+
+                alpha = current_y - cond_mean
+                quad_form = alpha**2 *(1/cov_ygivenx)
+                log_det = np.log(cov_ygivenx)
+                # Compute the negative log-likelihood
+
+                neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
+
+                if time_idx == 1:
+                    self.cov_map[index] = {
+                        'tmp1': tmp1,
+                        'cov_xx_inv': cov_xx_inv,
+                        'cov_matrix_inv': cov_matrix_inv,
+                        'cov_matrix': cov_matrix
+                    }
+        return neg_log_lik    
+
         
     def mle_parallel_vecc(self, bounds, params,covariance_function ):
         iteration_count = 0 
