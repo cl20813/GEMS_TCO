@@ -151,10 +151,10 @@ def main():
     # data = data.iloc[ord, :]
 
     # out = instance.vecchia_likelihood(params)
-    out2 = instance.vecchia_likelihood_test(params)
+    out2 = instance.vecchia_likelihood_test(params, instance.matern_cov_yx)
 
     start_time = time.time()
-    full_likelihood = instance.full_likelihood(params, aggregated_np, aggregated_np[:,2])
+    full_likelihood = instance.full_likelihood(params, aggregated_np, aggregated_np[:,2], instance.matern_cov_yx)
     print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Full likelihood using params={params} is {full_likelihood}')
     end_time = time.time()  # Record the end time
     iteration_time = end_time - start_time  # Calculate the time spent

@@ -175,7 +175,7 @@ def main():
                         for p6 in param_ranges['param6']:
                             params = (p1, p2, p3, p4, p5, p6)
                             start_time = time.time()
-                            likelihood = instance.vecchia_likelihood_test(params)
+                            likelihood = instance.vecchia_likelihood(params, instance.matern_cov_yx)
                             print(f'grid {lat_number}*{lon_number}:Vecchia approximation likelihood using condition size {mm_cond_number}, {params} is {likelihood}')
                             if likelihood < lowest_neg_likelihood:
                                 lowest_neg_likelihood = likelihood
