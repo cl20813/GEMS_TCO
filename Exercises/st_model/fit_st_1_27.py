@@ -161,7 +161,7 @@ def main():
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         futures = [
             executor.submit(
-                instance.mle_parallel2,
+                instance.mle_parallel_vecc,
                 bounds, params
             )   
         
