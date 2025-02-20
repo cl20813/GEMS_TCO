@@ -18,6 +18,7 @@ from scipy.spatial.distance import cdist  # For space and time distance
 from scipy.special import gamma, kv  # Bessel function and gamma function
 from scipy.optimize import minimize
 from scipy.optimize import basinhopping, minimize
+from scipy.stats import norm,uniform
 
 # Type hints
 from typing import Callable, Union, Tuple
@@ -97,6 +98,7 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
         # Validate inputs
         if y is None or x is None:
             raise ValueError("Both y and x_df must be provided.")
+        
         # Extract values
         x1 = x[:, 0]
         y1 = x[:, 1]
@@ -112,7 +114,7 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
         coords1 = np.hstack ((spat_coord1, (beta * t1).reshape(-1,1) ))
         coords2 = np.hstack ((spat_coord2, (beta * t2).reshape(-1,1) ))
 
-        sqrt_range_mat = np.diag([ 1/range_lon**0.5, 1/range_lat**0.5])
+        sqrt_range_mat = np.diag([ 1/range_lat**0.5, 1/range_lon**0.5])
         self.sqrt_range_mat = sqrt_range_mat
 
         distance = cdist(coords1,coords2, metric = self.custom_distance)
@@ -153,7 +155,7 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
         coords1 = np.hstack ((spat_coord1, (beta * t1).reshape(-1,1) ))
         coords2 = np.hstack ((spat_coord2, (beta * t2).reshape(-1,1) ))
 
-        sqrt_range_mat = np.diag([ 1/range_lon**0.5, 1/range_lat**0.5])
+        sqrt_range_mat = np.diag([ 1/range_lat**0.5, 1/range_lon**0.5])
         self.sqrt_range_mat = sqrt_range_mat
 
         distance = cdist(coords1,coords2, metric = self.custom_distance)
@@ -207,6 +209,24 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
         n = len(y)
         neg_log_lik = 0.5 * (n * np.log(2 * np.pi) + log_det + quad_form)
 
+        '''
+        priors = [
+            norm(loc=15, scale=20),  # Prior for parameter sigmasq
+            uniform(loc=0, scale=30),  # Prior for parameter range_lon
+            uniform(loc=0, scale=5),  # Prior for parameter range_lat
+            norm(loc=0, scale=0.01),  # Prior for parameter advection
+            norm(loc=0, scale=0.1),   # Prior for parameter beta
+            norm(loc=0, scale=1),   # Prior for parameter nugget
+        ]
+
+                # Add prior terms for the parameters
+        prior_terms = 0
+        for i, prior in enumerate(priors):
+            prior_terms += prior.logpdf(params[i])
+
+        neg_log_lik += prior_terms
+        '''
+        
         return neg_log_lik
     
     def vecchia_like_nocache(self, params, covariance_function):
@@ -406,7 +426,7 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
     def vecchia_like_using_cholesky(self, params, covariance_function):
         self.cov_map = defaultdict(list)
         neg_log_lik = 0
-        print(self.size_per_hour)
+        
         for time_idx in range(self.number_of_timestamps):
             current_np = self.input_map[self.key_list[time_idx]]
 
@@ -439,6 +459,7 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                     cond_mean_tmp = self.cov_map[index]['cond_mean_tmp']
                     log_det = self.cov_map[index]['log_det']
                     locs  = self.cov_map[index]['locs']
+                    prior_terms = self.cov_map[index]['prior_terms']
 
                     last_hour_np = self.input_map[self.key_list[time_idx-1]]
                    
@@ -471,6 +492,7 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                     quad_form = alpha**2 *(1/cov_ygivenx)
                    
                     neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
+                    neg_log_lik += prior_terms
 
                     continue
 
@@ -533,7 +555,25 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                 log_det = np.log(cov_ygivenx)
                
                 neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
-                
+
+                ''' 
+                priors = [
+                    norm(loc=15, scale=20),  # Prior for parameter sigmasq
+                    uniform(loc=0, scale=5),  # Prior for parameter range_lat
+                    uniform(loc=0, scale=30),  # Prior for parameter range_lon
+                    norm(loc=0, scale=0.01),  # Prior for parameter advection
+                    norm(loc=0, scale=0.1),   # Prior for parameter beta
+                    norm(loc=0, scale=1),   # Prior for parameter nugget
+                ]
+
+                # Add prior terms for the parameters
+                prior_terms = 0
+                for i, prior in enumerate(priors):
+                    prior_terms += prior.logpdf(params[i])
+
+                neg_log_lik += prior_terms
+                '''
+
                 if time_idx == 1:
                     self.cov_map[index] = {
                         'tmp_for_beta': tmp_for_beta,
@@ -543,7 +583,8 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                         'cov_ygivenx':cov_ygivenx,
                         'cond_mean_tmp': cond_mean_tmp,
                         'log_det': log_det,
-                        'locs':locs
+                        'locs':locs,
+                        'prior_terms':prior_terms
                     }
         return neg_log_lik   
  
