@@ -133,6 +133,7 @@ def main():
     analysis_data_map = {}
     for i in range(key_for_dict[0], key_for_dict[1]):
         tmp = coarse_dicts[key_idx[i]]
+        tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'])
         # tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
         tmp = tmp.iloc[ord_mm, :4].to_numpy()
 
@@ -141,6 +142,7 @@ def main():
     aggregated_data = pd.DataFrame()
     for i in range(key_for_dict[0], key_for_dict[1]):
         tmp = coarse_dicts[key_idx[i]]
+        tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'])
         tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
         aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
     
@@ -173,7 +175,6 @@ def main():
     end_time = time.time()  # Record the end time
     estimation_time = end_time - start_time  # Calculate the time spent
     print(f"Vecchia estimation_time took {estimation_time:.4f} seconds")
-
 
     start_time = time.time()
     # keys = sorted(analysis_data_map)
