@@ -52,7 +52,6 @@ def main():
     # Argument parser
     parser = argparse.ArgumentParser(description="Fit spatio-temporal model")
     
-    
     #sigmasq (0.05,600), range_ (0.05,600), advec (-200,200), beta (0,600), nugget (0,600)
     parser.add_argument('--v', type=float, default=0.5, help="smooth")
     parser.add_argument('--space', type=int,nargs='+', default=[20,20], help="spatial resolution")
@@ -71,6 +70,7 @@ def main():
     params= args.params
     bounds = [(args.bounds[i], args.bounds[i+1]) for i in range(0, len(args.bounds), 2)]
     key_for_dict= args.keys
+
 
     v = args.v
    
