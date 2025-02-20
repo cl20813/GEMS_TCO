@@ -180,7 +180,7 @@ def main():
     print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out2}')
     end_time2 = time.time()  # Record the end time
     iteration_time2 = end_time2 - start_time2  # Calculate the time spent
-    print(f"Vecchia approximation2 took {iteration_time2:.4f} seconds")
+    print(f"vecchia_likelihood took {iteration_time2:.4f} seconds")
 
 
     out4 = instance.vecchia_like_using_cholesky(params, instance.matern_cov_yx)
@@ -190,7 +190,7 @@ def main():
     print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out4}')
     end_time2 = time.time()  # Record the end time
     iteration_time2 = end_time2 - start_time2  # Calculate the time spent
-    print(f"Vecchia approximation2 took {iteration_time2:.4f} seconds")
+    print(f"vecchia_like_using_cholesky took {iteration_time2:.4f} seconds")
 
 
     out5 = instance.vecchia_like_nocache(params, instance.matern_cov_yx)
@@ -200,7 +200,7 @@ def main():
     print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out5}')
     end_time2 = time.time()  # Record the end time
     iteration_time2 = end_time2 - start_time2  # Calculate the time spent
-    print(f"Vecchia approximation2 took {iteration_time2:.4f} seconds")
+    print(f"vecchia_like_nocache took {iteration_time2:.4f} seconds")
 
 if __name__ == '__main__':
     main()
