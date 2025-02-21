@@ -867,7 +867,7 @@ class diagnosis(matern_spatio_temporal):
         for time_idx in range(self.number_of_timestamps):
             current_np = self.input_map[self.key_list[time_idx]]
             
-            for index in range(0, self.size_per_hour):
+            for index in range(31, self.size_per_hour):
 
                 current_row = current_np[index]
     
