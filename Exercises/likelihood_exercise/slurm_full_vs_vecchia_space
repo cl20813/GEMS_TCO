@@ -4,7 +4,7 @@ scp -r "C:\Users\joonw\TCO\GEMS_TCO-1\GEMS_TCO" jl2815@amarel.rutgers.edu:/home/
 For significant updates or installations, use pip install --force-reinstall or python setup.py install after copying the files.
 
 ### Copy from ```local``` to ```Amarel HPC```
-scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\likelihood_exercise\full_vs_vecchia.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise
+scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\likelihood_exercise\full_vs_vecchia_space.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise\likelihood_exercise
 
 ### Copy from ```Amarel HPC``` to ```local computer```
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise/full_vs_vecchia_space.py "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\likelihood_exercise"
