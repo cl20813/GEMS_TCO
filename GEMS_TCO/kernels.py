@@ -209,24 +209,6 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
         n = len(y)
         neg_log_lik = 0.5 * (n * np.log(2 * np.pi) + log_det + quad_form)
 
-        '''
-        priors = [
-            norm(loc=15, scale=20),  # Prior for parameter sigmasq
-            uniform(loc=0, scale=30),  # Prior for parameter range_lon
-            uniform(loc=0, scale=5),  # Prior for parameter range_lat
-            norm(loc=0, scale=0.01),  # Prior for parameter advection
-            norm(loc=0, scale=0.1),   # Prior for parameter beta
-            norm(loc=0, scale=1),   # Prior for parameter nugget
-        ]
-
-                # Add prior terms for the parameters
-        prior_terms = 0
-        for i, prior in enumerate(priors):
-            prior_terms += prior.logpdf(params[i])
-
-        neg_log_lik += prior_terms
-        '''
-
         return neg_log_lik
     
     def vecchia_like_nocache(self, params, covariance_function):
@@ -556,24 +538,6 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                
                 neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
 
-                ''' 
-                priors = [
-                    norm(loc=15, scale=20),  # Prior for parameter sigmasq
-                    uniform(loc=0, scale=5),  # Prior for parameter range_lat
-                    uniform(loc=0, scale=30),  # Prior for parameter range_lon
-                    norm(loc=0, scale=0.01),  # Prior for parameter advection
-                    norm(loc=0, scale=0.1),   # Prior for parameter beta
-                    norm(loc=0, scale=1),   # Prior for parameter nugget
-                ]
-
-                # Add prior terms for the parameters
-                prior_terms = 0
-                for i, prior in enumerate(priors):
-                    prior_terms += prior.logpdf(params[i])
-
-                neg_log_lik += prior_terms
-                '''
-
                 if time_idx == 1:
                     self.cov_map[index] = {
                         'tmp_for_beta': tmp_for_beta,
@@ -856,7 +820,293 @@ class matern_spatial:
         except Exception as e:
             logging.error(f"An error occurred for day {key}: {str(e)}", exc_info=True)
             return f"An error occurred for day {key}: {str(e)}"
+
+class bayesian(matern_spatio_temporal):
+    def __init__(self, smooth, input_map, nns_map, mm_cond_number):
+        super().__init__(smooth, input_map, nns_map, mm_cond_number)
+        # Any additional initialization for dignosis class can go here
+
+    def full_likelihood(self, params, input_np, y, covariance_function):
+  
+        # Compute the covariance matrix from the matern function
+            # Convert DataFrame to NumPy array with float64 dtype
+               
         
+        input_arr = input_np[:,:4]
+        y_arr = y
+    
+        cov_matrix = covariance_function(params=params, y = input_arr, x =input_arr)
+        
+        sign, log_det = np.linalg.slogdet(cov_matrix)
+
+        # Compute the Cholesky decomposition
+        # L = np.linalg.cholesky(cov_matrix)
+        # Solve for the log determinant
+        # log_det = 2 * np.sum(np.log(np.diagonal(L)))
+        locs = input_arr[:,:2]
+       
+        tmp1 = np.dot(locs.T, np.linalg.solve(cov_matrix, locs))
+        tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y_arr))
+        beta = np.linalg.solve(tmp1, tmp2)
+      
+        mu = np.dot(locs, beta)
+        y_mu = y_arr - mu
+    
+        # alpha = np.linalg.solve(L, y_mu)
+        # quad_form = np.dot(alpha.T, alpha)
+        quad_form = np.dot( y_mu, np.linalg.solve(cov_matrix, y_mu))
+        # Compute the negative log-likelihood
+        n = len(y)
+        neg_log_lik = 0.5 * (n * np.log(2 * np.pi) + log_det + quad_form)
+
+        
+        priors = [
+            norm(loc=15, scale=10),  # Prior for parameter sigmasq
+            uniform(loc=0.1, scale=8),  # Prior for parameter range_lat
+            uniform(loc=0.1, scale=15),  # Prior for parameter range_lon
+            uniform(loc=0.01, scale=2),  # Prior for parameter advection
+            uniform(loc=0.01, scale=2),   # Prior for parameter beta
+            uniform(loc=0.01, scale=1)   # Prior for parameter nugget
+            
+        ]
+        prior_terms = 0
+        try:
+            for i, prior in enumerate(priors):
+                prior_terms += prior.logpdf(params[i])
+            neg_log_lik += prior_terms
+        except Exception as e:
+            print(f"Error in prior term calculation: {e}")
+        
+
+        return neg_log_lik
+    def vecchia_like_using_cholesky(self, params, covariance_function):
+        self.cov_map = defaultdict(list)
+        neg_log_lik = 0
+        
+        for time_idx in range(self.number_of_timestamps):
+            current_np = self.input_map[self.key_list[time_idx]]
+
+            # use below when working on local computer to avoid singular matrix
+            #cur_heads = current_np[:31,:]
+            #neg_log_lik += self.full_likelihood(params,cur_heads, cur_heads[:,2],covariance_function)
+
+            for index in range(0, self.size_per_hour):
+
+                current_row = current_np[index]
+      
+                current_row = current_row.reshape(1,-1)
+                current_y = current_row[0][2]
+
+                # construct conditioning set
+                
+                mm_neighbors = self.nns_map[index]
+                past = list(mm_neighbors)
+                data_list = []
+
+                if past:
+                    data_list.append( current_np[past])
+
+                if time_idx > 1:
+                    cov_matrix = self.cov_map[index]['cov_matrix']
+                    tmp_for_beta = self.cov_map[index]['tmp_for_beta']
+                    cov_xx_inv = self.cov_map[index]['cov_xx_inv']
+                    L_inv = self.cov_map[index]['L_inv']
+                    cov_ygivenx = self.cov_map[index]['cov_ygivenx'] 
+                    cond_mean_tmp = self.cov_map[index]['cond_mean_tmp']
+                    log_det = self.cov_map[index]['log_det']
+                    locs  = self.cov_map[index]['locs']
+                    prior_terms = self.cov_map[index]['prior_terms']
+
+                    last_hour_np = self.input_map[self.key_list[time_idx-1]]
+                   
+                    past_conditioning_data = last_hour_np[ (past+[index]),: ]
+                    data_list.append( past_conditioning_data)
+
+                    if data_list:
+                        conditioning_data = np.vstack(data_list)
+                    else:
+                        conditioning_data = np.array([]).reshape(0, current_row.shape[1])
+
+                    np_arr = np.vstack( (current_row, conditioning_data) )
+                    y_and_neighbors = np_arr[:,2]
+                    # locs = np_arr[:,:2]
+
+                    cov_yx = cov_matrix[0,1:]
+
+                    tmp2 = np.dot( np.dot(L_inv, locs).T, np.dot(L_inv, y_and_neighbors))
+                    beta = np.linalg.solve(tmp_for_beta , tmp2)
+
+                    mu = np.dot(locs, beta)
+                    mu_current = mu[0]
+                    mu_neighbors = mu[1:]
+                    
+                    # mean and variance of y|x
+                         
+                    cond_mean = mu_current + np.dot(cond_mean_tmp, (y_and_neighbors[1:]-mu_neighbors) )  # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
+            
+                    alpha = current_y - cond_mean
+                    quad_form = alpha**2 *(1/cov_ygivenx)
+                   
+                    neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
+                    neg_log_lik += prior_terms
+
+                    continue
+
+                if time_idx >0:
+                    last_hour_np = self.input_map[self.key_list[time_idx-1]]
+                   
+                    past_conditioning_data = last_hour_np[ (past+[index]),: ]
+                    data_list.append( past_conditioning_data)
+                
+
+                if data_list:
+                    conditioning_data = np.vstack(data_list)
+                else:
+                    conditioning_data = np.array([]).reshape(0, current_row.shape[1])
+
+                np_arr = np.vstack( (current_row, conditioning_data) )
+                y_and_neighbors = np_arr[:,2]
+                locs = np_arr[:,:2]
+
+
+                cov_matrix = covariance_function(params=params, y = np_arr, x = np_arr)
+                L = np.linalg.cholesky(cov_matrix)
+                L11 = L[:1,:1]
+                L12 = np.zeros(L[:1,1:].shape)
+                L21 = L[1:,:1]
+                L22 = L[1:,1:]
+                L11_inv = np.linalg.inv(L11)
+                L22_inv = np.linalg.inv(L22)
+
+                L_inv = np.block([
+                    [L11_inv, L12],
+                    [- np.dot( np.dot(L22_inv,L21), L11_inv), L22_inv]
+                ])
+
+                cov_yx = cov_matrix[0,1:]
+                
+                tmp1 = np.dot(L_inv,locs)
+                tmp2 = np.dot( np.dot(L_inv, locs).T, np.dot(L_inv, y_and_neighbors))
+                tmp_for_beta= np.dot(tmp1.T,tmp1)
+                beta = np.linalg.solve(tmp_for_beta , tmp2)
+
+                mu = np.dot(locs, beta)
+                mu_current = mu[0]
+                mu_neighbors = mu[1:]
+                
+                # mean and variance of y|x
+                sigma = cov_matrix[0][0]
+
+                # cov_xx = np.dot(L21,L21.T) +np.dot(L22,L22.T) 
+                cov_xx = cov_matrix[1:,1:]
+                cov_xx_inv = np.linalg.inv(cov_xx)
+                
+                cov_ygivenx = sigma - np.dot(cov_yx.T, np.dot(cov_xx_inv, cov_yx))
+               
+                cond_mean_tmp = np.dot(cov_yx.T, cov_xx_inv)
+                cond_mean = mu_current + np.dot(cond_mean_tmp, (y_and_neighbors[1:]-mu_neighbors) )  # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
+            
+                alpha = current_y - cond_mean
+                quad_form = alpha**2 *(1/cov_ygivenx)
+                log_det = np.log(cov_ygivenx)
+               
+                neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
+
+                
+                priors = [
+                    uniform(loc=5, scale=35),  # Prior for parameter sigmasq
+                    uniform(loc=0.1, scale=8),  # Prior for parameter range_lat
+                    uniform(loc=0.1, scale=15),  # Prior for parameter range_lon
+                    uniform(loc=0.01, scale=2),  # Prior for parameter advection
+                    uniform(loc=0.01, scale=2),   # Prior for parameter beta
+                    uniform(loc=0.01, scale=1)   # Prior for parameter nugget
+                    
+                ]
+
+                # Add prior terms for the parameters
+                prior_terms = 0
+                for i, prior in enumerate(priors):
+                    prior_terms += prior.logpdf(params[i])
+
+                neg_log_lik += prior_terms
+                
+
+                if time_idx == 1:
+                    self.cov_map[index] = {
+                        'tmp_for_beta': tmp_for_beta,
+                        'cov_xx_inv': cov_xx_inv,
+                        'cov_matrix': cov_matrix,
+                        'L_inv':L_inv,
+                        'cov_ygivenx':cov_ygivenx,
+                        'cond_mean_tmp': cond_mean_tmp,
+                        'log_det': log_det,
+                        'locs':locs,
+                        'prior_terms':prior_terms
+                    }
+        return neg_log_lik   
+ 
+    def mle_parallel_vecc(self, bounds, params,covariance_function ):
+        iteration_count = 0 
+        def callback(xk):
+            nonlocal iteration_count
+            iteration_count += 1
+
+        try:
+            logging.info(f"fit_st_1_27")
+            print(f"fit_st_1_27")  # Debugging line
+        
+            result = minimize(
+                self.vecchia_like_using_cholesky, 
+                params, 
+                args = (covariance_function),
+                # neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map)
+                # bounds=bounds,
+                method='L-BFGS-B',
+                callback= callback
+            )
+            jitter = result.x
+            logging.info(f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}")
+            logging.info(f"Total iterations: {iteration_count}")
+            print(f"Total iterations: {iteration_count}")
+
+            return f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}"
+        except Exception as e:
+            error_message = f"Error occurred: {str(e)}"
+            print(error_message)
+            logging.error(error_message)
+
+    def mle_parallel_full(self, bounds, params , input_np, y,covariance_function):
+        iteration_count = 0 
+        def callback(xk):
+            nonlocal iteration_count
+            iteration_count += 1
+
+        try:
+            logging.info(f"fit_st_1_27")
+            print(f"fit_st_1_27")  # Debugging line
+        
+            result = minimize(
+                self.full_likelihood, 
+                params, 
+                args = (input_np, y,covariance_function),
+                # neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map)
+                # bounds=bounds,
+                method='L-BFGS-B',
+                callback= callback
+            )
+            jitter = result.x
+            logging.info(f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}")
+            logging.info(f"Total iterations: {iteration_count}")
+            print(f"Total iterations: {iteration_count}")
+
+            return f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}"
+        except Exception as e:
+            error_message = f"Error occurred: {str(e)}"
+            print(error_message)
+            logging.error(error_message)
+
+
+
 class diagnosis(matern_spatio_temporal):
     def __init__(self, smooth, input_map, nns_map, mm_cond_number):
         super().__init__(smooth, input_map, nns_map, mm_cond_number)
