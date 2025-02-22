@@ -446,8 +446,7 @@ class likelihood_function(spatio_temporal_kernels):
                     cond_mean_tmp = self.cov_map[index]['cond_mean_tmp']
                     log_det = self.cov_map[index]['log_det']
                     locs  = self.cov_map[index]['locs']
-                    prior_terms = self.cov_map[index]['prior_terms']
-
+                   
                     last_hour_np = self.input_map[self.key_list[time_idx-1]]
                    
                     past_conditioning_data = last_hour_np[ (past+[index]),: ]
@@ -479,7 +478,7 @@ class likelihood_function(spatio_temporal_kernels):
                     quad_form = alpha**2 *(1/cov_ygivenx)
                    
                     neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
-                    neg_log_lik += prior_terms
+                    
 
                     continue
 
@@ -552,8 +551,7 @@ class likelihood_function(spatio_temporal_kernels):
                         'cov_ygivenx':cov_ygivenx,
                         'cond_mean_tmp': cond_mean_tmp,
                         'log_det': log_det,
-                        'locs':locs,
-                        'prior_terms':prior_terms
+                        'locs':locs
                     }
         return neg_log_lik   
 
@@ -648,7 +646,7 @@ class likelihood_function(spatio_temporal_kernels):
                     cond_mean_tmp = self.cov_map[index]['cond_mean_tmp']
                     log_det = self.cov_map[index]['log_det']
                     locs  = self.cov_map[index]['locs']
-                    prior_terms = self.cov_map[index]['prior_terms']
+                    
 
                     last_hour_np = self.input_map[self.key_list[time_idx-1]]
                    
@@ -681,7 +679,7 @@ class likelihood_function(spatio_temporal_kernels):
                     quad_form = alpha**2 *(1/cov_ygivenx)
                    
                     neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
-                    neg_log_lik += prior_terms
+                  
 
                     continue
 
@@ -746,31 +744,7 @@ class likelihood_function(spatio_temporal_kernels):
                 neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
 
                 
-                priors = [
-                    norm(loc=15, scale=15),  # Prior for parameter sigmasq
-                    uniform(loc= 0.001, scale= 15),  # Prior for parameter range_lat
-                    uniform(loc= 0.001, scale= 15),  # Prior for parameter range_lon
-                    norm(loc=0, scale=5),  # Prior for parameter advection
-                    uniform(loc=0.001, scale=4),   # Prior for parameter beta
-                    uniform(loc=0.0001, scale=2.5)   # Prior for parameter nugget
-                    
-                ]
 
-                # Add prior terms for the parameters
-                prior_terms = 0
-                for i, prior in enumerate(priors):
-                    param_value = params[i]
-                    logpdf_value = prior.logpdf(param_value)
-                    print(f"Parameter {i}: {param_value}, logpdf: {logpdf_value}")
-                    if np.isnan(logpdf_value) or np.isinf(logpdf_value):
-                        raise ValueError(f"Invalid logpdf value for parameter {i}: {logpdf_value}")
-                    prior_terms += logpdf_value
-
-                # Combine the negative log-likelihood and prior terms with scaling factors
-                neg_log_lik = 0.8 * neg_log_lik + 0.2 * prior_terms
-                print(prior_terms)
-                
-                neg_log_lik = 0.8 * neg_log_lik + 0.2 * prior_terms
 
                 if time_idx == 1:
                     self.cov_map[index] = {
@@ -781,9 +755,34 @@ class likelihood_function(spatio_temporal_kernels):
                         'cov_ygivenx':cov_ygivenx,
                         'cond_mean_tmp': cond_mean_tmp,
                         'log_det': log_det,
-                        'locs':locs,
-                        'prior_terms':prior_terms
+                        'locs':locs
                     }
+
+        priors = [
+            norm(loc=15, scale=25),  # Prior for parameter sigmasq
+            uniform(loc= 0.001, scale= 30),  # Prior for parameter range_lat
+            uniform(loc= 0.001, scale= 30),  # Prior for parameter range_lon
+            norm(loc=0, scale=0.01),  # Prior for parameter advection
+            norm(loc=0.001, scale= 1),   # Prior for parameter beta
+            uniform(loc=0.0001, scale=8)   # Prior for parameter nugget
+            
+        ]
+        idx_params = [0, 1,2, 3,4,5]
+        # Add prior terms for the parameters
+        prior_terms = 0
+        for i in idx_params:
+            prior = priors[i]
+            param_value = params[i]
+            logpdf_value = prior.logpdf(param_value)
+            # print(f"Parameter {i}: {param_value}, logpdf: {logpdf_value}")
+            if np.isnan(logpdf_value) or np.isinf(logpdf_value):
+                raise ValueError(f"Invalid logpdf value for parameter {i}: {logpdf_value}")
+            prior_terms += logpdf_value
+
+        # Combine the negative log-likelihood and prior terms with scaling factors
+        lr = 0.85
+        neg_log_lik -= prior_terms
+        # neg_log_lik = lr * neg_log_lik + (1-lr) * prior_terms            
         return neg_log_lik   
     
 class model_fitting(likelihood_function):

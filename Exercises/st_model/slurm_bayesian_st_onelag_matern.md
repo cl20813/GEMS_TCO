@@ -27,13 +27,13 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/fit_st_Bayes
 ```mkdir -p ./jobscript/tco/gp_exercise```      
 
 ```cd ./jobscript/tco/gp_exercise```                          
-```nano fit_st_onelag.sh```         (rm vecc_per_search.sh)        # open a new text editor     
+```nano bay_st_onelag.sh```         (rm vecc_per_search.sh)        # open a new text editor     
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=fit_st_onelag                                      # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_st_onelag_%j.out    # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_st_onelag_%j.err     # Standard error file (%j = JobID)
+#SBATCH --job-name=bay_st_onelag                                      # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/bay_st_onelag_%j.out    # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/bay_st_onelag_%j.err     # Standard error file (%j = JobID)
 #SBATCH --time=24:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
@@ -54,29 +54,29 @@ echo "Current date and time: $(date)"
 #### Run the Python script { (20,20):(5,10), (5,5):(20,40) }
 echo "fitting one lage st_model"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 20 20 --keys 0 8 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_Bayesian_1_27.py --v 0.5 --space 20 20 --keys 0 8 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 20 20 --keys 8 16 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_Bayesian_1_27.py --v 0.5 --space 20 20 --keys 8 16 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 20 20 --keys 16 24 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_Bayesian_1_27.py --v 0.5 --space 20 20 --keys 16 24 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 15 15 --keys 0 8 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_Bayesian_1_27.py --v 0.5 --space 15 15 --keys 0 8 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 15 15 --keys 8 16 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_Bayesian_1_27.py --v 0.5 --space 15 15 --keys 8 16 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 15 15 --keys 16 24 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_Bayesian_1_27.py --v 0.5 --space 15 15 --keys 16 24 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 10 10 --keys 0 8 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_Bayesian_1_27.py --v 0.5 --space 10 10 --keys 0 8 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 10 10 --keys 8 16 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_Bayesian_1_27.py --v 0.5 --space 10 10 --keys 8 16 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 10 10 --keys 16 24 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_Bayesian_1_27.py --v 0.5 --space 10 10 --keys 16 24 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 5 5 --keys 0 8 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_Bayesian_1_27.py --v 0.5 --space 5 5 --keys 0 8 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 5 5 --keys 8 16 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_Bayesian_1_27.py --v 0.5 --space 5 5 --keys 8 16 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 5 5 --keys 16 24 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_Bayesian_1_27.py --v 0.5 --space 5 5 --keys 16 24 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2
 
 
 ```

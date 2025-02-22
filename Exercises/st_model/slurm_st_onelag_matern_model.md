@@ -20,7 +20,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/fit_st_1_27.
 ## space 5 5: 5x10, 4 4: 25x50, 2 2: 50x100
 
 
-``` srun --cpus-per-task=32 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 20 20 --keys 0 8 --mm_cond_number=5 --params 20 5.25 5.25 0.1 0.1 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5 ```
+``` srun --cpus-per-task=32 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 20 20 --keys 0 8 --mm_cond_number=5 --params 20 5.25 5.25 0.1 0.1 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2 ```
 
 
 ### Job Order SLURM: fv_onelag.py    
@@ -54,29 +54,29 @@ echo "Current date and time: $(date)"
 #### Run the Python script { (20,20):(5,10), (5,5):(20,40) }
 echo "fitting one lage st_model"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 20 20 --keys 0 8 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 20 20 --keys 0 8 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 20 20 --keys 8 16 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 20 20 --keys 8 16 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 20 20 --keys 16 24 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 20 20 --keys 16 24 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 15 15 --keys 0 8 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 15 15 --keys 0 8 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 15 15 --keys 8 16 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 15 15 --keys 8 16 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 15 15 --keys 16 24 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 15 15 --keys 16 24 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 10 10 --keys 0 8 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 10 10 --keys 0 8 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 10 10 --keys 8 16 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 10 10 --keys 8 16 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 10 10 --keys 16 24 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 10 10 --keys 16 24 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 5 5 --keys 0 8 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 5 5 --keys 0 8 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 5 5 --keys 8 16 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 5 5 --keys 8 16 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 5 5 --keys 16 24 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 40 0.05 15 0.05 15 -15 15 0.25 20 0.05 0.5
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_1_27.py --v 0.5 --space 5 5 --keys 16 24 --mm_cond_number 5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 50 0.001 15 0.001 15 -5 5 0.001 5 0.001 0.2 
 
 
 ```
