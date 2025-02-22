@@ -153,8 +153,8 @@ def main():
     lenth_of_analysis = key_for_dict[1]-key_for_dict[0]
     print(f'data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}')
 #####################################################################
-    instance1 = kernels.matern_spatio_temporal(smooth = v, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
-    instance2 = kernels.bayesian(smooth = v, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
+    
+    instance = kernels.model_fitting(smooth = v, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
     
     # data = data.iloc[ord,:]
 
@@ -164,8 +164,8 @@ def main():
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         futures = [
             executor.submit(
-                instance2.mle_parallel_vecc,
-                bounds, params, instance1.matern_cov_yx
+                instance.mle_parallel_vecc,
+                bounds, params, instance.matern_cov_yx, instance.vecchia_like_using_cholesky_bayesian
             )   
         
         ]
@@ -177,13 +177,15 @@ def main():
     estimation_time = end_time - start_time  # Calculate the time spent
     print(f"Vecchia estimation_time took {estimation_time:.4f} seconds")
 
+
+    ''' 
     start_time = time.time()
     # keys = sorted(analysis_data_map)
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         futures = [
             executor.submit(
-                instance2.mle_parallel_full,
-                bounds, params, aggregated_np, aggregated_np[:,2], instance1.matern_cov_yx
+                instance.mle_parallel_full,
+                bounds, params, aggregated_np, aggregated_np[:,2], instance.matern_cov_yx, instance.full_likelihood
             )   
         ]
 
@@ -193,27 +195,7 @@ def main():
     end_time = time.time()  # Record the end time
     estimation_time = end_time - start_time  # Calculate the time spent
     print(f"Full likelihood estimation_time took {estimation_time:.4f} seconds")
-
     '''
-    start_time = time.time()
-    # keys = sorted(analysis_data_map)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
-        futures = [
-            executor.submit(
-                instance.mle_parallel_full_test,
-                bounds, params, aggregated_np, aggregated_np[:,2]
-            )   
-        ]
-
-        for future in concurrent.futures.as_completed(futures):
-            print(future.result())
-
-    end_time = time.time()  # Record the end time
-    estimation_time = end_time - start_time  # Calculate the time spent
-    print(f"Full likelihood test estimation_time took {estimation_time:.4f} seconds")
-    '''
-
-
 
 if __name__ == '__main__':
     main()

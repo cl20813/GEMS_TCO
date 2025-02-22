@@ -20,7 +20,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/fit_st_Bayes
 ## space 5 5: 5x10, 4 4: 25x50, 2 2: 50x100
 
 
-``` srun --cpus-per-task=5 --mem=10G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_Bayesian_1_27.py --v 0.5 --space 20 20 --keys 0 2 --mm_cond_number=5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 80 0.01 20 0.01 20 -5 5 0.01 20 0.002 1 ```
+``` srun --cpus-per-task=5 --mem=10G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_Bayesian_1_27.py --v 0.5 --space 20 20 --keys 0 8 --mm_cond_number=5 --params 20 1 1 0.1 0.5 0.1 --bounds 0.05 80 0.01 20 0.01 20 -5 5 0.01 20 0.002 1 ```
 
 
 ### Job Order SLURM: fv_onelag.py    

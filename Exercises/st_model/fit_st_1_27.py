@@ -154,7 +154,7 @@ def main():
     print(f'data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}')
 #####################################################################
 
-    instance = kernels.matern_spatio_temporal(smooth = v, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
+    instance = kernels.model_fitting(smooth = v, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
     # data = data.iloc[ord,:]
 
     start_time = time.time()
@@ -164,7 +164,7 @@ def main():
         futures = [
             executor.submit(
                 instance.mle_parallel_vecc,
-                bounds, params, instance.matern_cov_yx
+                bounds, params, instance.matern_cov_yx, instance.vecchia_like_using_cholesky
             )   
         
         ]
@@ -182,7 +182,7 @@ def main():
         futures = [
             executor.submit(
                 instance.mle_parallel_full,
-                bounds, params, aggregated_np, aggregated_np[:,2], instance.matern_cov_yx
+                bounds, params, aggregated_np, aggregated_np[:,2], instance.matern_cov_yx, instance.full_likelihood
             )   
         ]
 

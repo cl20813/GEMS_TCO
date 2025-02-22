@@ -149,7 +149,7 @@ def main():
     # print(aggregated_data.to_string())
     #####################################################################
 
-    instance = kernels.matern_spatio_temporal(smooth=0.5, input_map=analysis_data_map, nns_map=nns_map, mm_cond_number=mm_cond_number)
+    instance = kernels.likelihood_function(smooth=0.5, input_map=analysis_data_map, nns_map=nns_map, mm_cond_number=mm_cond_number)
     # data = data.iloc[ord, :]
 
     # out = instance.vecchia_likelihood(params)
