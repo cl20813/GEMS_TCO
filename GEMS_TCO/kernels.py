@@ -31,7 +31,7 @@ sys.path.append("/cache/home/jl2815/tco")
 log_file_path = '/home/jl2815/tco/exercise_25/st_models/log/fit_st_by_latitude_11_14.log'
 
 
-class matern_spatio_temporal:               #sigmasq range advec beta  nugget
+class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
     def __init__(self, smooth, input_map, nns_map, mm_cond_number):
         self.smooth = smooth
         self.input_map = input_map
@@ -176,12 +176,17 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
 
         return out
         
+
+class likelihood_function(spatio_temporal_kernels):
+    def __init__(self, smooth, input_map, nns_map, mm_cond_number):
+        super().__init__(smooth, input_map, nns_map, mm_cond_number)
+        # Any additional initialization for dignosis class can go here
+
     def full_likelihood(self, params, input_np, y, covariance_function):
   
         # Compute the covariance matrix from the matern function
             # Convert DataFrame to NumPy array with float64 dtype
                
-        
         input_arr = input_np[:,:4]
         y_arr = y
     
@@ -551,282 +556,10 @@ class matern_spatio_temporal:               #sigmasq range advec beta  nugget
                         'prior_terms':prior_terms
                     }
         return neg_log_lik   
- 
-    def mle_parallel_vecc(self, bounds, params,covariance_function ):
-        iteration_count = 0 
-        def callback(xk):
-            nonlocal iteration_count
-            iteration_count += 1
 
-        try:
-            logging.info(f"fit_st_1_27")
-            print(f"fit_st_1_27")  # Debugging line
-        
-            result = minimize(
-                self.vecchia_like_using_cholesky, 
-                params, 
-                args = (covariance_function),
-                # neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map)
-                bounds=bounds,
-                method='L-BFGS-B',
-                callback= callback
-            )
-            jitter = result.x
-            logging.info(f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}")
-            logging.info(f"Total iterations: {iteration_count}")
-            print(f"Total iterations: {iteration_count}")
 
-            return f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}"
-        except Exception as e:
-            error_message = f"Error occurred: {str(e)}"
-            print(error_message)
-            logging.error(error_message)
 
-    def mle_parallel_full(self, bounds, params , input_np, y,covariance_function):
-        iteration_count = 0 
-        def callback(xk):
-            nonlocal iteration_count
-            iteration_count += 1
-
-        try:
-            logging.info(f"fit_st_1_27")
-            print(f"fit_st_1_27")  # Debugging line
-        
-            result = minimize(
-                self.full_likelihood, 
-                params, 
-                args = (input_np, y,covariance_function),
-                # neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map)
-                bounds=bounds,
-                method='L-BFGS-B',
-                callback= callback
-            )
-            jitter = result.x
-            logging.info(f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}")
-            logging.info(f"Total iterations: {iteration_count}")
-            print(f"Total iterations: {iteration_count}")
-
-            return f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}"
-        except Exception as e:
-            error_message = f"Error occurred: {str(e)}"
-            print(error_message)
-            logging.error(error_message)
-
-    
-class matern_spatial:
-    def __init__(self):
-        pass     
-      
-    def custom_distance(self,u, v):
-
-        d = np.dot(self.sqrt_range_mat, u-v)
-        out = np.linalg.norm(d)
-        return (out)
-    
-    def matern_cov_yx(self, params: Tuple[float,float,float,float,float], y_df= None, x_df=None)-> pd.DataFrame:
-        sigmasq, range_lat, range_lon, smooth, nugget = params 
-        # Validate inputs
-        if y_df is None or x_df is None:
-            raise ValueError("Both y and x_df must be provided.")
-
-        # Extract values
-        x1 = x_df['Longitude'].values
-        y1 = x_df['Latitude'].values
-
-        x2 = y_df['Longitude'].values
-        y2 = y_df['Latitude'].values
-
-        coords1 = np.stack((x1, y1), axis=-1)
-        coords2 = np.stack((x2, y2), axis=-1)
-
-        # Calculate spatial distances using cdist
-
-        sqrt_range_mat = np.diag([ 1/range_lon**0.5, 1/range_lat**0.5])
-        self.sqrt_range_mat = sqrt_range_mat
-
-        s_dist = cdist(coords1, coords2, self.custom_distance)
-         
-        # Initialize the covariance matrix with zeros
-        out = s_dist
-        
-        # Compute the covariance for non-zero distances
-        non_zero_indices = s_dist != 0
-        if np.any(non_zero_indices):
-            out[non_zero_indices] = (sigmasq * (2**(1-smooth)) / gamma(smooth) *
-                                    (s_dist[non_zero_indices] )**smooth *
-                                    kv(smooth, s_dist[non_zero_indices] ))
-        out[~non_zero_indices] = sigmasq
-        # Add a small jitter term to the diagonal for numerical stability
-        out += np.eye(out.shape[0]) * nugget
-        return pd.DataFrame(out)
-        
-    def full_likelihood(self, params: Tuple[float,float,float,float,float], input_df, y):
-        # Compute the covariance matrix from the matern function
-        cov_matrix = self.matern_cov_yx(params=params, y_df = input_df, x_df = input_df)
-        # Compute the Cholesky decomposition
-        L = np.linalg.cholesky(cov_matrix)
-        # Solve for the log determinant
-        log_det = 2 * np.sum(np.log(np.diagonal(L)))
-        locs = np.array(input_df[['Latitude','Longitude']])
-        
-        tmp1 = np.dot(locs.T, np.linalg.solve(cov_matrix, locs))
-        tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y))
-        beta = np.linalg.solve(tmp1, tmp2)
-        
-        mu = np.dot(locs, beta)
-        y_mu = y - mu
-    
-        alpha = np.linalg.solve(L, y_mu)
-        quad_form = np.dot(alpha.T, alpha)
-        
-        # Compute the negative log-likelihood
-        n = len(y)
-        neg_log_lik = 0.5 * (n * np.log(2 * np.pi) + log_det + quad_form)
-        return neg_log_lik
-    
-    def vecchia_likelihood(self,params: Tuple[float,float,float, float,float],input_df, mm_cond_number, nns_map):
-
-        # reordered_df['ColumnAmountO3'] = reordered_df['ColumnAmountO3']-np.mean(reordered_df['ColumnAmountO3'])
-        neg_log_lik = 0
-        ## likelihood for the first 30 observations
-        # smallset = input_df.iloc[:31,:]
-        # neg_log_lik += self.full_likelihood(params, smallset, smallset['ColumnAmountO3'])
-
-        for i in range(0,len(input_df)):
-            # current_data and conditioning data
-            current_data = input_df.iloc[i:i+1,:]
-            current_y = current_data['ColumnAmountO3'].values[0]
-            mm_past = nns_map[i,:mm_cond_number]
-            mm_past = mm_past[mm_past!=-1]
-            # mm_past = np.arange(i)
-
-            conditioning_data = input_df.loc[mm_past,: ]
-            df = pd.concat( (current_data, conditioning_data), axis=0)
-            y_and_neighbors = df['ColumnAmountO3'].values
-            cov_matrix = self.matern_cov_yx(params, y_df= df, x_df=df)
-
-            cov_xx = cov_matrix.iloc[1:,1:].reset_index(drop=True)
-            cov_yx = cov_matrix.iloc[0,1:]
-
-            # get mean
-            locs = np.array(df[['Latitude','Longitude']])
-
-            tmp1 = np.dot(locs.T, np.linalg.solve(cov_matrix, locs))
-            tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y_and_neighbors))
-            beta = np.linalg.solve(tmp1, tmp2)
-
-            mu = np.dot(locs, beta)
-            mu_current = mu[0]
-            mu_neighbors = mu[1:]
-            
-            # mean and variance of y|x
-            sigma = cov_matrix.iloc[0,0]
-            cov_ygivenx = sigma - np.dot(cov_yx.T,np.linalg.solve(cov_xx, cov_yx))
-            cond_mean = mu_current + np.dot(cov_yx.T, np.linalg.solve( cov_xx, (y_and_neighbors[1:]-mu_neighbors) ))   # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
-            # print(f'cond_mean{mean_z}')
-
-            alpha = current_y - cond_mean
-            quad_form = alpha**2 *(1/cov_ygivenx)
-            log_det = np.log(cov_ygivenx)
-            # Compute the negative log-likelihood
-
-            neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
-        
-        return neg_log_lik
-                           
-    def mle_parallel(self, key, bounds, initial_params, input_df, mm_cond_number, nns_map):
-        try:
-            logging.info(f"fit_spatial_matern,L-BFGS-B, day {key}")
-            print(f"fit_purely_space, L-BFGS-B: day {key}")  # Debugging line
-        
-            result = minimize(
-                self.vecchia_likelihood, 
-                initial_params, 
-                args=(input_df, mm_cond_number, nns_map),  # neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map)
-                bounds=bounds,
-                method='L-BFGS-B'
-            )
-            jitter = result.x
-            logging.info(f"Estimated parameters on {key}, is : {jitter}, when cond {mm_cond_number}, bounds={bounds}")
-        
-            return f"Estimated parameters on {key}, is : {jitter}, when cond {mm_cond_number},  bounds={bounds}"
-        except Exception as e:
-            print(f"Error occurred on {key}: {str(e)}")
-            logging.error(f"Error occurred on {key}: {str(e)}")
-            return f"Error occurred on {key}"
-        
-    def mle_parallel_basin(self, key, bounds, initial_params, input_df, mm_cond_number, nns_map, niter=150):
-        try:
-            logging.info(f"Starting basinhopping optimization for day {key}")
-            print(f"Starting basinhopping optimization for day {key}")  # Debugging line
-
-            result = basinhopping(
-                func=self.vecchia_likelihood,
-                x0=initial_params,
-                minimizer_kwargs={
-                    'method': 'L-BFGS-B',
-                    'bounds': bounds,  # Use dynamic bounds
-                    'args': (input_df, mm_cond_number, nns_map)
-                },
-                niter=niter
-            )
-            optimized_params = result.x
-            logging.info(
-                f"Estimated parameters on {key}: {optimized_params}, "
-                f"cond {mm_cond_number}, bounds={bounds}"
-            )
-            return f"Estimated parameters on {key}: {optimized_params}, cond {mm_cond_number}, bounds={bounds}"
-        except Exception as e:
-            logging.error(f"Error occurred on {key}: {str(e)}", exc_info=True)
-            return f"Error occurred on {key}"
-        
-    def mle_parallel_nelder_mead(self, key, bounds, initial_params, input_df, mm_cond_number, nns_map):
-        try:
-            logging.info(f"Starting Nelder-Mead optimization for day {key}")
-            print(f"Starting Nelder-Mead optimization for day {key}")  # Debugging line
-
-            # Define a wrapper to handle bounds for Nelder-Mead
-            def constrained_vecchia_likelihood(params, input_df, mm_cond_number, nns_map):
-                # Apply manual bounds handling
-                for i, (low, high) in enumerate(bounds):
-                    if not (low <= params[i] <= high):
-                        logging.warning(f"Parameter out of bounds: {params}")
-                        return float('inf')  # Penalize out-of-bound values heavily
-                # Call the actual likelihood function
-                return self.vecchia_likelihood(params, input_df, mm_cond_number, nns_map)
-
-            # Perform optimization with Nelder-Mead
-            result = minimize(
-                fun=constrained_vecchia_likelihood,
-                x0=initial_params,
-                args=(input_df, mm_cond_number, nns_map),
-                method='Nelder-Mead',
-                options={'maxiter': 1500, 'disp': True, 'adaptive': True}  # Enable adaptive step sizes
-            )
-
-            # Extract and log results
-            optimized_params = result.x
-            if result.success:
-                logging.info(
-                    f"Optimization succeeded for day {key}. "
-                    f"Parameters: {optimized_params}, "
-                    f"Bounds: {bounds}, Condition number: {mm_cond_number}"
-                )
-                return f"Optimization succeeded for day {key}. Parameters: {optimized_params}, Bounds: {bounds}"
-            else:
-                logging.warning(f"Optimization failed for day {key}. Message: {result.message}")
-                return f"Optimization failed for day {key}. Message: {result.message}"
-
-        except Exception as e:
-            logging.error(f"An error occurred for day {key}: {str(e)}", exc_info=True)
-            return f"An error occurred for day {key}: {str(e)}"
-
-class bayesian(matern_spatio_temporal):
-    def __init__(self, smooth, input_map, nns_map, mm_cond_number):
-        super().__init__(smooth, input_map, nns_map, mm_cond_number)
-        # Any additional initialization for dignosis class can go here
-
-    def full_likelihood(self, params, input_np, y, covariance_function):
+    def full_likelihood_bayesian(self, params, input_np, y, covariance_function):
   
         # Compute the covariance matrix from the matern function
             # Convert DataFrame to NumPy array with float64 dtype
@@ -872,14 +605,14 @@ class bayesian(matern_spatio_temporal):
         prior_terms = 0
         try:
             for i, prior in enumerate(priors):
-                prior_terms += prior.logpdf(params[i])
+                prior_terms += 0.2*prior.logpdf(params[i])
             neg_log_lik += prior_terms
         except Exception as e:
             print(f"Error in prior term calculation: {e}")
         
-
         return neg_log_lik
-    def vecchia_like_using_cholesky(self, params, covariance_function):
+
+    def vecchia_like_using_cholesky_bayesian(self, params, covariance_function):
         self.cov_map = defaultdict(list)
         neg_log_lik = 0
         
@@ -1014,22 +747,30 @@ class bayesian(matern_spatio_temporal):
 
                 
                 priors = [
-                    uniform(loc=5, scale=35),  # Prior for parameter sigmasq
-                    uniform(loc=0.1, scale=8),  # Prior for parameter range_lat
-                    uniform(loc=0.1, scale=15),  # Prior for parameter range_lon
-                    uniform(loc=0.01, scale=2),  # Prior for parameter advection
-                    uniform(loc=0.01, scale=2),   # Prior for parameter beta
-                    uniform(loc=0.01, scale=1)   # Prior for parameter nugget
+                    norm(loc=15, scale=15),  # Prior for parameter sigmasq
+                    uniform(loc= 0.001, scale= 15),  # Prior for parameter range_lat
+                    uniform(loc= 0.001, scale= 15),  # Prior for parameter range_lon
+                    norm(loc=0, scale=5),  # Prior for parameter advection
+                    uniform(loc=0.001, scale=4),   # Prior for parameter beta
+                    uniform(loc=0.0001, scale=2.5)   # Prior for parameter nugget
                     
                 ]
 
                 # Add prior terms for the parameters
                 prior_terms = 0
                 for i, prior in enumerate(priors):
-                    prior_terms += prior.logpdf(params[i])
+                    param_value = params[i]
+                    logpdf_value = prior.logpdf(param_value)
+                    print(f"Parameter {i}: {param_value}, logpdf: {logpdf_value}")
+                    if np.isnan(logpdf_value) or np.isinf(logpdf_value):
+                        raise ValueError(f"Invalid logpdf value for parameter {i}: {logpdf_value}")
+                    prior_terms += logpdf_value
 
-                neg_log_lik += prior_terms
+                # Combine the negative log-likelihood and prior terms with scaling factors
+                neg_log_lik = 0.8 * neg_log_lik + 0.2 * prior_terms
+                print(prior_terms)
                 
+                neg_log_lik = 0.8 * neg_log_lik + 0.2 * prior_terms
 
                 if time_idx == 1:
                     self.cov_map[index] = {
@@ -1044,25 +785,30 @@ class bayesian(matern_spatio_temporal):
                         'prior_terms':prior_terms
                     }
         return neg_log_lik   
- 
-    def mle_parallel_vecc(self, bounds, params,covariance_function ):
+    
+class model_fitting(likelihood_function):
+    def __init__(self, smooth, input_map, nns_map, mm_cond_number):
+        super().__init__(smooth, input_map, nns_map, mm_cond_number)
+        # Any additional initialization for dignosis class can go here
+
+    def mle_parallel_vecc(self, bounds, params,covariance_function, vecch_fun ):
         iteration_count = 0 
         def callback(xk):
             nonlocal iteration_count
             iteration_count += 1
-
         try:
             logging.info(f"fit_st_1_27")
             print(f"fit_st_1_27")  # Debugging line
         
             result = minimize(
-                self.vecchia_like_using_cholesky, 
+                vecch_fun, 
                 params, 
                 args = (covariance_function),
                 # neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map)
-                # bounds=bounds,
+                bounds=bounds,
                 method='L-BFGS-B',
-                callback= callback
+                callback= callback,
+                options={'maxiter': 60}
             )
             jitter = result.x
             logging.info(f"Estimated parameters : {jitter}, when cond {self.mm_cond_number}, bounds={bounds}, smooth={self.smooth}")
@@ -1075,7 +821,7 @@ class bayesian(matern_spatio_temporal):
             print(error_message)
             logging.error(error_message)
 
-    def mle_parallel_full(self, bounds, params , input_np, y,covariance_function):
+    def mle_parallel_full(self, bounds, params , input_np, y,covariance_function, full_fun):
         iteration_count = 0 
         def callback(xk):
             nonlocal iteration_count
@@ -1086,11 +832,11 @@ class bayesian(matern_spatio_temporal):
             print(f"fit_st_1_27")  # Debugging line
         
             result = minimize(
-                self.full_likelihood, 
+                full_fun, 
                 params, 
                 args = (input_np, y,covariance_function),
                 # neg_ll_nugget(params, input_df, mm_cond_number, ord, nns_map)
-                # bounds=bounds,
+                bounds=bounds,
                 method='L-BFGS-B',
                 callback= callback
             )
@@ -1103,11 +849,10 @@ class bayesian(matern_spatio_temporal):
         except Exception as e:
             error_message = f"Error occurred: {str(e)}"
             print(error_message)
-            logging.error(error_message)
+            logging.error(error_message) 
 
 
-
-class diagnosis(matern_spatio_temporal):
+class diagnosis(spatio_temporal_kernels):
     def __init__(self, smooth, input_map, nns_map, mm_cond_number):
         super().__init__(smooth, input_map, nns_map, mm_cond_number)
         # Any additional initialization for dignosis class can go here
