@@ -60,37 +60,57 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         temporal_diff = np.abs(u[2] - v[2])           # Distance between y1 and y2
         return np.sqrt(spatial_diff**2 + temporal_diff**2)
     
+    ''' 
+    # gneiting model (gneting 2002)
+    https://www.tandfonline.com/doi/abs/10.1198/016214502760047113
 
-    ## gneiting_kernel has to be updated for np_array input
-    def gneiting_kernel(self, params: Tuple[float,float,float,float,float,float,float], input_df=None)->pd.DataFrame: 
-        a, c, tau, alpha,gamma,sigma, beta = params
-        nugget = 1
+    See the equation (14) on page 5/12.
+
+    $C(s,t) = \frac{\sigma^2}{ (a|t|^{2\alpha}+1 )^{\tau}} \exp(  \frac{ -c||s||^{2\gamma}}{(a|t|^{2\alpha}+1 )^{\beta \gamma}})$, 
+
+    where 
+    $s \in R^2$ is spatial distance and $t \in R^1$ is temporal distance.   
+    a: scaling parameter of time, non-negative   
+    c: scaling parameter of space, non-negative   
+    $\alpha, \gamma$: smooth parameter of time, and space. both $ \alpha, \gamma \in (0,1]$      
+    $\beta, \tau$: space and time interaction parameters. $\tau >=d/2 = 1$, $\beta \in [0,1]$.   
+    '''
+    def gneiting_kernel(self, params: Tuple[float, float, float, float, float, float, float], y: np.ndarray, x: np.ndarray) -> np.ndarray:
+        a, c, alpha, gamma, tau, beta, sigma  = params                 ### x for just consistency with other functions
+        nugget = 0.1
+
+        if y is None or x is None:
+            raise ValueError("Both y and x_df must be provided.")
+     
+        # Extract values
+        x1 = x[:, 0]
+        y1 = x[:, 1]
+        t1 = x[:, 3]
+
+        x2 = y[:, 0]
+        y2 = y[:, 1]
+        t2 = y[:, 3] # hour
+
+        # Efficient distance computation using cdist (operation is vectorized)
+        coords1 = np.stack((x1, y1), axis=-1)
+        coords2 = np.stack((x2, y2), axis=-1)
+
+        s_dist = cdist(coords1, coords2, 'euclidean')
+        t_dist = cdist(t1[:, None], t2[:, None], 'euclidean')  # Ensure t is a 2D array for cdist
         
-        # Convert DataFrame columns into numpy arrays
-        x = input_df['Longitude'].values
-        y = input_df['Latitude'].values
-        t = input_df['Hours_elapsed'].values
-
-        # Efficient distance computation using cdist  (operation is vectorized)
-        
-        coords = np.stack( (x, y), axis=-1)  # also implemented in C and faster than numpy broadcasting
-        s_dist = cdist(coords, coords, 'euclidean')
-        t_dist = cdist(t[:, None], t[:, None], 'euclidean')  # Ensure t is a 2D array for cdist
-
         # Calculate spatial distance. I did sanity check that above gives same result as below:
         # s_dist = np.sqrt((x[:, np.newaxis] - x)**2 + (y[:, np.newaxis] - y)**2)
         # Calculate temporal distance
         # t_dist = np.abs(t[:, np.newaxis] - t)
-
         # Calculate covariance matrix
+
         tmp1 = sigma**2 / (a * t_dist**(2 * alpha) + 1)**tau
         tmp2 = np.exp(-c * s_dist**(2 * gamma) / (a * t_dist**(2 * alpha) + 1)**(beta * gamma))
         out = tmp1 * tmp2
 
         # Add a small jitter term to the diagonal for numerical stability
         out += np.eye(out.shape[0]) * nugget
-        return pd.DataFrame(out)
-
+        return out
 
     def matern_cov_yx_v05(self,params: Tuple[float,float,float,float,float,float], y: np.ndarray, x: np.ndarray) -> np.ndarray:
     
