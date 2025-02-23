@@ -166,6 +166,90 @@ Data size: ```200 x 8(hours)```
 ```Estimates from Vecchia Approximation:    [10.67 0.05 0.05 -0.069 0.91 0.5] 131.74 seconds (32 iterations)```
 
 
+# Model Fitting (updated Vecchia computation time complexity) bounds=[(0.05, 50.0), (0.001, 15.0), (0.001, 15.0), (-5.0, 5.0), (0.001, 5.0), (0.001, 0.2)],  
 
+### Data: ```GEMS July 2024```, Model: ```Matern($\sqrt{ ||x-vt||+\beta^2t^2}}$)```.
+Initial parameters ```(sigmasq, range_latitude, range_longitude, advection, beta and nugget)```: [20, 1, 1, 0.1, 0.5, 0.1],  bounds=[(0.05, 50.0), (0.001, 15.0), (0.001, 15.0), (-5.0, 5.0), (0.001, 5.0), (0.001, 0.2)], smooth=0.5  
+
+#### July 1st 2024: Conditioning number: 10 (5 on current space, 5 on one lag space)    
+Data size: ```50 x 8(hours)```
+```Estimates from Full Likelihood:          [50, 8.53 13.38 -3.35e-04 0.13 0.2] 226.78 seconds (31 iterations)```                      
+```Estimates from Vecchia Approximation:    [11.73 5.41e-03 8.42e-03 -0.036 0.25 0.012 ] 45 seconds (59 iterations)```     
+
+Data size: ```100 x 8(hours)```
+```Estimates from Full Likelihood:          [50 3.78 4.94 0.15 0.15 0.2] 1449.6128 seconds (46 iterations)```                     When nugget hits the upper bound, sigmasq blows up.             
+```Estimates from Vecchia Approximation:    [12.12 2.3e-03 2.05e-03 0.023 0.79 1.004e-03] 76 seconds (53 iterations)``` 
+
+Data size: ```200 x 8(hours)```
+```Estimates from Full Likelihood:          [50 4.42 4.87 -0.09 0.13 0.2] 3869 seconds (37 iterations)```             When nugget hits the upper bound, sigmasq blows up. if nugget upper bound was set to 0.5, sigmasq does not blow up                 
+```Estimates from Vecchia Approximation:    [8.57 1.36e-03 1.0e-03 0.02 0.88 0.199 ] 175 seconds (53 iterations)```   Even when nugget hits the upper bound, sigma sq does not blow up
+
+         
+#### July 2nd 2024:  Conditioning number: 10 (5 on current space, 5 on one lag space)       
+
+```Estimates from Full Likelihood:          [35.23 15 15 0.026 0.15 0.2] 236 seconds (33 iterations)```                               
+```Estimates from Vecchia Approximation:    [17.63 7.37 3.21 -0.26 0.24 0.2] 15 seconds (27 iterations)```   
+
+Data size: ```100 x 8(hours)```
+```Estimates from Full Likelihood:          [49.77 9.92 15 0.19 0.07 0.2] 1441 seconds (50 iterations)```                      
+```Estimates from Vecchia Approximation:    [7.16 1.32e-03 2.28e-03 -0.02 0.60 0.19] 70 seconds (40 iterations)```         range parameter hits the lower bound
+
+Data size: ```200 x 8(hours)```
+```Estimates from Full Likelihood:          [50 11.89 12.95 -0.036 0.09 0.2] 5104 seconds (46 iterations)```                      
+```Estimates from Vecchia Approximation:    [50 11.35 13.54 0.3 0.001 0.001] 106 seconds (41 iterations)```
+
+#### July 3rd 2024:  Conditioning number: 10 (5 on current space, 5 on one lag space)       
+    
+```Estimates from Full Likelihood:          [50 5.57 5.98 0.17 0.15 0.2] 336.57 seconds (28 iterations)```                           
+```Estimates from Vecchia Approximation:    [13.93 0.07 0.05 0.13 0.016 0.19] 30 seconds (34 iterations)``` 
+
+Data size: ```100 x 8(hours)```
+```Estimates from Full Likelihood:          [50 4.37 4.48 -0.17 0.13 0.2 ] 931 seconds (36 iterations)```                When nugget hit the upper bound, sigmasq blows up.          
+```Estimates from Vecchia Approximation:    [20.07 0.9 1.79e-03 -0.02 0.08 0.11  12.30 0.05 0.05 -0.13 0.25 0.5] 83 seconds (51 iterations)```   why latitude range parameter is larger than longitude range parameter
+
+Data size: ```200 x 8(hours)```
+```Estimates from Full Likelihood:          [50 3.14 4.18 -0.11 0.15 0.2] 3631 seconds (34 iterations)```                      
+```Estimates from Vecchia Approximation:    [10.33 1.71e-03 1.06e-03 0.025 0.62 0.19] 149 seconds (47 iterations)```
+
+# Model Fitting Bayes (updated Vecchia computation time complexity) bounds=[(0.05, 50.0), (0.001, 15.0), (0.001, 15.0), (-5.0, 5.0), (0.001, 5.0), (0.001, 0.2)],
+
+### Data: ```GEMS July 2024```, Model: ```Matern($\sqrt{ ||x-vt||+\beta^2t^2}}$)```.
+Initial parameters ```(sigmasq, range_latitude, range_longitude, advection, beta and nugget)```: [20, 1, 1, 0.1, 0.5, 0.1],  bounds=[(0.05, 50.0), (0.001, 15.0), (0.001, 15.0), (-5.0, 5.0), (0.001, 5.0), (0.001, 0.2)], smooth=0.5  
+
+#### July 1st 2024: Conditioning number: 10 (5 on current space, 5 on one lag space)    
+Data size: ```50 x 8(hours)```
+                 
+```Estimates from Vecchia Approximation:    [11.58 3.79e-03 1.0e-03 -2.06e-08 0.66 0.2] 41 seconds (60 iterations)```     
+
+Data size: ```100 x 8(hours)```
+        
+```Estimates from Vecchia Approximation:    [12.15 1.0e-03 1.0e-03 5.56e-06 1.03 1.79e-03] 74 seconds (53 iterations)``` 
+
+Data size: ```200 x 8(hours)```
+```Estimates from Vecchia Approximation:    [8.30 8.7e-03 1.98e-03 -0.042 0.53 0.19] 117 seconds ```   
+Data size: ```800 x 8(hours)```
+```Estimates from Vecchia Approximation:    [6.61 1e-03 1e-03 -5.15e-04 2.76 0.13] 646 seconds ``` 
+         
+#### July 2nd 2024:  Conditioning number: 10 (5 on current space, 5 on one lag space)       
+
+                          
+```Estimates from Vecchia Approximation:    [14.78 5.82 1.41 -1.3e-03 0.36 0.2] 28 seconds (52 iterations)```   
+Data size: ```100 x 8(hours)```       
+```Estimates from Vecchia Approximation:    [7.18 1e-03 2.4e-03 -8.5e-07 0.92 0.2 ] 70 seconds (57 iterations)```         range parameter hits the lower bound
+Data size: ```200 x 8(hours)```          
+```Estimates from Vecchia Approximation:    [5.62 1e-03 1e-03 -0.26 0.55 0.19 ] 132 seconds ```
+Data size: ```800 x 8(hours)```
+```Estimates from Vecchia Approximation:    [4.39 1e-03 1e-03 -3.03e-04 2.70 0.2] 765 seconds ``` 
+
+#### July 3rd 2024:  Conditioning number: 10 (5 on current space, 5 on one lag space)       
+
+                  
+```Estimates from Vecchia Approximation:    [13.64 1.02e-03 1.0e-03 -.141e-05 0.78 0.2] 33 seconds (53 iterations)``` 
+Data size: ```100 x 8(hours)```
+```Estimates from Vecchia Approximation:    [12.41 1.05e-03 1.8e-03 -1.16e-06 0.92 0.2] 83 seconds (51 iterations)```   why latitude range parameter is larger than longitude range parameter
+Data size: ```200 x 8(hours)```     
+```Estimates from Vecchia Approximation:    [10.34 1e-03 1e-03 -3.59e-06 1.16 0.2] 163 seconds )```
+Data size: ```800 x 8(hours)```
+```Estimates from Vecchia Approximation:    [7.55 1e-03 1e-03 -3.67e-04 3.75 0.2] 445 seconds ``` 
 
 
