@@ -7,7 +7,7 @@ import math
 from collections import defaultdict
 import concurrent
 from concurrent.futures import ThreadPoolExecutor  # Importing specific executor for clarity
-import time 
+import time
 
 # Data manipulation and analysis
 import pandas as pd
@@ -50,32 +50,24 @@ logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctim
 
 def main():
     # Argument parser
-    parser = argparse.ArgumentParser(description="Fit spatio-temporal model")
-    
-    #sigmasq (0.05,600), range_ (0.05,600), advec (-200,200), beta (0,600), nugget (0,600)
-    parser.add_argument('--v', type=float, default=0.5, help="smooth")
+    parser = argparse.ArgumentParser(description="Full vs Vecchia Comparison")
+    # Define the parameters you want to change at runtime
     parser.add_argument('--space', type=int,nargs='+', default=[20,20], help="spatial resolution")
     parser.add_argument('--mm_cond_number', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
-    parser.add_argument('--keys', type=int, nargs='+', default=[0,8], help="Index for the datasets.")
+    parser.add_argument('--key', type=int, default=1, help="Index for the datasets.")
     parser.add_argument('--params', type=float,nargs='+', default=[0.5,0.5,0.5,0.5,0.5, 0.5, 10], help="Initial parameters")
-    
-    parser.add_argument('--bounds', type=float, nargs='+', default=[0.001, 40, 0.001, 40, 0.01, 1, 0.01, 1, 1.5, 30, 0.001, 1, 0.5, 70], help="Bounds for parameters" )    
-    
-  
+        
     # Parse the arguments
     args = parser.parse_args()
-
+    
     # Use args.param1, args.param2 in your script
     lat_lon_resolution = args.space 
     mm_cond_number = args.mm_cond_number
     params= args.params
-    bounds = [(args.bounds[i], args.bounds[i+1]) for i in range(0, len(args.bounds), 2)]
-    key_for_dict= args.keys
+    key_for_dict= args.key
 
-
-    v = args.v
-   
-    ############################## 
+    ############ 
+    start_time_setup= time.time()
 
     # Load the one dictionary to set spaital coordinates
     filepath = "/home/jl2815/tco/data/pickle_data/pickle_2023/coarse_cen_map23_01.pkl"
@@ -112,7 +104,7 @@ def main():
                     coarse_filter = (tmp_df['Latitude'].isin(lat_n)) & (tmp_df['Longitude'].isin(lon_n))
                     coarse_dicts[f"{year}_{month:02d}_{key}"] = tmp_df[coarse_filter].reset_index(drop=True)
 
-
+    
     key_idx = sorted(coarse_dicts)
     if not key_idx:
         raise ValueError("coarse_dicts is empty")
@@ -131,69 +123,84 @@ def main():
     coords1_reordered = np.stack((data_for_coord['Longitude'].values, data_for_coord['Latitude'].values), axis=-1)
     nns_map = instance.find_nns_naive(locs=coords1_reordered, dist_fun='euclidean', max_nn=mm_cond_number)
 
+
     analysis_data_map = {}
-    for i in range(key_for_dict[0], key_for_dict[1]):
+    for i in range(key_for_dict):
         tmp = coarse_dicts[key_idx[i]]
         tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'])
         # tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
         tmp = tmp.iloc[ord_mm, :4].to_numpy()
-
         analysis_data_map[key_idx[i]] = tmp
 
     aggregated_data = pd.DataFrame()
-    for i in range(key_for_dict[0], key_for_dict[1]):
+    for i in range((key_for_dict)):
         tmp = coarse_dicts[key_idx[i]]
         tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'])
         tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
         aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
     
     aggregated_np = aggregated_data.iloc[:,:4].to_numpy()
+    
+    print(f'Aggregated data shape: {aggregated_data.shape}')
 
-    # long, lat , ColumnAmount O3, Hour, time
-    lenth_of_analysis = key_for_dict[1]-key_for_dict[0]
-    print(f'data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}')
-#####################################################################
+    end_time_setup= time.time()
+    iteration_time_setup = end_time_setup - start_time_setup  # Calculate the time spent
+    print(f"iteration_time_setup {iteration_time_setup:.4f} seconds")
+    # print(aggregated_data.to_string())
+    #####################################################################
+
+    instance = kernels.likelihood_function(smooth=0.5, input_map=analysis_data_map, nns_map=nns_map, mm_cond_number=mm_cond_number)
+    # data = data.iloc[ord, :]
+
+    # out = instance.vecchia_likelihood(params)
     
-    instance = kernels.model_fitting(smooth = v, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
-    
-    # data = data.iloc[ord,:]
 
     start_time = time.time()
-
-    # keys = sorted(analysis_data_map)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
-        futures = [
-            executor.submit(
-                instance.mle_parallel_vecc,
-                bounds, params, instance.gneiting_cov_yx, instance.vecchia_like_using_cholesky
-            )   
-        ]
-        for future in concurrent.futures.as_completed(futures):
-            print(future.result())
-
+    full_likelihood = instance.full_likelihood(params, aggregated_np, aggregated_np[:,2], instance.gneiting_cov_yx)
+    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Full likelihood using params={params} is {full_likelihood}')
     end_time = time.time()  # Record the end time
-    estimation_time = end_time - start_time  # Calculate the time spent
-    print(f"Vecchia estimation_time took {estimation_time:.4f} seconds")
+    iteration_time = end_time - start_time  # Calculate the time spent
+    print(f"Full likelihood took {iteration_time:.4f} seconds")
 
-     
-    start_time = time.time()
-    # keys = sorted(analysis_data_map)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
-        futures = [
-            executor.submit(
-                instance.mle_parallel_full,
-                bounds, params, aggregated_np, aggregated_np[:,2], instance.gneiting_cov_yx, instance.full_likelihood
-            )   
-        ]
 
-        for future in concurrent.futures.as_completed(futures):
-            print(future.result())
+    '''
+    start_time2 = time.time()
+    # Introduce a small delay for testing purposes
+    time.sleep(0.01)  # Sleep for 10 milliseconds
+    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out}')
+    end_time2 = time.time()  # Record the end time
+    iteration_time2 = end_time2 - start_time2  # Calculate the time spent
+    print(f"Vecchia approximation took {iteration_time2:.4f} seconds")
+    '''
 
-    end_time = time.time()  # Record the end time
-    estimation_time = end_time - start_time  # Calculate the time spent
-    print(f"Full likelihood estimation_time took {estimation_time:.4f} seconds")
-    
+    start_time2 = time.time()
+    out2 = instance.vecchia_likelihood(params, instance.gneiting_cov_yx)
+    # Introduce a small delay for testing purposes
+    time.sleep(0.01)  # Sleep for 10 milliseconds
+    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out2}')
+    end_time2 = time.time()  # Record the end time
+    iteration_time2 = end_time2 - start_time2  # Calculate the time spent
+    print(f"vecchia_likelihood took {iteration_time2:.4f} seconds")
 
+
+    out4 = instance.vecchia_like_using_cholesky(params, instance.gneiting_cov_yx)
+    start_time2 = time.time()
+    # Introduce a small delay for testing purposes
+    time.sleep(0.01)  # Sleep for 10 milliseconds
+    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out4}')
+    end_time2 = time.time()  # Record the end time
+    iteration_time2 = end_time2 - start_time2  # Calculate the time spent
+    print(f"vecchia_like_using_cholesky took {iteration_time2:.4f} seconds")
+
+
+    out5 = instance.vecchia_like_nocache(params, instance.gneiting_cov_yx)
+    start_time2 = time.time()
+    # Introduce a small delay for testing purposes
+    time.sleep(0.01)  # Sleep for 10 milliseconds
+    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out5}')
+    end_time2 = time.time()  # Record the end time
+    iteration_time2 = end_time2 - start_time2  # Calculate the time spent
+    print(f"vecchia_like_nocache took {iteration_time2:.4f} seconds")
 
 if __name__ == '__main__':
     main()
