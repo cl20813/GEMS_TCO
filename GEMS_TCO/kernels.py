@@ -75,7 +75,7 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
     $\alpha, \gamma$: smooth parameter of time, and space. both $ \alpha, \gamma \in (0,1]$      
     $\beta, \tau$: space and time interaction parameters. $\tau >=d/2 = 1$, $\beta \in [0,1]$.   
     '''
-    def gneiting_kernel(self, params: Tuple[float, float, float, float, float, float, float], y: np.ndarray, x: np.ndarray) -> np.ndarray:
+    def gneiting_cov_yx(self, params: Tuple[float, float, float, float, float, float, float], y: np.ndarray, x: np.ndarray) -> np.ndarray:
         a, c, alpha, gamma, tau, beta, sigma  = params                 ### x for just consistency with other functions
         nugget = 0.1
 
