@@ -36,9 +36,8 @@ from typing import Callable, Union, Tuple
 sys.path.append("/cache/home/jl2815/tco")
 
 # Custom imports
-from GEMS_TCO import orbitmap 
 from GEMS_TCO import kernels 
-from GEMS_TCO import smoothspace
+
 
 import pickle
 
