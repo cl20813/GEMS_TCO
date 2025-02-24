@@ -416,7 +416,7 @@ class likelihood_function(spatio_temporal_kernels):
         n = len(y)
         neg_log_lik = 0.5 * (n * np.log(2 * np.pi) + log_det + quad_form)
 
-        np.random.seed(42)
+        # np.random.seed(42)
         priors = [
             norm(loc=15, scale=25),  # Prior for parameter sigmasq
             uniform(loc= 0.001, scale= 30),  # Prior for parameter range_lat
@@ -577,8 +577,6 @@ class likelihood_function(spatio_temporal_kernels):
                 neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
 
                 
-
-
                 if time_idx == 1:
                     self.cov_map[index] = {
                         'tmp_for_beta': tmp_for_beta,
@@ -590,7 +588,7 @@ class likelihood_function(spatio_temporal_kernels):
                         'log_det': log_det,
                         'locs':locs
                     }
-        np.random.seed(42)
+        # np.random.seed(42)
         priors = [
             norm(loc=15, scale=25),  # Prior for parameter sigmasq
             uniform(loc= 0.001, scale= 30),  # Prior for parameter range_lat

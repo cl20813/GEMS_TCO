@@ -7,8 +7,6 @@ import os
 # !pip install numpy==2.0
 
 from GEMS_TCO import orbitmap
-from GEMS_TCO.smoothspace import space_average
-
 
 # Base file path and settings
 base_path = "/home/jl2815/tco/data/pickle_data"
@@ -82,13 +80,13 @@ for year in years:        # years = [2023,2024]
             with open(input_filepath, 'rb') as pickle_file:
                 loaded_map = pickle.load(pickle_file)
             center_points = instance.make_center_points(step=0.05)
-            sparse_cen_map = instance.sparse_by_center(loaded_map, center_points)
+            coarse_cen_map = instance.coarse_by_center(loaded_map, center_points)
 
             # Save pickle
             output_filename = f"coarse_cen_map{str(year)[2:]}_{month_str}.pkl"
             output_filepath = os.path.join(output_path, output_filename)
             with open(output_filepath, 'wb') as pickle_file:
-                pickle.dump(sparse_cen_map, pickle_file)
+                pickle.dump(coarse_cen_map, pickle_file)
             
             print(f"Successfully processed and saved data for year {str(year)[2:]} month {month_str}.")
         
