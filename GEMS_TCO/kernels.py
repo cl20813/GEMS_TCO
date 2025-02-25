@@ -19,6 +19,7 @@ from scipy.special import gamma, kv  # Bessel function and gamma function
 from scipy.optimize import minimize
 from scipy.optimize import basinhopping, minimize
 from scipy.stats import norm,uniform
+from scipy.stats import t
 
 # Type hints
 from typing import Callable, Union, Tuple
@@ -195,6 +196,51 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         out += np.eye(out.shape[0]) * nugget
 
         return out
+
+    def matern_cov_yx_tnugget(self,params: Tuple[float,float,float,float,float,float], y: np.ndarray, x: np.ndarray) -> np.ndarray:
+    
+        sigmasq, range_lat, range_lon, advec, beta, nugget  = params
+        # Validate inputs
+        if y is None or x is None:
+            raise ValueError("Both y and x_df must be provided.")
+        # Extract values
+        x1 = x[:, 0]
+        y1 = x[:, 1]
+        t1 = x[:, 3]
+
+        x2 = y[:, 0]
+        y2 = y[:, 1]
+        t2 = y[:, 3] # hour
+
+        spat_coord1 = np.stack((x1- advec*t1, y1 - advec*t1), axis=-1)
+        spat_coord2 = np.stack((x2- advec*t2, y2 - advec*t2), axis=-1)
+
+        coords1 = np.hstack ((spat_coord1, (beta * t1).reshape(-1,1) ))
+        coords2 = np.hstack ((spat_coord2, (beta * t2).reshape(-1,1) ))
+
+        sqrt_range_mat = np.diag([ 1/range_lat**0.5, 1/range_lon**0.5])
+        self.sqrt_range_mat = sqrt_range_mat
+
+        distance = cdist(coords1,coords2, metric = self.custom_distance)
+
+        # Initialize the covariance matrix with zeros
+        out = distance
+        
+        # Compute the covariance for non-zero distances
+        non_zero_indices = distance != 0
+        if np.any(non_zero_indices):
+            out[non_zero_indices] = (sigmasq * (2**(1-self.smooth)) / gamma(self.smooth) *
+                                    (distance[non_zero_indices] )**self.smooth *
+                                    kv(self.smooth, distance[non_zero_indices]))
+        out[~non_zero_indices] = sigmasq
+
+        # Add a small jitter term to the diagonal for numerical stability
+        out += np.eye(out.shape[0]) * nugget
+
+
+        return out
+    
+
         
 
 class likelihood_function(spatio_temporal_kernels):
