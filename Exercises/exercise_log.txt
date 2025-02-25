@@ -1,0 +1,12 @@
+February 24
+
+Tested t-distributed nugget
+
+        # Generate t-distributed noise values
+        df = out.shape[0] # degrees of freedom for the t-distribution
+        t_noise = t.rvs(df, size=out.shape[0]) * nugget
+        
+        # Add the t-distributed noise term to the diagonal for numerical stability
+        out += np.diag( np.abs(t_noise))
+
+By looking at the likelihood, it didn't seem to be helpful. 
