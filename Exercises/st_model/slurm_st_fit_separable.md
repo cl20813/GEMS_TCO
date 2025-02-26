@@ -23,6 +23,14 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/fit_st_separ
 ``` srun --cpus-per-task=32 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_separable.py --v 0.5 --space 20 20 --keys 0 8 --mm_cond_number=5 --params 15 1.25 1.25 12 1 0.2 --bounds 0.05 80 0.01 20 0.01 20 0.1 20 0.01 20 0.002 0.5  ```
 
 
+# from search srun--params 10 10 10 5 5 0.01
+
+'''  
+srun --cpus-per-task=32 --mem=20G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_separable.py --v 0.5 --space 15 15 --keys 0 8 --mm_cond_number=5 --params 10 10 10 5 5 0.01 --bounds 0.05 80 0.01 20 0.01 20 0.1 20 0.01 20 0.002 0.5  
+
+'''
+
+
 ### Job Order SLURM: fv_onelag.py    
 ```mkdir -p ./jobscript/tco/gp_exercise```      
 
