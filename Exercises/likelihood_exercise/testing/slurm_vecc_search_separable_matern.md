@@ -53,7 +53,7 @@ echo "Current date and time: $(date)"
 #### Run the Python script { (20,20):(5,10), (5,5):(20,40) }
 echo "Parameter search using Vecchia approximation; one t lag"
 
-srun python /home/jl2815/tco/exercise_25/likelihood_exercise/testing/vecc_search_separable_matern.py --keys 0 8 --params 15 1.25 1.25 12 1 0.2 --space 15 15 --mm_cond_number 5
+srun python /home/jl2815/tco/exercise_25/likelihood_exercise/vecc_search_separable_matern.py --keys 0 8 --params 15 1.25 1.25 12 1 0.2 --space 15 15 --mm_cond_number 5
 
 ```
 
