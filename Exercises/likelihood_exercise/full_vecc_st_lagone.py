@@ -54,7 +54,8 @@ def main():
     # Define the parameters you want to change at runtime
     parser.add_argument('--space', type=int,nargs='+', default=[20,20], help="spatial resolution")
     parser.add_argument('--mm_cond_number', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
-    parser.add_argument('--key', type=int, default=1, help="Index for the datasets.")
+    parser.add_argument('--keys', type=int, nargs='+', default=[0,8], help="Index for the datasets.")
+    
     parser.add_argument('--params', type=float,nargs='+', default=[0.5,0.5,0.5,0.5,0.5, 0.5], help="Initial parameters")
    
     # Parse the arguments
@@ -64,7 +65,7 @@ def main():
     lat_lon_resolution = args.space 
     mm_cond_number = args.mm_cond_number
     params= args.params
-    key_for_dict= args.key
+    key_for_dict= args.keys
 
     ############ 
     start_time_setup= time.time()
@@ -125,15 +126,16 @@ def main():
 
 
     analysis_data_map = {}
-    for i in range(key_for_dict):
+    for i in range(key_for_dict[0], key_for_dict[1]):
         tmp = coarse_dicts[key_idx[i]]
         tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'])
         # tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
         tmp = tmp.iloc[ord_mm, :4].to_numpy()
+
         analysis_data_map[key_idx[i]] = tmp
 
     aggregated_data = pd.DataFrame()
-    for i in range((key_for_dict)):
+    for i in range(key_for_dict[0], key_for_dict[1]):
         tmp = coarse_dicts[key_idx[i]]
         tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'])
         tmp = tmp.iloc[ord_mm].reset_index(drop=True)  

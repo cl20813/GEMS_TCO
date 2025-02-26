@@ -18,7 +18,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/likelihood_exercise/f
 
 ## space 5 5: 5x10, 4 4: 25x50, 2 2: 50x100
 
-```srun --cpus-per-task=2 --mem=10G --time=05:00:00 python /home/jl2815/tco/exercise_25/likelihood_exercise/full_vecc_st_lagone.py --key 1 --params 60 8.25 8.25 0.5 0.5 5 --space 20 20 --mm_cond_number 5```
+```srun --cpus-per-task=2 --mem=10G --time=05:00:00 python /home/jl2815/tco/exercise_25/likelihood_exercise/full_vecc_st_lagone.py --keys 0 5 --params 60 8.25 8.25 0.5 0.5 5 --space 20 20 --mm_cond_number 5```
 
 
 ### Job Order SLURM: fv_onelag.py    

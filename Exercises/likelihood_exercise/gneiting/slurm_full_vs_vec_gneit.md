@@ -18,7 +18,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/likelihood_exercise/f
 
 ## space 5 5: 5x10, 4 4: 25x50, 2 2: 50x100
 
-```srun --cpus-per-task=2 --mem=10G --time=05:00:00 python /home/jl2815/tco/exercise_25/likelihood_exercise/full_vecc_gneit.py --key 8 --params 0.41 0.61 0.34 0.22 1.5 1 6.15 --space 5 5 --mm_cond_number 5 ```
+```srun --cpus-per-task=2 --mem=10G --time=05:00:00 python /home/jl2815/tco/exercise_25/likelihood_exercise/full_vecc_gneit.py --keys 0 8 --params 0.41 0.61 0.34 0.22 1.5 1 6.15 --space 15 15 --mm_cond_number 5 ```
 
 #   0.44 13.28 0.5 0.02 2.83 0.208 .346        full estimated
 #   0.41 0.61 0.34 0.22 1.5 1 6.15              vecc  boom!
@@ -28,10 +28,8 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/likelihood_exercise/f
 # tau >=d/2 beta in [0,1], sigma
 
 
-### Job Order SLURM: fv_onelag.py    
 
-
-### Job Order SLURM: fv_onelag.py    
+ 
 ```mkdir -p ./jobscript/tco/gp_exercise```      
 
 ```cd ./jobscript/tco/gp_exercise```                          
