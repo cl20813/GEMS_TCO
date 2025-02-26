@@ -21,7 +21,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/likelihood_exercise/f
 ```srun --cpus-per-task=2 --mem=10G --time=05:00:00 python /home/jl2815/tco/exercise_25/likelihood_exercise/full_vecc_gneit.py --key 8 --params 0.41 0.61 0.34 0.22 1.5 1 6.15 --space 5 5 --mm_cond_number 5 ```
 
 #   0.44 13.28 0.5 0.02 2.83 0.208 .346        full estimated
-#   0.41 0.61 0.34 0.22 1.5 1 6.15              vecc
+#   0.41 0.61 0.34 0.22 1.5 1 6.15              vecc  boom!
  
 # a, c non negative
 # alpha gamma smooth of time and space both in (0,1]
