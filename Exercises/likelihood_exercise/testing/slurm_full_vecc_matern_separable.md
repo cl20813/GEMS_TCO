@@ -4,10 +4,10 @@ scp -r "C:\Users\joonw\TCO\GEMS_TCO-1\GEMS_TCO" jl2815@amarel.rutgers.edu:/home/
 For significant updates or installations, use pip install --force-reinstall or python setup.py install after copying the files.
 
 ### Copy from ```local``` to ```Amarel HPC```
-scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\likelihood_exercise\testing\full_vecc_matern_t.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/likelihood_exercise
+scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\likelihood_exercise\testing\full_vecc_matern_separable.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/likelihood_exercise
 
 ### Copy from ```Amarel HPC``` to ```local computer```
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/likelihood_exercise/full_vecc_matern_t.py "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\likelihood_exercise\testing"
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/likelihood_exercise/full_vecc_matern_separable.py "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\likelihood_exercise\testing"
 
 
 ### Run this part
@@ -18,9 +18,17 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/likelihood_exercise/f
 
 ## space 5 5: 5x10, 4 4: 25x50, 2 2: 50x100
 
-```  srun --cpus-per-task=2 --mem=10G --time=05:00:00 python /home/jl2815/tco/exercise_25/likelihood_exercise/full_vecc_st_lagone.py --key 1 --params 20 1.25 1.25 0.5 0.5 0.2 --space 15 15 --mm_cond_number 5   ```
+#  15 1.25 1.25 12 1 0.2   my random number this guarantee good approximation. 
 
-```  srun --cpus-per-task=2 --mem=10G --time=05:00:00 python /home/jl2815/tco/exercise_25/likelihood_exercise/full_vecc_matern_t.py --key 1 --params 20 1.25 1.25 0.5 0.5 0.2 --space 15 15 --mm_cond_number 5  ```
+# To avoid singular, I need to find good initial point
+#  0.05 5.21 4.47 0.1 12.93 0.0027   estimated from full likelihood  --> approximation does not work 
+#  4.18 0.01 0.01 2.55 4.07 0.002   estimated from vecchia likelihood
+
+```  srun --cpus-per-task=2 --mem=10G --time=01:00:00 python /home/jl2815/tco/exercise_25/likelihood_exercise/full_vecc_matern_separable.py --keys 0 8 --params 15 1.25 1.25 12 1 0.2 --space 15 15 --mm_cond_number 5  ```
+
+
+```  srun --cpus-per-task=2 --mem=10G --time=01:00:00 python /home/jl2815/tco/exercise_25/likelihood_exercise/full_vecc_matern_separable.py --keys 0 8 --params 4.18 0.01 0.01 2.55 4.07 0.002  --space 15 15 --mm_cond_number 5  ```
+
 
 
 

@@ -237,8 +237,9 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         out[~non_zero_indices] = sigmasq
 
         # it seems vecchia is catching the behavior when smooth = 0.5  if 1 full likelihood better but worse approximation
-        # and   15 1.25 1.25 12 1 0.2
-        smooth_time = 1
+        # and   15 1.25 1.25 12 1 0.2 guaranteed to be better. 
+        
+        smooth_time = 0.5
         non_zero_indices = temp_distance != 0
         if np.any(non_zero_indices):
             out[non_zero_indices] *= (sigmasq2 * (2**(1 -smooth_time)) / gamma(smooth_time) *

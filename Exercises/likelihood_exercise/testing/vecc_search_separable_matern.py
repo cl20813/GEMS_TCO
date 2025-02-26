@@ -38,7 +38,7 @@ sys.path.append("/cache/home/jl2815/tco")
 # Custom imports
 from GEMS_TCO import orbitmap 
 from GEMS_TCO import kernels 
-
+from GEMS_TCO import smoothspace
 
 import pickle
 
@@ -54,7 +54,8 @@ def main():
     # Define the parameters you want to change at runtime
     parser.add_argument('--space', type=int,nargs='+', default=[20,20], help="spatial resolution")
     parser.add_argument('--mm_cond_number', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
-    parser.add_argument('--key', type=int, default=1, help="Index for the datasets.")
+    parser.add_argument('--keys', type=int, nargs='+', default=[0,8], help="Index for the datasets.")
+    
     parser.add_argument('--params', type=float,nargs='+', default=[0.5,0.5,0.5,0.5,0.5, 0.5], help="Initial parameters")
    
     # Parse the arguments
@@ -64,10 +65,10 @@ def main():
     lat_lon_resolution = args.space 
     mm_cond_number = args.mm_cond_number
     params= args.params
-    key_for_dict= args.key
+    key_for_dict= args.keys
 
     ############ 
-    start_time_setup= time.time()
+
 
     # Load the one dictionary to set spaital coordinates
     filepath = "/home/jl2815/tco/data/pickle_data/pickle_2023/coarse_cen_map23_01.pkl"
@@ -123,9 +124,10 @@ def main():
     coords1_reordered = np.stack((data_for_coord['Longitude'].values, data_for_coord['Latitude'].values), axis=-1)
     nns_map = instance.find_nns_naive(locs=coords1_reordered, dist_fun='euclidean', max_nn=mm_cond_number)
 
+    
 
     analysis_data_map = {}
-    for i in range(key_for_dict):
+    for i in range(key_for_dict[0], key_for_dict[1]):
         tmp = coarse_dicts[key_idx[i]]
         tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'])
         # tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
@@ -133,7 +135,7 @@ def main():
         analysis_data_map[key_idx[i]] = tmp
 
     aggregated_data = pd.DataFrame()
-    for i in range((key_for_dict)):
+    for i in range(key_for_dict[0], key_for_dict[1]):
         tmp = coarse_dicts[key_idx[i]]
         tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'])
         tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
@@ -143,38 +145,49 @@ def main():
     
     print(f'Aggregated data shape: {aggregated_data.shape}')
 
-    end_time_setup= time.time()
-    iteration_time_setup = end_time_setup - start_time_setup  # Calculate the time spent
-    print(f"iteration_time_setup {iteration_time_setup:.4f} seconds")
     # print(aggregated_data.to_string())
     #####################################################################
+    
+    #####################################################################
 
-    instance = kernels.likelihood_function(smooth=0.5, input_map=analysis_data_map, nns_map=nns_map, mm_cond_number=mm_cond_number)
-    # data = data.iloc[ord, :]
-
-    # out = instance.vecchia_likelihood(params)
-
-    # out = instance.vecchia_likelihood(params)
-    start_time = time.time()
-    full_likelihood = instance.full_likelihood(params, aggregated_np, aggregated_np[:,2], instance.matern_cov_yx_test1)
-    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Full likelihood using params={params} is {full_likelihood}')
-    end_time = time.time()  # Record the end time
-    iteration_time = end_time - start_time  # Calculate the time spent
-    print(f"Full likelihood from real data took {iteration_time:.4f} seconds")
+    instance = kernels.matern_spatio_temporal(smooth = 0.5, input_map = analysis_data_map, nns_map = nns_map, mm_cond_number = mm_cond_number )
+    # data = data.iloc[ord,:]
+    
 
 
+    # Define parameter ranges
+    param_ranges = {
+        'param1': [10,20],   #sigmasq  range_lat range_lon  sigmasq2 range tmp nugget
+        'param2': [1,5,10],
+        'param3': [1,5,10],
+        'param4': [5,10],
+        'param5': [1, 5, 10],
+        'param6': [0.01,0.1, 0.2]
+    }
 
-    out1 = instance.vecchia_like_using_cholesky(params, instance.matern_cov_yx_test1)
-    start_time2 = time.time()
-    # Introduce a small delay for testing purposes
-    time.sleep(0.01)  # Sleep for 10 milliseconds
-    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out1}')
-    end_time2 = time.time()  # Record the end time
-    iteration_time2 = end_time2 - start_time2  # Calculate the time spent
-    print(f"vecchia_like_using_cholesky took {iteration_time2:.4f} seconds")
+    # Initialize variables to store the best parameters and highest likelihood
+    best_params = None
+    lowest_neg_likelihood = np.inf
 
+    # Perform grid search
+    for p1 in param_ranges['param1']:
+        for p2 in param_ranges['param2']:
+            for p3 in param_ranges['param3']:
+                for p4 in param_ranges['param4']:
+                    for p5 in param_ranges['param5']:
+                        for p6 in param_ranges['param6']:
+                            params = (p1, p2, p3, p4, p5, p6)
+                            start_time = time.time()
+                            likelihood = instance.vecchia_likelihood(params, instance.matern_cov_yx_test1)
+                            print(f'grid {lat_number}*{lon_number}:Vecchia approximation likelihood using condition size {mm_cond_number}, {params} is {likelihood}')
+                            if likelihood < lowest_neg_likelihood:
+                                lowest_neg_likelihood = likelihood
+                                best_params = params 
+                            end_time = time.time()  # Record the end time
+                            iteration_time = end_time - start_time  # Calculate the time spent
+                            print(f"vecchia {key_for_dict} time points took {iteration_time:.4f} seconds for one set of params")
 
-
+    print(f'best_param {best_params} with lowest_negative_log_likelihood {lowest_neg_likelihood}')
 
 if __name__ == '__main__':
     main()
