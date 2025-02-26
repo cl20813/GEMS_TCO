@@ -61,21 +61,22 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         temporal_diff = np.abs(u[2] - v[2])           # Distance between y1 and y2
         return np.sqrt(spatial_diff**2 + temporal_diff**2)
     
-    ''' 
-    # gneiting model (gneting 2002)
-    https://www.tandfonline.com/doi/abs/10.1198/016214502760047113
+        ''' 
+        # gneiting model (gneting 2002)
+        https://www.tandfonline.com/doi/abs/10.1198/016214502760047113
 
-    See the equation (14) on page 5/12.
+        See the equation (14) on page 5/12.
 
-    $C(s,t) = \frac{\sigma^2}{ (a|t|^{2\alpha}+1 )^{\tau}} \exp(  \frac{ -c||s||^{2\gamma}}{(a|t|^{2\alpha}+1 )^{\beta \gamma}})$, 
+        $C(s,t) = \frac{\sigma^2}{ (a|t|^{2\alpha}+1 )^{\tau}} \exp(  \frac{ -c||s||^{2\gamma}}{(a|t|^{2\alpha}+1 )^{\beta \gamma}})$, 
 
-    where 
-    $s \in R^2$ is spatial distance and $t \in R^1$ is temporal distance.   
-    a: scaling parameter of time, non-negative   
-    c: scaling parameter of space, non-negative   
-    $\alpha, \gamma$: smooth parameter of time, and space. both $ \alpha, \gamma \in (0,1]$      
-    $\beta, \tau$: space and time interaction parameters. $\tau >=d/2 = 1$, $\beta \in [0,1]$.   
-    '''
+        where 
+        $s \in R^2$ is spatial distance and $t \in R^1$ is temporal distance.   
+        a: scaling parameter of time, non-negative   
+        c: scaling parameter of space, non-negative   
+        $\alpha, \gamma$: smooth parameter of time, and space. both $ \alpha, \gamma \in (0,1]$      
+        $\beta, \tau$: space and time interaction parameters. $\tau >=d/2 = 1$, $\beta \in [0,1]$.  
+        '''
+
     def gneiting_cov_yx(self, params: Tuple[float, float, float, float, float, float, float], y: np.ndarray, x: np.ndarray) -> np.ndarray:
         a, c, alpha, gamma, tau, beta, sigma  = params                 ### x for just consistency with other functions
         nugget = 0.1
@@ -176,7 +177,7 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         coords1 = np.hstack ((spat_coord1, (beta * t1).reshape(-1,1) ))
         coords2 = np.hstack ((spat_coord2, (beta * t2).reshape(-1,1) ))
 
-        sqrt_range_mat = np.diag([ 1/range_lat**0.5, 1/range_lon**0.5])
+        sqrt_range_mat = np.diag([ 1/np.sqrt(range_lat), 1/np.sqrt(range_lon)])
         self.sqrt_range_mat = sqrt_range_mat
 
         distance = cdist(coords1,coords2, metric = self.custom_distance)
@@ -197,49 +198,60 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
 
         return out
 
-    def matern_cov_yx_tnugget(self,params: Tuple[float,float,float,float,float,float], y: np.ndarray, x: np.ndarray) -> np.ndarray:
-    
-        sigmasq, range_lat, range_lon, advec, beta, nugget  = params
+    def matern_cov_yx_test1(self, params: Tuple[float, float, float, float, float,float], y: np.ndarray, x: np.ndarray) -> np.ndarray:
+        sigmasq, range_lat, range_lon, sigmasq2, range_tmp, nugget = params
         # Validate inputs
         if y is None or x is None:
-            raise ValueError("Both y and x_df must be provided.")
+            raise ValueError("Both y and x must be provided.")
         # Extract values
         x1 = x[:, 0]
         y1 = x[:, 1]
-        t1 = x[:, 3]
+        t1 = x[:, 2]
 
         x2 = y[:, 0]
         y2 = y[:, 1]
-        t2 = y[:, 3] # hour
+        t2 = y[:, 2]  # hour
 
-        spat_coord1 = np.stack((x1- advec*t1, y1 - advec*t1), axis=-1)
-        spat_coord2 = np.stack((x2- advec*t2, y2 - advec*t2), axis=-1)
+        spat_coord1 = np.stack((x1, y1), axis=-1)
+        spat_coord2 = np.stack((x2, y2), axis=-1)
+        # Scale spatial coordinates by the square root of the range parameters
+        sqrt_range_mat = np.diag([1/ np.sqrt(range_lat), 1/np.sqrt(range_lon)])
+        scaled_spat_coord1 = np.dot(spat_coord1, sqrt_range_mat)
+        scaled_spat_coord2 = np.dot(spat_coord2, sqrt_range_mat)
 
-        coords1 = np.hstack ((spat_coord1, (beta * t1).reshape(-1,1) ))
-        coords2 = np.hstack ((spat_coord2, (beta * t2).reshape(-1,1) ))
-
-        sqrt_range_mat = np.diag([ 1/range_lat**0.5, 1/range_lon**0.5])
-        self.sqrt_range_mat = sqrt_range_mat
-
-        distance = cdist(coords1,coords2, metric = self.custom_distance)
-
+        # Calculate spatial distances
+        spat_distance = cdist(scaled_spat_coord1, scaled_spat_coord2, metric='euclidean')
+        temp_coord1 = t1.reshape(-1, 1)
+        temp_coord2 = t2.reshape(-1, 1)
+        tmp_distance = cdist(temp_coord1, temp_coord2, metric='euclidean')
+        temp_distance = tmp_distance / range_tmp
+      
         # Initialize the covariance matrix with zeros
-        out = distance
-        
-        # Compute the covariance for non-zero distances
-        non_zero_indices = distance != 0
+        out = np.zeros_like(spat_distance)
+
+        non_zero_indices = spat_distance != 0
         if np.any(non_zero_indices):
-            out[non_zero_indices] = (sigmasq * (2**(1-self.smooth)) / gamma(self.smooth) *
-                                    (distance[non_zero_indices] )**self.smooth *
-                                    kv(self.smooth, distance[non_zero_indices]))
+            out[non_zero_indices] = (sigmasq * (2**(1 - self.smooth)) / gamma(self.smooth) *
+                                    (spat_distance[non_zero_indices] )**self.smooth *
+                                    kv(self.smooth, spat_distance[non_zero_indices]))
         out[~non_zero_indices] = sigmasq
+
+        # it seems vecchia is catching the behavior when smooth = 0.5  if 1 full likelihood better but worse approximation
+        # and   15 1.25 1.25 12 1 0.2
+        smooth_time = 1
+        non_zero_indices = temp_distance != 0
+        if np.any(non_zero_indices):
+            out[non_zero_indices] *= (sigmasq2 * (2**(1 -smooth_time)) / gamma(smooth_time) *
+                                    (temp_distance[non_zero_indices])*smooth_time *
+                                    kv(smooth_time, temp_distance[non_zero_indices] ))
+        out[~non_zero_indices] *= sigmasq2
 
         # Add a small jitter term to the diagonal for numerical stability
         out += np.eye(out.shape[0]) * nugget
-
+        
 
         return out
-    
+        
 
         
 
