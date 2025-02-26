@@ -20,18 +20,18 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/likelihood_exercise/f
 
 #  15 1.25 1.25 12 1 0.2   my random number this guarantee good approximation. 
 
+# best search on 2/26/2025 10 10 10 5 5 0.01
 # To avoid singular, I need to find good initial point
-#  0.05 5.21 4.47 0.1 12.93 0.0027   estimated from full likelihood  --> approximation does not work 
-#  4.18 0.01 0.01 2.55 4.07 0.002   estimated from vecchia likelihood
+#  4.32 11.99 6.52 2.21 2.39 0.22    estimated from full likelihood  --> approximation does not work 
+#  4.85 20 0.01 2.40 3.61 0.002    estimated from vecchia likelihood
 
 ```  srun --cpus-per-task=2 --mem=10G --time=01:00:00 python /home/jl2815/tco/exercise_25/likelihood_exercise/full_vecc_matern_separable.py --keys 0 8 --params 15 1.25 1.25 12 1 0.2 --space 15 15 --mm_cond_number 5  ```
 
 
-```  srun --cpus-per-task=2 --mem=10G --time=01:00:00 python /home/jl2815/tco/exercise_25/likelihood_exercise/full_vecc_matern_separable.py --keys 0 8 --params 4.18 0.01 0.01 2.55 4.07 0.002  --space 15 15 --mm_cond_number 5  ```
+```  srun --cpus-per-task=2 --mem=10G --time=01:00:00 python /home/jl2815/tco/exercise_25/likelihood_exercise/full_vecc_matern_separable.py --keys 0 8 --params 4.32 11.99 6.52 2.21 2.39 0.22 --space 15 15 --mm_cond_number 5  ```
 
 
-
-
+# the bset number so far  15 1.25 1.25 12 1 0.2 
 
 ### Job Order SLURM: fv_onelag.py    
 ```mkdir -p ./jobscript/tco/gp_exercise```      
