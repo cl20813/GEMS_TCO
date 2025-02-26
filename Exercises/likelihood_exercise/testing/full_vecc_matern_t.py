@@ -152,21 +152,11 @@ def main():
     instance = kernels.likelihood_function(smooth=0.5, input_map=analysis_data_map, nns_map=nns_map, mm_cond_number=mm_cond_number)
     # data = data.iloc[ord, :]
 
-
-    
-    # Step 1: Compute the covariance matrix
-    cov_matrix = instance.matern_cov_yx_tnugget(params, aggregated_np, aggregated_np)
-
-    # Step 2: Generate a single multivariate normal sample
-    mean = np.ones(aggregated_np.shape[0]) * np.mean(aggregated_np[:, 3])  # Mean vector based on the fourth column
-    simulated_data = np.random.multivariate_normal(mean, cov_matrix)
-
-    # Combine the simulated data with the original coordinates
-    simulated_np = np.hstack((aggregated_np[:, :3], simulated_data.reshape(-1, 1)))
+    # out = instance.vecchia_likelihood(params)
 
     # out = instance.vecchia_likelihood(params)
     start_time = time.time()
-    full_likelihood = instance.full_likelihood(params, aggregated_np, aggregated_np[:,2], instance.matern_cov_yx)
+    full_likelihood = instance.full_likelihood(params, aggregated_np, aggregated_np[:,2], instance.matern_cov_yx_test1)
     print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Full likelihood using params={params} is {full_likelihood}')
     end_time = time.time()  # Record the end time
     iteration_time = end_time - start_time  # Calculate the time spent
@@ -174,13 +164,14 @@ def main():
 
 
 
-    # data = data.iloc[ord, :]
-    start_time = time.time()
-    full_likelihood = instance.full_likelihood(params,simulated_np, simulated_np[:,2], instance.matern_cov_yx_tnugget)
-    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Full likelihood using params={params} is {full_likelihood}')
-    end_time = time.time()  # Record the end time
-    iteration_time = end_time - start_time  # Calculate the time spent
-    print(f"Full likelihood from simulated data took {iteration_time:.4f} seconds")
+    out1 = instance.vecchia_like_using_cholesky(params, instance.matern_cov_yx_test1)
+    start_time2 = time.time()
+    # Introduce a small delay for testing purposes
+    time.sleep(0.01)  # Sleep for 10 milliseconds
+    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out1}')
+    end_time2 = time.time()  # Record the end time
+    iteration_time2 = end_time2 - start_time2  # Calculate the time spent
+    print(f"vecchia_like_using_cholesky took {iteration_time2:.4f} seconds")
 
 
 

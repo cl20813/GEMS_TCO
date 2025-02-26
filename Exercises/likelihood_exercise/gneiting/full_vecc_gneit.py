@@ -37,7 +37,7 @@ sys.path.append("/cache/home/jl2815/tco")
 
 # Custom imports
 from GEMS_TCO import kernels 
-
+from GEMS_TCO import orbitmap
 
 import pickle
 
@@ -162,26 +162,6 @@ def main():
     print(f"Full likelihood took {iteration_time:.4f} seconds")
 
 
-    '''
-    start_time2 = time.time()
-    # Introduce a small delay for testing purposes
-    time.sleep(0.01)  # Sleep for 10 milliseconds
-    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out}')
-    end_time2 = time.time()  # Record the end time
-    iteration_time2 = end_time2 - start_time2  # Calculate the time spent
-    print(f"Vecchia approximation took {iteration_time2:.4f} seconds")
-    '''
-
-    start_time2 = time.time()
-    out2 = instance.vecchia_likelihood(params, instance.gneiting_cov_yx)
-    # Introduce a small delay for testing purposes
-    time.sleep(0.01)  # Sleep for 10 milliseconds
-    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out2}')
-    end_time2 = time.time()  # Record the end time
-    iteration_time2 = end_time2 - start_time2  # Calculate the time spent
-    print(f"vecchia_likelihood took {iteration_time2:.4f} seconds")
-
-
     out4 = instance.vecchia_like_using_cholesky(params, instance.gneiting_cov_yx)
     start_time2 = time.time()
     # Introduce a small delay for testing purposes
@@ -192,14 +172,6 @@ def main():
     print(f"vecchia_like_using_cholesky took {iteration_time2:.4f} seconds")
 
 
-    out5 = instance.vecchia_like_nocache(params, instance.gneiting_cov_yx)
-    start_time2 = time.time()
-    # Introduce a small delay for testing purposes
-    time.sleep(0.01)  # Sleep for 10 milliseconds
-    print(f'Spatial grid lat ({lat_number}) * lon ({lon_number}), {key_for_dict} timestamps:\n Vecchia approximation likelihood using condition size {mm_cond_number}, params={params} is {out5}')
-    end_time2 = time.time()  # Record the end time
-    iteration_time2 = end_time2 - start_time2  # Calculate the time spent
-    print(f"vecchia_like_nocache took {iteration_time2:.4f} seconds")
 
 if __name__ == '__main__':
     main()

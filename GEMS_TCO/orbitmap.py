@@ -10,7 +10,7 @@ from scipy.spatial.distance import cdist  # For space and time distance
 from scipy.spatial import distance  # Find closest spatial point
 
 from typing import Callable, Union, Tuple
-from GEMS_TCO.smoothspace import space_average
+
  
 class MakeOrbitdata():
     """
