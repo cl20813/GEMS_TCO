@@ -438,8 +438,246 @@ class likelihood_function(spatio_temporal_kernels):
                         'log_det': log_det,
                         'locs':locs
                     }
+
         return neg_log_lik   
 
+
+    def vecchia_like_local(self, params, covariance_function):
+        self.cov_map = defaultdict(list)
+        neg_log_lik = 0
+        
+        for time_idx in range(self.number_of_timestamps):
+            current_np = self.input_map[self.key_list[time_idx]]
+
+            # use below when working on local computer to avoid singular matrix
+            cur_heads = current_np[:21,:]
+            neg_log_lik += self.full_likelihood(params,cur_heads, cur_heads[:,2],covariance_function)
+
+            for index in range(21, self.size_per_hour):
+
+                current_row = current_np[index]
+      
+                current_row = current_row.reshape(1,-1)
+                current_y = current_row[0][2]
+
+                # construct conditioning set
+                
+                mm_neighbors = self.nns_map[index]
+                past = list(mm_neighbors)
+                data_list = []
+
+                if past:
+                    data_list.append( current_np[past])
+
+                if time_idx > 1:
+                    cov_matrix = self.cov_map[index]['cov_matrix']
+                    tmp_for_beta = self.cov_map[index]['tmp_for_beta']
+                    cov_xx_inv = self.cov_map[index]['cov_xx_inv']
+                    L_inv = self.cov_map[index]['L_inv']
+                    cov_ygivenx = self.cov_map[index]['cov_ygivenx'] 
+                    cond_mean_tmp = self.cov_map[index]['cond_mean_tmp']
+                    log_det = self.cov_map[index]['log_det']
+                    locs  = self.cov_map[index]['locs']
+                   
+                    last_hour_np = self.input_map[self.key_list[time_idx-1]]
+                   
+                    past_conditioning_data = last_hour_np[ (past+[index]),: ]
+                    data_list.append( past_conditioning_data)
+
+                    if data_list:
+                        conditioning_data = np.vstack(data_list)
+                    else:
+                        conditioning_data = np.array([]).reshape(0, current_row.shape[1])
+
+                    np_arr = np.vstack( (current_row, conditioning_data) )
+                    y_and_neighbors = np_arr[:,2]
+                    # locs = np_arr[:,:2]
+
+                    cov_yx = cov_matrix[0,1:]
+
+                    tmp2 = np.dot( np.dot(L_inv, locs).T, np.dot(L_inv, y_and_neighbors))
+                    beta = np.linalg.solve(tmp_for_beta , tmp2)
+
+                    mu = np.dot(locs, beta)
+                    mu_current = mu[0]
+                    mu_neighbors = mu[1:]
+                    
+                    # mean and variance of y|x
+                         
+                    cond_mean = mu_current + np.dot(cond_mean_tmp, (y_and_neighbors[1:]-mu_neighbors) )  # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
+            
+                    alpha = current_y - cond_mean
+                    quad_form = alpha**2 *(1/cov_ygivenx)
+                   
+                    neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
+                    
+
+                    continue
+
+                if time_idx >0:
+                    last_hour_np = self.input_map[self.key_list[time_idx-1]]
+                   
+                    past_conditioning_data = last_hour_np[ (past+[index]),: ]
+                    data_list.append( past_conditioning_data)
+                
+
+                if data_list:
+                    conditioning_data = np.vstack(data_list)
+                else:
+                    conditioning_data = np.array([]).reshape(0, current_row.shape[1])
+
+                np_arr = np.vstack( (current_row, conditioning_data) )
+                y_and_neighbors = np_arr[:,2]
+                locs = np_arr[:,:2]
+
+
+                cov_matrix = covariance_function(params=params, y = np_arr, x = np_arr)
+                L = np.linalg.cholesky(cov_matrix)
+                L11 = L[:1,:1]
+                L12 = np.zeros(L[:1,1:].shape)
+                L21 = L[1:,:1]
+                L22 = L[1:,1:]
+                L11_inv = np.linalg.inv(L11)
+                L22_inv = np.linalg.inv(L22)
+
+                L_inv = np.block([
+                    [L11_inv, L12],
+                    [- np.dot( np.dot(L22_inv,L21), L11_inv), L22_inv]
+                ])
+
+                cov_yx = cov_matrix[0,1:]
+                
+                tmp1 = np.dot(L_inv,locs)
+                tmp2 = np.dot( np.dot(L_inv, locs).T, np.dot(L_inv, y_and_neighbors))
+                tmp_for_beta= np.dot(tmp1.T,tmp1)
+                beta = np.linalg.solve(tmp_for_beta , tmp2)
+
+                mu = np.dot(locs, beta)
+                mu_current = mu[0]
+                mu_neighbors = mu[1:]
+                
+                # mean and variance of y|x
+                sigma = cov_matrix[0][0]
+
+                # cov_xx = np.dot(L21,L21.T) +np.dot(L22,L22.T) 
+                cov_xx = cov_matrix[1:,1:]
+                cov_xx_inv = np.linalg.inv(cov_xx)
+                
+                cov_ygivenx = sigma - np.dot(cov_yx.T, np.dot(cov_xx_inv, cov_yx))
+               
+                cond_mean_tmp = np.dot(cov_yx.T, cov_xx_inv)
+                cond_mean = mu_current + np.dot(cond_mean_tmp, (y_and_neighbors[1:]-mu_neighbors) )  # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
+            
+                alpha = current_y - cond_mean
+                quad_form = alpha**2 *(1/cov_ygivenx)
+                log_det = np.log(cov_ygivenx)
+               
+                neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
+
+                if time_idx == 1:
+                    self.cov_map[index] = {
+                        'tmp_for_beta': tmp_for_beta,
+                        'cov_xx_inv': cov_xx_inv,
+                        'cov_matrix': cov_matrix,
+                        'L_inv':L_inv,
+                        'cov_ygivenx':cov_ygivenx,
+                        'cond_mean_tmp': cond_mean_tmp,
+                        'log_det': log_det,
+                        'locs':locs
+                    }
+        return neg_log_lik   
+    
+    def vecchia_like_columnn(self, params, covariance_function):
+        self.cov_map = defaultdict(list)
+        neg_log_lik = 0
+        
+        for time_idx in range(self.number_of_timestamps):
+            current_np = self.input_map[self.key_list[time_idx]]
+            self.lon_key = np.unique(current_np[:,1])
+
+            # use below when working on local computer to avoid singular matrix
+            #cur_heads = current_np[:31,:]
+            #neg_log_lik += self.full_likelihood(params,cur_heads, cur_heads[:,2],covariance_function)
+
+            for i in range(len(self.lon_key)):
+                if i<2:
+                    pass
+
+                else:
+                    current_col = current_np[current_np[:, i] == self.lon_key[i]]
+                    cond_col = current_np[(current_np[:, i] == self.lon_key[i-1]) | (current_np[:, i] == self.lon_key[i-2])]
+                    np_arr = np.vstack((current_col, cond_col))
+
+    
+                    y_and_neighbors = np_arr[:,2]
+                    current_y = current_col[:,2]
+                    locs = np_arr[:,:2]
+
+                    p = len(current_col)
+                    cov_matrix = covariance_function(params=params, y = np_arr, x = np_arr)
+                    L = np.linalg.cholesky(cov_matrix)
+                    L11 = L[:p,:p]
+                    L12 = np.zeros(L[:p,p:].shape)
+                    L21 = L[p:,:p]
+                    L22 = L[p:,p:]
+                    L11_inv = np.linalg.inv(L11)
+                    L22_inv = np.linalg.inv(L22)
+
+                    L_inv = np.block([
+                        [L11_inv, L12],
+                        [- np.dot( np.dot(L22_inv,L21), L11_inv), L22_inv]
+                    ])
+
+                    cov_yx = cov_matrix[:p,p:]
+                    
+                    tmp1 = np.dot(L_inv,locs)
+                    tmp2 = np.dot( np.dot(L_inv, locs).T, np.dot(L_inv, y_and_neighbors))
+                    tmp_for_beta= np.dot(tmp1.T,tmp1)
+                    beta = np.linalg.solve(tmp_for_beta , tmp2)
+
+                    mu = np.dot(locs, beta)
+                    mu_current = mu[:p]
+                    mu_neighbors = mu[p:]
+                    
+                    # mean and variance of y|x
+                    sigma = cov_matrix[0][0]
+
+                    # cov_xx = np.dot(L21,L21.T) +np.dot(L22,L22.T) 
+                    cov_xx = cov_matrix[p:,p:]
+                    cov_xx_inv = np.linalg.inv(cov_xx)
+                    
+                    cov_ygivenx = sigma - np.dot(cov_yx.T, np.dot(cov_xx_inv, cov_yx))
+                
+                    cond_mean_tmp = np.dot(cov_yx.T, cov_xx_inv)
+                    cond_mean = mu_current + np.dot(cond_mean_tmp, (y_and_neighbors[1:]-mu_neighbors) )  # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
+                
+                    alpha = current_y - cond_mean
+                    quad_form = alpha**2 *(1/cov_ygivenx)
+                    log_det = np.log(cov_ygivenx)
+                
+                    neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
+
+
+                    cov_yx = cov_matrix[0,1:]
+
+                    tmp2 = np.dot( np.dot(L_inv, locs).T, np.dot(L_inv, y_and_neighbors))
+                    beta = np.linalg.solve(tmp_for_beta , tmp2)
+
+                    mu = np.dot(locs, beta)
+                    mu_current = mu[0]
+                    mu_neighbors = mu[1:]
+                    
+                    # mean and variance of y|x
+                         
+                    cond_mean = mu_current + np.dot(cond_mean_tmp, (y_and_neighbors[1:]-mu_neighbors) )  # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
+            
+                    alpha = current_y - cond_mean
+                    quad_form = alpha**2 *(1/cov_ygivenx)
+                   
+                    neg_log_lik += 0.5 * (1 * np.log(2 * np.pi) + log_det + quad_form)
+                    
+
+        return neg_log_lik   
 
 
     def full_likelihood_bayesian(self, params, input_np, y, covariance_function):
