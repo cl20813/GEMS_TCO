@@ -12,6 +12,7 @@ import numpy as np
 # Nearest neighbor search
 import sklearn
 from sklearn.neighbors import BallTree
+from sklearn.preprocessing import MinMaxScaler
 
 # Special functions and optimizations
 from scipy.spatial.distance import cdist  # For space and time distance
@@ -23,6 +24,9 @@ from scipy.stats import t
 
 # Type hints
 from typing import Callable, Union, Tuple
+
+
+
 
 # Add your custom path
 sys.path.append("/cache/home/jl2815/tco")
@@ -52,14 +56,6 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
             else:
                 nns_map[i] = []
         self.nns_map = nns_map
-
-         
-    # Custom distance function for cdist
-    def custom_distance(self,u, v):
-        d = np.dot(self.sqrt_range_mat, u[:2] - v[:2] ) # Distance between x1,x2 (2D)
-        spatial_diff = np.linalg.norm(d)  # Distance between x1,x2 (2D)
-        temporal_diff = np.abs(u[2] - v[2])           # Distance between y1 and y2
-        return np.sqrt(spatial_diff**2 + temporal_diff**2)
     
         ''' 
         # gneiting model (gneting 2002)
@@ -100,12 +96,7 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         s_dist = cdist(coords1, coords2, 'euclidean')
         t_dist = cdist(t1[:, None], t2[:, None], 'euclidean')  # Ensure t is a 2D array for cdist
         
-        # Calculate spatial distance. I did sanity check that above gives same result as below:
-        # s_dist = np.sqrt((x[:, np.newaxis] - x)**2 + (y[:, np.newaxis] - y)**2)
-        # Calculate temporal distance
-        # t_dist = np.abs(t[:, np.newaxis] - t)
-        # Calculate covariance matrix
-
+        # Compute the covariance matrix
         tmp1 = sigma**2 / (a * t_dist**(2 * alpha) + 1)**tau
         tmp2 = np.exp(-c * s_dist**(2 * gamma) / (a * t_dist**(2 * alpha) + 1)**(beta * gamma))
         out = tmp1 * tmp2
@@ -114,6 +105,16 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         out += np.eye(out.shape[0]) * nugget
         return out
 
+    # Custom distance function for cdist
+    def custom_distance_matrix(self,U, V, sqrt_range_mat):
+        diff = U[:, :2, np.newaxis] - V[:, :2].T
+        d = np.tensordot(sqrt_range_mat, diff, axes=(1, 1))
+
+    
+        spatial_diff = np.linalg.norm(d, axis=0)
+        temporal_diff = np.abs(U[:, 2, np.newaxis] - V[:, 2].T)
+        return np.sqrt(spatial_diff**2 + temporal_diff**2)
+    
     def matern_cov_yx_v05(self,params: Tuple[float,float,float,float,float,float], y: np.ndarray, x: np.ndarray) -> np.ndarray:
     
         sigmasq, range_lat, range_lon, advec, beta, nugget  = params
@@ -139,7 +140,9 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         sqrt_range_mat = np.diag([ 1/range_lat**0.5, 1/range_lon**0.5])
         self.sqrt_range_mat = sqrt_range_mat
 
-        distance = cdist(coords1,coords2, metric = self.custom_distance)
+
+        # distance = cdist(coords1,coords2, metric = 'self.custom_distance_matrix')
+        distance = self.custom_distance_matrix(coords1, coords2, self.sqrt_range_mat)
 
         # Initialize the covariance matrix with zeros
         out = distance
@@ -180,8 +183,7 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         sqrt_range_mat = np.diag([ 1/np.sqrt(range_lat), 1/np.sqrt(range_lon)])
         self.sqrt_range_mat = sqrt_range_mat
 
-        distance = cdist(coords1,coords2, metric = self.custom_distance)
-
+        distance = self.custom_distance_matrix(coords1, coords2, self.sqrt_range_mat)
         # Initialize the covariance matrix with zeros
         out = distance
         
@@ -253,8 +255,104 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
 
         return out
         
+class likelihood_function_testing(spatio_temporal_kernels):
+    def __init__(self, smooth, input_map, nns_map, mm_cond_number):
+        super().__init__(smooth, input_map, nns_map, mm_cond_number)
+        # Any additional initialization for dignosis class can go here
 
         
+    def custom_distance_matrix(self,U, V, sqrt_range_mat):
+        diff = U[:, :2, np.newaxis] - V[:, :2].T
+        d = np.tensordot(sqrt_range_mat, diff, axes=(1, 1))
+
+        spatial_diff = np.linalg.norm(d, axis=0)
+        temporal_diff = np.abs(U[:, 2, np.newaxis] - V[:, 2].T)
+        return np.sqrt(spatial_diff**2 + temporal_diff**2)         
+
+    def matern_cov_yx(self,params: Tuple[float,float,float,float,float,float], y: np.ndarray, x: np.ndarray) -> np.ndarray:
+    
+        sigmasq, range_lat, range_lon, advec, beta, nugget  = params
+        # Validate inputs
+        if y is None or x is None:
+            raise ValueError("Both y and x_df must be provided.")
+        # Extract values
+        x1 = x[:, 0]
+        y1 = x[:, 1]
+        t1 = x[:, 3]
+
+        x2 = y[:, 0]
+        y2 = y[:, 1]
+        t2 = y[:, 3] # hour
+
+        spat_coord1 = np.stack((x1- advec*t1, y1 - advec*t1), axis=-1)
+        spat_coord2 = np.stack((x2- advec*t2, y2 - advec*t2), axis=-1)
+
+        coords1 = np.hstack ((spat_coord1, (beta * t1).reshape(-1,1) ))
+        coords2 = np.hstack ((spat_coord2, (beta * t2).reshape(-1,1) ))
+
+        self.sqrt_range_mat = np.diag([ 1/np.sqrt(range_lat), 1/np.sqrt(range_lon)])
+        
+        def custom_distance_matrix(U, V, sqrt_range_mat):
+            diff = U[:, :2, np.newaxis] - V[:, :2].T
+            d = np.tensordot(sqrt_range_mat, diff, axes=(1, 1))
+
+            spatial_diff = np.linalg.norm(d, axis=0)
+            temporal_diff = np.abs(U[:, 2, np.newaxis] - V[:, 2].T)
+            return np.sqrt(spatial_diff**2 + temporal_diff**2)       
+  
+        distance = custom_distance_matrix(coords1, coords2, self.sqrt_range_mat)
+        # Initialize the covariance matrix with zeros
+        out = distance
+        
+        # Compute the covariance for non-zero distances
+        non_zero_indices = distance != 0
+        if np.any(non_zero_indices):
+            out[non_zero_indices] = (sigmasq * (2**(1-self.smooth)) / gamma(self.smooth) *
+                                    (distance[non_zero_indices] )**self.smooth *
+                                    kv(self.smooth, distance[non_zero_indices]))
+        out[~non_zero_indices] = sigmasq
+
+        # Add a small jitter term to the diagonal for numerical stability
+        out += np.eye(out.shape[0]) * nugget
+
+        return out
+        
+    def full_likelihood(self, params, input_np, y, covariance_function):
+        # Convert DataFrame to NumPy array with float64 dtype
+        input_arr = input_np[:, :4]
+        y_arr = y
+
+        # Compute the covariance matrix from the matern function
+        cov_matrix = covariance_function(params=params, y=input_arr, x=input_arr)
+        
+        # Compute the log determinant
+        sign, log_det = np.linalg.slogdet(cov_matrix)
+
+        # Compute the Cholesky decomposition (commented out)
+        # L = np.linalg.cholesky(cov_matrix)
+        # Solve for the log determinant (commented out)
+        # log_det = 2 * np.sum(np.log(np.diagonal(L)))
+
+        locs = input_arr[:, :2]
+    
+        # Solve linear systems
+        tmp1 = np.dot(locs.T, np.linalg.solve(cov_matrix, locs))
+        tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y_arr))
+        beta = np.linalg.solve(tmp1, tmp2)
+    
+        mu = np.dot(locs, beta)
+        y_mu = y_arr - mu
+
+        # Compute the quadratic form
+        # alpha = np.linalg.solve(L, y_mu) (commented out)
+        # quad_form = np.dot(alpha.T, alpha) (commented out)
+        quad_form = np.dot(y_mu, np.linalg.solve(cov_matrix, y_mu))
+        
+        # Compute the negative log-likelihood
+        n = len(y)
+        neg_log_lik = 0.5 * (n * np.log(2 * np.pi) + log_det + quad_form)
+
+        return neg_log_lik
 
 class likelihood_function(spatio_temporal_kernels):
     def __init__(self, smooth, input_map, nns_map, mm_cond_number):
@@ -1122,4 +1220,5 @@ class space_smooth_experiment:               #sigmasq range advec beta  nugget
             logging.error(f"Error occurred on {key}: {str(e)}")
             return f"Error occurred on {key}"
         
+
 
