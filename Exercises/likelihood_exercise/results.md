@@ -253,3 +253,38 @@ Data size: ```800 x 8(hours)```
 ```Estimates from Vecchia Approximation:    [7.55 1e-03 1e-03 -3.67e-04 3.75 0.2] 445 seconds ``` 
 
 
+
+
+<200*8>
+
+
+params= [20, 8.25, 5.25, 0.2, 0.5, 5]
+Full likelihood: 2704.56                    1.1 seconds
+Vecchia Maxmin : 2771.82                     0.2 seconds
+Vecchia Column: 3248.39                     0.1 seconds   # Data has to be sorted by longitude and latitude for better likelihood 
+ 
+params= [60, 8.25, 5.25, 0.2, 0.5, 5]
+Full likelihood: 2827.82       +123          1 seconds
+Vecchia Maxmin: 2865.35        +93         0.2 seconds
+Vecchia Column: 3110.07	       -138 	    0.00?
+
+
+<800*8>
+params= [20, 8.25, 5.25, 0.2, 0.5, 5]                              
+Full likelihood: 9902.49                    23.1 seconds
+Vecchia Maxmin : 9968.99                    0.8 seconds
+Vecchia Column: 10775.29                     0.1 seconds   # Data has to be sorted by longitude and latitude for better likelihood 
+ 
+params= [60, 8.25, 5.25, 0.2, 0.5, 5]
+Full likelihood: 10269.25       +366.76        25.6 seconds
+Vecchia Maxmin: 10268.71        +299.72         0.8 seconds
+Vecchia Column: 10724.31       -50 	    0.1
+
+
+## Condition number
+<800*8>
+params= [20, 8.25, 5.25, 0.2, 0.5, 5] 
+Full covariance matrix: condition number: 3526 (even for 200*8 dataset, condition number is 1366 for full covariance matrix)
+Vecchia covraince matrix conditioned on 10: condition number 9~53
+
+
