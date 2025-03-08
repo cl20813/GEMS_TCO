@@ -286,7 +286,6 @@ class likelihood_function_testing(spatio_temporal_kernels):
         def custom_distance_matrix(U, V, sqrt_range_mat):
             diff = U[:, :2].unsqueeze(1) - V[:, :2].unsqueeze(0)
             d = torch.tensordot(sqrt_range_mat, diff, dims=([1], [2]))
-
             spatial_diff = torch.norm(d, dim=0)
             temporal_diff = torch.abs(U[:, 2].unsqueeze(1) - V[:, 2].unsqueeze(0))
             return torch.sqrt(spatial_diff**2 + temporal_diff**2)
@@ -303,33 +302,36 @@ class likelihood_function_testing(spatio_temporal_kernels):
         out += torch.eye(out.shape[0]) * nugget
 
         return out
-            
-    def full_likelihood(self, params: torch.Tensor, input_np: torch.Tensor, y: torch.Tensor, covariance_function, lambda_: float) -> torch.Tensor:
+                
+    def full_likelihood(self, params: torch.Tensor, input_np: torch.Tensor, y: torch.Tensor, covariance_function) -> torch.Tensor:
         input_arr = input_np[:, :4]
         y_arr = y
 
+        # Compute the covariance matrix
         cov_matrix = covariance_function(params=params, y=input_arr, x=input_arr)
+        
+        # Compute the log determinant of the covariance matrix
         sign, log_det = torch.slogdet(cov_matrix)
-
+        # if sign <= 0:
+        #     raise ValueError("Covariance matrix is not positive definite")
+        
+        # Extract locations
         locs = input_arr[:, :2]
 
+        # Compute beta
         tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
         tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, y_arr))
         beta = torch.linalg.solve(tmp1, tmp2)
 
+        # Compute the mean
         mu = torch.matmul(locs, beta)
         y_mu = y_arr - mu
 
+        # Compute the quadratic form
         quad_form = torch.matmul(y_mu, torch.linalg.solve(cov_matrix, y_mu))
 
-        n = len(y)
+        # Compute the negative log likelihood
         neg_log_lik = 0.5 * (log_det + quad_form)
-
-        # Compute the L2 regularization term
-        l2_term = lambda_ * torch.sum(params ** 2)
-
-        # Add the L2 term to the negative log-likelihood
-        neg_log_lik += l2_term
 
         return neg_log_lik
     
@@ -739,7 +741,7 @@ class likelihood_function(spatio_temporal_kernels):
 
 
                 cov_matrix = covariance_function(params=params, y = np_arr, x = np_arr)
-                print(f'conditio number {np.linalg.cond(cov_matrix)}')
+               
                 L = np.linalg.cholesky(cov_matrix)
                 L11 = L[:1,:1]
                 L12 = np.zeros(L[:1,1:].shape)
