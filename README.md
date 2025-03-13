@@ -6,7 +6,7 @@
 -[Create an environment on Rutgers Amarel](https://github.com/cl20813/Softwares_Setup/blob/main/amarel_environment.md)
 
 
--[Install ```gems_tco``` package on local computer](install_gems_tco_local.md)   
+-[Install ```gems_tco``` package on local computer](https://github.com/cl20813/Software_Setup/blob/main/install_gems_tco_local.md)   
 
 -[Install ```gems_tco``` package on Amarel](https://github.com/cl20813/Softwares_Setup/blob/main/install_mypackage_amarel.md)      
 
