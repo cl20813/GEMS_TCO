@@ -388,7 +388,7 @@ class likelihood_function_testing(spatio_temporal_kernels):
                 cov_xx_inv = torch.linalg.inv(cov_xx)
 
                 cov_ygivenx = sigma - torch.matmul(cov_yx, torch.matmul(cov_xx_inv, cov_yx))
-                cond_mean_tmp = torch.matmul(cov_yx.T, cov_xx_inv)
+                cond_mean_tmp = torch.matmul(cov_yx, cov_xx_inv)
                 cond_mean = mu_current + torch.matmul(cond_mean_tmp, (y_and_neighbors[1:] - mu_neighbors))
                 
                 alpha = current_y - cond_mean
