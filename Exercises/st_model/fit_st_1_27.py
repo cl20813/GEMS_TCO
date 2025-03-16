@@ -59,7 +59,6 @@ def main():
     parser.add_argument('--params', type=float,nargs='+', default=[0.5,0.5,0.5,0.5,0.5, 0.5], help="Initial parameters")
     parser.add_argument('--bounds', type=float, nargs='+', default=[0.05, 600, 0.05, 600, -200, 200, 0.5, 600, 0.5, 600, 0.5, 600], help="Bounds for parameters" )    
     
-  
     # Parse the arguments
     args = parser.parse_args()
 
@@ -144,7 +143,6 @@ def main():
         tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'])
         tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
         aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
-    
     
     aggregated_np = aggregated_data.iloc[:,:4].to_numpy()
 
