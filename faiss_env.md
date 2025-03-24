@@ -25,9 +25,10 @@ When activate the new environment for the first time, system will ask to install
 
 
 # Amarel
+Make the same environment as above.
 
 cd /home/jl2815/tco/GEMS_TCO/src_cpp
 
-c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin_ancestor.cpp -o ../maxmin_ancestor.so
-c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin.cpp -o ../maxmin.so  
+``` c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin_ancestor.cpp -o ../maxmin_ancestor.so ```
+``` c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin.cpp -o ../maxmin.so  ```
 
