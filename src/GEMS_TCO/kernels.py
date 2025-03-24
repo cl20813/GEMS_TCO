@@ -418,9 +418,13 @@ class model_fitting(likelihood_function):
 
 
     # Example function to compute out1
-    def compute_vecc_nll(self,params):
+    def compute_vecc_nll_local(self,params):
         vecc_nll = self.vecchia_like_local_computer(params, self.matern_cov_anisotropy_v05)
         return vecc_nll
+
+    def compute_vecc_nll_amarel(self,params):
+            vecc_nll = self.vecchia_like_local_computer(params, self.matern_cov_anisotropy_v05)
+            return vecc_nll
 
     def compute_full_nll(self,params):
         full_nll = self.full_likelihood(params=params, input_np=self.aggregated_data, y=self.aggregated_response, covariance_function= self.matern_cov_anisotropy_v05) 
@@ -459,14 +463,43 @@ class model_fitting(likelihood_function):
 
         print('Training full likelihood complete.') 
 
-    def run_vecc(self, params, optimizer, epochs=10):
+    def run_vecc_local(self, params, optimizer, epochs=10):
         prev_loss= float('inf')
 
         tol = 1e-4  # Convergence tolerance
         for epoch in range(epochs):  # Number of epochs
             optimizer.zero_grad()  # Zero the gradients 
             
-            loss = self.compute_vecc_nll(params)
+            loss = self.compute_vecc_nll_local(params)
+            loss.backward()  # Backpropagate the loss
+            
+            # Print gradients and parameters every 10th epoch
+            # if epoch % 10 == 0:
+            #    print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            optimizer.step()  # Update the parameters
+            
+            # Check for convergence
+            if abs(prev_loss - loss.item()) < tol:
+                print(f"Converged at epoch {epoch}")
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
+            
+                break
+            
+            prev_loss = loss.item()
+
+        print('Training vecchia likelihood complete.') 
+
+    def run_vecc_amarel(self, params, optimizer, epochs=10):
+        prev_loss= float('inf')
+
+        tol = 1e-4  # Convergence tolerance
+        for epoch in range(epochs):  # Number of epochs
+            optimizer.zero_grad()  # Zero the gradients 
+            
+            loss = self.compute_vecc_nll_amarel(params)
             loss.backward()  # Backpropagate the loss
             
             # Print gradients and parameters every 10th epoch

@@ -161,7 +161,7 @@ def main():
     # optimizer = optim.Adam([params], lr=0.01)  # For Adam
     optimizer = instance.optimizer_fun( params, lr=0.01, betas=(0.9, 0.8), eps=1e-8)    
    
-    instance.run_vecc(params, optimizer, epochs=epochs)
+    instance.run_vecc_amarel(params, optimizer, epochs=epochs)
 
 if __name__ == '__main__':
     main()
