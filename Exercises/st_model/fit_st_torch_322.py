@@ -161,7 +161,5 @@ def main():
     optimizer = instance.optimizer_fun( params, lr=0.01, betas=(0.9, 0.8), eps=1e-8)    
     instance.run_full(params, optimizer, epochs=epochs)
 
-    instance.run_vecc(params, optimizer, epochs=epochs)
-
 if __name__ == '__main__':
     main()
