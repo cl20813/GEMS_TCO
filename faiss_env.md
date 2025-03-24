@@ -28,10 +28,13 @@ When activate the new environment for the first time, system will ask to install
 # Amarel
 Make the same environment as above.
 
-cd /home/jl2815/tco/GEMS_TCO/src_cpp
+cd /home/jl2815/tco/GEMS_TCO/cpp_src
 
-``` c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin_ancestor.cpp -o ../maxmin_ancestor.so ```
-``` c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin.cpp -o ../maxmin.so  ```
+NOTE: It should be ```maxmin_ancestor_cpp.so``` instead of ```maxmin_ancestor.so.``` The file should be compiled within the Linux system rather than compiling it on a local computer and transferring the file to Amarel, which is Linux-based.
+      
+``` c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin_ancestor.cpp -o ../maxmin_ancestor_cpp.so ```      
+``` c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin.cpp -o ../maxmin_cpp.so  ```         
+
 
 Now I need to add path so that python can find my libraries.
    
