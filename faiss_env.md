@@ -5,8 +5,8 @@ Go to terminal in VSCode.
 ```conda create -n faiss_env python=3.12```       
 ```conda activate faiss_env```       
 ```conda install -c pytorch faiss-cpu```      
-```conda install pybind11```      # comfile c++ file
-```conda install numpy pandas matplotlib seaborn scikit-learn```     
+```conda install pybind11```      # comfile c++ file       
+```conda install numpy pandas matplotlib seaborn scikit-learn```         
 ```conda install pytorch::pytorch torchvision torchaudio -c pytorch```  
 
 ### Install gems_tco packge on local computer. 
@@ -22,4 +22,22 @@ When activate the new environment for the first time, system will ask to install
 ```c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin_ancestor.cpp -o ../maxmin_ancestor_cpp$(python3-config --extension-suffix) -undefined dynamic_lookup```  
 
 ```c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin.cpp -o ../maxmin_cpp$(python3-config --extension-suffix) -undefined dynamic_lookup```   
+
+
+
+# Amarel
+Make the same environment as above.
+
+cd /home/jl2815/tco/GEMS_TCO/src_cpp
+
+``` c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin_ancestor.cpp -o ../maxmin_ancestor.so ```
+``` c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin.cpp -o ../maxmin.so  ```
+
+Now I need to add path so that python can find my libraries.
+   
+nano ~/.bashrc   
+export PATH="/home/jl2815/.conda/envs/faiss_env/bin:$PATH"   
+source ~/.bashrc   
+
+conda activate faiss_env   
 
