@@ -12,6 +12,10 @@ For significant updates or installations, use pip install --force-reinstall or p
 # mac
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/fit_st_torch_322.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/fit_st_torch_vecc_322.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+
+
+
 # window
 scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\fit_st_torch_322.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
@@ -22,14 +26,20 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/fit_st_torch
 
 ### Run this part
 ```ssh jl2815@amarel.rutgers.edu```
-```module use /projects/community/modulefiles```           
-```module load anaconda/2024.06-ts840``` 
+```  module use /projects/community/modulefiles  ```           
+```  module load anaconda/2024.06-ts840  ``` 
 ```conda activate gems_tco```
+
+nano ~/.bashrc
+export PATH="/home/jl2815/.conda/envs/faiss_env/bin:$PATH"
+source ~/.bashrc
+
+conda activate faiss_env
 
 ## space 5 5: 5x10, 4 4: 25x50, 2 2: 50x100
 
 
-``` srun --cpus-per-task=30 --mem=50G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_322.py --v 0.5 --space 20 20 --keys 0 8 --mm_cond_number=5 --params 20 10 5 .2 .2 .05 5  ```
+``` srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_322.py --v 0.5 --space 20 20 --keys 0 8 --mm_cond_number=5 --params 20 10 5 .2 .2 .05 5  ```
 
 
 ### Job Order SLURM for both vecchia and full
