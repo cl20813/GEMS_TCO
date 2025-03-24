@@ -38,6 +38,7 @@ sys.path.append("/cache/home/jl2815/tco")
 # Custom imports
 from GEMS_TCO import orbitmap 
 from GEMS_TCO import kernels 
+from GEMS_TCO import orderings as _orderings 
 
 import pickle
 import torch
@@ -119,13 +120,11 @@ def main():
     y1 = data_for_coord['Latitude'].values 
     coords1 = np.stack((x1, y1), axis=-1)
 
-    instance = orbitmap.MakeOrbitdata()
-    s_dist = cdist(coords1, coords1, 'euclidean')
-    ord_mm, _ = instance.maxmin_naive(s_dist, 0)
-
+    ord_mm = _orderings.maxmin_cpp(coords1)
     data_for_coord = data_for_coord.iloc[ord_mm].reset_index(drop=True)
     coords1_reordered = np.stack((data_for_coord['Longitude'].values, data_for_coord['Latitude'].values), axis=-1)
-    nns_map = instance.find_nns_naive(locs=coords1_reordered, dist_fun='euclidean', max_nn=mm_cond_number)
+    # nns_map = instance.find_nns_naive(locs=coords1_reordered, dist_fun='euclidean', max_nn=mm_cond_number)
+    nns_map=_orderings.find_nns_l2(locs= coords1_reordered  ,max_nn = mm_cond_number)
 
     analysis_data_map = {}
     for i in range(key_for_dict[0], key_for_dict[1]):
