@@ -416,7 +416,6 @@ class model_fitting(likelihood_function):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
         # Any additional initialization for dignosis class can go here
 
-
     # Example function to compute out1
     def compute_vecc_nll_local(self,params):
         vecc_nll = self.vecchia_like_local_computer(params, self.matern_cov_anisotropy_v05)
