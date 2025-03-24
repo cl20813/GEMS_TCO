@@ -10,7 +10,7 @@
 
 -[Install ```gems_tco``` package on Amarel](https://github.com/cl20813/Softwares_Setup/blob/main/install_mypackage_amarel.md)    
 
--[Compile ```maxmin.cpp``` file on local computer](faiss_env.md)      
+-[Compile ```maxmin.cpp``` file on local, and AMAREL](faiss_env.md)      
 
 -[Copy the dataset to Amarel HPC](copy_gemsdata_to_amarel)
 
