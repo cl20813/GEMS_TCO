@@ -5,8 +5,8 @@ Go to terminal in VSCode.
 ```conda create -n faiss_env python=3.12```       
 ```conda activate faiss_env```       
 ```conda install -c pytorch faiss-cpu```      
-```conda install pybind11```      # comfile c++ file
-```conda install numpy pandas matplotlib seaborn scikit-learn```     
+```conda install pybind11```      # comfile c++ file       
+```conda install numpy pandas matplotlib seaborn scikit-learn```         
 ```conda install pytorch::pytorch torchvision torchaudio -c pytorch```  
 
 ### Install gems_tco packge on local computer. 
