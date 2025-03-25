@@ -57,6 +57,9 @@ def main():
     
     #sigmasq (0.05,600), range_ (0.05,600), advec (-200,200), beta (0,600), nugget (0,600)
     parser.add_argument('--v', type=float, default=0.5, help="smooth")
+    parser.add_argument('--lr', type=float, default=0.01, help="learning rate")
+    
+    
     parser.add_argument('--space', type=int,nargs='+', default=[20,20], help="spatial resolution")
     parser.add_argument('--mm_cond_number', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
     parser.add_argument('--keys', type=int, nargs='+', default=[0,8], help="Index for the datasets.")
@@ -71,6 +74,7 @@ def main():
     params= torch.tensor(args.params, requires_grad=True)
     key_for_dict= args.keys
     v = args.v
+    lr = args.lr
     epochs = args.epochs
    
     ############################## 
@@ -149,7 +153,7 @@ def main():
     lenth_of_analysis = key_for_dict[1]-key_for_dict[0]
     print(f'data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}')
 
-    print(lat_lon_resolution, mm_cond_number, key_for_dict, params, v)
+    print(lat_lon_resolution, mm_cond_number, key_for_dict, params, v, lr)
 
     instance = kernels.model_fitting(
     smooth= v ,
@@ -159,7 +163,7 @@ def main():
     mm_cond_number=mm_cond_number
     )
     # optimizer = optim.Adam([params], lr=0.01)  # For Adam
-    optimizer = instance.optimizer_fun( params, lr=0.01, betas=(0.9, 0.8), eps=1e-8)    
+    optimizer = instance.optimizer_fun( params, lr=lr, betas=(0.9, 0.8), eps=1e-8)    
    
     instance.run_vecc_amarel(params, optimizer, epochs=epochs)
 
