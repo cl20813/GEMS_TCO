@@ -410,7 +410,6 @@ class likelihood_function(spatio_temporal_kernels):
 
         return neg_log_lik    
 
-    
 class model_fitting(likelihood_function): 
     def __init__(self, smooth, input_map, aggregated_data, nns_map, mm_cond_number):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
@@ -444,11 +443,10 @@ class model_fitting(likelihood_function):
             loss.backward()  # Backpropagate the loss
             
             # Print gradients and parameters every 10th epoch
-            # if epoch % 10 == 0:
-            #    print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            if epoch % 100 == 0:
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
-            # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
-            
+   
             optimizer.step()  # Update the parameters
             
             # Check for convergence
@@ -460,6 +458,8 @@ class model_fitting(likelihood_function):
             
             prev_loss = loss.item()
 
+        print(f'FINAL STATE: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, full Parameters: {params.detach().numpy()}')
+        
         print('Training full likelihood complete.') 
 
     def run_vecc_local(self, params, optimizer, epochs=10):
@@ -473,8 +473,8 @@ class model_fitting(likelihood_function):
             loss.backward()  # Backpropagate the loss
             
             # Print gradients and parameters every 10th epoch
-            # if epoch % 10 == 0:
-            #    print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            if epoch % 100 == 0:
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
@@ -488,7 +488,8 @@ class model_fitting(likelihood_function):
                 break
             
             prev_loss = loss.item()
-
+        print(f'FINAL STATE: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
+            
         print('Training vecchia likelihood complete.') 
 
     def run_vecc_amarel(self, params, optimizer, epochs=10):
@@ -502,8 +503,8 @@ class model_fitting(likelihood_function):
             loss.backward()  # Backpropagate the loss
             
             # Print gradients and parameters every 10th epoch
-            # if epoch % 10 == 0:
-            #    print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            if epoch % 100 == 0:
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
@@ -518,6 +519,8 @@ class model_fitting(likelihood_function):
             
             prev_loss = loss.item()
 
+        print(f'Final State: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
+        
         print('Training vecchia likelihood complete.') 
 
 
