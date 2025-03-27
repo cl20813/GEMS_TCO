@@ -430,47 +430,13 @@ class model_fitting(likelihood_function):
         full_nll = self.full_likelihood(params=params, input_np=self.aggregated_data, y=self.aggregated_response, covariance_function= self.matern_cov_anisotropy_v05) 
         return full_nll
     
-    def optimizer_fun(self, params, lr=0.01, betas=(0.9,.8), eps=1e-8):
-        optimizer = torch.optim.Adam([params], lr=lr, betas=betas, eps=eps)
-        return optimizer
-    
-    def optimizer_fun2(self, params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=40, gamma=0.5):
+    def optimizer_fun(self, params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=40, gamma=0.5):
         optimizer = torch.optim.Adam([params], lr=lr, betas=betas, eps=eps)
         scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)  # Decrease LR by a factor of 0.1 every 10 epochs
         return optimizer, scheduler
 
-    def run_full(self, params, optimizer, epochs=10):
-        prev_loss= float('inf')
-
-        tol = 1e-4  # Convergence tolerance
-        for epoch in range(epochs):  # Number of epochs
-            optimizer.zero_grad()  # Zero the gradients 
-            
-            loss = self.compute_full_nll(params)
-            loss.backward()  # Backpropagate the loss
-            
-            # Print gradients and parameters every 10th epoch
-            if epoch % 100 == 0:
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
-            
-   
-            optimizer.step()  # Update the parameters
-            
-            # Check for convergence
-            if abs(prev_loss - loss.item()) < tol:
-                print(f"Converged at epoch {epoch}")
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, full Parameters: {params.detach().numpy()}')
-            
-                break
-            
-            prev_loss = loss.item()
-
-        print(f'FINAL STATE: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, full Parameters: {params.detach().numpy()}')
-        
-        print('Training full likelihood complete.') 
-    
     # use adpating lr
-    def run_full2(self, params, optimizer, scheduler, epochs=10):
+    def run_full(self, params, optimizer, scheduler, epochs=10):
         prev_loss= float('inf')
 
         tol = 1e-4  # Convergence tolerance
@@ -484,7 +450,6 @@ class model_fitting(likelihood_function):
             if epoch % 100 == 0:
                 print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
-   
             optimizer.step()  # Update the parameters
             scheduler.step()  # Update the learning rate
             # Check for convergence
