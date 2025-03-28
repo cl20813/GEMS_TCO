@@ -2,12 +2,12 @@
 import pandas as pd
 import numpy as np
 from collections import defaultdict
-
 import sklearn
 from sklearn.neighbors import BallTree
-from scipy.optimize import minimize
-from scipy.spatial.distance import cdist  # For space and time distance
-from scipy.spatial import distance  # Find closest spatial point
+
+# from scipy.optimize import minimize
+# from scipy.spatial.distance import cdist  # For space and time distance
+# from scipy.spatial import distance  # Find closest spatial point
 
 from typing import Callable, Union, Tuple
 
@@ -119,85 +119,7 @@ class MakeOrbitdata():
 
         return sparse_map
 
-    def maxmin_naive(self,dist: np.ndarray, first: int) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Performs min-max ordering
 
-        The implementation is naive and will not perform well for large inputs.
-
-        Parameters
-        ----------
-        dist
-            distance matrix
-        first
-            Index of the observation that should be sorted first
-
-        Returns
-        -------
-        np.ndarray
-            The minmax ordering
-        np.ndarray
-            Array with the distances to the location preceding in ordering
-        """
-
-        n = dist.shape[0]
-        ord = np.zeros(n, dtype=np.int64)
-        ord[0] = first
-        dists = np.zeros(n)
-        dists[0] = np.nan
-        idx = np.arange(n)
-
-
-        for i in range(1, n):
-            # find min dist for each not selected loccation
-            mask = ~np.isin(idx, ord[:i])
-            min_d = np.min(dist[mask, :][:, ord[:i]], axis=1)
-
-            # find max idx among those
-            idx_max = np.argmax(min_d)
-
-            # record dist
-            dists[i] = min_d[idx_max]
-
-            # adjust idx for the prevous removed rows
-            idx_max = idx[mask][idx_max]
-            ord[i] = idx_max
-        return ord, dists
-
-    
-    def find_nns_naive(
-        self, locs: np.ndarray, dist_fun: Union[Callable, str] = "euclidean", max_nn: int = 10, **kwargs
-    ) -> np.ndarray:
-        """
-        Finds the max_nn nearest neighbors preceding in the ordering.
-
-        The method is naivly implemented and will not perform well for large inputs.
-
-        Parameters
-        ----------
-        locs
-            an n x m array of ordered locations
-        dist_fun
-            a distance function
-        max_nn
-            number of nearest neighbours
-        kwargs
-            supplied dist_func
-
-        Returns
-        -------
-        np.ndarray
-            Returns an n x max_nn array holding the indices of the nearest neighbors
-            preceding in the ordering where -1 indicates missing neighbors.
-        """
-        n = locs.shape[0]
-        nns = np.zeros((n, max_nn), dtype=np.int64) - 1
-        for i in range(1, n):
-            nn = sklearn.neighbors.BallTree(locs[:i], metric=dist_fun, **kwargs)   # dist_fun= 'euclidean'
-            k = min(i-1, max_nn)
-            nn_res = nn.query(locs[[i], :], k=k, return_distance=False)
-            nns[i, :k] = nn_res
-        return nns
 
 
     

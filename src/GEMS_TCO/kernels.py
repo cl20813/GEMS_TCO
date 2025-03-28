@@ -1,35 +1,27 @@
 # Standard libraries
-import logging
-import math
-import sys
-from collections import defaultdict
-import time
+# import logging
+# import math
+# import time
+# from collections import defaultdict
+# Special functions and optimizations
+# from scipy.spatial.distance import cdist  # For space and time distance
+# from scipy.optimize import minimize  # For optimization
 
-# Data manipulation and analysis
+import sys
+gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
+sys.path.append(gems_tco_path)
+import GEMS_TCO
+from scipy.special import gamma, kv  # Bessel function and gamma function
+
+from collections import defaultdict
 import pandas as pd
 import numpy as np
-
-# Nearest neighbor search
-import sklearn
-from sklearn.neighbors import BallTree
-from sklearn.preprocessing import MinMaxScaler
-
-# Special functions and optimizations
-from scipy.spatial.distance import cdist  # For space and time distance
-from scipy.special import gamma, kv  # Bessel function and gamma function
-from scipy.optimize import minimize
-from scipy.optimize import basinhopping, minimize
-from scipy.stats import norm,uniform
-from scipy.stats import t
 import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
-
-import copy      
-
-# Type hints
-from typing import Callable, Union, Tuple
-
+import torch.optim as optim
+import copy    
+import logging     # for logging
 # Add your custom path
 sys.path.append("/cache/home/jl2815/tco")
 
@@ -465,7 +457,7 @@ class model_fitting(likelihood_function):
         return [params.detach().numpy(), loss.item()]
         print('Training full likelihood complete.')
 
-    def run_vecc_local(self, params, optimizer, epochs=10):
+    def run_vecc_local(self, params, optimizer, scheduler, epochs=10):
         prev_loss= float('inf')
 
         tol = 1e-4  # Convergence tolerance
@@ -482,7 +474,7 @@ class model_fitting(likelihood_function):
             # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             optimizer.step()  # Update the parameters
-            
+            scheduler.step()  # Update the learning rate
             # Check for convergence
             if abs(prev_loss - loss.item()) < tol:
                 print(f"Converged at epoch {epoch}")
@@ -492,8 +484,8 @@ class model_fitting(likelihood_function):
             prev_loss = loss.item()
         print(f'FINAL STATE: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
         print('Training vecchia likelihood complete.') 
-
-    def run_vecc_amarel(self, params, optimizer, epochs=10):
+        return [params.detach().numpy(), loss.item()]
+    def run_vecc_amarel(self, params, optimizer, scheduler,epochs=10):
         prev_loss= float('inf')
 
         tol = 1e-4  # Convergence tolerance
@@ -510,7 +502,7 @@ class model_fitting(likelihood_function):
             # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             optimizer.step()  # Update the parameters
-            
+            scheduler.step()  # Update the learning rate
             # Check for convergence
             if abs(prev_loss - loss.item()) < tol:
                 print(f"Converged at epoch {epoch}")
@@ -524,4 +516,4 @@ class model_fitting(likelihood_function):
         
         print('Training vecchia likelihood complete.') 
 
-
+        return [params.detach().numpy(), loss.item()]

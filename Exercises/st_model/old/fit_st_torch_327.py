@@ -1,53 +1,31 @@
-# work environment: jl2815
 # Standard libraries
 import sys
+# Add your custom path
+sys.path.append("/cache/home/jl2815/tco")
 import os
 import logging
 import argparse # Argument parsing
-import math
-from collections import defaultdict
-import concurrent
-from concurrent.futures import ThreadPoolExecutor  # Importing specific executor for clarity
-import time 
 
 # Data manipulation and analysis
 import pandas as pd
 import numpy as np
-
-# Nearest neighbor search
-import sklearn
-from sklearn.neighbors import BallTree
-
-# Special functions and optimizations
-from scipy.special import gamma, kv  # Bessel function and gamma function
-from scipy.stats import multivariate_normal  # Simulation
-from scipy.optimize import minimize
-from scipy.spatial.distance import cdist  # For space and time distance
-from scipy.spatial import distance  # Find closest spatial point
-from scipy.optimize import differential_evolution
-
-# Plotting and visualization
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-# Type hints
-from typing import Callable, Union, Tuple
-
-# Add your custom path
-sys.path.append("/cache/home/jl2815/tco")
-
-# Custom imports
-from GEMS_TCO import orbitmap 
-from GEMS_TCO import kernels 
-from GEMS_TCO import orderings as _orderings 
-
 import pickle
 import torch
 import torch.optim as optim
 import copy                    # clone tensor
 
+
+# Custom imports
+import GEMS_TCO
+from GEMS_TCO import kernels
+from GEMS_TCO import orbitmap 
+from GEMS_TCO import kernels 
+from GEMS_TCO import orderings as _orderings 
+
+
+
 # Configure logging to a specific file path
-log_file_path = '/home/jl2815/tco/exercise_output/logs/fit_st1.log'
+log_file_path = '/home/jl2815/tco/exercise_output/logs/fit_full.log'
 
 logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(message)s')
 
@@ -55,13 +33,11 @@ logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctim
 def main():
     # Argument parser
     parser = argparse.ArgumentParser(description="Fit spatio-temporal model")
-    #sigmasq (0.05,600), range_ (0.05,600), advec (-200,200), beta (0,600), nugget (0,600)
     parser.add_argument('--v', type=float, default=0.5, help="smooth")
     parser.add_argument('--lr', type=float, default=0.01, help="learning rate")
     parser.add_argument('--space', type=int,nargs='+', default=[20,20], help="spatial resolution")
     parser.add_argument('--days', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
     parser.add_argument('--mm_cond_number', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
-        
     parser.add_argument('--params', type=float,nargs='+', default=[20, 8.25, 5.25, .2, .2, .05 , 5], help="Initial parameters")
     parser.add_argument('--epochs', type=int, default=100, help="Number of iterations in optimization")
     
