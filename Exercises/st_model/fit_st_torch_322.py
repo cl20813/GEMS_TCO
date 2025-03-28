@@ -60,6 +60,7 @@ def main():
     
     parser.add_argument('--space', type=int,nargs='+', default=[20,20], help="spatial resolution")
     parser.add_argument('--mm_cond_number', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
+    
     parser.add_argument('--keys', type=int, nargs='+', default=[0,8], help="Index for the datasets.")
     parser.add_argument('--params', type=float,nargs='+', default=[20, 8.25, 5.25, .2, .2, .05 , 5], help="Initial parameters")
     parser.add_argument('--epochs', type=int, default=100, help="Number of iterations in optimization")

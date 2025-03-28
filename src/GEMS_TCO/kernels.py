@@ -487,12 +487,10 @@ class model_fitting(likelihood_function):
             if abs(prev_loss - loss.item()) < tol:
                 print(f"Converged at epoch {epoch}")
                 print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
-            
                 break
-            
+
             prev_loss = loss.item()
         print(f'FINAL STATE: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
-            
         print('Training vecchia likelihood complete.') 
 
     def run_vecc_amarel(self, params, optimizer, epochs=10):
