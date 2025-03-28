@@ -12,17 +12,17 @@ For significant updates or installations, use pip install --force-reinstall or p
 # mac
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/fit_st_torch_322.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/fit_st_torch_327.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/fit_st_torch_vecc_322.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
-
-
 
 # window
 scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\fit_st_torch_322.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 ### Copy from ```Amarel HPC``` to ```local computer```
 
-# window
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/fit_st_torch_322.py "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\"
+# amarel
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/estimation_1250_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates"
 
 ### Run this part
 ```ssh jl2815@amarel.rutgers.edu```
@@ -35,6 +35,8 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/fit_st_torch
 
 
 ``` srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_322.py --v 0.5 --lr 0.01 --epochs 3000 --space 20 20 --keys 0 8 --mm_cond_number=5 --params 24.42 1.92 1.92 0.001 -0.045 0.237 3.34   ```
+
+``` srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_327.py --v 0.5 --lr 0.01 --epochs 3000 --space 20 20 --keys 0 8 --mm_cond_number=5 --params 24.42 1.92 1.92 0.001 -0.045 0.237 3.34   ```
 
 
 ``` srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_322.py --v 0.5 --epochs 5 --space 20 20 --keys 0 8 --mm_cond_number=5 --params 20 20 5 .2 .2 .05 5  ```

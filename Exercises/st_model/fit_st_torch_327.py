@@ -58,10 +58,10 @@ def main():
     #sigmasq (0.05,600), range_ (0.05,600), advec (-200,200), beta (0,600), nugget (0,600)
     parser.add_argument('--v', type=float, default=0.5, help="smooth")
     parser.add_argument('--lr', type=float, default=0.01, help="learning rate")
-    
     parser.add_argument('--space', type=int,nargs='+', default=[20,20], help="spatial resolution")
+    parser.add_argument('--days', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
     parser.add_argument('--mm_cond_number', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
-    parser.add_argument('--keys', type=int, nargs='+', default=[0,8], help="Index for the datasets.")
+        
     parser.add_argument('--params', type=float,nargs='+', default=[20, 8.25, 5.25, .2, .2, .05 , 5], help="Initial parameters")
     parser.add_argument('--epochs', type=int, default=100, help="Number of iterations in optimization")
     
@@ -70,10 +70,11 @@ def main():
 
     # Use args.param1, args.param2 in your script
     lat_lon_resolution = args.space 
+    days = args.days
     mm_cond_number = args.mm_cond_number
     params= torch.tensor(args.params, requires_grad=True)
-    key_for_dict= args.keys
     v = args.v
+    key_for_dict= [0,8]
     lr = args.lr
     epochs = args.epochs
     ############################## 
@@ -132,7 +133,7 @@ def main():
 
     result = {}
 
-    for day in range(2):
+    for day in range(days):
         idx_for_datamap= [8*day,8*(day+1)]
         analysis_data_map = {}
         for i in range(idx_for_datamap[0],idx_for_datamap[1]):
@@ -176,16 +177,18 @@ def main():
 
         # optimizer = optim.Adam([params], lr=0.01)  # For Adam
         optimizer, scheduler = instance.optimizer_fun(params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=20, gamma=0.9)    
-        out = instance.run_full(params, optimizer,scheduler, epochs=3000)
+        out = instance.run_full(params, optimizer,scheduler, epochs=epochs)
         result[day+1] = out
 
-    output_filename = f"estimation_1250_july24.pkl"
+    output_filename = f"estimation_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
 
     # base_path = "/home/jl2815/tco/data/pickle_data"
-    output_path = "/home/jl2815/tco/exercise_output/"
+    output_path = "/home/jl2815/tco/exercise_output/estimates"
     output_filepath = os.path.join(output_path, output_filename)
     with open(output_filepath, 'wb') as pickle_file:
         pickle.dump(result, pickle_file)    
 
 if __name__ == '__main__':
     main()
+
+
