@@ -45,9 +45,9 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/empirical_sem
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=fit_st_torch_full_estimates                             # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_full_est%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_torch_full_est%j.err # Standard error file (%j = JobID)
+#SBATCH --job-name=emp_sem                            # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/emp_sem%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/emp_sem%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
@@ -69,7 +69,7 @@ echo "compute empirical semivariograms by lat,lon distance h"
 
 srun python /home/jl2815/tco/exercise_25/empirical_sem_map.py --space 2 2 --days 31 
 
-srun python /home/jl2815/tco/exercise_25/empirical_sem_map.py --space 2 2 --days 31 
+srun python /home/jl2815/tco/exercise_25/empirical_sem_map.py --space 1 1 --days 31 
 
 
 ```
