@@ -99,6 +99,8 @@ def main():
 
     tolerance=0.01
     for day in range(days):
+        print(f'day {day+1}, data size per hour: {int((200/rho_lat)*(100/rho_lon))}')
+        
         idx_for_datamap= [8*day,8*(day+1)]
         analysis_data_map, aggregated_data = instance.load_working_data_byday( ym_map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
 
@@ -109,8 +111,8 @@ def main():
             deltas_copy = deltas[mask].clone().detach()
             emp_st_sem = empirical_sem[mask].clone().detach()
 
-            emp_sem_map[(1, temporal_lag,0)] = deltas_copy
-            emp_sem_map[(1, temporal_lag,1)] =  emp_st_sem
+            emp_sem_map[(day+1, temporal_lag,0)] = deltas_copy
+            emp_sem_map[(day+1, temporal_lag,1)] =  emp_st_sem
 
     output_filename = f"empirical_sem_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
 
