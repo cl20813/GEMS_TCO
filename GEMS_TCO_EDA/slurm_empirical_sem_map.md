@@ -74,6 +74,8 @@ echo "compute empirical semivariograms by lat,lon distance h"
 
 srun python /home/jl2815/tco/exercise_25/empirical_sem_map.py --space 4 4 --days 31 
 
+srun python /home/jl2815/tco/exercise_25/empirical_sem_map_short_lag.py --space 2 2 --days 31 
+
 
 
 
