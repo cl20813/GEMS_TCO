@@ -91,7 +91,7 @@ def main():
         return deltas, empirical_sem    
     
     #deltas = torch.cat((torch.linspace(0.1, 0.9, 9), torch.linspace(1.1, 2.5, 7)), dim=0)
-    deltas = torch.linspace(0.05, 0.1,2)
+    deltas = torch.linspace(0.1, 0.1,1)
     colors = plt.cm.viridis(np.linspace(0, 1, 8))  # Color map for the temporal lags
     
     emp_sem_map = {}
@@ -100,6 +100,8 @@ def main():
     tolerance=0.005
 
     for day in range(days):
+        print(f'day {day+1}, data size per hour: {int((200/rho_lat)*(100/rho_lon))}')
+        
         idx_for_datamap= [8*day,8*(day+1)]
         analysis_data_map, aggregated_data = instance.load_working_data_byday( ym_map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
 
