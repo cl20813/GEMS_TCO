@@ -9,8 +9,9 @@ For significant updates or installations, use pip install --force-reinstall or p
 
 ### Copy run file from ```local``` to ```Amarel HPC```
 # mac
-
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/empirical_sem_map.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25
+
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/empirical_sem_map_short_lag.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25
 
 # window
 scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\fit_st_torch_327.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
@@ -51,7 +52,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/empirical_sem
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
-#SBATCH --mem=350G                                                 # Memory per node
+#SBATCH --mem=400G                                                 # Memory per node
 #SBATCH --partition=mem                                            # Partition name
 
 #### Load the Anaconda module to use srun 
@@ -69,7 +70,7 @@ echo "compute empirical semivariograms by lat,lon distance h"
 
 srun python /home/jl2815/tco/exercise_25/empirical_sem_map.py --space 4 4 --days 31 
 
-
+srun python /home/jl2815/tco/exercise_25/empirical_sem_map_short_lag.py --space 1 1 --days 31 
 
 
 ```
