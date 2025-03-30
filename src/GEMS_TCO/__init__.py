@@ -69,7 +69,7 @@ class load_data_local_computer:
 
         return coarse_dicts, ord_mm, nns_map
 
-    def load_working_data_byday(self, coarse_dicts, key_idx, ord_mm, nns_map, idx_for_datamap=[0,8]):
+    def load_working_data_byday(self, coarse_dicts,  ord_mm, nns_map, idx_for_datamap=[0,8]):
         key_idx = sorted(coarse_dicts)
         if not key_idx:
             raise ValueError("coarse_dicts is empty")
