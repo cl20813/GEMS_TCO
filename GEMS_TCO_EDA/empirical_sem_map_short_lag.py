@@ -66,7 +66,7 @@ def main():
 
         # Demean the values
         values = values - torch.mean(values)
-        
+
         # Calculate spatial and temporal distances
         spatial_distances = torch.sqrt((lat.unsqueeze(1) - lat.unsqueeze(0))**2 + (lon.unsqueeze(1) - lon.unsqueeze(0))**2)
         temporal_distances = torch.abs(time.unsqueeze(1) - time.unsqueeze(0))
@@ -91,13 +91,14 @@ def main():
         return deltas, empirical_sem    
     
     #deltas = torch.cat((torch.linspace(0.1, 0.9, 9), torch.linspace(1.1, 2.5, 7)), dim=0)
-    deltas = torch.linspace(0.1,2.5,25)
+    deltas = torch.linspace(0.05, 0.1,2)
     colors = plt.cm.viridis(np.linspace(0, 1, 8))  # Color map for the temporal lags
     
     emp_sem_map = {}
     print(f'data size per hour: {int((200/rho_lat)*(100/rho_lon))}')
 
-    tolerance=0.01
+    tolerance=0.005
+
     for day in range(days):
         idx_for_datamap= [8*day,8*(day+1)]
         analysis_data_map, aggregated_data = instance.load_working_data_byday( ym_map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
@@ -112,7 +113,7 @@ def main():
             emp_sem_map[(1, temporal_lag,0)] = deltas_copy
             emp_sem_map[(1, temporal_lag,1)] =  emp_st_sem
 
-    output_filename = f"empirical_sem_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
+    output_filename = f"empirical_short_sem_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
 
     # base_path = "/home/jl2815/tco/data/pickle_data"
     output_path = "/home/jl2815/tco/exercise_output/eda"

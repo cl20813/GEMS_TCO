@@ -17,7 +17,7 @@ scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\fit_st_torch_327.py" jl281
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/empirical_sem_50_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/outputs"
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/empirical_sem_5000_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/outputs"
 
 
 ### Run this part
@@ -67,9 +67,9 @@ echo "Current date and time: $(date)"
 
 echo "compute empirical semivariograms by lat,lon distance h"
 
-srun python /home/jl2815/tco/exercise_25/empirical_sem_map.py --space 2 2 --days 31 
+srun python /home/jl2815/tco/exercise_25/empirical_sem_map.py --space 4 4 --days 31 
 
-srun python /home/jl2815/tco/exercise_25/empirical_sem_map.py --space 1 1 --days 31 
+
 
 
 ```
