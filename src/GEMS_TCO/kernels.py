@@ -230,8 +230,16 @@ class likelihood_function(spatio_temporal_kernels):
                 L11_inv = torch.linalg.inv(L11)
                 L22_inv = torch.linalg.inv(L22)
 
-                L_inv = torch.block_diag(L11_inv, L22_inv)
-                L_inv[1:, :1] = -torch.matmul(L22_inv, L21) @ L11_inv
+                # First block: [L11_inv, L12]
+                upper_block = torch.cat((L11_inv, L12), dim=1)  # Concatenate along columns (dim=1)
+
+                # Second block: [-torch.matmul(torch.matmul(L22_inv, L21), L11_inv), L22_inv]
+                lower_left = -torch.matmul(torch.matmul(L22_inv, L21), L11_inv)
+                lower_block = torch.cat((lower_left, L22_inv), dim=1)  # Concatenate along columns (dim=1)
+
+                # Combine the upper and lower blocks
+                L_inv = torch.cat((upper_block, lower_block), dim=0)  # Concatenate along rows (dim=0)
+
 
                 cov_yx = cov_matrix[0, 1:]
 
@@ -361,8 +369,16 @@ class likelihood_function(spatio_temporal_kernels):
                 L11_inv = torch.linalg.inv(L11)
                 L22_inv = torch.linalg.inv(L22)
 
-                L_inv = torch.block_diag(L11_inv, L22_inv)
-                L_inv[1:, :1] = -torch.matmul(L22_inv, L21) @ L11_inv
+                # First block: [L11_inv, L12]
+                upper_block = torch.cat((L11_inv, L12), dim=1)  # Concatenate along columns (dim=1)
+
+                # Second block: [-torch.matmul(torch.matmul(L22_inv, L21), L11_inv), L22_inv]
+                lower_left = -torch.matmul(torch.matmul(L22_inv, L21), L11_inv)
+                lower_block = torch.cat((lower_left, L22_inv), dim=1)  # Concatenate along columns (dim=1)
+
+                # Combine the upper and lower blocks
+                L_inv = torch.cat((upper_block, lower_block), dim=0)  # Concatenate along rows (dim=0)
+
 
                 cov_yx = cov_matrix[0, 1:]
 
