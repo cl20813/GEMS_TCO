@@ -36,11 +36,11 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_ex
 ### Job Order SLURM for both vecchia and full
 ```mkdir -p ./jobscript/tco/gp_exercise```     
 
-```   sbatch fit_st_vecc_extra.sh   ```
+```   sbatch fit_vecc_ext_nohead.sh   ```
 
 
 ```  cd ./jobscript/tco/gp_exercise  ```                             
-```  nano fit_st_vecc_extra.sh  ```        
+```  nano fit_vecc_ext_nohead.sh  ```        
  
 
 ``` 

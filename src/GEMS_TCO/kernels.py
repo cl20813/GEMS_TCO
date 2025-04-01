@@ -143,21 +143,10 @@ class likelihood_function(spatio_temporal_kernels):
         return  neg_log_lik 
     
 
-
-
-    def vecchia_extrapolate(self, params: torch.Tensor, covariance_function, cut_line=200) -> torch.Tensor:
+    def vecchia_extrapolate(self, params: torch.Tensor, covariance_function) -> torch.Tensor:
         self.cov_map = defaultdict(list)
         neg_log_lik = 0.0
-
-        key_list = sorted(self.input_map)
-        cut_line = cut_line
-        heads = self.input_map[key_list[0]][:cut_line,:]
-        for time_idx in range(1, len(self.input_map)):
-            tmp = self.input_map[key_list[time_idx]][:cut_line,:]
-            heads = torch.cat( (heads,tmp), dim=0)
-
-        neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
-        
+          
         for time_idx in range(len(self.input_map)):
             current_np = self.input_map[self.key_list[time_idx]]
 
@@ -165,7 +154,7 @@ class likelihood_function(spatio_temporal_kernels):
             # cur_heads = current_np[:5, :]
             # neg_log_lik += self.full_likelihood(params, cur_heads, cur_heads[:, 2], covariance_function)
 
-            for index in range(cut_line, self.size_per_hour):
+            for index in range(0, self.size_per_hour):
                 current_row = current_np[index].reshape(1, -1)
                 current_y = current_row[0, 2]
 
@@ -369,7 +358,7 @@ class model_fitting(likelihood_function):
 
     # Example function to compute out1
     def compute_vecc_nll_interpolate(self,params):
-        vecc_nll = self.vecchia_extrapolate(params, self.matern_cov_anisotropy_v05,200)
+        vecc_nll = self.vecchia_extrapolate(params, self.matern_cov_anisotropy_v05)
         return vecc_nll
 
     def compute_vecc_nll_extrapolate(self,params):
