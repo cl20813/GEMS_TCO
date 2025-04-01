@@ -12,7 +12,6 @@ For significant updates or installations, use pip install --force-reinstall or p
 
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/fit_st_torch_vecc_ext331.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/fit_st_torch_vecc_int331.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 # window
 scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\fit_st_torch_327.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
@@ -20,11 +19,6 @@ scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\fit_st_torch_327.py" jl281
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
 
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_extra_estimates_1250_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"
-
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_inter_estimates_1250_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"
-
-
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/estimation_1250_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"
 
 
 ### Run this part
@@ -38,25 +32,22 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/estimat
 
 ``` srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_ext331.py --v 0.5 --lr 0.01 --epochs 3000 --space 20 20 --days 2 --mm_cond_number=5 --params 24.42 1.92 1.92 0.001 -0.045 0.237 3.34   ```
 
-``` srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_int331.py --v 0.5 --lr 0.01 --epochs 3000 --space 20 20 --days 2 --mm_cond_number=5 --params 24.42 1.92 1.92 0.001 -0.045 0.237 3.34   ```
-
-
 
 ### Job Order SLURM for both vecchia and full
 ```mkdir -p ./jobscript/tco/gp_exercise```     
 
-```   sbatch fit_st_torch_vecc3.sh   ```
+```   sbatch fit_st_vecc_extra.sh   ```
 
 
 ```  cd ./jobscript/tco/gp_exercise  ```                             
-```  nano fit_st_torch_vecc3.sh  ```        
+```  nano fit_st_vecc_extra.sh  ```        
  
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=fit_st_torch_vecc3                            # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_vecc3_est%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_torch_vecc3_est%j.err # Standard error file (%j = JobID)
+#SBATCH --job-name=fit_st_vecc_extra                           # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/fit_st_vecc_extra_est%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/fit_st_vecc_extra_est%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
@@ -74,9 +65,7 @@ conda activate faiss_env
 
 echo "Current date and time: $(date)"
 
-echo "fit_st_full_save_estimates"
-
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_int331.py --v 0.5 --lr 0.01 --epochs 1000 --space 4 4 --days 31 --mm_cond_number=10 --params 24.42 1.92 1.92 0.001 -0.045 0.237 3.34 
+echo "fit_st_vecc_extra_save_estimates"
 
 srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_ext331.py --v 0.5 --lr 0.01 --epochs 1000 --space 4 4 --days 31 --mm_cond_number=10 --params 24.42 1.92 1.92 0.001 -0.045 0.237 3.34 
 
