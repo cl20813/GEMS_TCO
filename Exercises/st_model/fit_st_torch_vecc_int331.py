@@ -84,7 +84,7 @@ def main():
 
         # optimizer = optim.Adam([params], lr=0.01)  # For Adam
         optimizer, scheduler = model_instance.optimizer_fun(params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=20, gamma=0.9)    
-        out = model_instance.vecchia_interpolation_1to6(params, optimizer,scheduler, epochs=epochs)
+        out = model_instance.run_vecc_interpolate(params, optimizer,scheduler, epochs=epochs)
         result_inter[day+1] = out
 
     output_filename = f"vecc_inter_estimates_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
