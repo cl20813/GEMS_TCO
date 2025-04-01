@@ -67,7 +67,7 @@ echo "Current date and time: $(date)"
 
 echo "fit_st_full_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_int331.py --v 0.5 --lr 0.01 --epochs 1000 --space 4 4 --days 31 --mm_cond_number=10 --params 24.42 1.92 1.92 0.001 -0.045 0.237 3.34 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_int331.py --v 0.5 --lr 0.01 --epochs 1000 --space 2 2 --days 5 --mm_cond_number=10 --params 24.42 1.92 1.92 0.001 -0.045 0.237 3.34 
 
 
 ```
