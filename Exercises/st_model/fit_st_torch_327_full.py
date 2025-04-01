@@ -6,6 +6,7 @@ import os
 import logging
 import argparse # Argument parsing
 
+
 # Data manipulation and analysis
 import pandas as pd
 import numpy as np
@@ -13,6 +14,7 @@ import pickle
 import torch
 import torch.optim as optim
 import copy                    # clone tensor
+import time
 
 # Custom imports
 import GEMS_TCO
@@ -82,10 +84,15 @@ def main():
                 mm_cond_number=mm_cond_number
             )
 
+        start_time = time.time()
         # optimizer = optim.Adam([params], lr=0.01)  # For Adam
         optimizer, scheduler = model_instance.optimizer_fun(params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=20, gamma=0.9)    
         out = model_instance.run_full(params, optimizer,scheduler, epochs=epochs)
         result[day+1] = out
+
+        end_time = time.time()
+        epoch_time = end_time - start_time
+        print(f'day {day + 1} took {epoch_time:.2f}')
 
     output_filename = f"estimation_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
 
