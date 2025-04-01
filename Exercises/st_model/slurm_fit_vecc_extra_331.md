@@ -45,9 +45,9 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_ex
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=fit_st_vecc_extra                           # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_st_vecc_extra_est%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_st_vecc_extra_est%j.err # Standard error file (%j = JobID)
+#SBATCH --job-name=fit_vecc_ext_nohead                          # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/fit_st_vecc_extra_nohead%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/fit_st_vecc_extra_nohead%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
