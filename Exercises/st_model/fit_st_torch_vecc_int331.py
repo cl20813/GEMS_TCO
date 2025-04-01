@@ -68,7 +68,7 @@ def main():
         analysis_data_map, aggregated_data = instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
 
         lenth_of_analysis = key_for_dict[1]-key_for_dict[0]
-        print(f'data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}')
+        print(f'day {day+1}, data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}')
         print(lat_lon_resolution, mm_cond_number, key_for_dict, params, v,lr)
 
         params = [24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34]
