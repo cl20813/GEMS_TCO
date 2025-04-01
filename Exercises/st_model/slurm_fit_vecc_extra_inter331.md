@@ -19,7 +19,9 @@ scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\fit_st_torch_327.py" jl281
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/estimation_200_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_extra_estimates_1250_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_inter_estimates_1250_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"
 
 
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/estimation_1250_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"
@@ -41,22 +43,22 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/estimat
 ### Job Order SLURM for both vecchia and full
 ```mkdir -p ./jobscript/tco/gp_exercise```     
 
-```   sbatch fit_st_torch_full_estimates.sh   ```
+```   sbatch fit_st_torch_vecc3.sh   ```
 
 
 ```  cd ./jobscript/tco/gp_exercise  ```                             
-```  nano fit_st_torch_full_estimates.sh  ```        
+```  nano fit_st_torch_vecc3.sh  ```        
  
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=fit_st_torch_full_estimates                             # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_full_est%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_torch_full_est%j.err # Standard error file (%j = JobID)
+#SBATCH --job-name=fit_st_torch_vecc3                            # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/fit_vecc3_est%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/fit_torch_vecc3_est%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
-#SBATCH --mem=250G                                                 # Memory per node
+#SBATCH --mem=350G                                                 # Memory per node
 #SBATCH --partition=mem                                            # Partition name
 
 #### Load the Anaconda module to use srun 
@@ -72,8 +74,9 @@ echo "Current date and time: $(date)"
 
 echo "fit_st_full_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_327_full.py --v 0.5 --lr 0.01 --epochs 3000 --space 2 2 --days 31 --mm_cond_number=5 --params 24.42 1.92 1.92 0.001 -0.045 0.237 3.34 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_int331.py --v 0.5 --lr 0.01 --epochs 1000 --space 4 4 --days 31 --mm_cond_number=10 --params 24.42 1.92 1.92 0.001 -0.045 0.237 3.34 
 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_ext331.py --v 0.5 --lr 0.01 --epochs 1000 --space 4 4 --days 31 --mm_cond_number=10 --params 24.42 1.92 1.92 0.001 -0.045 0.237 3.34 
 
 ```
 
