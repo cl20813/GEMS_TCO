@@ -112,8 +112,8 @@ def main():
             deltas_copy = deltas[mask].clone().detach()
             emp_st_sem = empirical_sem[mask].clone().detach()
 
-            emp_sem_map[(1, temporal_lag,0)] = deltas_copy
-            emp_sem_map[(1, temporal_lag,1)] =  emp_st_sem
+            emp_sem_map[(day+1, temporal_lag,0)] = deltas_copy
+            emp_sem_map[(day+1, temporal_lag,1)] =  emp_st_sem
 
     output_filename = f"empirical_short_sem_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
 
