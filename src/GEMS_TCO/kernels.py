@@ -16,10 +16,12 @@ from scipy.special import gamma, kv  # Bessel function and gamma function
 from collections import defaultdict
 import pandas as pd
 import numpy as np
+
 import torch
-import torch.optim as optim
+from torch.func import grad, hessian, jacfwd, jacrev
 from torch.optim.lr_scheduler import StepLR
 import torch.optim as optim
+
 import copy    
 import logging     # for logging
 # Add your custom path
@@ -101,8 +103,30 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         out[~non_zero_indices] = sigmasq
 
         # Add a small jitter term to the diagonal for numerical stability
-        out += torch.eye(out.shape[0]) * nugget
+        out += torch.eye(out.shape[0], dtype=torch.float64) * nugget 
         return out
+    
+    def compute_statistic(self,params, data,y, like_fun, cov_function):
+
+        # Define the function to compute the loss
+        def compute_loss(params):
+            return like_fun(params,data , y, cov_function)
+            # return instance.vecchia_interpolation_1to6(params, instance.matern_cov_ani, 35)
+        grad_function = torch.func.grad(compute_loss)
+        gradient = grad_function(params)
+
+        # print(f'Gradient: {g1}')
+
+        # Compute the Hessian matrix using torch.func.hessian
+        try:
+            hessian_matrix =  torch.func.hessian(compute_loss)(params)
+            print(hessian_matrix)
+        except Exception as e:
+            print(f'Error computing Hessian: {e}')
+
+        statistic  = torch.matmul(g1, torch.linalg.solve(hessian_matrix, g1))
+        # print(f' statistic is {statistic}')
+        return statistic
     
 
 class likelihood_function(spatio_temporal_kernels):
