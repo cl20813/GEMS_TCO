@@ -358,12 +358,15 @@ class model_fitting(likelihood_function):
 
     # Example function to compute out1
     def compute_vecc_nll_interpolate(self,params):
-        vecc_nll = self.vecchia_extrapolate(params, self.matern_cov_anisotropy_v05)
+
+        vecc_nll = self.vecchia_interpolation_1to6(params, self.matern_cov_anisotropy_v05,200)
         return vecc_nll
 
+
     def compute_vecc_nll_extrapolate(self,params):
-            vecc_nll = self.vecchia_interpolation_1to6(params, self.matern_cov_anisotropy_v05,200)
-            return vecc_nll
+   
+        vecc_nll = self.vecchia_extrapolate(params, self.matern_cov_anisotropy_v05)
+        return vecc_nll
 
     def compute_full_nll(self,params):
         full_nll = self.full_likelihood(params=params, input_np=self.aggregated_data, y=self.aggregated_response, covariance_function= self.matern_cov_anisotropy_v05) 

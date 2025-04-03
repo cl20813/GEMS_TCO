@@ -19,6 +19,8 @@ scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\fit_st_torch_327.py" jl281
 
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_inter_estimates_1250_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"
 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_inter_estimates_5000_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"
+
 
 ### Run this part
 ```ssh jl2815@amarel.rutgers.edu```
