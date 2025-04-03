@@ -79,8 +79,8 @@ class load_data_local_computer:
             tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed']-477700)
 
             tmp = tmp.iloc[ord_mm, :4].to_numpy()  # reorder the data
-            tmp = torch.from_numpy(tmp).float()  # Convert NumPy to Tensor
-   
+            # tmp = torch.from_numpy(tmp).float()  # Convert NumPy to Tensor
+            tmp = torch.from_numpy(tmp).double()
             analysis_data_map[key_idx[i]] = tmp
 
         aggregated_data = pd.DataFrame()
@@ -91,7 +91,8 @@ class load_data_local_computer:
             aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
 
         aggregated_data = aggregated_data.iloc[:, :4].to_numpy()
-        aggregated_data = torch.from_numpy(aggregated_data).float() 
+        #aggregated_data = torch.from_numpy(aggregated_data).float() 
+        aggregated_data = torch.from_numpy(aggregated_data).double()
 
         return analysis_data_map, aggregated_data
     
