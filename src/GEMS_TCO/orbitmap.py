@@ -90,7 +90,7 @@ class MakeOrbitdata():
         assert isinstance(orbit_map, dict), "orbit_map must be a dict"
         assert isinstance(center_points, pd.DataFrame), "center_points must be a pd.DataFrame"
 
-        sparse_map = {}
+        coarse_map = {}
         key_list = sorted(orbit_map)
 
         res = [0]* len(center_points) 
@@ -107,7 +107,7 @@ class MakeOrbitdata():
             
             res_series = pd.Series(res)
 
-            sparse_map[key] = pd.DataFrame( 
+            coarse_map[key] = pd.DataFrame( 
                 {
                     'Latitude':center_points.loc[:,'lat'], 
                     'Longitude':center_points.loc[:,'lon'], 
@@ -117,7 +117,7 @@ class MakeOrbitdata():
                 }
             )
 
-        return sparse_map
+        return coarse_map
 
 
 

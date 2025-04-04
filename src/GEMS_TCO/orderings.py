@@ -12,7 +12,6 @@ import sys
 import os
 gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src/"
 
-
 sys.path.append(gems_tco_path)
 
 # original code from .maxmin_ancestor_cpp import maxmin_ancestor_cpp as _maxmin_ancestor_cpp

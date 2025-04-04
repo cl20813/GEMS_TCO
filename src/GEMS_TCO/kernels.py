@@ -370,9 +370,8 @@ class likelihood_function(spatio_temporal_kernels):
                 quad_form = alpha**2 * (1 / cov_ygivenx)
                 log_det = torch.log(cov_ygivenx)
                 neg_log_lik += 0.5 * (log_det + quad_form)
- 
-        return neg_log_lik
 
+        return neg_log_lik
 
 
 class model_fitting(likelihood_function): 
@@ -385,7 +384,6 @@ class model_fitting(likelihood_function):
 
         vecc_nll = self.vecchia_interpolation_1to6(params, self.matern_cov_anisotropy_v05,200)
         return vecc_nll
-
 
     def compute_vecc_nll_extrapolate(self,params):
    
