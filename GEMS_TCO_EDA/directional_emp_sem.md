@@ -46,7 +46,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/empirical_sem
 ### Job Order SLURM for both vecchia and full
 ```mkdir -p ./jobscript/tco/gp_exercise```     
 
-```   sbatch dir_emp .sh   ```
+```   sbatch dir_emp.sh   ```
 
 
 ```  cd ./jobscript/tco/gp_exercise  ```                             
@@ -78,7 +78,7 @@ echo "Current date and time: $(date)"
 echo "compute empirical semivariograms by lat,lon distance h"
 
 
-srun python /home/jl2815/tco/exercise_25/directional_emp_sem.py --space 4 4 --days 31 
+srun python /home/jl2815/tco/exercise_25/directional_emp_sem.py --space 1 1 --days 31 
 
 ```
 
