@@ -165,7 +165,7 @@ def main():
     instance_sem = evaluate.CrossVariogram()
     dn45_n135_sem = instance_sem.cross_directional_sem(deltas, map,  days, tolerance, direction1 = dn45, direction2 = dn135)
 
-    output_filename = f"empirical_{(direction1*(180/np.pi)) ,(direction2*(180/np.pi))}_sem_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
+    output_filename = f"empirical_{(direction1*(180/np.pi)),(direction2*(180/np.pi))}_sem_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
 
     # base_path = "/home/jl2815/tco/data/pickle_data"
     output_path = "/home/jl2815/tco/exercise_output/eda"
