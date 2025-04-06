@@ -9,9 +9,9 @@ For significant updates or installations, use pip install --force-reinstall or p
 
 ### Copy run file from ```local``` to ```Amarel HPC```
 # mac
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/directional_emp_sem.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/semivariograms/directional_emp_sem.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/empirical_sem_map_short_lag.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/semivariograms/empirical_sem_map_short_lag.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25
 
 # window
 scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\fit_st_torch_327.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
