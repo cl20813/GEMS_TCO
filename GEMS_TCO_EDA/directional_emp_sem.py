@@ -70,14 +70,12 @@ def main():
 
     analysis_data_map, aggregated_data = instance.load_working_data_byday( ym_map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
 
-    deltas = [(0,0), (0, 0.2), (0, 0.4), (0, 0.6), (0, 0.8), (0, 1) ]
-    # Include negative deltas
-    deltas += [(d[0], -d[1]) for d in deltas if d[1] != 0] + [(-d[0], d[1]) for d in deltas if d[0] != 0]
-
+    tmp = np.concatenate((np.linspace(-2, -0.2, 10), [-0.1, 0, 0.1], np.linspace(0.2, 2, 10)))
+    deltas = [ (0, round(a,1)) for a in tmp]
     map = analysis_data_map
     tolerance = 0.02
-
     days= list(np.arange(1,32))  # Example days you want to plot
+
     instance_sem = evaluate.CrossVariogram()
     lon_lag_sem = instance_sem.cross_lon_lat(deltas, map, days, tolerance)
 
@@ -98,16 +96,13 @@ def main():
     idx_for_datamap= [0,248]
     analysis_data_map, aggregated_data = instance.load_working_data_byday( ym_map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
 
-    deltas = [ (0,0), (0.2, 0), (0.4, 0), (0.6, 0), (0.8, 0), (1, 0)]
-    # Include negative deltas
-    deltas += [(d[0], -d[1]) for d in deltas if d[1] != 0] + [(-d[0], d[1]) for d in deltas if d[0] != 0]
-
+    tmp = np.concatenate((np.linspace(-2, -0.2, 10), [-0.1, 0, 0.1], np.linspace(0.2, 2, 10)))
+    deltas = [ ( round(a,1),0 ) for a in tmp]
+    days= list(np.arange(1,32))
     map = analysis_data_map
     tolerance = 0.02
 
     instance_sem = evaluate.CrossVariogram()
-    days= list(np.arange(1,32))
-
     lat_lag_sem = instance_sem.cross_lon_lat(deltas, map, days, tolerance)
 
     output_filename = f"empirical_lat_sem_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
@@ -128,9 +123,8 @@ def main():
 
     d45 = np.arctan2(1,1)
     d135 = np.arctan2(-1,-1)  
-    neg_deltas = [ 1, 0.8,0.6, 0.4 ,0.2, 0]
-    pos_deltas = [ 0.2, 0.4, 0.6, 0.8, 1.0]
-    deltas = neg_deltas + pos_deltas
+
+    deltas = np.concatenate(( np.linspace(2, 0.2, 10), [0.1, 0, 0.1], np.linspace(0.2, 2, 10)))
 
     direction1 = d135
     direction2 = d45
@@ -138,8 +132,9 @@ def main():
     days= list(np.arange(1,32))  # Example days you want to plot
     map = analysis_data_map
     tolerance = 0.03  # no pairs for 0.02
+
     instance_sem = evaluate.CrossVariogram()
-    d135_45_sem = instance_sem.cross_directional_sem(deltas, map,  days, tolerance, direction1=dn45, direction2=dn135)
+    d135_45_sem = instance_sem.cross_directional_sem(deltas, map,  days, tolerance, direction1=d135, direction2=d45)
 
     output_filename = f"empirical_{(direction1*(180/np.pi)) ,(direction2*(180/np.pi))}_sem_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
 
@@ -149,11 +144,9 @@ def main():
     with open(output_filepath, 'wb') as pickle_file:
         pickle.dump(d135_45_sem, pickle_file)  
 
-
     #############
     ############# directional semivariogram y= -x
   
-    
     print(f'directional_sem, data size per hour: {int((200/rho_lat)*(100/rho_lon))}')
     idx_for_datamap= [0,248]
     analysis_data_map, aggregated_data = instance.load_working_data_byday( ym_map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
@@ -163,16 +156,14 @@ def main():
     direction1 = dn45
     direction2 = dn135
 
-    neg_deltas = [ 1, 0.8,0.6, 0.4 ,0.2, 0]
-    pos_deltas = [ 0.2, 0.4, 0.6, 0.8, 1.0]
-    deltas = neg_deltas + pos_deltas
+    deltas = np.concatenate(( np.linspace(2, 0.2, 10), [0.1, 0, 0.1], np.linspace(0.2, 2, 10)))
 
     days= list(np.arange(1,32))  # Example days you want to plot
     map = analysis_data_map
     tolerance = 0.03  # no pairs for 0.02
 
     instance_sem = evaluate.CrossVariogram()
-    dn45_n135_sem = instance_sem.cross_directional_sem(deltas, map,  days, tolerance, direction1=dn45, direction2=dn135)
+    dn45_n135_sem = instance_sem.cross_directional_sem(deltas, map,  days, tolerance, direction1 = dn45, direction2 = dn135)
 
     output_filename = f"empirical_{(direction1*(180/np.pi)) ,(direction2*(180/np.pi))}_sem_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
 
@@ -181,8 +172,6 @@ def main():
     output_filepath = os.path.join(output_path, output_filename)
     with open(output_filepath, 'wb') as pickle_file:
         pickle.dump(dn45_n135_sem, pickle_file)  
-
-
 
 if __name__ == '__main__':
     main()

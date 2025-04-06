@@ -31,7 +31,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/empirical_sem
 
 
 ### Run this part
-```ssh jl2815@amarel.rutgers.edu```
+```  ssh jl2815@amarel.rutgers.edu  ```
 ```  module use /projects/community/modulefiles  ```           
 ```  module load anaconda/2024.06-ts840  ``` 
 ```  conda activate faiss_env   ```
@@ -50,7 +50,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/empirical_sem
 
 
 ```  cd ./jobscript/tco/gp_exercise  ```                             
-```  nano dir_emp .sh  ```        
+```  nano dir_emp.sh  ```        
  
 
 ``` 
@@ -77,9 +77,41 @@ echo "Current date and time: $(date)"
 
 echo "compute empirical semivariograms by lat,lon distance h"
 
-# srun python /home/jl2815/tco/exercise_25/directional_emp_sem.py --space # 4 4 --days 31 
+
+srun python /home/jl2815/tco/exercise_25/directional_emp_sem.py --space 4 4 --days 31 
+
+```
 
 
+```  nano dir_emp.sh  ```        
+ 
+
+``` 
+#!/bin/bash
+#SBATCH --job-name=dir_emp                            # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/dir_emp%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/dir_emp%j.err # Standard error file (%j = JobID)
+#SBATCH --time=72:00:00                                            # Time limit
+#SBATCH --ntasks=1                                                # Number of tasks
+#SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
+#SBATCH --mem=400G                                                 # Memory per node
+#SBATCH --partition=mem                                            # Partition name
+
+#### Load the Anaconda module to use srun 
+module purge                                              
+module use /projects/community/modulefiles                 
+module load anaconda/2024.06-ts840 
+
+#### Initialize conda for the current shell session if not already done for the current shell session.
+eval "$(conda shell.bash hook)"
+conda activate faiss_env
+
+echo "Current date and time: $(date)"
+
+echo "compute empirical semivariograms by lat,lon distance h"
+
+
+srun python /home/jl2815/tco/exercise_25/directional_emp_sem.py --space 4 4 --days 31 
 
 ```
 

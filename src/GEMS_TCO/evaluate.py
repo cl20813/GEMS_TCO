@@ -22,6 +22,7 @@ from scipy.stats import norm,uniform
 
 import torch
 import matplotlib.pyplot as plt
+import matplotlib.transforms as transforms
 
 # Type hints
 from typing import Callable, Union, Tuple
@@ -226,7 +227,7 @@ class CrossVariogram:
                 
         return directional_sem
 
-    def plot_lon_sem(self,map, lon_lag_sem, days,deltas):
+    def plot_lon_sem(self,map, lon_lag_sem, days, deltas):
         fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
         for index, day in enumerate(days):
@@ -240,14 +241,20 @@ class CrossVariogram:
             x_values = []
             for j, (lat, lon) in enumerate(deltas):
                 x_values.append(lon)  # Use negative index for negative lags
-            weight = [-0.55, -0.5, -0.25, -0.15, -0.05, 0, 0.05, 0.15, 0.25, 0.5, 0.55]
-            weight2 = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]
+            # weight = [-0.55, -0.5, -0.25, -0.15, -0.05, 0, 0.05, 0.15, 0.25, 0.5, 0.55]
+            # weight2 = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]
 
             # Plotting for each orbit
             for i in range(7):
                 for j, (x, y) in enumerate(zip(x_values, lon_lag_sem[day][i])):
                     ax.scatter(x, y, marker='o', s=9, color='black')
-                    ax.text(x + weight2[i] * 1.5, y + weight[j] * 0.5, str(i + 1), fontsize=9, color='blue', ha='center', va='bottom')
+                    # ax.text(x + weight2[i] * 1.5, y + weight[j] * 0.5, str(i + 1), fontsize=9, color='blue', ha='center', va='bottom')
+
+                # Apply offset using transforms
+                    offset = transforms.ScaledTranslation(0.04 * i, 0.04 * j, fig.dpi_scale_trans)
+                    
+                    trans = ax.transData + offset
+                    ax.text(x, y, str(i + 1), fontsize=9, color='blue', ha='center', va='bottom', transform=trans)
 
             ax.grid(True)
             ax.set_xlabel('Longitude Lags', fontsize=12)
@@ -255,14 +262,17 @@ class CrossVariogram:
             ax.set_title(f'Cross-Variogram on 2024-07-{day:02d}', fontsize=14)
             ax.set_xscale('linear')  # Linear scale for x-axis
             ax.set_yscale('linear')  # Linear scale for y-axis
-            ax.set_xticks([-1, -0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8, 1.0])
-            ax.set_xticklabels(['-1', '-0.8', '-0.6', '-0.4', '-0.2', '0', '0.2', '0.4', '0.6', '0.8', '1.0'])
+            ax.set_xticks(x_values)
+            ticks = [ str( round(x,1)) for x in x_values]
+            ax.set_xticklabels(ticks)
             ax.set_ylim(1e-4, 30)
+            # Rotate x-axis labels by 45 degrees
+            plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
 
         plt.tight_layout()
         plt.show()
 
-    def plot_lat_sem(self,map, lon_lag_sem, days,deltas):
+    def plot_lat_sem(self,map, lon_lag_sem, days, deltas):
         fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
         for index, day in enumerate(days):
@@ -276,14 +286,20 @@ class CrossVariogram:
             x_values = []
             for j, (lat, lon) in enumerate(deltas):
                 x_values.append(lat)  # Use negative index for negative lags
-            weight = [-0.55, -0.5, -0.25, -0.15, -0.05, 0, 0.05, 0.15, 0.25, 0.5, 0.55]
-            weight2 = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]
+            # weight = [-0.55, -0.5, -0.25, -0.15, -0.05, 0, 0.05, 0.15, 0.25, 0.5, 0.55]
+            # weight2 = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]
 
             # Plotting for each orbit
             for i in range(7):
                 for j, (x, y) in enumerate(zip(x_values, lon_lag_sem[day][i])):
                     ax.scatter(x, y, marker='o', s=9, color='black')
-                    ax.text(x + weight2[i] * 1.5, y + weight[j] * 0.5, str(i + 1), fontsize=9, color='blue', ha='center', va='bottom')
+                    # ax.text(x + weight2[i] * 1.5, y + weight[j] * 0.5, str(i + 1), fontsize=9, color='blue', ha='center', va='bottom')
+
+                    offset = transforms.ScaledTranslation(0.04 * i, 0.04 * j, fig.dpi_scale_trans)
+                    
+                    trans = ax.transData + offset
+                    ax.text(x, y, str(i + 1), fontsize=9, color='blue', ha='center', va='bottom', transform=trans)
+
 
             ax.grid(True)
             ax.set_xlabel('Latitude Lags', fontsize=12)
@@ -291,9 +307,12 @@ class CrossVariogram:
             ax.set_title(f'Cross-Variogram on 2024-07-{day:02d}', fontsize=14)
             ax.set_xscale('linear')  # Linear scale for x-axis
             ax.set_yscale('linear')  # Linear scale for y-axis
-            ax.set_xticks([-1, -0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8, 1.0])
-            ax.set_xticklabels(['-1', '-0.8', '-0.6', '-0.4', '-0.2', '0', '0.2', '0.4', '0.6', '0.8', '1.0'])
+            ax.set_xticks(x_values)
+            ticks = [ str( round(x,1)) for x in x_values]
+            ax.set_xticklabels(ticks)
             ax.set_ylim(1e-4, 30)
+        # Rotate x-axis labels by 45 degrees
+            plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
 
         plt.tight_layout()
         plt.show()
@@ -306,14 +325,19 @@ class CrossVariogram:
             # Create a 2x2 plot
             ax = axs[index // 2, index % 2]
 
-            weight = [-0.55, -0.5, -0.25, -0.15, -0.05, 0, 0.05, 0.15, 0.25, 0.5, 0.55]
-            weight2 = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]
+            # weight = [-0.55, -0.5, -0.25, -0.15, -0.05, 0, 0.05, 0.15, 0.25, 0.5, 0.55]
+            # weight2 = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]
 
             # Plotting for each orbit
             for i in range(7):
                 for j, (x, y) in enumerate(zip(x_values, direictional_sem[day][i])):
                     ax.scatter(x, y, marker='o', s=9, color='black')
-                    ax.text(x + weight2[i] * 1.5, y + weight[j] * 0.5, str(i + 1), fontsize=9, color='blue', ha='center', va='bottom')
+                   # ax.text(x + weight2[i] * 1.5, y + weight[j] * 0.5, str(i + 1), fontsize=9, color='blue', ha='center', va='bottom')
+                    offset = transforms.ScaledTranslation(0.04 * i, 0.04 * j, fig.dpi_scale_trans)
+                    
+                    
+                    trans = ax.transData + offset
+                    ax.text(x, y, str(i + 1), fontsize=9, color='blue', ha='center', va='bottom', transform=trans)
 
             ax.grid(True)
             ax.set_xlabel('Euclidean disstance', fontsize=12)
@@ -322,8 +346,13 @@ class CrossVariogram:
             ax.set_xscale('linear')  # Linear scale for x-axis
             ax.set_yscale('linear')  # Linear scale for y-axis
             ax.set_xticks(x_values)
-            ax.set_xticklabels(['-1', '-0.8', '-0.6', '-0.4', '-0.2', '0', '0.2', '0.4', '0.6', '0.8', '1.0'])
+            ticks = [ str( round(x,1)) for x in x_values]
+            ax.set_xticklabels(ticks)
             ax.set_ylim(1e-4, 30)
+
+
+        # Rotate x-axis labels by 45 degrees
+            plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
 
         plt.tight_layout()
         plt.show()
