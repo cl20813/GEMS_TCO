@@ -21,6 +21,8 @@ scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\fit_st_torch_327.py" jl281
 ##### change name for directional semivariograms
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/empirical_n135_45_sem_20000_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/outputs"  
 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/empirical_n45_135_sem_20000_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/outputs" 
+
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/empirical_lon_sem_20000_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/outputs"
 
 
