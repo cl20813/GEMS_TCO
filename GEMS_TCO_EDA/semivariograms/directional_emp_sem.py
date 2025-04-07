@@ -122,11 +122,11 @@ def main():
     analysis_data_map, aggregated_data = instance.load_working_data_byday( ym_map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
 
     d45 = np.arctan2(1,1)
-    d135 = np.arctan2(-1,-1)  
+    dn135 = np.arctan2(-1,-1)  
 
     deltas = np.concatenate(( np.linspace(2, 0.2, 10), [0.1, 0, 0.1], np.linspace(0.2, 2, 10)))
 
-    direction1 = d135
+    direction1 = dn135
     direction2 = d45
 
     days= list(np.arange(1,32))  # Example days you want to plot
@@ -134,7 +134,7 @@ def main():
     tolerance = 0.03  # no pairs for 0.02
 
     instance_sem = evaluate.CrossVariogram()
-    d135_45_sem = instance_sem.cross_directional_sem(deltas, map,  days, tolerance, direction1=d135, direction2=d45)
+    d135_45_sem = instance_sem.cross_directional_sem(deltas, map,  days, tolerance, direction1=dn135, direction2=d45)
 
     output_filename = f"empirical_{(direction1*(180/np.pi)) ,(direction2*(180/np.pi))}_sem_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
 
@@ -152,9 +152,10 @@ def main():
     analysis_data_map, aggregated_data = instance.load_working_data_byday( ym_map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
 
     dn45 = np.arctan2(-1,1)
-    dn135 = np.arctan2(1,-1)
+    d135 = np.arctan2(1,-1)
+    
     direction1 = dn45
-    direction2 = dn135
+    direction2 = d135
 
     deltas = np.concatenate(( np.linspace(2, 0.2, 10), [0.1, 0, 0.1], np.linspace(0.2, 2, 10)))
 
@@ -163,7 +164,7 @@ def main():
     tolerance = 0.03  # no pairs for 0.02
 
     instance_sem = evaluate.CrossVariogram()
-    dn45_n135_sem = instance_sem.cross_directional_sem(deltas, map,  days, tolerance, direction1 = dn45, direction2 = dn135)
+    dn45_n135_sem = instance_sem.cross_directional_sem(deltas, map,  days, tolerance, direction1 = dn45, direction2 = d135)
 
     output_filename = f"empirical_{(direction1*(180/np.pi)),(direction2*(180/np.pi))}_sem_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
 

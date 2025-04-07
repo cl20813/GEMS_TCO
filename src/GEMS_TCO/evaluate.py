@@ -227,12 +227,12 @@ class CrossVariogram:
                 
         return directional_sem
 
-    def plot_lon_sem(self,map, lon_lag_sem, days, deltas):
+    def plot_lon_sem(self, lon_lag_sem, days, deltas):
         fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
         for index, day in enumerate(days):
-            t = day - 1
-            key_list = sorted(map)
+            # t = day - 1
+            # key_list = sorted(map)
 
             # Create a 2x2 plot
             ax = axs[index // 2, index % 2]
@@ -270,14 +270,15 @@ class CrossVariogram:
             plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
 
         plt.tight_layout()
+        plt.savefig(f'/Users/joonwonlee/Documents/GEMS_TCO-1/plots/directional_semivariograms/dir_sem_longitude_days{days[0]}_{days[-1]}.png')
         plt.show()
 
-    def plot_lat_sem(self,map, lon_lag_sem, days, deltas):
+    def plot_lat_sem(self, lon_lag_sem, days, deltas):
         fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
         for index, day in enumerate(days):
-            t = day - 1
-            key_list = sorted(map)
+            # t = day - 1
+            # key_list = sorted(map)
 
             # Create a 2x2 plot
             ax = axs[index // 2, index % 2]
@@ -315,6 +316,9 @@ class CrossVariogram:
             plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
 
         plt.tight_layout()
+
+        plt.savefig(f'/Users/joonwonlee/Documents/GEMS_TCO-1/plots/directional_semivariograms/dir_sem_latitude_days{days[0]}_{days[-1]}.png')
+
         plt.show()
 
 
@@ -342,7 +346,7 @@ class CrossVariogram:
             ax.grid(True)
             ax.set_xlabel('Euclidean disstance', fontsize=12)
             ax.set_ylabel('Cross-Variogram Value', fontsize=12)
-            ax.set_title(f'Directional Cross-Variogram {(direction1*(180/np.pi)) ,(direction2*(180/np.pi))} on 2024-07-{day:02d}', fontsize=14)
+            ax.set_title(f'Directional Cross-Variogram {direction1*(180/np.pi)}_{direction2*(180/np.pi)} on 2024-07-{day:02d}', fontsize=14)
             ax.set_xscale('linear')  # Linear scale for x-axis
             ax.set_yscale('linear')  # Linear scale for y-axis
             ax.set_xticks(x_values)
@@ -355,4 +359,8 @@ class CrossVariogram:
             plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
 
         plt.tight_layout()
+
+            # Save the plot to the specified directory
+        plt.savefig(f'/Users/joonwonlee/Documents/GEMS_TCO-1/plots/directional_semivariograms/dir_sem_{direction1*(180/np.pi)}_{direction2*(180/np.pi)}_days{days[0]}_{days[-1]}.png')
+
         plt.show()
