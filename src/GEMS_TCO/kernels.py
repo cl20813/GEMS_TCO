@@ -605,17 +605,18 @@ class vecchia_experiment(likelihood_function):
     def vecchia_b2(self, params: torch.Tensor, covariance_function) -> torch.Tensor:
         self.cov_map = defaultdict(list)
         cut_line= self.nheads
+        key_list = list(self.input_map.keys())
 
         neg_log_lik = 0.0
-        heads = self.input_map[self.key_list[0]][:cut_line,:]
+        heads = self.input_map[key_list[0]][:cut_line,:]
         for time_idx in range(1, len(self.input_map)):
-            tmp = self.input_map[self.key_list[time_idx]][:cut_line,:]
+            tmp = self.input_map[key_list[time_idx]][:cut_line,:]
             heads = torch.cat( (heads,tmp), dim=0)
 
         neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
         
         for time_idx in range(0,len(self.input_map)):
-            current_np = self.input_map[self.key_list[time_idx]]
+            current_np = self.input_map[key_list[time_idx]]
 
             # Use below when working on local computer to avoid singular matrix
             for index in range(cut_line, self.size_per_hour):
@@ -631,12 +632,12 @@ class vecchia_experiment(likelihood_function):
                     data_list.append(current_np[past])
 
                 if time_idx > 0:
-                    last_hour_np = self.input_map[self.key_list[time_idx - 1]]
+                    last_hour_np = self.input_map[key_list[time_idx - 1]]
                     past_conditioning_data = last_hour_np[past + [index], :]
                     data_list.append(past_conditioning_data)
 
                 if time_idx > 1:
-                    last_hour_np = self.input_map[self.key_list[time_idx -2]]
+                    last_hour_np = self.input_map[key_list[time_idx -2]]
                     # if index==200:
                     #     print(self.input_map[self.key_list[time_idx-6]])
                     past_conditioning_data = last_hour_np[past + [index], :]
@@ -656,6 +657,7 @@ class vecchia_experiment(likelihood_function):
                 cov_yx = cov_matrix[0, 1:]
                         # Compute the log determinant of the covariance matrix
                 sign, log_det = torch.slogdet(cov_matrix)
+
                 # if sign <= 0:
                 #     raise ValueError("Covariance matrix is not positive definite")
             
