@@ -352,124 +352,7 @@ class likelihood_function(spatio_temporal_kernels):
 
 
 
-class model_fitting(likelihood_function): 
-    def __init__(self, smooth, input_map, aggregated_data, nns_map, mm_cond_number):
-        super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
-        # Any additional initialization for dignosis class can go here
 
-    # Example function to compute out1
-    def compute_vecc_nll_interpolate(self,params):
-
-        vecc_nll = self.vecchia_interpolation_1to6(params, self.matern_cov_anisotropy_v05)
-        return vecc_nll
-
-    def compute_vecc_nll_extrapolate(self,params):
-   
-        vecc_nll = self.vecchia_extrapolate(params, self.matern_cov_anisotropy_v05)
-        return vecc_nll
-
-    def compute_full_nll(self,params):
-        full_nll = self.full_likelihood(params=params, input_np=self.aggregated_data, y=self.aggregated_response, covariance_function= self.matern_cov_anisotropy_v05) 
-        return full_nll
-    
-    def optimizer_fun(self, params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=40, gamma=0.5):
-        optimizer = torch.optim.Adam([params], lr=lr, betas=betas, eps=eps)
-        scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)  # Decrease LR by a factor of 0.1 every 10 epochs
-        return optimizer, scheduler
-
-    # use adpating lr
-    def run_full(self, params, optimizer, scheduler, epochs=10):
-        prev_loss= float('inf')
-
-        tol = 1e-4  # Convergence tolerance
-        for epoch in range(epochs):  # Number of epochs
-            optimizer.zero_grad()  # Zero the gradients 
-            
-            loss = self.compute_full_nll(params)
-            loss.backward()  # Backpropagate the loss
-            
-            # Print gradients and parameters every 10th epoch
-            if epoch % 100 == 0:
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
-            
-            optimizer.step()  # Update the parameters
-            scheduler.step()  # Update the learning rate
-            # Check for convergence
-            if abs(prev_loss - loss.item()) < tol:
-                print(f"Converged at epoch {epoch}")
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, full Parameters: {params.detach().numpy()}')
-            
-                break
-            
-            prev_loss = loss.item()
-
-        print(f'FINAL STATE: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, full Parameters: {params.detach().numpy()}')
-        return [params.detach().numpy(), loss.item()]
-        print('Training full likelihood complete.')
-
-    def run_vecc_interpolate(self, params, optimizer, scheduler, epochs=10):
-        prev_loss= float('inf')
-
-        tol = 1e-4  # Convergence tolerance
-        for epoch in range(epochs):  # Number of epochs
-            optimizer.zero_grad()  # Zero the gradients 
-            
-            loss = self.compute_vecc_nll_interpolate(params)
-            loss.backward()  # Backpropagate the loss
-            
-            # Print gradients and parameters every 10th epoch
-            if epoch % 100 == 0:
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
-            
-            # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
-            
-            optimizer.step()  # Update the parameters
-            scheduler.step()  # Update the learning rate
-            # Check for convergence
-            if abs(prev_loss - loss.item()) < tol:
-                print(f"Converged at epoch {epoch}")
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
-                break
-
-            prev_loss = loss.item()
-        print(f'FINAL STATE: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
-        print('Training vecchia likelihood complete.') 
-        return [params.detach().numpy(), loss.item()]
-    def run_vecc_extrapolate(self, params, optimizer, scheduler,epochs=10):
-        prev_loss= float('inf')
-
-        tol = 1e-4  # Convergence tolerance
-        for epoch in range(epochs):  # Number of epochs
-            optimizer.zero_grad()  # Zero the gradients 
-            
-            loss = self.compute_vecc_nll_extrapolate(params)
-            loss.backward()  # Backpropagate the loss
-            
-            # Print gradients and parameters every 10th epoch
-            if epoch % 100 == 0:
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
-            
-            # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
-            
-            optimizer.step()  # Update the parameters
-            scheduler.step()  # Update the learning rate
-            # Check for convergence
-            if abs(prev_loss - loss.item()) < tol:
-                print(f"Converged at epoch {epoch}")
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
-            
-                break
-            
-            prev_loss = loss.item()
-
-        print(f'Final State: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
-        
-        print('Training vecchia likelihood complete.') 
-
-        return [params.detach().numpy(), loss.item()]
-
-
-####################
 ####################
 
 class vecchia_experiment(likelihood_function):
@@ -1351,3 +1234,122 @@ class vecchia_experiment(likelihood_function):
                     }
 
         return neg_log_lik  
+    
+
+class model_fitting(vecchia_experiment): 
+    def __init__(self, smooth, input_map, aggregated_data, nns_map, mm_cond_number, nheads):
+        super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number, nheads)
+     
+    # Example function to compute out1
+    def compute_vecc_nll_interpolate(self,params):
+
+        vecc_nll = self.vecchia_interpolation_1to6(params, self.matern_cov_anisotropy_v05)
+        return vecc_nll
+
+    def compute_vecc_nll_extrapolate(self,params):
+   
+        vecc_nll = self.vecchia_b2(params, self.matern_cov_anisotropy_v05)
+        return vecc_nll
+
+    def compute_full_nll(self,params):
+        full_nll = self.full_likelihood(params=params, input_np=self.aggregated_data, y=self.aggregated_response, covariance_function= self.matern_cov_anisotropy_v05) 
+        return full_nll
+    
+    def optimizer_fun(self, params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=40, gamma=0.5):
+        optimizer = torch.optim.Adam([params], lr=lr, betas=betas, eps=eps)
+        scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)  # Decrease LR by a factor of 0.1 every 10 epochs
+        return optimizer, scheduler
+
+    # use adpating lr
+    def run_full(self, params, optimizer, scheduler, epochs=10):
+        prev_loss= float('inf')
+
+        tol = 1e-4  # Convergence tolerance
+        for epoch in range(epochs):  # Number of epochs
+            optimizer.zero_grad()  # Zero the gradients 
+            
+            loss = self.compute_full_nll(params)
+            loss.backward()  # Backpropagate the loss
+            
+            # Print gradients and parameters every 10th epoch
+            if epoch % 100 == 0:
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            optimizer.step()  # Update the parameters
+            scheduler.step()  # Update the learning rate
+            # Check for convergence
+            if abs(prev_loss - loss.item()) < tol:
+                print(f"Converged at epoch {epoch}")
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, full Parameters: {params.detach().numpy()}')
+            
+                break
+            
+            prev_loss = loss.item()
+
+        print(f'FINAL STATE: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, full Parameters: {params.detach().numpy()}')
+        return [params.detach().numpy(), loss.item()]
+        print('Training full likelihood complete.')
+
+    def run_vecc_interpolate(self, params, optimizer, scheduler, epochs=10):
+        prev_loss= float('inf')
+
+        tol = 1e-4  # Convergence tolerance
+        for epoch in range(epochs):  # Number of epochs
+            optimizer.zero_grad()  # Zero the gradients 
+            
+            loss = self.compute_vecc_nll_interpolate(params)
+            loss.backward()  # Backpropagate the loss
+            
+            # Print gradients and parameters every 10th epoch
+            if epoch % 100 == 0:
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            optimizer.step()  # Update the parameters
+            scheduler.step()  # Update the learning rate
+            # Check for convergence
+            if abs(prev_loss - loss.item()) < tol:
+                print(f"Converged at epoch {epoch}")
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
+                break
+
+            prev_loss = loss.item()
+        print(f'FINAL STATE: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
+        print('Training vecchia likelihood complete.') 
+        return [params.detach().numpy(), loss.item()]
+    def run_vecc_extrapolate(self, params, optimizer, scheduler,epochs=10):
+        prev_loss= float('inf')
+
+        tol = 1e-4  # Convergence tolerance
+        for epoch in range(epochs):  # Number of epochs
+            optimizer.zero_grad()  # Zero the gradients 
+            
+            loss = self.compute_vecc_nll_extrapolate(params)
+            loss.backward()  # Backpropagate the loss
+            
+            # Print gradients and parameters every 10th epoch
+            if epoch % 100 == 0:
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            optimizer.step()  # Update the parameters
+            scheduler.step()  # Update the learning rate
+            # Check for convergence
+            if abs(prev_loss - loss.item()) < tol:
+                print(f"Converged at epoch {epoch}")
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
+            
+                break
+            
+            prev_loss = loss.item()
+
+        print(f'Final State: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
+        
+        print('Training vecchia likelihood complete.') 
+
+        return [params.detach().numpy(), loss.item()]
+
+
+####################

@@ -38,6 +38,7 @@ def main():
     parser.add_argument('--mm_cond_number', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
     parser.add_argument('--params', type=float,nargs='+', default=[20, 8.25, 5.25, .2, .2, .05 , 5], help="Initial parameters")
     parser.add_argument('--epochs', type=int, default=100, help="Number of iterations in optimization")
+    parser.add_argument('--nheads', type=int, default=200, help="Number of iterations in optimization")
     
     # Parse the arguments
     args = parser.parse_args()
@@ -51,9 +52,37 @@ def main():
     key_for_dict= [0,8]
     lr = args.lr
     epochs = args.epochs
+    nheads = args.nheads
+
     rho_lat = lat_lon_resolution[0]          
     rho_lon = lat_lon_resolution[1]
     ############################## 
+
+    input_path = "/home/jl2815/tco/exercise_output/estimates/"
+    input_filename = "estimation_1250_july24.pkl"
+    input_filepath = os.path.join(input_path, input_filename)
+    # Load pickle
+    with open(input_filepath, 'rb') as pickle_file:
+        amarel_map1250= pickle.load(pickle_file)
+
+    # Assuming df_1250 is your DataFrame
+    df_1250 = pd.DataFrame()
+    for key in amarel_map1250:
+        tmp = pd.DataFrame(amarel_map1250[key][0].reshape(1, -1), columns=['sigmasq', 'range_lat', 'range_lon', 'advec_lat', 'advec_lon', 'beta', 'nugget'])
+        tmp['loss'] = amarel_map1250[key][1]
+        df_1250 = pd.concat((df_1250, tmp), axis=0)
+
+    # Generate date range
+    date_range = pd.date_range(start='07-01-24', end='07-31-24')
+
+    # Ensure the number of dates matches the number of rows in df_1250
+    if len(date_range) == len(df_1250):
+        df_1250.index = date_range
+    else:
+        print("The number of dates does not match the number of rows in the DataFrame.")
+
+
+    ######
 
     # Load the one dictionary to set spaital coordinates
     years = ['2024']
@@ -72,15 +101,18 @@ def main():
         print(f'day {day+1}, data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}')
         print(lat_lon_resolution, mm_cond_number, key_for_dict, params, v,lr)
 
-        params = [24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34]
-        params = torch.tensor(params, requires_grad=True)
+        # params = [24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34]
+        # params = torch.tensor(params, requires_grad=True)
+        params = list(df_1250.iloc[day-1][:-1])
+        params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
 
         model_instance = kernels.model_fitting(
                 smooth=v,
                 input_map=analysis_data_map,
                 aggregated_data=aggregated_data,
                 nns_map=nns_map,
-                mm_cond_number=mm_cond_number
+                mm_cond_number=mm_cond_number,
+                nheads = nheads 
             )
 
         start_time = time.time()
