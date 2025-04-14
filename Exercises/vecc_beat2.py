@@ -59,14 +59,15 @@ def main():
     lat_lon_resolution = [4, 4]
     years = ['2024']
     month_range = [7, 8]
-    nheads = 200  
+    nheads = 100  
     
     # 50 for 10 work best for competitor 2 lags reordered, cahced
     #  50 for resolution 10: result1 [11,10,9] result2 = [9,11,10]
     #  200 for resolution 4, result1 [21,2,7] result2=[7,7,16]
-    result_2 = [0] * 3
-    result_1 = [0] * 3
-    for day in range(1,31):
+    # 300 for resolution 4, result1 [23, 1, 6]  result2 = [6,10,14]
+    result_2 = {}
+    result_1 =  defaultdict(int)
+    for day in range(1,5):
         print(f'\n Day {day} data size per day: { (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) } \n')
 
         # parameters
@@ -111,8 +112,8 @@ def main():
         second_best_index = top2_indices[1].item()
 
         # Update the result for the best approximation
-        result_1[best_index] += 1
-        result_2[second_best_index] += 1
+        result_1[best_index] = result_1.get(best_index,0) + 1
+        result_2[second_best_index] = result_2.get(best_index,0) + 1
         # Print the results
         print(f'\n\n Day {day} full likelihood: {out}\n parameters: {params.tolist()} \n')
         print(f'Best approximation: {approx_map[best_index]} with abs_diff: {stacked_tensor[best_index]}')
