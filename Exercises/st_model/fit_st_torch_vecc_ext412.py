@@ -23,39 +23,51 @@ from GEMS_TCO import kernels
 from GEMS_TCO import orderings as _orderings 
 from GEMS_TCO import load_data_amarel
 
+from typing import Optional, List, Tuple
+from pathlib import Path
+import typer
+
 # Configure logging to a specific file path
 log_file_path = '/home/jl2815/tco/exercise_output/logs/fit_vecc.log'
 logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(message)s')
 
 
-def main():
-    # Argument parser
-    parser = argparse.ArgumentParser(description="Fit spatio-temporal model")
-    parser.add_argument('--v', type=float, default=0.5, help="smooth")
-    parser.add_argument('--lr', type=float, default=0.01, help="learning rate")
-    parser.add_argument('--space', type=int,nargs='+', default=[20,20], help="spatial resolution")
-    parser.add_argument('--days', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
-    parser.add_argument('--mm_cond_number', type=int, default=1, help="Number of nearest neighbors in Vecchia approx.")
-    parser.add_argument('--params', type=float,nargs='+', default=[20, 8.25, 5.25, .2, .2, .05 , 5], help="Initial parameters")
-    parser.add_argument('--epochs', type=int, default=100, help="Number of iterations in optimization")
-    parser.add_argument('--nheads', type=int, default=200, help="Number of iterations in optimization")
+app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
+@app.command()
+
+def cli(
+    v: float = typer.Option(0.5, help="smooth"),
+    lr: float = typer.Option(0.01, help="learning rate"),
+    space: List[str] = typer.Option(['20', '20'], help="spatial resolution"),
+    days: int = typer.Option(1, help="Number of nearest neighbors in Vecchia approx."),
+    mm_cond_number: int = typer.Option(1, help="Number of nearest neighbors in Vecchia approx."),
+    params: List[str] = typer.Option(['20', '8.25', '5.25', '.2', '.2', '.05', '5'], help="Initial parameters"),
+    ## mm-cond-number should be called in command line
+    ## negative number can be a problem when parsing with typer
+    epochs: int = typer.Option(100, help="Number of iterations in optimization"),
+    nheads: int = typer.Option(200, help="Number of iterations in optimization"),
+) -> None:
+      
+    v = v
+    # key_for_dict = [0, 8]
+    lr = lr
+    epochs = epochs
+    nheads = nheads
+
+    lat_lon_resolution = [int(s) for s in space[0].split(',')]
+    parsed_params = [float(p) for p in params[0].split(',')]
+
+    params = torch.tensor(parsed_params, requires_grad=True)
+
+    days = days
+    mm_cond_number = mm_cond_number
+   
     
-    # Parse the arguments
-    args = parser.parse_args()
-
-    # Use args.param1, args.param2 in your script
-    lat_lon_resolution = args.space 
-    days = args.days
-    mm_cond_number = args.mm_cond_number
-    params= torch.tensor(args.params, requires_grad=True)
-    v = args.v
-    key_for_dict= [0,8]
-    lr = args.lr
-    epochs = args.epochs
-    nheads = args.nheads
-
-    rho_lat = lat_lon_resolution[0]          
+    rho_lat = lat_lon_resolution[0]
     rho_lon = lat_lon_resolution[1]
+
+    # Argument parser
+
     ############################## 
 
     input_path = "/home/jl2815/tco/exercise_output/estimates/"
@@ -81,7 +93,6 @@ def main():
     else:
         print("The number of dates does not match the number of rows in the DataFrame.")
 
-
     ######
 
     # Load the one dictionary to set spaital coordinates
@@ -89,26 +100,31 @@ def main():
     month_range =[7,8]
     
     instance = load_data_amarel()
-    map, ord_mm, nns_map= instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
+    map, ord_mm, nns_map= instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number= mm_cond_number ,years_=years, months_=month_range)
    
     result = {}
-
+    key_for_dict = [0,8]
     for day in range(days):
         idx_for_datamap= [8*day,8*(day+1)]
         analysis_data_map, aggregated_data = instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
 
-        lenth_of_analysis = key_for_dict[1]-key_for_dict[0]
+        lenth_of_analysis = idx_for_datamap[1]-idx_for_datamap[0]
         print(f'day {day+1}, data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}')
-        print(lat_lon_resolution, mm_cond_number, key_for_dict, params, v,lr)
+        print(lat_lon_resolution, mm_cond_number, idx_for_datamap, params, v,lr)
 
         # params = [24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34]
         # params = torch.tensor(params, requires_grad=True)
         params = list(df_1250.iloc[day-1][:-1])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
 
+        # different approximations 
+        key_order = [0,1,2,4,3,5,7,6]
+        keys = list(analysis_data_map.keys())
+        reordered_dict = {keys[key]: analysis_data_map[keys[key]] for key in key_order}
+
         model_instance = kernels.model_fitting(
                 smooth=v,
-                input_map=analysis_data_map,
+                input_map= reordered_dict,
                 aggregated_data=aggregated_data,
                 nns_map=nns_map,
                 mm_cond_number=mm_cond_number,
@@ -133,5 +149,9 @@ def main():
     with open(output_filepath, 'wb') as pickle_file:
         pickle.dump(result, pickle_file)    
 
-if __name__ == '__main__':
-    main()
+
+if __name__ == "__main__":
+    app()
+
+
+
