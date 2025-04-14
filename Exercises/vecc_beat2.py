@@ -56,14 +56,14 @@ def main():
   
     df = df_1250
 
-    lat_lon_resolution = [10, 10]
+    lat_lon_resolution = [4, 4]
     years = ['2024']
     month_range = [7, 8]
-    nheads = 50  # 50 for 10 work best for competitor 2 lags reordered, cahced
+    nheads = 200  # 50 for 10 work best for competitor 2 lags reordered, cahced
 
     result_2 = [0] * 3
     result_1 = [0] * 3
-    for day in range(1, 31):
+    for day in range(1,31):
         print(f'\n Day {day} data size per day: { (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) } \n')
 
         # parameters
