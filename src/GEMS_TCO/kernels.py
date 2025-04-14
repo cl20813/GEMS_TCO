@@ -1291,7 +1291,7 @@ class model_fitting(vecchia_experiment):
     # Example function to compute out1
     def compute_vecc_nll_interpolate(self,params):
 
-        vecc_nll = self.vecchia_interpolation_1to6(params, self.matern_cov_anisotropy_v05)
+        vecc_nll = self.vecchia_competitor(params, self.matern_cov_anisotropy_v05)
         return vecc_nll
 
     def compute_vecc_nll_extrapolate(self,params):

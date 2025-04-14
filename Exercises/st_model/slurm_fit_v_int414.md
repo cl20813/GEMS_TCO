@@ -10,7 +10,7 @@ For significant updates or installations, use pip install --force-reinstall or p
 ### Copy run file from ```local``` to ```Amarel HPC```
 # mac
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/fit_st_torch_vecc_ext412.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/fit_st_torch_v_int414.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 
 # window
@@ -29,7 +29,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_ex
 
 ## space 5 5: 5x10, 4 4: 25x50, 2 2: 50x100
 
-```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_ext412.py --v 0.5 --lr 0.01 --epochs 3000 --space "20, 20" --days 1 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"    ```
+```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_v_int414.py --v 0.5 --lr 0.01 --epochs 3000 --space "20, 20" --days 1 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"    ```
 
 ### Job Order SLURM for both vecchia and full
 ```mkdir -p ./jobscript/tco/gp_exercise```     
@@ -65,7 +65,7 @@ echo "Current date and time: $(date)"
 
 echo "fit_st_vecc_1250_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_ext412.py --v 0.5 --lr 0.01 --epochs 3000 --space "20, 20" --days 31 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"  
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_v_int414.py --v 0.5 --lr 0.01 --epochs 3000 --space "20, 20" --days 31 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"  
 
 ```
 
@@ -101,7 +101,7 @@ echo "Current date and time: $(date)"
 echo "fit_st_vecc_5000_save_estimates"
 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_ext412.py --v 0.5 --lr 0.01 --epochs 3000 --space "2, 2" --days 31 --mm-cond-number 10 --nheads 300 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"  
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_v_int414.py --v 0.5 --lr 0.01 --epochs 3000 --space "2, 2" --days 31 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"  
 
 ```
 
