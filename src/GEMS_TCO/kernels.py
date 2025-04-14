@@ -571,6 +571,7 @@ class vecchia_experiment(likelihood_function):
         return neg_log_lik
     
     def vecchia_competitor(self, params: torch.Tensor, covariance_function) -> torch.Tensor:
+
         self.cov_map = defaultdict(list)
         cut_line= self.nheads
         key_list = list(self.input_map.keys())
@@ -671,7 +672,6 @@ class vecchia_experiment(likelihood_function):
                 # if sign <= 0:
                 #     raise ValueError("Covariance matrix is not positive definite")
             
-
                 # Compute beta
                 tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
                 tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, y_and_neighbors))
@@ -706,7 +706,6 @@ class vecchia_experiment(likelihood_function):
                         'locs': locs
                     }
 
- 
         return neg_log_lik
 
 

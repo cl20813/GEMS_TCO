@@ -63,7 +63,7 @@ def main():
 
     result_2 = [0] * 3
     result_1 = [0] * 3
-    for day in range(1, 5):
+    for day in range(1, 31):
         print(f'\n Day {day} data size per day: { (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) } \n')
 
         # parameters
@@ -114,6 +114,6 @@ def main():
         print(f'\n\n Day {day} full likelihood: {out}\n parameters: {params.tolist()} \n')
         print(f'Best approximation: {approx_map[best_index]} with abs_diff: {stacked_tensor[best_index]}')
         print(f'Second best approximation: {approx_map[second_best_index]} with abs_diff: {stacked_tensor[second_best_index]}')
-
+    print( f'first winner: {result_1}, seond winner: {result_2}')
 if __name__ == "__main__":
     main()
