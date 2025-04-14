@@ -20,7 +20,6 @@ scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\fit_st_torch_327.py" jl281
 
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_extra_estimates_1250_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"
 
-
 ### Run this part
 ```ssh jl2815@amarel.rutgers.edu```
 ```  module use /projects/community/modulefiles  ```           
@@ -30,8 +29,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_ex
 
 ## space 5 5: 5x10, 4 4: 25x50, 2 2: 50x100
 
-``` srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_ext412.py --v 0.5 --lr 0.01 --epochs 3000 --space 20 20 --days 2 --mm_cond_number=5 --nheads=200 --params 24.42 1.92 1.92 0.001 -0.045 0.237 3.34   ```
-
+```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_ext412.py --v 0.5 --lr 0.01 --epochs 3000 --space "20, 20" --days 1 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"    ```
 
 ### Job Order SLURM for both vecchia and full
 ```mkdir -p ./jobscript/tco/gp_exercise```     
@@ -65,11 +63,12 @@ conda activate faiss_env
 
 echo "Current date and time: $(date)"
 
-echo "fit_st_vecc_extra_save_estimates"
+echo "fit_st_vecc_1250_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_ext412.py --v 0.5 --lr 0.01 --epochs 3000 --space 4 4 --days 31 --mm_cond_number=10 --nheads=200 --params 24.42 1.92 1.92 0.001 -0.045 0.237 3.34 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_ext412.py --v 0.5 --lr 0.01 --epochs 3000 --space "20, 20" --days 31 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"  
 
 ```
+
 
 
 #######  5000 data
@@ -77,10 +76,11 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_ext412.py --
 ```  nano fit_vecc_5000.sh  ```    
 
 ``` 
+
 #!/bin/bash
 #SBATCH --job-name=fit_v5000                        # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_st_vecc_extra_nohead%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_st_vecc_extra_nohead%j.err # Standard error file (%j = JobID)
+#SBATCH --output=/home/jl2815/tco/exercise_output/fit_v5000%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/fit_v5000%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
@@ -98,10 +98,10 @@ conda activate faiss_env
 
 echo "Current date and time: $(date)"
 
-echo "fit_st_vecc_extra_save_estimates"
+echo "fit_st_vecc_5000_save_estimates"
 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_ext412.py --v 0.5 --lr 0.01 --epochs 3000 --space 2 2 --days 31 --mm_cond_number= 10 --nheads=300 --params 24.42 1.92 1.92 0.001 -0.045 0.237 3.34 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_vecc_ext412.py --v 0.5 --lr 0.01 --epochs 3000 --space "2, 2" --days 31 --mm-cond-number 10 --nheads 300 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"  
 
 ```
 

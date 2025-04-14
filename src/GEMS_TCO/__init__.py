@@ -11,6 +11,13 @@ gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
 sys.path.append(gems_tco_path)
 from GEMS_TCO import orderings as _orderings
 
+### 
+
+
+    # print(f"lat_lon_resolution: {lat_lon_resolution}, mm_cond_number: {mm_cond_number}, params: {params}, v: {v}, lr: {lr}, epochs: {epochs}, nheads: {nheads}")
+
+###
+
 class load_data_local_computer:
     def __init__(self):
         pass
@@ -179,4 +186,7 @@ class load_data_amarel:
         #aggregated_data = torch.from_numpy(aggregated_data).float() 
         aggregated_data = torch.from_numpy(aggregated_data).double()
         return analysis_data_map, aggregated_data
-            
+
+
+if __name__ == "__main__":
+    app()
