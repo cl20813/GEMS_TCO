@@ -31,13 +31,20 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_ex
 
 ```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_v_int414.py --v 0.5 --lr 0.01 --epochs 3000 --space "20, 20" --days 1 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"    ```
 
+
+srun --cpus-per-task=40 --mem=200G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_v_int414.py --v 0.5 --lr 0.01 --epochs 3000 --space "4, 4" --days 1 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34" 
+
+
 ### Job Order SLURM for both vecchia and full
 ```mkdir -p ./jobscript/tco/gp_exercise```     
 
 ```   sbatch fit_vecc_ext_nohead.sh   ```
 
 
-```  cd ./jobscript/tco/gp_exercise  ```                             
+```  cd ./jobscript/tco/gp_exercise  ```          
+
+
+```  rm fit_vecc_1250.sh  ``` 
 
 ```  nano fit_vecc_1250.sh  ``` 
 
@@ -49,8 +56,8 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_ex
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
-#SBATCH --mem=400G                                                 # Memory per node
-#SBATCH --partition=mem                                            # Partition name
+#SBATCH --mem=200G                                                 # Memory per node
+#SBATCH --partition=main                                            # Partition name
 
 #### Load the Anaconda module to use srun 
 module purge                                              
