@@ -32,6 +32,7 @@ log_file_path = '/home/jl2815/tco/exercise_25/st_models/log/fit_st_by_latitude_1
 
 class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
     def __init__(self, smooth, input_map, aggregated_data, nns_map, mm_cond_number):
+        # self.smooth = torch.tensor(smooth,dtype=torch.float64 )
         self.smooth = smooth
         self.input_map = input_map
         self.aggregated_data = aggregated_data[:,:4]
@@ -88,12 +89,11 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         distance = self.custom_distance_matrix(U,V)
         non_zero_indices = distance != 0
         return distance, non_zero_indices
-    
-        # anisotropic in three 
+ 
+
     def matern_cov_anisotropy_v05(self,params: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
         
-
         distance, non_zero_indices = self.precompute_coords_anisotropy(params, x,y)
         out = torch.zeros_like(distance)
 
@@ -104,6 +104,41 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
 
         # Add a small jitter term to the diagonal for numerical stability
         out += torch.eye(out.shape[0], dtype=torch.float64) * nugget 
+        return out
+
+    def matern_cov_anisotropy_v15(self,params: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
+        
+
+        distance, non_zero_indices = self.precompute_coords_anisotropy(params, x,y)
+        out = torch.zeros_like(distance)
+
+        non_zero_indices = distance != 0
+        if torch.any(non_zero_indices):
+            out[non_zero_indices] = sigmasq * (1+ torch.sqrt(distance[non_zero_indices])) * torch.exp(- torch.sqrt(distance[non_zero_indices]))
+        out[~non_zero_indices] = sigmasq
+
+        # Add a small jitter term to the diagonal for numerical stability
+        out += torch.eye(out.shape[0], dtype=torch.float64) * nugget 
+        return out
+    def matern_cov_anisotropy_kv(self,params: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
+
+        distance, non_zero_indices = self.precompute_coords_anisotropy(params, x,y)
+        out = torch.zeros_like(distance)
+        
+        # Compute the covariance for non-zero distances
+        non_zero_indices = distance != 0
+        if torch.any(non_zero_indices):
+            tmp = torch.tensor( kv(self.smooth, np.sqrt(distance[non_zero_indices].detach().numpy())), dtype=torch.float64)
+            out[non_zero_indices] = (sigmasq * (2**(1-self.smooth)) / gamma(self.smooth) *
+                                    (torch.sqrt(distance[non_zero_indices]) )**self.smooth *
+                                    tmp)
+        out[~non_zero_indices] = sigmasq
+
+        # Add a small jitter term to the diagonal for numerical stability
+        out += torch.eye(out.shape[0], dtype=torch.float64) * nugget
+
         return out
     
 class likelihood_function(spatio_temporal_kernels):
@@ -1299,8 +1334,8 @@ class model_fitting(vecchia_experiment):
         vecc_nll = self.vecchia_b2(params, self.matern_cov_anisotropy_v05)
         return vecc_nll
 
-    def compute_full_nll(self,params):
-        full_nll = self.full_likelihood(params=params, input_np=self.aggregated_data, y=self.aggregated_response, covariance_function= self.matern_cov_anisotropy_v05) 
+    def compute_full_nll(self,params, covariance_function):
+        full_nll = self.full_likelihood(params=params, input_np=self.aggregated_data, y=self.aggregated_response, covariance_function= covariance_function) 
         return full_nll
     
     def optimizer_fun(self, params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=40, gamma=0.5):
@@ -1309,14 +1344,14 @@ class model_fitting(vecchia_experiment):
         return optimizer, scheduler
 
     # use adpating lr
-    def run_full(self, params, optimizer, scheduler, epochs=10):
+    def run_full(self, params, optimizer, scheduler,  covariance_function, epochs=10 ):
         prev_loss= float('inf')
 
         tol = 1e-4  # Convergence tolerance
         for epoch in range(epochs):  # Number of epochs
             optimizer.zero_grad()  # Zero the gradients 
             
-            loss = self.compute_full_nll(params)
+            loss = self.compute_full_nll(params, covariance_function)
             loss.backward()  # Backpropagate the loss
             
             # Print gradients and parameters every 10th epoch
