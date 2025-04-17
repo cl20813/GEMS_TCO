@@ -59,7 +59,7 @@ def main():
     lat_lon_resolution = [4, 4]
     years = ['2024']
     month_range = [7, 8]
-    nheads = 100  
+    nheads = 200  
     
     # 50 for 10 work best for competitor 2 lags reordered, cahced
     #  50 for resolution 10: result1 [11,10,9] result2 = [9,11,10]
