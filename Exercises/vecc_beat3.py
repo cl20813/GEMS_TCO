@@ -67,7 +67,7 @@ def main():
     # 300 for resolution 4, result1 [23, 1, 6]  result2 = [6,10,14]
     result_2 = defaultdict(list)
     result_1 =  defaultdict(list)
-    for day in range(1,3):
+    for day in range(1,10):
         print(f'\n Day {day} data size per day: { (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) } \n')
 
         # parameters
@@ -93,29 +93,29 @@ def main():
         # print(f'full: {out}')  
         out = 100
 
-        nheads = 100
+        nheads = 200
         instance = kernels.vecchia_experiment(0.5, reordered_dict, aggregated_data, nns_map, mm_cond_number, nheads)
-        out2 = instance.vecchia_b2(params, instance.matern_cov_anisotropy_v05)
-        print(f'vecc two lags: {out2}')  
+        out2 = instance_ori.vecchia_b2(params, instance.matern_cov_anisotropy_v05)
+        print(f'vecc b2: {out2}')  
         out3 = instance.vecchia_competitor(params, instance.matern_cov_anisotropy_v05)
         print(f'vecc competitor: {out3}')  
 
         nheads = 200
         instance = kernels.vecchia_experiment(0.5, reordered_dict, aggregated_data, nns_map, mm_cond_number, nheads)
-        out22 = instance.vecchia_b2(params, instance.matern_cov_anisotropy_v05)
-        print(f'vecc two lags: {out22}')  
-        out33 = instance.vecchia_competitor(params, instance.matern_cov_anisotropy_v05)
-        print(f'vecc competitor: {out33}')  
+        out22 = instance_ori.vecchia_b3(params, instance.matern_cov_anisotropy_v05)
+        print(f'vecc b3: {out22}')  
+        out33 = instance_ori.vecchia_b1(params, instance.matern_cov_anisotropy_v05)
+        print(f'vecc b1: {out33}')  
 
-        nheads = 300
+        nheads = 200
         instance = kernels.vecchia_experiment(0.5, reordered_dict, aggregated_data, nns_map, mm_cond_number, nheads)
-        out222 = instance.vecchia_b2(params, instance.matern_cov_anisotropy_v05)
-        print(f'vecc two lags: {out222}')  
+        out222 = instance.vecchia_contender(params, instance.matern_cov_anisotropy_v05)
+        print(f'vecc contender: {out222}')  
         out333 = instance.vecchia_competitor(params, instance.matern_cov_anisotropy_v05)
         print(f'vecc competitor: {out333}')  
 
 
-        approx_map = {0: 'two lag nh100', 1: 'competitor nh100', 2: 'two lag nh200', 3: 'competitor nh200', 4: 'two lag nh300', 5: 'competitor nh300'   }
+        approx_map = {0: 'two lag nh100', 1: 'competitor nh100', 2: 'two lag nh200', 3: 'competitor nh200', 4: 'contender nh200', 5: 'competitor nh200'   }
 
         tmp = [out2,out3, out22,out33, out222,out333]
         tmp = torch.stack( tmp)
