@@ -87,47 +87,71 @@ def cli(
     month_range =[7,8]
     
     instance = load_data_amarel()
-    map, ord_mm, nns_map= instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
+    map, ord_mm, nns_map = instance.load_mm20k_data_bymonthyear( lat_lon_resolution = lat_lon_resolution, mm_cond_number = mm_cond_number,years_ = years, months_ = month_range)
     
-    result = {}
+    result_morning = {}
+    result_noon = {}
+
 
     for day in range(days):
-        idx_for_datamap= [8*day,8*(day+1)]
-        analysis_data_map, aggregated_data = instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
+        idx_morning = [8*day,8*day+4]
+        idx_noon = [8*day+4,8*day+8]
 
-        lenth_of_analysis =idx_for_datamap[1]-idx_for_datamap[0]
-        print(f'day {day+1}, data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}, smooth: {v}')
-        print(lat_lon_resolution, mm_cond_number, idx_for_datamap, params, v,lr)
+        analysis_data_map_morning, aggregated_data_morning = instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap = idx_morning)
+        analysis_data_map_noon, aggregated_data_noon = instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap = idx_noon)
+
+        lenth_of_analysis = idx_morning[1]- idx_morning[0]
+        print(f'day {day+1}, data size per hour: {aggregated_data_morning.shape[0]/lenth_of_analysis}, smooth: {v}')
+        print(lat_lon_resolution, mm_cond_number, idx_morning, params, v,lr)
         
         params = list(df_1250.iloc[day-1][:-1])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
 
-        model_instance = kernels.model_fitting(
+        model_morning = kernels.model_fitting(
                 smooth=v,
-                input_map=analysis_data_map,
-                aggregated_data=aggregated_data,
+                input_map=analysis_data_map_morning,
+                aggregated_data=aggregated_data_morning,
                 nns_map=nns_map,
                 mm_cond_number=mm_cond_number,
                 nheads = nheads
             )
 
+        model_noon = kernels.model_fitting(
+                smooth=v,
+                input_map=analysis_data_map_noon,
+                aggregated_data=aggregated_data_noon,
+                nns_map=nns_map,
+                mm_cond_number=mm_cond_number,
+                nheads = nheads
+            )
+        
+
         start_time = time.time()
         # optimizer = optim.Adam([params], lr=0.01)  # For Adam
-        optimizer, scheduler = model_instance.optimizer_fun(params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=20, gamma=0.9)    
-        out = model_instance.run_full(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, epochs=epochs)
-        result[day+1] = out
+        optimizer_m, scheduler_m = model_morning.optimizer_fun(params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=20, gamma=0.9)    
+        optimizer_n, scheduler_n = model_noon.optimizer_fun(params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=20, gamma=0.9)
+        out_m = model_morning.run_full(params, optimizer_m,scheduler_m, model_morning.matern_cov_anisotropy_v05, epochs=epochs)
+        out_n = model_noon.run_full(params, optimizer_n,scheduler_n, model_noon.matern_cov_anisotropy_v05, epochs=epochs)
+        result_morning[day+1] = out_m
+        result_noon[day+1] = out_n
 
         end_time = time.time()
         epoch_time = end_time - start_time
-        print(f'day {day + 1} took {epoch_time:.2f}')
+        print(f'day {day + 1} took {epoch_time/2:.2f} for each morning and noon')
 
-    output_filename = f"full_v({v})_estimation_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
+    output_filename_m = f"full_morning_v({v})_estimation_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
+    output_filename_n = f"full_noon_v({v})_estimation_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
 
     # base_path = "/home/jl2815/tco/data/pickle_data"
-    output_path = "/home/jl2815/tco/exercise_output/estimates"
-    output_filepath = os.path.join(output_path, output_filename)
-    with open(output_filepath, 'wb') as pickle_file:
-        pickle.dump(result, pickle_file)    
+    output_path = "/home/jl2815/tco/exercise_output/estimates/halfday"
+
+    output_filepath_m = os.path.join(output_path, output_filename_m)
+    with open(output_filepath_m, 'wb') as pickle_file:
+        pickle.dump(result_morning, pickle_file)    
+
+    output_filepath_n = os.path.join(output_path, output_filename_n)
+    with open(output_filepath_n, 'wb') as pickle_file:
+        pickle.dump(result_noon, pickle_file)  
 
 if __name__ == '__main__':
     app()
