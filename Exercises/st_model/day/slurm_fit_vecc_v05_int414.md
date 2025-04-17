@@ -10,7 +10,7 @@ For significant updates or installations, use pip install --force-reinstall or p
 ### Copy run file from ```local``` to ```Amarel HPC```
 # mac
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/fit_st_vecc_v05_int414.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_st_vecc_v05_int414.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 
 # window
@@ -42,15 +42,15 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_ex
 
 ```  rm fit_vecc_1250.sh  ``` 
 
-```  nano fit_vecc_v05_1250.sh  ``` 
+```  nano fit_day_vecc_v05_1250.sh  ``` 
 
-```  sbatch fit_vecc_v05_1250.sh  ``` 
+```  sbatch fit_day_vecc_v05_1250.sh  ``` 
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=fit_vecc_v05_1250                         # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_vecc_v05_1250_%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_vecc_v05_1250_%j.err # Standard error file (%j = JobID)
+#SBATCH --job-name=fit_day_vecc_v05_1250                         # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/fit_day_vecc_v05_1250_%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/fit_day_vecc_v05_1250_%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                        # Number of CPU cores per task

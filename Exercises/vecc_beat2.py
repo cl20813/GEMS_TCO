@@ -67,7 +67,7 @@ def main():
     # 300 for resolution 4, result1 [23, 1, 6]  result2 = [6,10,14]
     result_2 = {}
     result_1 =  defaultdict(int)
-    for day in range(1,5):
+    for day in range(8,10):
         print(f'\n Day {day} data size per day: { (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) } \n')
 
         # parameters
@@ -88,18 +88,22 @@ def main():
         reordered_dict = {keys[key]: analysis_data_map[keys[key]] for key in key_order}
 
         instance_ori = kernels.vecchia_experiment(0.5, analysis_data_map, aggregated_data, nns_map, mm_cond_number, nheads)
-        out = instance_ori.full_likelihood(params, aggregated_data[:, :4], aggregated_data[:, 2], instance_ori.matern_cov_anisotropy_v05)
-        print(f'full: {out}')  
+        # out = instance_ori.full_likelihood(params, aggregated_data[:, :4], aggregated_data[:, 2], instance_ori.matern_cov_anisotropy_v05)
+        # print(f'full: {out}')  
+        out = 100
 
         out1 = instance_ori.vecchia_interpolation_1to6(params, instance_ori.matern_cov_anisotropy_v05)
         print(f'vecc t-1, t+1: {out1}')  
+    
+        out11 = instance_ori.vecchia_b2(params, instance_ori.matern_cov_anisotropy_v05)
+        print(f'vecc b2 ori order: {out11}')  
 
         instance = kernels.vecchia_experiment(0.5, reordered_dict, aggregated_data, nns_map, mm_cond_number, nheads)
 
         out2 = instance.vecchia_b2(params, instance.matern_cov_anisotropy_v05)
-        print(f'vecc two lags: {out2}')  
+        print(f'vecc b2 new ord: {out2}')  
 
-        out3 = instance.vecchia_competitor(params, instance.matern_cov_anisotropy_v05)
+        out3 = instance_ori.vecchia_competitor(params, instance.matern_cov_anisotropy_v05)
         print(f'vecc competitor: {out3}')  
 
         approx_map = {0: 'vecc t-1, t+1', 1: 'two lag', 2: 'competitor'}

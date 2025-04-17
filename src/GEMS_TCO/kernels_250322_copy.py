@@ -1630,3 +1630,388 @@ base_list = indices_tensor.clone().detach().tolist()
                         'locs': locs
                     }
         return neg_log_lik
+
+
+
+
+
+ def vecchia_b3(self, params: torch.Tensor, covariance_function) -> torch.Tensor:
+        self.cov_map = defaultdict(list)
+        cut_line= self.nheads
+
+
+        neg_log_lik = 0.0
+
+        cut_line = cut_line
+        heads = self.input_map[self.key_list[0]][:cut_line,:]
+        for time_idx in range(1, len(self.input_map)):
+            tmp = self.input_map[self.key_list[time_idx]][:cut_line,:]
+            heads = torch.cat( (heads,tmp), dim=0)
+
+        neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
+        
+        for time_idx in range(0,len(self.input_map)):
+            current_np = self.input_map[self.key_list[time_idx]]
+
+            # Use below when working on local computer to avoid singular matrix
+            for index in range(cut_line, self.size_per_hour):
+                current_row = current_np[index].reshape(1, -1)
+                current_y = current_row[0, 2]
+
+                # Construct conditioning set
+                mm_neighbors = self.nns_map[index]
+                past = list(mm_neighbors) 
+                data_list = []
+
+                if past:
+                    data_list.append(current_np[past])
+
+                if time_idx > 0:
+                    last_hour_np = self.input_map[self.key_list[time_idx - 1]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if time_idx > 1:
+                    last_hour_np = self.input_map[self.key_list[time_idx -2]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if time_idx > 2:
+                    last_hour_np = self.input_map[self.key_list[time_idx -3]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+                
+                if data_list:
+                    conditioning_data = torch.vstack(data_list)
+                else:
+                    conditioning_data = torch.empty((0, current_row.shape[1]), dtype=torch.float32)
+
+                np_arr = torch.vstack((current_row, conditioning_data))
+                y_and_neighbors = np_arr[:, 2]
+                locs = np_arr[:, :2]
+
+                cov_matrix = covariance_function(params=params, y= np_arr, x= np_arr)
+
+                cov_yx = cov_matrix[0, 1:]
+                        # Compute the log determinant of the covariance matrix
+                sign, log_det = torch.slogdet(cov_matrix)
+     
+                y_arr = y_and_neighbors
+                # Compute beta
+                tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
+                tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, y_arr))
+                beta = torch.linalg.solve(tmp1, tmp2)
+
+                mu = torch.matmul(locs, beta)
+                mu_current = mu[0]
+                mu_neighbors = mu[1:]
+
+                # Mean and variance of y|x
+                sigma = cov_matrix[0, 0]
+                cov_xx = cov_matrix[1:, 1:]
+                cov_xx_inv = torch.linalg.inv(cov_xx)
+
+                cov_ygivenx = sigma - torch.matmul(cov_yx, torch.matmul(cov_xx_inv, cov_yx))
+                cond_mean_tmp = torch.matmul(cov_yx, cov_xx_inv)
+                cond_mean = mu_current + torch.matmul(cond_mean_tmp, (y_and_neighbors[1:] - mu_neighbors))
+                
+                alpha = current_y - cond_mean
+                quad_form = alpha**2 * (1 / cov_ygivenx)
+                log_det = torch.log(cov_ygivenx)
+                neg_log_lik += 0.5 * (log_det + quad_form)
+ 
+        return neg_log_lik
+    
+
+    def vecchia_b4(self, params: torch.Tensor, covariance_function) -> torch.Tensor:
+        self.cov_map = defaultdict(list)
+        cut_line= self.nheads
+
+
+        neg_log_lik = 0.0
+        heads = self.input_map[self.key_list[0]][:cut_line,:]
+        for time_idx in range(1, len(self.input_map)):
+            tmp = self.input_map[self.key_list[time_idx]][:cut_line,:]
+            heads = torch.cat( (heads,tmp), dim=0)
+
+        neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
+        
+        for time_idx in range(0,len(self.input_map)):
+            current_np = self.input_map[self.key_list[time_idx]]
+
+            # Use below when working on local computer to avoid singular matrix
+            for index in range(cut_line, self.size_per_hour):
+                current_row = current_np[index].reshape(1, -1)
+                current_y = current_row[0, 2]
+
+                # Construct conditioning set
+                mm_neighbors = self.nns_map[index]
+                past = list(mm_neighbors) 
+                data_list = []
+
+                if past:
+                    data_list.append(current_np[past])
+
+                if time_idx > 0:
+                    last_hour_np = self.input_map[self.key_list[time_idx - 1]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if time_idx > 1:
+                    last_hour_np = self.input_map[self.key_list[time_idx -2]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if time_idx > 2:
+                    last_hour_np = self.input_map[self.key_list[time_idx -3]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if time_idx > 3:
+                    last_hour_np = self.input_map[self.key_list[time_idx -4]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if data_list:
+                    conditioning_data = torch.vstack(data_list)
+                else:
+                    conditioning_data = torch.empty((0, current_row.shape[1]), dtype=torch.float32)
+
+                np_arr = torch.vstack((current_row, conditioning_data))
+                y_and_neighbors = np_arr[:, 2]
+                locs = np_arr[:, :2]
+
+                cov_matrix = covariance_function(params=params, y= np_arr, x= np_arr)
+                # print(f'Condition number: {torch.linalg.cond(cov_matrix)}')
+                cov_yx = cov_matrix[0, 1:]
+                        # Compute the log determinant of the covariance matrix
+                sign, log_det = torch.slogdet(cov_matrix)
+                # if sign <= 0:
+                #     raise ValueError("Covariance matrix is not positive definite")
+            
+                y_arr = y_and_neighbors
+                # Compute beta
+                tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
+                tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, y_arr))
+                beta = torch.linalg.solve(tmp1, tmp2)
+
+                mu = torch.matmul(locs, beta)
+                mu_current = mu[0]
+                mu_neighbors = mu[1:]
+
+                # Mean and variance of y|x
+                sigma = cov_matrix[0, 0]
+                cov_xx = cov_matrix[1:, 1:]
+                cov_xx_inv = torch.linalg.inv(cov_xx)
+
+                cov_ygivenx = sigma - torch.matmul(cov_yx, torch.matmul(cov_xx_inv, cov_yx))
+                cond_mean_tmp = torch.matmul(cov_yx, cov_xx_inv)
+                cond_mean = mu_current + torch.matmul(cond_mean_tmp, (y_and_neighbors[1:] - mu_neighbors))
+                
+                alpha = current_y - cond_mean
+                quad_form = alpha**2 * (1 / cov_ygivenx)
+                log_det = torch.log(cov_ygivenx)
+                neg_log_lik += 0.5 * (log_det + quad_form)
+        return neg_log_lik
+
+    def vecchia_b5(self, params: torch.Tensor, covariance_function) -> torch.Tensor:
+        self.cov_map = defaultdict(list)
+        cut_line= self.nheads
+
+        neg_log_lik = 0.0
+
+        cut_line = cut_line
+        heads = self.input_map[self.key_list[0]][:cut_line,:]
+        for time_idx in range(1, len(self.input_map)):
+            tmp = self.input_map[self.key_list[time_idx]][:cut_line,:]
+            heads = torch.cat( (heads,tmp), dim=0)
+
+        neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
+        
+        for time_idx in range(0,len(self.input_map)):
+            current_np = self.input_map[self.key_list[time_idx]]
+
+            # Use below when working on local computer to avoid singular matrix
+            for index in range(cut_line, self.size_per_hour):
+                current_row = current_np[index].reshape(1, -1)
+                current_y = current_row[0, 2]
+
+                # Construct conditioning set
+                mm_neighbors = self.nns_map[index]
+                past = list(mm_neighbors) 
+                data_list = []
+
+                if past:
+                    data_list.append(current_np[past])
+
+                if time_idx > 0:
+                    last_hour_np = self.input_map[self.key_list[time_idx - 1]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if time_idx > 1:
+                    last_hour_np = self.input_map[self.key_list[time_idx -2]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if time_idx > 2:
+                    last_hour_np = self.input_map[self.key_list[time_idx -3]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if time_idx > 3:
+                    last_hour_np = self.input_map[self.key_list[time_idx -4]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if time_idx > 4:
+                    last_hour_np = self.input_map[self.key_list[time_idx -5]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                
+                if data_list:
+                    conditioning_data = torch.vstack(data_list)
+                else:
+                    conditioning_data = torch.empty((0, current_row.shape[1]), dtype=torch.float32)
+
+                np_arr = torch.vstack((current_row, conditioning_data))
+                y_and_neighbors = np_arr[:, 2]
+                locs = np_arr[:, :2]
+
+                cov_matrix = covariance_function(params=params, y= np_arr, x= np_arr)
+                # print(f'Condition number: {torch.linalg.cond(cov_matrix)}')
+                cov_yx = cov_matrix[0, 1:]
+                        # Compute the log determinant of the covariance matrix
+                sign, log_det = torch.slogdet(cov_matrix)
+                # if sign <= 0:
+                #     raise ValueError("Covariance matrix is not positive definite")
+            
+                y_arr = y_and_neighbors
+                # Compute beta
+                tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
+                tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, y_arr))
+                beta = torch.linalg.solve(tmp1, tmp2)
+
+                mu = torch.matmul(locs, beta)
+                mu_current = mu[0]
+                mu_neighbors = mu[1:]
+
+                # Mean and variance of y|x
+                sigma = cov_matrix[0, 0]
+                cov_xx = cov_matrix[1:, 1:]
+                cov_xx_inv = torch.linalg.inv(cov_xx)
+
+                cov_ygivenx = sigma - torch.matmul(cov_yx, torch.matmul(cov_xx_inv, cov_yx))
+                cond_mean_tmp = torch.matmul(cov_yx, cov_xx_inv)
+                cond_mean = mu_current + torch.matmul(cond_mean_tmp, (y_and_neighbors[1:] - mu_neighbors))
+                
+                alpha = current_y - cond_mean
+                quad_form = alpha**2 * (1 / cov_ygivenx)
+                log_det = torch.log(cov_ygivenx)
+                neg_log_lik += 0.5 * (log_det + quad_form)
+ 
+        return neg_log_lik
+
+    def vecchia_b6(self, params: torch.Tensor, covariance_function) -> torch.Tensor:
+        self.cov_map = defaultdict(list)
+        cut_line= self.nheads
+
+        neg_log_lik = 0.0
+        cut_line = cut_line
+        heads = self.input_map[self.key_list[0]][:cut_line,:]
+        for time_idx in range(1, len(self.input_map)):
+            tmp = self.input_map[self.key_list[time_idx]][:cut_line,:]
+            heads = torch.cat( (heads,tmp), dim=0)
+
+        neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
+        
+        for time_idx in range(0,len(self.input_map)):
+            current_np = self.input_map[self.key_list[time_idx]]
+
+            # Use below when working on local computer to avoid singular matrix
+            for index in range(cut_line, self.size_per_hour):
+                current_row = current_np[index].reshape(1, -1)
+                current_y = current_row[0, 2]
+
+                # Construct conditioning set
+                mm_neighbors = self.nns_map[index]
+                past = list(mm_neighbors) 
+                data_list = []
+
+                if past:
+                    data_list.append(current_np[past])
+
+                if time_idx > 0:
+                    last_hour_np = self.input_map[self.key_list[time_idx - 1]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if time_idx > 1:
+                    last_hour_np = self.input_map[self.key_list[time_idx -2]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if time_idx > 2:
+                    last_hour_np = self.input_map[self.key_list[time_idx -3]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if time_idx > 3:
+                    last_hour_np = self.input_map[self.key_list[time_idx -4]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if time_idx > 4:
+                    last_hour_np = self.input_map[self.key_list[time_idx -5]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if time_idx > 5:
+                    last_hour_np = self.input_map[self.key_list[time_idx -6]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if data_list:
+                    conditioning_data = torch.vstack(data_list)
+                else:
+                    conditioning_data = torch.empty((0, current_row.shape[1]), dtype=torch.float32)
+
+                np_arr = torch.vstack((current_row, conditioning_data))
+                y_and_neighbors = np_arr[:, 2]
+                locs = np_arr[:, :2]
+
+                cov_matrix = covariance_function(params=params, y= np_arr, x= np_arr)
+                # print(f'Condition number: {torch.linalg.cond(cov_matrix)}')
+                cov_yx = cov_matrix[0, 1:]
+                        # Compute the log determinant of the covariance matrix
+                sign, log_det = torch.slogdet(cov_matrix)
+                # if sign <= 0:
+                #     raise ValueError("Covariance matrix is not positive definite")
+            
+                y_arr = y_and_neighbors
+                # Compute beta
+                tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
+                tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, y_arr))
+                beta = torch.linalg.solve(tmp1, tmp2)
+
+                mu = torch.matmul(locs, beta)
+                mu_current = mu[0]
+                mu_neighbors = mu[1:]
+
+                # Mean and variance of y|x
+                sigma = cov_matrix[0, 0]
+                cov_xx = cov_matrix[1:, 1:]
+                cov_xx_inv = torch.linalg.inv(cov_xx)
+
+                cov_ygivenx = sigma - torch.matmul(cov_yx, torch.matmul(cov_xx_inv, cov_yx))
+                cond_mean_tmp = torch.matmul(cov_yx, cov_xx_inv)
+                cond_mean = mu_current + torch.matmul(cond_mean_tmp, (y_and_neighbors[1:] - mu_neighbors))
+                
+                alpha = current_y - cond_mean
+                quad_form = alpha**2 * (1 / cov_ygivenx)
+                log_det = torch.log(cov_ygivenx)
+                neg_log_lik += 0.5 * (log_det + quad_form)
+ 
+        return neg_log_lik
+    
