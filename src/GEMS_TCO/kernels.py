@@ -38,7 +38,7 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         self.aggregated_data = aggregated_data[:,:4]
         self.aggregated_response = aggregated_data[:,2]
 
-        self.key_list = sorted(input_map)
+        self.key_list = list(input_map.keys())
         self.number_of_timestamps = len(self.key_list)
 
         sample_df = input_map[self.key_list[0]]
@@ -644,11 +644,11 @@ class vecchia_experiment(likelihood_function):
                     log_det = self.cov_map[index]['log_det']
                     locs = self.cov_map[index]['locs']
 
-                    one_hour_lag = self.input_map[self.key_list[time_idx - 1]]
+                    one_hour_lag = self.input_map[key_list[time_idx - 1]]
                     past_conditioning_data = one_hour_lag[past + [index], :]
                     data_list.append(past_conditioning_data)
 
-                    two_hour_lag = self.input_map[self.key_list[time_idx - 2]]
+                    two_hour_lag = self.input_map[key_list[time_idx - 2]]
                     past_conditioning_data = two_hour_lag[past + [index], :]
                     data_list.append(past_conditioning_data)
 
@@ -674,7 +674,6 @@ class vecchia_experiment(likelihood_function):
                     alpha = current_y - cond_mean
                     quad_form = alpha**2 * (1 / cov_ygivenx)
                     neg_log_lik += 0.5 * (log_det + quad_form)
-
                     continue
 
                 if time_idx > 0:

@@ -10,7 +10,7 @@ For significant updates or installations, use pip install --force-reinstall or p
 ### Copy run file from ```local``` to ```Amarel HPC```
 # mac
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/fit_st_torch_v_int414.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/fit_st_vecc_v05_int414.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 
 # window
@@ -29,7 +29,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_ex
 
 ## space 5 5: 5x10, 4 4: 25x50, 2 2: 50x100
 
-```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_v_int414.py --v 0.5 --lr 0.01 --epochs 3000 --space "20, 20" --days 1 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"    ```
+```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_st_vecc_v05_int414.py --v 0.5 --lr 0.01 --epochs 3000 --space "20, 20" --days 1 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"    ```
 
 
 
@@ -42,20 +42,20 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_ex
 
 ```  rm fit_vecc_1250.sh  ``` 
 
-```  nano fit_vecc_1250.sh  ``` 
+```  nano fit_vecc_v05_1250.sh  ``` 
 
-```  sbatch fit_vecc_1250.sh  ``` 
+```  sbatch fit_vecc_v05_1250.sh  ``` 
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=fit_v1250                         # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_v1250_%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_v1250_%j.err # Standard error file (%j = JobID)
+#SBATCH --job-name=fit_vecc_v05_1250                         # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/fit_vecc_v05_1250_%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/fit_vecc_v05_1250_%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                        # Number of CPU cores per task
-#SBATCH --mem=200G                                                 # Memory per node
-#SBATCH --partition=main                                            # Partition name
+#SBATCH --mem=300G                                                 # Memory per node
+#SBATCH --partition=mem                                            # Partition name
 
 #### Load the Anaconda module to use srun 
 module purge                                              
@@ -67,9 +67,10 @@ eval "$(conda shell.bash hook)"
 conda activate faiss_env
 
 echo "Current date and time: $(date)"
-echo "fit_st_vecc_1250_save_estimates"
+echo "fit_st_vecc_v05_1250_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_v_int414.py --v 0.5 --lr 0.01 --epochs 3000 --space "4,4" --days 31 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"  
+
+srun python /home/jl2815/tco/exercise_25/st_model/fit_st_vecc_v05_int414.py --v 0.5 --lr 0.01 --epochs 3000 --space "4,4" --days 31 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"  
 
 ```
 
