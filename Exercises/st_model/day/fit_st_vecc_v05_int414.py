@@ -127,7 +127,7 @@ def cli(
                 mm_cond_number=mm_cond_number,
                 nheads = nheads 
             )
-
+ 
         start_time = time.time()
         # optimizer = optim.Adam([params], lr=0.01)  # For Adam
         optimizer, scheduler = model_instance.optimizer_fun(params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=20, gamma=0.9)    
@@ -138,7 +138,7 @@ def cli(
         epoch_time = end_time - start_time
         print(f'day {day + 1} took {epoch_time:.2f}')
 
-    output_filename = f"vecc_v({v})_estimates_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
+    output_filename = f"vecc_day_v({v})_estimates_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
 
     # base_path = "/home/jl2815/tco/data/pickle_data"
     output_path = "/home/jl2815/tco/exercise_output/estimates"
