@@ -107,7 +107,8 @@ def cli(
                 input_map=analysis_data_map,
                 aggregated_data=aggregated_data,
                 nns_map=nns_map,
-                mm_cond_number=mm_cond_number
+                mm_cond_number=mm_cond_number,
+                nheads = nheads
             )
 
         start_time = time.time()
