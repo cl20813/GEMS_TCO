@@ -56,7 +56,6 @@ def cli(
 
     lat_lon_resolution = [int(s) for s in space[0].split(',')]
     parsed_params = [float(p) for p in params[0].split(',')]
-
     params = torch.tensor(parsed_params, requires_grad=True)
 
     days = days
@@ -66,9 +65,11 @@ def cli(
     rho_lat = lat_lon_resolution[0]
     rho_lon = lat_lon_resolution[1]
 
-    # Argument parser
+   
 
     ############################## 
+
+    ## load initial estimates 
 
     input_path = "/home/jl2815/tco/exercise_output/estimates/"
     input_filename = "estimation_1250_july24.pkl"
@@ -77,14 +78,12 @@ def cli(
     with open(input_filepath, 'rb') as pickle_file:
         amarel_map1250= pickle.load(pickle_file)
 
-    # Assuming df_1250 is your DataFrame
     df_1250 = pd.DataFrame()
     for key in amarel_map1250:
         tmp = pd.DataFrame(amarel_map1250[key][0].reshape(1, -1), columns=['sigmasq', 'range_lat', 'range_lon', 'advec_lat', 'advec_lon', 'beta', 'nugget'])
         tmp['loss'] = amarel_map1250[key][1]
         df_1250 = pd.concat((df_1250, tmp), axis=0)
 
-    # Generate date range
     date_range = pd.date_range(start='07-01-24', end='07-31-24')
 
     # Ensure the number of dates matches the number of rows in df_1250
@@ -95,7 +94,7 @@ def cli(
 
     ######
 
-    # Load the one dictionary to set spaital coordinates
+    # Set spaital coordinates
     years = ['2024']
     month_range =[7,8]
     
@@ -112,8 +111,6 @@ def cli(
         print(f'day {day+1}, data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}')
         print(lat_lon_resolution, mm_cond_number, idx_for_datamap, params, v,lr)
 
-        # params = [24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34]
-        # params = torch.tensor(params, requires_grad=True)
         params = list(df_1250.iloc[day-1][:-1])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
 
