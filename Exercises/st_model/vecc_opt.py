@@ -131,32 +131,6 @@ def cli(
         print(f'day testing {day + 1} took {epoch_time:.2f}')
 
 
-        start_time = time.time()
-        params = list(df.iloc[day][:-1])
-        params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
-        # optimizer = optim.Adam([params], lr=0.01)  # For Adam
-        optimizer, scheduler = model_instance.optimizer_testing(params, lr=0.01, betas=(0.9, 0.80), eps=1e-8, step_size=80, gamma=0.9)    
-        
-        out = model_instance.run_vecc_interpolate(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, epochs=epochs)
-        print(out)
-        end_time = time.time()
-        epoch_time = end_time - start_time
-        print(f'day map vecc {day + 1} took {epoch_time:.2f}')        
-
-        start_time = time.time()
-        params = list(df.iloc[day][:-1])
-        params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
-        # optimizer = optim.Adam([params], lr=0.01)  # For Adam
-        optimizer, scheduler = model_instance.optimizer_fun(params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=20, gamma=0.9)    
-        
-        out = model_instance.run_full(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, epochs=epochs)
-        print(out)
-        end_time = time.time()
-        epoch_time = end_time - start_time
-        print(f'day full {day + 1} took {epoch_time:.2f}')
-
-
-
 
 
 if __name__ == "__main__":
