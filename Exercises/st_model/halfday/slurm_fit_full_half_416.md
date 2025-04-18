@@ -52,11 +52,11 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/halfday
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=fit_full_half_v05_1250                             # Job name
+#SBATCH --job-name=fit_half_full_1250                             # Job name
 #SBATCH --output=/home/jl2815/tco/exercise_output/fit_full_half_1250_%j.out     # Standard output file (%j = JobID)
 #SBATCH --error=/home/jl2815/tco/exercise_output/fit_full_half_1250_%j.err # Standard error file (%j = JobID)
 #SBATCH --time=48:00:00                                            # Time limit
-#SBATCH --ntasks=1                                                # Number of tasks
+#SBATCH --ntasks=3                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
 #SBATCH --mem=300G                                                 # Memory per node
 #SBATCH --partition=mem                                            # Partition name

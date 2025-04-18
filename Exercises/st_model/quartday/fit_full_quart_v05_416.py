@@ -59,8 +59,8 @@ def cli(
 
     ## load initial estimates 
 
-    input_path = "/home/jl2815/tco/exercise_output/estimates/"
-    input_filename = "estimation_1250_july24.pkl"
+    input_path = "/home/jl2815/tco/exercise_output/estimates/day/"
+    input_filename = "full_day_v(0.5)_1250_july24.pkl"
     input_filepath = os.path.join(input_path, input_filename)
     # Load pickle
     with open(input_filepath, 'rb') as pickle_file:

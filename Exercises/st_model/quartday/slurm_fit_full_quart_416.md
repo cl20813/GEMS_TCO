@@ -46,17 +46,17 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/halfday
 
  ```  cd ./jobscript/tco/gp_exercise  ```   
 
- ```  nano fit_full_quart_5000_estimates.sh  ```        
- ```   sbatch fit_full_quart_5000_estimates.sh   ```
+ ```  nano fit_full_quart_1250_estimates.sh  ```        
+ ```   sbatch fit_full_quart_1250_estimates.sh   ```
 
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=fit_full_quart_5000                             # Job name
+#SBATCH --job-name=fit_quart_full_1250                             # Job name
 #SBATCH --output=/home/jl2815/tco/exercise_output/fit_full_quart_5000_%j.out     # Standard output file (%j = JobID)
 #SBATCH --error=/home/jl2815/tco/exercise_output/fit_full_quart_5000_%j.err # Standard error file (%j = JobID)
 #SBATCH --time=48:00:00                                            # Time limit
-#SBATCH --ntasks=1                                                # Number of tasks
+#SBATCH --ntasks=3                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
 #SBATCH --mem=300G                                                 # Memory per node
 #SBATCH --partition=mem                                            # Partition name
@@ -73,11 +73,11 @@ conda activate faiss_env
 echo "Current date and time: $(date)"
 echo "fit_full_half_v05_1250"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_full_half_v05_416.py --v 0.5 --lr 0.01 --epochs 3000 --space "2, 2" --days 31 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34" 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_full_half_v05_416.py --v 0.5 --lr 0.01 --epochs 3000 --space "4, 4" --days 31 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34" 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_full_half_v10_416.py --v 1.0 --lr 0.01 --epochs 3000 --space "2, 2" --days 31 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"
+srun python /home/jl2815/tco/exercise_25/st_model/fit_full_half_v10_416.py --v 1.0 --lr 0.01 --epochs 3000 --space "4, 4" --days 31 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_full_half_v15_416.py --v 1.5 --lr 0.01 --epochs 3000 --space "2, 2" --days 31 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"
+srun python /home/jl2815/tco/exercise_25/st_model/fit_full_half_v15_416.py --v 1.5 --lr 0.01 --epochs 3000 --space "4, 4" --days 31 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"
 
 
 ```
