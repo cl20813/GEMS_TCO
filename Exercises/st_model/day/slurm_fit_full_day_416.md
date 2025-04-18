@@ -46,8 +46,38 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/full_v(
 
 
 ```  cd ./jobscript/tco/gp_exercise  ```   
+```  nano fit_full_day_v10_1250_estimates.sh  ```        
+ ```   sbatch fit_full_day_v10_1250_estimates.sh   ```
 
-```  nano fit_full_v15_1250_estimates.sh  ```        
+``` 
+#!/bin/bash
+#SBATCH --job-name=fit_full_v10_1250                             # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/fit_full_day_v10_1250_%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/fit_full_day_v10_1250_%j.err # Standard error file (%j = JobID)
+#SBATCH --time=48:00:00                                            # Time limit
+#SBATCH --ntasks=1                                                # Number of tasks
+#SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
+#SBATCH --mem=300G                                                 # Memory per node
+#SBATCH --partition=mem                                            # Partition name
+
+#### Load the Anaconda module to use srun 
+module purge                                              
+module use /projects/community/modulefiles                 
+module load anaconda/2024.06-ts840 
+
+#### Initialize conda for the current shell session if not already done for the current shell session.
+eval "$(conda shell.bash hook)"
+conda activate faiss_env
+
+echo "Current date and time: $(date)"
+
+echo "fit_full_day_v10_1250"
+
+srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v10_416.py --v 1.0 --lr 0.01 --epochs 3000 --space "4, 4" --days 31 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34" 
+```
+
+
+``` nano fit_full_v15_1250_estimates.sh ```        
  ```   sbatch fit_full_v15_1250_estimates.sh   ```
 
 
@@ -82,35 +112,6 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v15_416.py --v 1.
 
 
 
-```  nano fit_full_day_v10_1250_estimates.sh  ```        
- ```   sbatch fit_full_day_v10_1250_estimates.sh   ```
-
-``` 
-#!/bin/bash
-#SBATCH --job-name=fit_full_v10_1250                             # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_full_day_v10_1250_%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_full_day_v10_1250_%j.err # Standard error file (%j = JobID)
-#SBATCH --time=48:00:00                                            # Time limit
-#SBATCH --ntasks=1                                                # Number of tasks
-#SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
-#SBATCH --mem=300G                                                 # Memory per node
-#SBATCH --partition=mem                                            # Partition name
-
-#### Load the Anaconda module to use srun 
-module purge                                              
-module use /projects/community/modulefiles                 
-module load anaconda/2024.06-ts840 
-
-#### Initialize conda for the current shell session if not already done for the current shell session.
-eval "$(conda shell.bash hook)"
-conda activate faiss_env
-
-echo "Current date and time: $(date)"
-
-echo "fit_full_day_v10_1250"
-
-srun python /home/jl2815/tco/exercise_25/st_model/fit_full_v10_day_416.py --v 1.0 --lr 0.01 --epochs 3000 --space "4, 4" --days 31 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34" 
 
 
-```
 
