@@ -56,7 +56,7 @@ def main():
   
     df = df_1250
 
-    lat_lon_resolution = [10, 10]
+    lat_lon_resolution = [4, 4]
     years = ['2024']
     month_range = [7, 8]
     nheads = 200  
@@ -84,9 +84,8 @@ def main():
 
         # different approximations
         key_order = [0, 1, 2, 4, 3, 5, 7, 6]
-        keys = list(analysis_data_map.keys())
-        reordered_dict = {keys[key]: analysis_data_map[keys[key]] for key in key_order}
 
+        reordered_dict, reorderd_df  =instance.reorder_data(analysis_data_map, aggregated_data, key_order)
         instance_ori = kernels.vecchia_experiment(0.5, analysis_data_map, aggregated_data, nns_map, mm_cond_number, nheads)
         # out = instance_ori.full_likelihood(params, aggregated_data[:, :4], aggregated_data[:, 2], instance_ori.matern_cov_anisotropy_v05)
         # print(f'full: {out}')  
@@ -98,7 +97,10 @@ def main():
         out11 = instance_ori.vecchia_b2(params, instance_ori.matern_cov_anisotropy_v05)
         print(f'vecc b2 ori order: {out11}')  
 
-        instance = kernels.vecchia_experiment(0.5, reordered_dict, aggregated_data, nns_map, mm_cond_number, nheads)
+        out111 = instance_ori.vecchia_contender(params, instance_ori.matern_cov_anisotropy_v05)
+        print(f'vecc contender ori order: {out111}')  
+
+        instance = kernels.vecchia_experiment(0.5, reordered_dict, reorderd_df, nns_map, mm_cond_number, nheads)
 
         out2 = instance.vecchia_b2(params, instance.matern_cov_anisotropy_v05)
         print(f'vecc b2 new ord: {out2}')  
@@ -107,8 +109,8 @@ def main():
         print(f'vecc competitor: {out3}')  
     
 
-        out3 = instance_ori.vecchia_contender(params, instance.matern_cov_anisotropy_v05)
-        print(f'vecc competitor: {out3}')  
+        out3 = instance.vecchia_contender(params, instance.matern_cov_anisotropy_v05)
+        print(f'vecc new ord contender: {out3}')  
 
         approx_map = {0: 'vecc t-1, t+1', 1: 'two lag', 2: 'competitor'}
 
