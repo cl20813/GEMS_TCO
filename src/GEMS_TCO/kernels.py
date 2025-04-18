@@ -765,11 +765,9 @@ class vecchia_experiment(likelihood_function):
                 current_row = current_np[index].reshape(1, -1)
                 current_y = current_row[0, 2]
 
-                    # Construct conditioning set
+                # Construct conditioning set
                 mm_neighbors = self.nns_map[index]
                 past = list(mm_neighbors) 
-                if past:
-                    half_past = [x for x in past for _ in range(len(past)//2)]
                 data_list = []
 
                 if past:
@@ -784,7 +782,7 @@ class vecchia_experiment(likelihood_function):
                     two_hour_lag = self.input_map[key_list[time_idx -2]]
                     # if index==200:
                     #     print(self.input_map[self.key_list[time_idx-6]])
-                    past_conditioning_data = two_hour_lag[half_past + [index], :]
+                    past_conditioning_data = two_hour_lag[past + [index], :]
                     data_list.append(past_conditioning_data)
                 
                 if data_list:
