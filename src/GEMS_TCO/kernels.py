@@ -757,30 +757,29 @@ class vecchia_experiment(likelihood_function):
 
         neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
         
-
         time_idx = 0
         sph = self.size_per_hour
         # Use below when working on local computer to avoid singular matrix
         while time_idx <8:
             time_sph = time_idx * sph
-            for index in range(cut_line + time_sph , self.size_per_hour + time_sph):
+            for index in range(time_sph + cut_line , time_sph + sph ):
                 
                 current_row = self.aggregated_data[index].reshape(1, -1)
                 current_y = current_row[0, 2]
 
                 # Construct conditioning set
-                mm_neighbors = self.nns_map[index//self.size_per_hour]
+                mm_neighbors = self.nns_map[index % self.size_per_hour]
                 past = list(mm_neighbors) 
                 data_list = []
 
                 if past:
-                    tmp = [x+sph for x in past]
+                    tmp = [x+time_sph for x in past]
                     data_list.append(self.aggregated_data[ tmp])
 
                 if time_idx > 0:
 
                     past_one_lag = [x + (time_idx-1)*sph for x  in past]
-                    past_conditioning_data = self.aggregated_data[past_one_lag + [index]]
+                    past_conditioning_data = self.aggregated_data[past_one_lag + [index-sph]]
                     data_list.append(past_conditioning_data)
 
                 if time_idx > 1:
@@ -788,7 +787,7 @@ class vecchia_experiment(likelihood_function):
 
                     # if index==200:
                     #     print(self.input_map[self.key_list[time_idx-6]])
-                    past_conditioning_data = self.aggregated_data[past_two_lag+ [index], :]
+                    past_conditioning_data = self.aggregated_data[past_two_lag+ [index - sph*2], :]
                     data_list.append(past_conditioning_data)
                 
                 if data_list:
@@ -1041,6 +1040,13 @@ class model_fitting(vecchia_experiment):
 
         vecc_nll = self.vecchia_b2(params, covariance_function)
         return vecc_nll
+    
+    # Example function to compute out1
+    def compute_vecc_nll_testing(self,params, covariance_function):
+
+        vecc_nll = self.vecchia_contender(params, covariance_function)
+        return vecc_nll
+
 
     def compute_vecc_nll_extrapolate(self,params , covariance_function):
    
@@ -1127,7 +1133,7 @@ class model_fitting(vecchia_experiment):
         for epoch in range(epochs):  # Number of epochs
             optimizer.zero_grad()  # Zero the gradients 
             
-            loss = self.compute_vecc_nll_interpolate(params, covariance_function)
+            loss = self.compute_vecc_nll_testing(params, covariance_function)
             loss.backward()  # Backpropagate the loss
             
             # Print gradients and parameters every 10th epoch
