@@ -110,7 +110,7 @@ def cli(
         print(f'day {day+1}, data size per hour: {aggregated_data_q1.shape[0]/lenth_of_analysis}, smooth: {v}')
         print(lat_lon_resolution, mm_cond_number, idx_q1, params, v,lr)
         
-        params = list(df_1250.iloc[day-1][:-1])
+        params = list(df_1250.iloc[day][:-1])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
 
         model_q1 = kernels.model_fitting(

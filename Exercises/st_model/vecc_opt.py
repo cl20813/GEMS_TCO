@@ -16,17 +16,21 @@ import torch.optim as optim
 import copy                    # clone tensor
 import time
 
+import torch
+from collections import defaultdict
+
+import torch.optim as optim
+from torch.optim.lr_scheduler import StepLR
+import copy  # clone tensor
+
 # Custom imports
 import GEMS_TCO
 from GEMS_TCO import kernels
 from GEMS_TCO import orbitmap 
 from GEMS_TCO import kernels 
 from GEMS_TCO import orderings as _orderings 
-from GEMS_TCO import load_data_amarel
+from GEMS_TCO import load_data_local_computer
 
-# Configure logging to a specific file path
-log_file_path = '/home/jl2815/tco/exercise_output/logs/fit_full.log'
-logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(message)s')
 
 from typing import Optional, List, Tuple
 from pathlib import Path
@@ -48,30 +52,27 @@ def cli(
     nheads: int = typer.Option(200, help="Number of iterations in optimization"),
 ) -> None:
 
- 
-    lat_lon_resolution = [int(s) for s in space[0].split(',')]
-    parsed_params = [float(p) for p in params[0].split(',')]
-    params = torch.tensor(parsed_params, requires_grad=True)
+    input_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates"
 
-    rho_lat = lat_lon_resolution[0]          
-    rho_lon = lat_lon_resolution[1]
-    ############################## 
+    # input_filename = "vecc_extra_estimates_50_july24.pkl"
+    # input_filename = "vecc_inter_estimates_1250_july24.pkl"
 
-    ## load initial estimates 
-
-    input_path = "/home/jl2815/tco/exercise_output/estimates/day/"
-    input_filename = "full_day_v(0.5)_1250_july24.pkl"
+    input_filename = "vecc_inter_estimates_5000_july24.pkl"
+    # input_filename = "estimation_200_july24.pkl"
+    input_filename = "full_estimation_1250_july24.pkl"
     input_filepath = os.path.join(input_path, input_filename)
     # Load pickle
     with open(input_filepath, 'rb') as pickle_file:
-        amarel_map1250= pickle.load(pickle_file)
-   
+        amarel_map1250 = pickle.load(pickle_file)
+
+    # Assuming df_1250 is your DataFrame
     df_1250 = pd.DataFrame()
     for key in amarel_map1250:
         tmp = pd.DataFrame(amarel_map1250[key][0].reshape(1, -1), columns=['sigmasq', 'range_lat', 'range_lon', 'advec_lat', 'advec_lon', 'beta', 'nugget'])
         tmp['loss'] = amarel_map1250[key][1]
         df_1250 = pd.concat((df_1250, tmp), axis=0)
 
+    # Generate date range
     date_range = pd.date_range(start='07-01-24', end='07-31-24')
 
     # Ensure the number of dates matches the number of rows in df_1250
@@ -80,56 +81,72 @@ def cli(
     else:
         print("The number of dates does not match the number of rows in the DataFrame.")
 
-    ##
+  
+    df = df_1250
 
-    # Set spaital coordinates
+    lat_lon_resolution = [int(s) for s in space[0].split(',')]
     years = ['2024']
-    month_range =[7,8]
+    month_range = [7, 8]
+    nheads = 200  
     
-    instance = load_data_amarel()
-    map, ord_mm, nns_map= instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
-    
-    result = {}
+    # 50 for 10 work best for competitor 2 lags reordered, cahced
+    #  50 for resolution 10: result1 [11,10,9] result2 = [9,11,10]
+    #  200 for resolution 4, result1 [21,2,7] result2=[7,7,16]
+    # 300 for resolution 4, result1 [23, 1, 6]  result2 = [6,10,14]
+    result_2 = {}
+    result_1 =  defaultdict(int)
+    for day in range(1,2):
+        print(f'\n Day {day+1} data size per day: { (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) } \n')
 
-    for day in range(days):
-        idx_for_datamap= [8*day,8*(day+1)]
-        analysis_data_map, aggregated_data = instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
-
-        lenth_of_analysis =idx_for_datamap[1]-idx_for_datamap[0]
-        print(f'day {day+1}, data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}, smooth: {v}')
-        print(lat_lon_resolution, mm_cond_number, idx_for_datamap, params, v,lr)
-        
-        params = list(df_1250.iloc[day][:-1])
+   
+        idx_for_datamap = [8 * (day), 8 * (day+1)]
+        # params = [27.25, 2.18, 2.294, 4.099e-4, -0.07915, 0.0999, 3.65]   #200
+        params = list(df.iloc[day][:-1])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
+        print(params)
+        # data
+        instance = load_data_local_computer()
+        map, ord_mm, nns_map = instance.load_mm20k_data_bymonthyear(lat_lon_resolution=lat_lon_resolution, mm_cond_number=mm_cond_number, years_=years, months_=month_range)
+        analysis_data_map, aggregated_data = instance.load_working_data_byday(map, ord_mm, nns_map, idx_for_datamap=idx_for_datamap)
+
+        # different approximations
+        key_order = [0, 1, 2, 4, 3, 5, 7, 6]
+        keys = list(analysis_data_map.keys())
+        reordered_dict = {keys[key]: analysis_data_map[keys[key]] for key in key_order}
+
+        instance_ori = kernels.vecchia_experiment(0.5, analysis_data_map, aggregated_data, nns_map, mm_cond_number, nheads)
 
         model_instance = kernels.model_fitting(
                 smooth=v,
-                input_map=analysis_data_map,
+                input_map=reordered_dict,
                 aggregated_data=aggregated_data,
                 nns_map=nns_map,
                 mm_cond_number=mm_cond_number,
                 nheads = nheads
             )
-
+        
         start_time = time.time()
         # optimizer = optim.Adam([params], lr=0.01)  # For Adam
-        optimizer, scheduler = model_instance.optimizer_fun(params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=20, gamma=0.9)    
-        out = model_instance.run_full(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, epochs=epochs)
-        result[day+1] = out
-
+        optimizer, scheduler = model_instance.optimizer_testing(params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=20, gamma=0.9)    
+        
+        out = model_instance.run_vecc_testing(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, epochs=epochs)
+        print(out)
         end_time = time.time()
         epoch_time = end_time - start_time
         print(f'day {day + 1} took {epoch_time:.2f}')
 
-    output_filename = f"full_day_v({v})_estimation_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
 
-    # base_path = "/home/jl2815/tco/data/pickle_data"
-    output_path = "/home/jl2815/tco/exercise_output/estimates/day"
-    output_filepath = os.path.join(output_path, output_filename)
-    with open(output_filepath, 'wb') as pickle_file:
-        pickle.dump(result, pickle_file)    
+        start_time = time.time()
+        # optimizer = optim.Adam([params], lr=0.01)  # For Adam
+        optimizer, scheduler = model_instance.optimizer_testing(params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=20, gamma=0.9)    
+        
+        out = model_instance.run_full(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, epochs=epochs)
+        print(out)
+        end_time = time.time()
+        epoch_time = end_time - start_time
+        print(f'day {day + 1} took {epoch_time:.2f}')
 
-if __name__ == '__main__':
+
+
+if __name__ == "__main__":
     app()
-
-
