@@ -757,32 +757,38 @@ class vecchia_experiment(likelihood_function):
 
         neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
         
-        for time_idx in range(0,len(self.input_map)):
-            current_np = self.input_map[key_list[time_idx]]
 
-            # Use below when working on local computer to avoid singular matrix
-            for index in range(cut_line, self.size_per_hour):
-                current_row = current_np[index].reshape(1, -1)
+        time_idx = 0
+        sph = self.size_per_hour
+        # Use below when working on local computer to avoid singular matrix
+        while time_idx <8:
+            time_sph = time_idx * sph
+            for index in range(cut_line + time_sph , self.size_per_hour + time_sph):
+                
+                current_row = self.aggregated_data[index].reshape(1, -1)
                 current_y = current_row[0, 2]
 
                 # Construct conditioning set
-                mm_neighbors = self.nns_map[index]
+                mm_neighbors = self.nns_map[index//self.size_per_hour]
                 past = list(mm_neighbors) 
                 data_list = []
 
                 if past:
-                    data_list.append(current_np[past])
+                    tmp = [x+sph for x in past]
+                    data_list.append(self.aggregated_data[ tmp])
 
                 if time_idx > 0:
-                    one_hour_lag = self.input_map[key_list[time_idx - 1]]
-                    past_conditioning_data = one_hour_lag[past + [index], :]
+
+                    past_one_lag = [x + (time_idx-1)*sph for x  in past]
+                    past_conditioning_data = self.aggregated_data[past_one_lag + [index]]
                     data_list.append(past_conditioning_data)
 
                 if time_idx > 1:
-                    two_hour_lag = self.input_map[key_list[time_idx -2]]
+                    past_two_lag = [x + (time_idx-2)*sph for x  in past]
+
                     # if index==200:
                     #     print(self.input_map[self.key_list[time_idx-6]])
-                    past_conditioning_data = two_hour_lag[past + [index], :]
+                    past_conditioning_data = self.aggregated_data[past_two_lag+ [index], :]
                     data_list.append(past_conditioning_data)
                 
                 if data_list:
@@ -825,6 +831,9 @@ class vecchia_experiment(likelihood_function):
                 quad_form = alpha**2 * (1 / cov_ygivenx)
                 log_det = torch.log(cov_ygivenx)
                 neg_log_lik += 0.5 * (log_det + quad_form)
+
+            time_idx += 1
+
  
         return neg_log_lik
 
