@@ -56,7 +56,7 @@ def main():
   
     df = df_1250
 
-    lat_lon_resolution = [4, 4]
+    lat_lon_resolution = [10, 10]
     years = ['2024']
     month_range = [7, 8]
     nheads = 200  
@@ -67,7 +67,7 @@ def main():
     # 300 for resolution 4, result1 [23, 1, 6]  result2 = [6,10,14]
     result_2 = {}
     result_1 =  defaultdict(int)
-    for day in range(8,10):
+    for day in range(8,9):
         print(f'\n Day {day} data size per day: { (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) } \n')
 
         # parameters
@@ -104,6 +104,10 @@ def main():
         print(f'vecc b2 new ord: {out2}')  
 
         out3 = instance_ori.vecchia_competitor(params, instance.matern_cov_anisotropy_v05)
+        print(f'vecc competitor: {out3}')  
+    
+
+        out3 = instance_ori.vecchia_contender(params, instance.matern_cov_anisotropy_v05)
         print(f'vecc competitor: {out3}')  
 
         approx_map = {0: 'vecc t-1, t+1', 1: 'two lag', 2: 'competitor'}
