@@ -54,11 +54,6 @@ def cli(
 
     input_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates"
 
-    # input_filename = "vecc_extra_estimates_50_july24.pkl"
-    # input_filename = "vecc_inter_estimates_1250_july24.pkl"
-
-    input_filename = "vecc_inter_estimates_5000_july24.pkl"
-    # input_filename = "estimation_200_july24.pkl"
     input_filename = "full_estimation_1250_july24.pkl"
     input_filepath = os.path.join(input_path, input_filename)
     # Load pickle
@@ -95,7 +90,7 @@ def cli(
     # 300 for resolution 4, result1 [23, 1, 6]  result2 = [6,10,14]
     result_2 = {}
     result_1 =  defaultdict(int)
-    for day in range(1,2):
+    for day in range(3,4):
         print(f'\n Day {day+1} data size per day: { (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) } \n')
 
    
