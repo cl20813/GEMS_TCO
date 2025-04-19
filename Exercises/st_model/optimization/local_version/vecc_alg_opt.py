@@ -173,11 +173,13 @@ def cli(
         epoch_time3 = end_time - start_time
         print(f'day full {day + 1} took {epoch_time3:.2f}')
 
+
+        # ndarray, set is not serializable
         input_path = Path("/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/optimization/local_version/output/")
         input_filepath = input_path / f"vecc_alg_opt_{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0])}.json"
-        res1 = alg_optimization( f"2025-07-{day+1}", "Vecc_b2",{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }, cur_lr, cur_stepsize, {"params": out1}, epoch_time1, epoch1)
-        res2 = alg_optimization( f"2025-07-{day+1}", "Vecc_testing",{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }, cur_lr, cur_stepsize, {"params": out2}, epoch_time2, epoch2)
-        res3 = alg_optimization( f"2025-07-{day+1}", "full_like",{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }, cur_lr, cur_stepsize, {"params": out3}, epoch_time3, epoch3)
+        res1 = alg_optimization( f"2025-07-{day+1}", "Vecc_b2",(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , cur_lr, cur_stepsize, out1, epoch_time1, epoch1)
+        res2 = alg_optimization( f"2025-07-{day+1}", "Vecc_testing",(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , cur_lr, cur_stepsize, out2, epoch_time2, epoch2)
+        res3 = alg_optimization( f"2025-07-{day+1}", "full_like",(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , cur_lr, cur_stepsize, out3, epoch_time3, epoch3)
 
         loaded_data = res1.load(input_filepath)
         loaded_data.append( res1.toJSON() )
