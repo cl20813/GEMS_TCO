@@ -213,6 +213,28 @@ class load_data_amarel:
         aggregated_data = torch.from_numpy(aggregated_data).double()
         return analysis_data_map, aggregated_data
 
+    def reorder_data(self, analysis_data_map, aggregated_data, key_order):
+        # key_order = [0, 1, 2, 4, 3, 5, 7, 6]
+        keys = list(analysis_data_map.keys())
+        reordered_dict = {keys[key]: analysis_data_map[keys[key]] for key in key_order}
+        reorder_keys = list(reordered_dict.keys())
+        data_frames = []
 
-if __name__ == "__main__":
-    app()
+        for key in reorder_keys:
+            tensor_data = reordered_dict[key]
+            if isinstance(tensor_data, torch.Tensor):
+                tensor_data = tensor_data.numpy()  # Convert tensor to NumPy array
+                tensor_df = pd.DataFrame(tensor_data)  # Convert NumPy array to DataFrame
+            else:
+                tensor_df = tensor_data  # If it's already a DataFrame
+            data_frames.append(tensor_df)
+
+        reordered_df = pd.concat(data_frames, axis=0)
+        reordered_df = reordered_df.to_numpy()
+        reordered_df = torch.from_numpy(reordered_df).double()
+
+        return reordered_dict, reordered_df
+
+
+if __name__ == "__main__": 
+    pass

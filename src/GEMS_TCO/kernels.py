@@ -744,70 +744,51 @@ class vecchia_experiment(likelihood_function):
 
 
     def vecchia_contender(self, params: torch.Tensor, covariance_function) -> torch.Tensor:
-
         self.cov_map = defaultdict(list)
-        cut_line= self.nheads
+        cut_line = self.nheads
         key_list = list(self.input_map.keys())
 
         neg_log_lik = 0.0
-        heads = self.input_map[key_list[0]][:cut_line,:]
-        for time_idx in range(1, len(self.input_map)):
-            tmp = self.input_map[key_list[time_idx]][:cut_line,:]
-            heads = torch.cat( (heads,tmp), dim=0)
+        heads = torch.cat([self.input_map[key_list[i]][:cut_line, :] for i in range(len(self.input_map))], dim=0)
+        neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)
 
-        neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
-        
-        time_idx = 0
         sph = self.size_per_hour
-        # Use below when working on local computer to avoid singular matrix
-        while time_idx <8:
+        for time_idx in range(8):
             time_sph = time_idx * sph
-            for index in range(time_sph + cut_line , time_sph + sph ):
-                
+            for index in range(time_sph + cut_line, time_sph + sph):
                 current_row = self.aggregated_data[index].reshape(1, -1)
                 current_y = current_row[0, 2]
 
                 # Construct conditioning set
                 mm_neighbors = self.nns_map[index % self.size_per_hour]
-                past = list(mm_neighbors) 
+                past = list(mm_neighbors)
                 data_list = []
 
                 if past:
-                    tmp = [x+time_sph for x in past]
-                    data_list.append(self.aggregated_data[ tmp])
+                    tmp = [x + time_sph for x in past]
+                    data_list.append(self.aggregated_data[tmp])
 
                 if time_idx > 0:
-
-                    past_one_lag = [x + (time_idx-1)*sph for x  in past]
-                    past_conditioning_data = self.aggregated_data[past_one_lag + [index-sph]]
+                    past_one_lag = [x + (time_idx - 1) * sph for x in past]
+                    past_conditioning_data = self.aggregated_data[past_one_lag + [index - sph]]
                     data_list.append(past_conditioning_data)
 
                 if time_idx > 1:
-                    past_two_lag = [x + (time_idx-2)*sph for x  in past]
-
-                    # if index==200:
-                    #     print(self.input_map[self.key_list[time_idx-6]])
-                    past_conditioning_data = self.aggregated_data[past_two_lag+ [index - sph*2], :]
+                    past_two_lag = [x + (time_idx - 2) * sph for x in past]
+                    past_conditioning_data = self.aggregated_data[past_two_lag + [index - sph * 2], :]
                     data_list.append(past_conditioning_data)
-                
-                if data_list:
-                    conditioning_data = torch.vstack(data_list)
-                else:
-                    conditioning_data = torch.empty((0, current_row.shape[1]), dtype=torch.float64)
 
+                conditioning_data = torch.vstack(data_list) if data_list else torch.empty((0, current_row.shape[1]), dtype=torch.float64)
                 aggregated_arr = torch.vstack((current_row, conditioning_data))
                 aggregated_y = aggregated_arr[:, 2]
                 locs = aggregated_arr[:, :2]
 
-                cov_matrix = covariance_function(params=params, y= aggregated_arr, x= aggregated_arr )
-                # print(f'Condition number: {torch.linalg.cond(cov_matrix)}')
+                cov_matrix = covariance_function(params=params, y=aggregated_arr, x=aggregated_arr)
                 cov_yx = cov_matrix[0, 1:]
-                        # Compute the log determinant of the covariance matrix
+
+                # Compute the log determinant of the covariance matrix
                 sign, log_det = torch.slogdet(cov_matrix)
 
-                # if sign <= 0:
-                #     raise ValueError("Covariance matrix is not positive definite")
-        
                 # Compute beta
                 tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
                 tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, aggregated_y))
@@ -825,17 +806,13 @@ class vecchia_experiment(likelihood_function):
                 cov_ygivenx = sigma - torch.matmul(cov_yx, torch.matmul(cov_xx_inv, cov_yx))
                 cond_mean_tmp = torch.matmul(cov_yx, cov_xx_inv)
                 cond_mean = mu_current + torch.matmul(cond_mean_tmp, (aggregated_y[1:] - mu_neighbors))
-                
+
                 alpha = current_y - cond_mean
                 quad_form = alpha**2 * (1 / cov_ygivenx)
                 log_det = torch.log(cov_ygivenx)
                 neg_log_lik += 0.5 * (log_det + quad_form)
 
-            time_idx += 1
-
- 
         return neg_log_lik
-
 
    
 
@@ -1079,23 +1056,21 @@ class model_fitting(vecchia_experiment):
             loss.backward()  # Backpropagate the loss
             
             # Print gradients and parameters every 10th epoch
-            if epoch % 500 == 0:
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            # if epoch % 500 == 0:
+            #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             optimizer.step()  # Update the parameters
             scheduler.step()  # Update the learning rate
             # Check for convergence
             if abs(prev_loss - loss.item()) < tol:
                 print(f"Converged at epoch {epoch}")
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, full Parameters: {params.detach().numpy()}')
-            
+                print(f'Epoch {epoch+1}, Gradients: Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
                 break
-            
-            prev_loss = loss.item()
 
-        print(f'FINAL STATE: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, full Parameters: {params.detach().numpy()}')
+            prev_loss = loss.item()
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
+    
         return [params.detach().numpy(), loss.item()]
-        print('Training full likelihood complete.')
 
     def run_vecc_interpolate(self, params, optimizer, scheduler, covariance_function, epochs=10):
         prev_loss= float('inf')
@@ -1108,8 +1083,8 @@ class model_fitting(vecchia_experiment):
             loss.backward()  # Backpropagate the loss
             
             # Print gradients and parameters every 10th epoch
-            if epoch % 100 == 0:
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            # if epoch % 100 == 0:
+            #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
@@ -1118,12 +1093,12 @@ class model_fitting(vecchia_experiment):
             # Check for convergence
             if abs(prev_loss - loss.item()) < tol:
                 print(f"Converged at epoch {epoch}")
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
+                print(f'Epoch {epoch+1}, Gradients: Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
                 break
 
             prev_loss = loss.item()
-        print(f'FINAL STATE: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
-        print('Training vecchia likelihood complete.') 
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
+
         return [params.detach().numpy(), loss.item()]
 
     def run_vecc_testing(self, params, optimizer, scheduler,  covariance_function, epochs=10):
@@ -1137,8 +1112,8 @@ class model_fitting(vecchia_experiment):
             loss.backward()  # Backpropagate the loss
             
             # Print gradients and parameters every 10th epoch
-            if epoch % 500 == 0:
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            # if epoch % 500 == 0:
+            #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
@@ -1147,12 +1122,12 @@ class model_fitting(vecchia_experiment):
             # Check for convergence
             if abs(prev_loss - loss.item()) < tol:
                 print(f"Converged at epoch {epoch}")
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
+                print(f'Epoch {epoch+1}, Gradients: Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
                 break
 
             prev_loss = loss.item()
-        print(f'FINAL STATE: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
-        print('Training vecchia likelihood complete.') 
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
+
         return [params.detach().numpy(), loss.item()]
     
 
