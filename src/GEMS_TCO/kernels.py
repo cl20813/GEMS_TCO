@@ -604,7 +604,7 @@ class vecchia_experiment(likelihood_function):
  
         return neg_log_lik
     
-    def vecchia_competitor(self, params: torch.Tensor, covariance_function) -> torch.Tensor:
+    def vecchia_b2_cache(self, params: torch.Tensor, covariance_function) -> torch.Tensor:
         # becareful this only work for natural order
 
         self.cov_map = defaultdict(list)
