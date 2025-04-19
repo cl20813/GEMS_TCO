@@ -9,6 +9,7 @@ import torch
 from pathlib import Path
 import json
 from json import JSONEncoder
+import csv
 
 
 gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
@@ -266,7 +267,16 @@ class alg_optimization:
         except FileNotFoundError:
             loaded_data = []
         return loaded_data
+    def tocsv(self, jsondata, csv_filepath):
+        data_dicts = [json.loads(data) for data in jsondata]
+        # convert json string into dictionary list
+        fieldnames = ['day', 'cov_name', 'lr', 'stepsize', 'lat_lon_resolution', 'params', 'time', 'epoch']
 
+        with open(csv_filepath, mode='w', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            for data in data_dicts:
+                writer.writerow(data)
 
 class alg_opt_Encoder(JSONEncoder):
     def default(self, o):

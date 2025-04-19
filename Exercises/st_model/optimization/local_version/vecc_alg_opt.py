@@ -30,10 +30,21 @@ from GEMS_TCO import orbitmap
 from GEMS_TCO import kernels 
 from GEMS_TCO import orderings as _orderings 
 from GEMS_TCO import load_data_local_computer
+from GEMS_TCO import alg_optimization, alg_opt_Encoder
+
+import torch
+from collections import defaultdict
+
+import torch.optim as optim
+from torch.optim.lr_scheduler import StepLR
+import copy                    # clone tensor
+
+from pathlib import Path
+import json
+from json import JSONEncoder
 
 
 from typing import Optional, List, Tuple
-from pathlib import Path
 import typer
 
 app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
@@ -127,37 +138,55 @@ def cli(
         
         start_time = time.time()
         params = list(df.iloc[day][:-1])
-        params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
-        optimizer, scheduler = model_instance.optimizer_fun(params, lr=0.02, betas=(0.9, 0.80), eps=1e-8, step_size=80, gamma=0.9)    
 
-        out = model_instance2.run_vecc_interpolate(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, epochs=epochs)
+        cur_lr = 0.02
+        cur_stepsize = 80
+
+        params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
+        optimizer, scheduler = model_instance.optimizer_fun(params, lr= cur_lr, betas=(0.9, 0.80), eps=1e-8, step_size=cur_stepsize, gamma=0.9)    
+
+        out1, epoch1 = model_instance2.run_vecc_interpolate(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, epochs=epochs)
     
         end_time = time.time()
-        epoch_time = end_time - start_time
-        print(f'day vecc b2 {day + 1} took {epoch_time:.2f}')
+        epoch_time1 = end_time - start_time
+        print(f'day vecc b2 {day + 1} took {epoch_time1:.2f}')
 
 
         start_time = time.time()
         params = list(df.iloc[day][:-1])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
         # optimizer = optim.Adam([params], lr=0.01)  # For Adam
-        optimizer, scheduler = model_instance.optimizer_testing(params, lr=0.02, betas=(0.9, 0.80), eps=1e-8, step_size=80, gamma=0.9)    
-        out = model_instance.run_vecc_testing(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, epochs=epochs)
+        optimizer, scheduler = model_instance.optimizer_testing(params, lr= cur_lr, betas=(0.9, 0.80), eps=1e-8, step_size=cur_stepsize, gamma=0.9)    
+        out2 , epoch2= model_instance.run_vecc_testing(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, epochs=epochs)
        
         end_time = time.time()
-        epoch_time = end_time - start_time
-        print(f'day testing {day + 1} took {epoch_time:.2f}')
+        epoch_time2 = end_time - start_time
+        print(f'day testing {day + 1} took {epoch_time2:.2f}')
 
         start_time = time.time()
         params = list(df.iloc[day][:-1])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
-        optimizer, scheduler = model_instance.optimizer_fun(params, lr=0.02, betas=(0.9, 0.80), eps=1e-8, step_size=40, gamma=0.9)    
+        optimizer, scheduler = model_instance.optimizer_fun(params, lr= cur_lr, betas=(0.9, 0.80), eps=1e-8, step_size=cur_stepsize/2, gamma=0.9)    
 
-        out = model_instance2.run_full(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, epochs=epochs)
+        out3, epoch3 = model_instance2.run_full(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, epochs=epochs)
         end_time = time.time()
-        epoch_time = end_time - start_time
-        print(f'day full {day + 1} took {epoch_time:.2f}')
+        epoch_time3 = end_time - start_time
+        print(f'day full {day + 1} took {epoch_time3:.2f}')
 
+        input_path = Path("/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/optimization/local_version/output/")
+        input_filepath = input_path / f"vecc_alg_opt_{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0])}.json"
+        res1 = alg_optimization( f"2025-07-{day+1}", "Vecc_b2",{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }, cur_lr, cur_stepsize, {"params": out1}, epoch_time1, epoch1)
+        res2 = alg_optimization( f"2025-07-{day+1}", "Vecc_testing",{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }, cur_lr, cur_stepsize, {"params": out2}, epoch_time2, epoch2)
+        res3 = alg_optimization( f"2025-07-{day+1}", "full_like",{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }, cur_lr, cur_stepsize, {"params": out3}, epoch_time3, epoch3)
+
+        loaded_data = res1.load(input_filepath)
+        loaded_data.append( res1.toJSON() )
+        loaded_data.append( res2.toJSON() )
+        loaded_data.append( res3.toJSON() )
+
+        res1.save(input_filepath,loaded_data)
+        csv_filepath = input_path/f"vecc_alg_opt_{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0])}.csv"
+        res1.tocsv( loaded_data, csv_filepath )
 
 if __name__ == "__main__":
     app()
