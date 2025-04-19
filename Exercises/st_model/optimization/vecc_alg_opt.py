@@ -73,23 +73,21 @@ def cli(
     else:
         print("The number of dates does not match the number of rows in the DataFrame.")
 
-  
     df = df_1250
 
     lat_lon_resolution = [int(s) for s in space[0].split(',')]
     years = ['2024']
     month_range = [7, 8]
 
-    
     # 50 for 10 work best for competitor 2 lags reordered, cahced
     #  50 for resolution 10: result1 [11,10,9] result2 = [9,11,10]
     #  200 for resolution 4, result1 [21,2,7] result2=[7,7,16]
     # 300 for resolution 4, result1 [23, 1, 6]  result2 = [6,10,14]
 
-    for day in range(days):
+    for day in range(20):
         print(f'\n Day {day+1} data size per day: { (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) } \n')
 
-        idx_for_datamap = [8 * (day), 8 * (day+1)]
+        idx_for_datamap = [ 8 * (day), 8 * (day+1) ]
         # params = [27.25, 2.18, 2.294, 4.099e-4, -0.07915, 0.0999, 3.65]   #200
         params = list(df.iloc[day][:-1])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)

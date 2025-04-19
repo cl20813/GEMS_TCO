@@ -109,7 +109,7 @@ echo "Current date and time: $(date)"
 
 echo "fit_hyper_opt"
 
-srun python /home/jl2815/tco/exercise_25/st_model/vecc_hyp_opt.py --v 0.5 --lr 0.01 --epochs 3000 --space "6, 6" --days 15 --mm-cond-number 10 --nheads 20 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34" 
+srun python /home/jl2815/tco/exercise_25/st_model/vecc_opt_hyper.py --v 0.5 --lr 0.01 --epochs 3000 --space "6, 6" --days 15 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34" 
 
 ```
 
