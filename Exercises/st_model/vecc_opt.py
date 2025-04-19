@@ -88,9 +88,8 @@ def cli(
     #  50 for resolution 10: result1 [11,10,9] result2 = [9,11,10]
     #  200 for resolution 4, result1 [21,2,7] result2=[7,7,16]
     # 300 for resolution 4, result1 [23, 1, 6]  result2 = [6,10,14]
-    result_2 = {}
-    result_1 =  defaultdict(int)
-    for day in range(1,1):
+
+    for day in range(1,11):
         print(f'\n Day {day+1} data size per day: { (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) } \n')
 
    
@@ -106,14 +105,22 @@ def cli(
 
         # different approximations
         key_order = [0, 1, 2, 4, 3, 5, 7, 6]
-        keys = list(analysis_data_map.keys())
-        reordered_dict = {keys[key]: analysis_data_map[keys[key]] for key in key_order}
 
-        instance_ori = kernels.vecchia_experiment(0.5, analysis_data_map, aggregated_data, nns_map, mm_cond_number, nheads)
+        reordered_dict, reordered_df = instance.reorder_data(analysis_data_map, aggregated_data, key_order)
 
         model_instance = kernels.model_fitting(
                 smooth=v,
                 input_map=reordered_dict,
+                aggregated_data=reordered_df,
+                nns_map=nns_map,
+                mm_cond_number=mm_cond_number,
+                nheads = nheads
+            )
+        
+    
+        model_instance2 = kernels.model_fitting(
+                smooth=v,
+                input_map=analysis_data_map,
                 aggregated_data=aggregated_data,
                 nns_map=nns_map,
                 mm_cond_number=mm_cond_number,
@@ -122,13 +129,34 @@ def cli(
         
         start_time = time.time()
         # optimizer = optim.Adam([params], lr=0.01)  # For Adam
-        optimizer, scheduler = model_instance.optimizer_testing(params, lr=0.03, betas=(0.9, 0.80), eps=1e-8, step_size=80, gamma=0.9)    
-        
+        optimizer, scheduler = model_instance.optimizer_testing(params, lr=0.02, betas=(0.9, 0.80), eps=1e-8, step_size=80, gamma=0.9)    
         out = model_instance.run_vecc_testing(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, epochs=epochs)
         print(out)
         end_time = time.time()
         epoch_time = end_time - start_time
         print(f'day testing {day + 1} took {epoch_time:.2f}')
+
+
+   
+        start_time = time.time()
+        optimizer, scheduler = model_instance.optimizer_fun(params, lr=0.02, betas=(0.9, 0.80), eps=1e-8, step_size=80, gamma=0.9)    
+        params = list(df.iloc[day][:-1])
+        params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
+        out = model_instance2.run_vecc_interpolate(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, epochs=epochs)
+        print(out)
+        end_time = time.time()
+        epoch_time = end_time - start_time
+        print(f'day vecc b2 {day + 1} took {epoch_time:.2f}')
+
+        start_time = time.time()
+        optimizer, scheduler = model_instance.optimizer_fun(params, lr=0.02, betas=(0.9, 0.80), eps=1e-8, step_size=80, gamma=0.9)    
+        params = list(df.iloc[day][:-1])
+        params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
+        out = model_instance2.run_full(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, epochs=epochs)
+        print(out)
+        end_time = time.time()
+        epoch_time = end_time - start_time
+        print(f'day full {day + 1} took {epoch_time:.2f}')
 
 
 

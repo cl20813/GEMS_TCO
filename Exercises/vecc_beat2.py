@@ -105,7 +105,7 @@ def main():
         out2 = instance.vecchia_b2(params, instance.matern_cov_anisotropy_v05)
         print(f'vecc b2 new ord: {out2}')  
 
-        out3 = instance_ori.vecchia_competitor(params, instance.matern_cov_anisotropy_v05)
+        out3 = instance_ori.vecchia_b2_cache(params, instance.matern_cov_anisotropy_v05)
         print(f'vecc competitor: {out3}')  
     
 
