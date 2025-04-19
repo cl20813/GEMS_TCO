@@ -1064,7 +1064,7 @@ class model_fitting(vecchia_experiment):
             # Check for convergence
             if abs(prev_loss - loss.item()) < tol:
                 print(f"Converged at epoch {epoch}")
-                print(f'Epoch {epoch+1}, Gradients: Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
+                print(f'Epoch {epoch+1}, : Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
                 break
 
             prev_loss = loss.item()
@@ -1093,7 +1093,7 @@ class model_fitting(vecchia_experiment):
             # Check for convergence
             if abs(prev_loss - loss.item()) < tol:
                 print(f"Converged at epoch {epoch}")
-                print(f'Epoch {epoch+1}, Gradients: Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
+                print(f'Epoch {epoch+1}, : Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
                 break
 
             prev_loss = loss.item()
@@ -1122,7 +1122,7 @@ class model_fitting(vecchia_experiment):
             # Check for convergence
             if abs(prev_loss - loss.item()) < tol:
                 print(f"Converged at epoch {epoch}")
-                print(f'Epoch {epoch+1}, Gradients: Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
+                print(f'Epoch {epoch+1},  \n vecc Parameters: {params.detach().numpy()}')
                 break
 
             prev_loss = loss.item()

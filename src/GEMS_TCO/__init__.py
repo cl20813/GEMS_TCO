@@ -6,6 +6,10 @@ import pandas as pd
 import numpy as np
 import torch
 
+from pathlib import Path
+import json
+from json import JSONEncoder
+
 
 gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
 sys.path.append(gems_tco_path)
@@ -234,6 +238,42 @@ class load_data_amarel:
         reordered_df = torch.from_numpy(reordered_df).double()
 
         return reordered_dict, reordered_df
+
+class alg_optimization:
+    def __init__(self,  day, lat_lon_resolution, lr, stepsize, cov_name, params, time, epoch):
+        self.day = day
+        self.cov_name = cov_name
+        self.lr = lr
+        self.stepsize = stepsize
+        self.lat_lon_resolution = lat_lon_resolution
+        self.params = params
+        self.time = time
+        self.epoch = epoch
+    def toJSON(self):
+        return json.dumps(self, cls=alg_opt_Encoder, sort_keys=False)
+
+    def save(self, input_filepath, data):
+        # Save the aggregated data back to the JSON file
+        with input_filepath.open('w', encoding='utf-8') as json_file:
+            json_file.write(json.dumps(data, separators=(",", ":"), indent=4))
+
+
+
+    def load(self, input_filepath):
+        try:
+            with input_filepath.open('r', encoding='utf-8') as f:
+                loaded_data = json.load(f)
+        except FileNotFoundError:
+            loaded_data = []
+        return loaded_data
+
+
+class alg_opt_Encoder(JSONEncoder):
+    def default(self, o):
+        if isinstance(o, alg_optimization):
+            return o.__dict__
+        return super().default(o)  # delegates the serialization process to the standard JSONEncoder
+
 
 
 if __name__ == "__main__": 
