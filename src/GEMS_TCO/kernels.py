@@ -1070,7 +1070,7 @@ class model_fitting(vecchia_experiment):
             prev_loss = loss.item()
         print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
     
-        rreturn [params.detach().numpy()] + [ loss.item()], epoch
+        return params.detach().numpy().tolist() + [ loss.item()], epoch
 
     def run_vecc_interpolate(self, params, optimizer, scheduler, covariance_function, epochs=10):
         prev_loss= float('inf')
@@ -1099,7 +1099,7 @@ class model_fitting(vecchia_experiment):
             prev_loss = loss.item()
         print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
 
-        return [params.detach().numpy()] + [ loss.item()], epoch
+        return params.detach().numpy().tolist() + [ loss.item()], epoch
 
     def run_vecc_testing(self, params, optimizer, scheduler,  covariance_function, epochs=10):
         prev_loss= float('inf')
@@ -1128,7 +1128,7 @@ class model_fitting(vecchia_experiment):
             prev_loss = loss.item()
         print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
 
-        return [params.detach().numpy()] + [ loss.item()], epoch
+        return params.detach().numpy().tolist() + [ loss.item()], epoch
     
 
     def run_vecc_extrapolate(self, params, optimizer, scheduler,covariance_function, epochs=10):
@@ -1162,7 +1162,7 @@ class model_fitting(vecchia_experiment):
         
         print('Training vecchia likelihood complete.') 
 
-        return [params.detach().numpy()] + [ loss.item()]
+        return params.detach().numpy().tolist() + [ loss.item()]
 
 
 ####################
