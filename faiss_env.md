@@ -69,6 +69,25 @@ Go to powershell and check
 
 ```g++ -O3 -Wall -shared -std=c++11 -fPIC -IC:\Users\joonw\anaconda3\envs\faiss_env\Include -IC:\Users\joonw\anaconda3\envs\faiss_env\Lib\site-packages\pybind11\include maxmin.cpp -o ../maxmin_cpp```
 
+#### It turns out that MinGW is not good for compiling my c++ file. 
+- Open Developer Command Prompt for VS code (cmd and then click + to find this)
+- locate the working directory ``` cd "C:\Users\joonw\tco\GEMS_TCO-2\src/GEMS_TCO/cpp_src/" ```
+-  ``` cl /O2 /LD /I"C:\Users\joonw\anaconda3\envs\faiss_env\Include" ^
+   /I"C:\Users\joonw\anaconda3\envs\faiss_env\Lib\site-packages\pybind11\include" ^
+   maxmin_ancestor.cpp /link ^
+   /OUT:..\maxmin_ancestor_cpp.pyd ^
+   /LIBPATH:"C:\Users\joonw\anaconda3\envs\faiss_env\libs" python312.lib
+ ```
+
+```cl /O2 /LD /I"C:\Users\joonw\anaconda3\envs\faiss_env\Include" ^
+   /I"C:\Users\joonw\anaconda3\envs\faiss_env\Lib\site-packages\pybind11\include" ^
+   maxmin.cpp /link ^
+   /OUT:..\maxmin_cpp.pyd ^
+   /LIBPATH:"C:\Users\joonw\anaconda3\envs\faiss_env\libs" python312.lib
+```  
+
+This work but note that file name is .pyd for window and .so for linux and mac os. So we have to change this carefully.
+
 
 # Amarel
 Make the same environment as above.
