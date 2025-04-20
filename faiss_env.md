@@ -33,17 +33,23 @@ Sometimes, it takes a time for adjustment. If above doesn't work, then consider 
 
 ### Comfile c++ file (after finishing above steps, you can do this)
 mac: ``` python3 -c "import platform; print(platform.machine())" ```   Verify yourself if it says ```arm64``` or others. My mac computer says arm64.
-window: ``` python -c "import platform; print(platform.machine())" ```   Verify yourself if it says ```arm64``` or others. My mac computer says arm64.
-
 mac:   
 ```cd /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/cpp_src/```  This is the location for .cpp files. Note that compiled c++ .so files are recommended to located at the package folder with other modules.
 
-window:
-``` cd "C:\Users\joonw\tco\GEMS_TCO-2\src/GEMS_TCO/cpp_src/" ```
-  
 mac:  I am using pybind11 to compile c++ for mac.
 ```c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin_ancestor.cpp -o ../maxmin_ancestor_cpp$(python3-config --extension-suffix) -undefined dynamic_lookup```
 ```c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin.cpp -o ../maxmin_cpp$(python3-config --extension-suffix) -undefined dynamic_lookup```  
+
+window: ``` python -c "import platform; print(platform.machine())" ```   Verify yourself if it says ```arm64``` or others. My mac computer says arm64.
+For window, I should use MinGW. Download MinGW installing manager and then check below then apply changes.
+
+Essential Packages for C++ Development. Also consider installing gdb 
+mingw32-base-bin: This package includes the basic tools required for MinGW.
+mingw32-gcc-g++-bin: This package includes the G++ compiler for C++.
+mingw32-gcc-bin: This package includes the GCC compiler for C.
+
+window:
+``` cd "C:\Users\joonw\tco\GEMS_TCO-2\src/GEMS_TCO/cpp_src/" ```
 
 window:   You need to install MingW for c++ compiler. Install this and add path ```C:\MinGW\bin```.
 ```c++ -O3 -Wall -shared -std=c++11 -fPIC $(python -m pybind11 --includes) maxmin_ancestor.cpp -o ../maxmin_ancestor_cpp$(python -m pybind11 --includes) -undefined dynamic_lookup```
