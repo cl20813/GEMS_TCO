@@ -58,7 +58,6 @@ window:   You need to install MingW for c++ compiler. Install this and add path 
  
 
 
-
 # Amarel
 Make the same environment as above.
 
