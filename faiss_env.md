@@ -48,12 +48,28 @@ mingw32-base-bin: This package includes the basic tools required for MinGW.
 mingw32-gcc-g++-bin: This package includes the G++ compiler for C++.
 mingw32-gcc-bin: This package includes the GCC compiler for C.
 
+#### Verify 
+``` "C:\MinGW\bin\gcc.exe" --version ```    this should work
+``` gcc --version ```  this should also work if the PATH  "C:\MinGW\bin" is added under PATH system variable. Making other variable won't work!!
+
+
 window:
 ``` cd "C:\Users\joonw\tco\GEMS_TCO-2\src/GEMS_TCO/cpp_src/" ```
 
 window:   You need to install MingW for c++ compiler. Install this and add path ```C:\MinGW\bin```.
-```c++ -O3 -Wall -shared -std=c++11 -fPIC $(python -m pybind11 --includes) maxmin_ancestor.cpp -o ../maxmin_ancestor_cpp$(python -m pybind11 --includes) -undefined dynamic_lookup```
-```c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin.cpp -o ../maxmin_cpp$(python3-config --extension-suffix) -undefined dynamic_lookup```  
+
+#### Now check the location of -I<path_to_python_include> -I<path_to_pybind11_include> manually      
+Type below in VS code terminal.
+```conda activate faiss_env```    
+```python -m pybind11 --includes```
+
+Go to powershell and check
+```g++ --version```  then proceed with below
+```g++ -O3 -Wall -shared -std=c++11 -fPIC -IC:\Users\joonw\anaconda3\envs\faiss_env\Include -IC:\Users\joonw\anaconda3\envs\faiss_env\Lib\site-packages\pybind11\include maxmin_ancestor.cpp -o ../maxmin_ancestor_cpp```
+
+```g++ -O3 -Wall -shared -std=c++11 -fPIC -IC:\Users\joonw\anaconda3\envs\faiss_env\Include -IC:\Users\joonw\anaconda3\envs\faiss_env\Lib\site-packages\pybind11\include maxmin.cpp -o ../maxmin_cpp```
+
+
 
  
 
