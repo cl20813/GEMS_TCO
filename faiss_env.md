@@ -6,8 +6,9 @@ Go to terminal in VSCode.
 ```conda activate faiss_env```       
 ```conda install -c pytorch faiss-cpu```      
 ```conda install pybind11```      # comfile c++ file       
-```conda install numpy pandas matplotlib seaborn scikit-learn```         
-```conda install pytorch::pytorch torchvision torchaudio -c pytorch```  
+```conda install numpy pandas matplotlib seaborn scikit-learn ```         
+```conda install pytorch::pytorch torchvision torchaudio -c pytorch```     
+``` pip install typer```   conda manages dependencies for a wide range of software, not just Python packages. This can sometimes lead to conflicts or delays in updating packages. pip
 
 ### Install gems_tco packge on my macbook. 
 ```cd /Users/joonwonlee/Documents/GEMS_TCO-1/src```    
