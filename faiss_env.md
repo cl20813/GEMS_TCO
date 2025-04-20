@@ -18,15 +18,20 @@ When activate the new environment for the first time, system will ask to install
 ```cd "C:\Users\joonw\tco\GEMS_TCO-2\src"```
 ``` C:\Users\joonw\anaconda3\envs\faiss_env\python.exe -m pip install -e . --use-pep517```
 
-### Check python interpreter because the environment in VS code may not linked to the python.
+### Check python interpreter because there might be a mismatch between the Python interpreter set in VS Code and the one in your conda environment.   
 For example, python in window computer is located at ```C:\Users\joonw\AppData\Local\Programs\Python\Python312\python.exe```.
+- You can check this by typing ```where python``` in cmd.   
+- VS code terminal: type ```python --v``` this will tell you VS code linked python interpreter. It should match with the environment. 
 
 Press Ctrl + Shift + P (or Cmd + Shift + P on macOS) to open the Command Palette.        
 Select Interpreter: Type Python: Select Interpreter and select it from the dropdown list.        
 You will see a list of available Python interpreters. Choose the one associated with your faiss_env environment.        
 
+Sometimes, it takes a time for adjustment. If above doesn't work, then consider adding following path to my environment if my environment cannot read conda:
+```C:\Users\joonw\Anaconda3\Scripts```
+```C:\Users\joonw\Anaconda3\condabin```
 
-### Comfile c++ file
+### Comfile c++ file (after finishing above steps, you can do this)
 mac: ``` python3 -c "import platform; print(platform.machine())" ```   Verify yourself if it says ```arm64``` or others. My mac computer says arm64.
 window: ``` python -c "import platform; print(platform.machine())" ```   Verify yourself if it says ```arm64``` or others. My mac computer says arm64.
 
@@ -40,8 +45,8 @@ mac:  I am using pybind11 to compile c++ for mac.
 ```c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin_ancestor.cpp -o ../maxmin_ancestor_cpp$(python3-config --extension-suffix) -undefined dynamic_lookup```
 ```c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin.cpp -o ../maxmin_cpp$(python3-config --extension-suffix) -undefined dynamic_lookup```  
 
-window:   
-```c++ -O3 -Wall -shared -std=c++11 -fPIC $(python -m pybind11 --includes) maxmin_ancestor.cpp -o ../maxmin_ancestor_cpp$(python-config --extension-suffix) -undefined dynamic_lookup```
+window:   You need to install MingW for c++ compiler. Install this and add path ```C:\MinGW\bin```.
+```c++ -O3 -Wall -shared -std=c++11 -fPIC $(python -m pybind11 --includes) maxmin_ancestor.cpp -o ../maxmin_ancestor_cpp$(python -m pybind11 --includes) -undefined dynamic_lookup```
 ```c++ -O3 -Wall -shared -std=c++11 -fPIC $(python3 -m pybind11 --includes) maxmin.cpp -o ../maxmin_cpp$(python3-config --extension-suffix) -undefined dynamic_lookup```  
 
  
