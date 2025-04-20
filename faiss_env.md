@@ -15,8 +15,8 @@ Go to terminal in VSCode.
 When activate the new environment for the first time, system will ask to install ```ipkernel```.
 
 ### Install gems_tco packge on my window laptop. 
-```cd "C:\Users\joonw\tco\GEMS_TCO-2\src"```
-``` C:\Users\joonw\anaconda3\envs\faiss_env\python.exe -m pip install -e . --use-pep517```
+``` cd "C:\Users\joonw\tco\GEMS_TCO-2\src" ```
+``` C:\Users\joonw\anaconda3\envs\faiss_env\python.exe -m pip install -e . --use-pep517  ```
 
 ### Check python interpreter because there might be a mismatch between the Python interpreter set in VS Code and the one in your conda environment.   
 For example, python in window computer is located at ```C:\Users\joonw\AppData\Local\Programs\Python\Python312\python.exe```.
@@ -68,10 +68,6 @@ Go to powershell and check
 ```g++ -O3 -Wall -shared -std=c++11 -fPIC -IC:\Users\joonw\anaconda3\envs\faiss_env\Include -IC:\Users\joonw\anaconda3\envs\faiss_env\Lib\site-packages\pybind11\include maxmin_ancestor.cpp -o ../maxmin_ancestor_cpp```
 
 ```g++ -O3 -Wall -shared -std=c++11 -fPIC -IC:\Users\joonw\anaconda3\envs\faiss_env\Include -IC:\Users\joonw\anaconda3\envs\faiss_env\Lib\site-packages\pybind11\include maxmin.cpp -o ../maxmin_cpp```
-
-
-
- 
 
 
 # Amarel
