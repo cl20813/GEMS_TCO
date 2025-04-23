@@ -1024,7 +1024,6 @@ class model_fitting(vecchia_experiment):
         vecc_nll = self.vecchia_contender(params, covariance_function)
         return vecc_nll
 
-
     def compute_vecc_nll_extrapolate(self,params , covariance_function):
    
         vecc_nll = self.vecchia_b2(params, covariance_function)
@@ -1159,7 +1158,6 @@ class model_fitting(vecchia_experiment):
             prev_loss = loss.item()
 
         print(f'Final State: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
-        
         print('Training vecchia likelihood complete.') 
 
         return params.detach().numpy().tolist() + [ loss.item()]
