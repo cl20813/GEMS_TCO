@@ -24,10 +24,6 @@ from GEMS_TCO import kernels
 from GEMS_TCO import orderings as _orderings 
 from GEMS_TCO import load_data_amarel
 
-# Configure logging to a specific file path
-log_file_path = '/home/jl2815/tco/exercise_output/logs/fit_full.log'
-logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(message)s')
-
 from typing import Optional, List, Tuple
 from pathlib import Path
 import typer
@@ -47,8 +43,8 @@ def cli(
     epochs: int = typer.Option(100, help="Number of iterations in optimization"),
     nheads: int = typer.Option(200, help="Number of iterations in optimization"),
 ) -> None:
-
- 
+    
+    
     lat_lon_resolution = [int(s) for s in space[0].split(',')]
     parsed_params = [float(p) for p in params[0].split(',')]
     params = torch.tensor(parsed_params, requires_grad=True)
@@ -127,8 +123,8 @@ def cli(
         
         start_time = time.time()
         # optimizer = optim.Adam([params], lr=0.01)  # For Adam
-        optimizer_m, scheduler_m = model_morning.optimizer_fun(params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=20, gamma=0.9)    
-        optimizer_n, scheduler_n = model_noon.optimizer_fun(params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=20, gamma=0.9)
+        optimizer_m, scheduler_m = model_morning.optimizer_fun(params, lr=lr, betas=(0.9, 0.8), eps=1e-8, step_size=40, gamma=0.9)    
+        optimizer_n, scheduler_n = model_noon.optimizer_fun(params, lr=lr, betas=(0.9, 0.8), eps=1e-8, step_size=40, gamma=0.9)
         out_m = model_morning.run_full(params, optimizer_m,scheduler_m, model_morning.matern_cov_anisotropy_v15, epochs=epochs)
         out_n = model_noon.run_full(params, optimizer_n,scheduler_n, model_noon.matern_cov_anisotropy_v15, epochs=epochs)
         result_morning[day+1] = out_m
