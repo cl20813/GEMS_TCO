@@ -128,8 +128,8 @@ def cli(
 
         start_time = time.time()
         # optimizer = optim.Adam([params], lr=0.01)  # For Adam
-        optimizer_m, scheduler_m = model_morning.optimizer_fun(params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=20, gamma=0.9)    
-        optimizer_n, scheduler_n = model_noon.optimizer_fun(params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=20, gamma=0.9)
+        optimizer_m, scheduler_m = model_morning.optimizer_fun(params, lr=lr, betas=(0.9, 0.8), eps=1e-8, step_size=40, gamma=0.9)    
+        optimizer_n, scheduler_n = model_noon.optimizer_fun(params, lr= lr, betas=(0.9, 0.8), eps=1e-8, step_size=40, gamma=0.9)
         out_m = model_morning.run_full(params, optimizer_m,scheduler_m, model_morning.matern_cov_anisotropy_v05, epochs=epochs)
         out_n = model_noon.run_full(params, optimizer_n,scheduler_n, model_noon.matern_cov_anisotropy_v05, epochs=epochs)
         result_morning[day+1] = out_m
