@@ -53,9 +53,7 @@ def main():
     else:
         print("The number of dates does not match the number of rows in the DataFrame.")
 
-  
     df = df_1250
-
     lat_lon_resolution = [4, 4]
     years = ['2024']
     month_range = [7, 8]
