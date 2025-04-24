@@ -80,14 +80,11 @@ srun python /home/jl2815/tco/exercise_25/st_model/vecc_alg_opt_ama.py --v 0.5 --
 
 srun python /home/jl2815/tco/exercise_25/st_model/vecc_alg_opt_ama.py --v 0.5 --lr 0.03 --step 80 --epochs 3000 --space "6, 6" --days 15 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34" 
 
-
-
 ```
 
 ```  cd ./jobscript/tco/gp_exercise  ```  
 ```  nano vecc_hyp_opt.sh  ```        
  ```   sbatch vecc_hyp_opt.sh   ```
-
 
 ``` 
 #!/bin/bash
