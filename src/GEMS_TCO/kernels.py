@@ -1118,6 +1118,7 @@ class model_fitting(vecchia_experiment):
             
             optimizer.step()  # Update the parameters
             scheduler.step()  # Update the learning rate
+   
             # Check for convergence
             if abs(prev_loss - loss.item()) < tol:
                 print(f"Converged at epoch {epoch}")
