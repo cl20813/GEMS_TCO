@@ -42,8 +42,6 @@ import copy                    # clone tensor
 from pathlib import Path
 import json
 from json import JSONEncoder
-
-
 from typing import Optional, List, Tuple
 import typer
 
@@ -64,7 +62,7 @@ def cli(
     nheads: int = typer.Option(200, help="Number of iterations in optimization")
 ) -> None:
 
-    input_path = "/home/jl2815/tco/exercise_output/estimates/day/"
+    input_path = "/home/jl2815/tco/exercise_output/estimates/day/"  
 
     input_filename = "full_day_v(0.5)_1250_july24.pkl"
     input_filepath = os.path.join(input_path, input_filename)
@@ -142,8 +140,7 @@ def cli(
         params = list(df.iloc[day][:-1])
 
       
-        
-
+    
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
         optimizer, scheduler = model_instance.optimizer_fun(params, lr= lr, betas=(0.9, 0.80), eps=1e-8, step_size=step, gamma=0.9)    
 

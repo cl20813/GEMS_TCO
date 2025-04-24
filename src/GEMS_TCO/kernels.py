@@ -739,7 +739,6 @@ class vecchia_experiment(likelihood_function):
                         'log_det': log_det,
                         'locs': locs
                     }
-
         return neg_log_lik
 
 
