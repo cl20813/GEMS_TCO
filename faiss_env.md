@@ -20,9 +20,14 @@ When activate the new environment for the first time, system will ask to install
 ``` C:\Users\joonw\anaconda3\envs\faiss_env\python.exe -m pip install -e . --use-pep517  ```
 ``` C:\Users\joonw\AppData\Local\Programs\Python\Python312\python.exe -m pip install -e . --use-pep517 ```   I have to choose base python interpreter so that change is pulled.
 ### Check python interpreter because there might be a mismatch between the Python interpreter set in VS Code and the one in your conda environment.   
+WINDOW:
+
 For example, my ```python interpreter linked to VS code``` is located at ```C:\Users\joonw\AppData\Local\Programs\Python\Python312\python.exe```.
 - You can check this by typing ```where python``` in ```DEVELOPER COMMAND PROMPT FOR VS CODE```.
-- VS code terminal: type ```python --v``` this will tell your ```python interpreter linked to the ENVIRONMENT```. It should match with the environment. 
+- VS code terminal: Type ```conda activate environment``` first and then type ```python --v``` this will tell your ```python interpreter linked to the ENVIRONMENT``` in window computer. It should match with the environment.
+
+MAC:
+Just type ```where python``` or ```which python``` in terminal to check python linked to VS code. Then activate conda environment and do ```which python``` again to see python linked to your environment.   
 
 Press Ctrl + Shift + P (or Cmd + Shift + P on macOS) to open the Command Palette.        
 Select Interpreter: Type Python: Select Interpreter and select it from the dropdown list.        
