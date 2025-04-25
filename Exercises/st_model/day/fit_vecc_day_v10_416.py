@@ -124,7 +124,7 @@ def cli(
         optimizer, scheduler = model_instance.optimizer_fun(params, lr= lr , betas=(0.9, 0.8), eps=1e-8, step_size= step, gamma=0.9)    
 
         instance_map = kernels.vecchia_experiment(0.5, reordered_dict, reordered_df, nns_map,mm_cond_number, nheads)
-        cov_map =  instance_map.cov_structure_saver(params, instance.matern_cov_anisotropy_kv)   
+        cov_map =  instance_map.cov_structure_saver(params, model_instance.matern_cov_anisotropy_kv)   
 
         out, epoch = model_instance.run_vecc_testing(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_kv, cov_map, epochs=epochs)
 

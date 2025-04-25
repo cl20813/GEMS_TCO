@@ -14,6 +14,7 @@ scp "C:\Users\joonw\tco\GEMS_TCO-2\Exercises\st_model\day\fit_vecc_day_v10_416.p
 
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_vecc_day_v05_416.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_vecc_day_v10_416.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 # window
 scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\fit_st_torch_327.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
@@ -33,6 +34,12 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_ex
 ```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_416.py --v 0.5 --lr 0.02 --step 80 --epochs 3000 --space "20, 20" --days 1 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"    ```
 
 ```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v10_416.py --v 0.5 --lr 0.02 --step 80 --epochs 3000 --space "20, 20" --days 1 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"    ```
+
+srun --cpus-per-task=10 --mem=100G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_416.py --v 0.5 --lr 0.02 --step 80 --epochs 3000 --space "6, 6" --days 1 --mm-cond-number 10 --nheads 200
+
+srun --cpus-per-task=30 --mem=150G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_416.py --v 0.5 --lr 0.02 --step 80 --epochs 3000 --space "4, 4" --days 1 --mm-cond-number 10 --nheads 200
+
+srun --cpus-per-task=10 --mem=50G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v10_416.py --v 0.5 --lr 0.02 --step 80 --epochs 3000 --space "10, 10" --days 1 --mm-cond-number 10 --nheads 200
 
 
 

@@ -876,13 +876,13 @@ class vecchia_experiment(likelihood_function):
                 log_det = torch.log(cov_ygivenx)
             
                 cov_map[(time_idx,index)] = {
-                    'tmp1': tmp1,
-                    'cov_xx_inv': cov_xx_inv,
-                    'cov_matrix': cov_matrix,
-                    'cov_ygivenx': cov_ygivenx,
-                    'cond_mean_tmp': cond_mean_tmp,
-                    'log_det': log_det,
-                    'locs': locs
+                    'tmp1': tmp1.clone(),
+                    'cov_xx_inv': cov_xx_inv.clone(),
+                    'cov_matrix': cov_matrix.clone(),
+                    'cov_ygivenx': cov_ygivenx.clone(),
+                    'cond_mean_tmp': cond_mean_tmp.clone(),
+                    'log_det': log_det.clone(),
+                    'locs': locs.clone()
                 }
         return cov_map
 
@@ -1331,8 +1331,9 @@ class model_fitting(vecchia_experiment):
             optimizer.zero_grad()  # Zero the gradients 
             
             loss = self.compute_vecc_nll_testing(params, covariance_function, cov_map)
-            loss.backward()  # Backpropagate the loss
-            
+            loss.backward(retain_graph=True) # Backpropagate the loss with retain_graph=True
+            # loss.backward()
+
             # Print gradients and parameters every 10th epoch
             # if epoch % 500 == 0:
             #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
