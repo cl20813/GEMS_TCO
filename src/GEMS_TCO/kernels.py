@@ -741,7 +741,6 @@ class vecchia_experiment(likelihood_function):
                     }
         return neg_log_lik
 
-
     def vecchia_contender(self, params: torch.Tensor, covariance_function) -> torch.Tensor:
         self.cov_map = defaultdict(list)
         cut_line = self.nheads
@@ -812,8 +811,234 @@ class vecchia_experiment(likelihood_function):
                 neg_log_lik += 0.5 * (log_det + quad_form)
 
         return neg_log_lik
+    
+    def cov_structure_saver(self, params: torch.Tensor, covariance_function) -> None:
+        
+        cov_map = defaultdict(lambda: defaultdict(dict))
+        cut_line= self.nheads
+        key_list = list(self.input_map.keys())
 
-   
+        for time_idx in range(0,8):
+            current_np = self.input_map[key_list[time_idx]]
+
+            # Use below when working on local computer to avoid singular matrix
+            for index in range(cut_line, self.size_per_hour):
+                current_row = current_np[index].reshape(1, -1)
+             
+                # Construct conditioning set
+                mm_neighbors = self.nns_map[index]
+                past = list(mm_neighbors) 
+                data_list = []
+
+                if past:
+                    data_list.append(current_np[past])
+
+                if time_idx > 0:
+                    last_hour_np = self.input_map[key_list[time_idx - 1]]
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+
+                if time_idx > 1:
+                    last_hour_np = self.input_map[key_list[time_idx -2]]
+                    # if index==200:
+                    #     print(self.input_map[self.key_list[time_idx-6]])
+                    past_conditioning_data = last_hour_np[past + [index], :]
+                    data_list.append(past_conditioning_data)
+                
+                if data_list:
+                    conditioning_data = torch.vstack(data_list)
+                else:
+                    conditioning_data = torch.empty((0, current_row.shape[1]), dtype=torch.float64)
+
+                aggregated_arr = torch.vstack((current_row, conditioning_data))
+            
+                locs = aggregated_arr[:, :2]
+
+                cov_matrix = covariance_function(params=params, y= aggregated_arr, x= aggregated_arr )
+                # print(f'Condition number: {torch.linalg.cond(cov_matrix)}')
+                cov_yx = cov_matrix[0, 1:]
+                        # Compute the log determinant of the covariance matrix
+                sign, log_det = torch.slogdet(cov_matrix)
+
+                # if sign <= 0:
+                #     raise ValueError("Covariance matrix is not positive definite")
+            
+                # Compute beta
+                tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
+            
+                # Mean and variance of y|x
+                sigma = cov_matrix[0, 0]
+                cov_xx = cov_matrix[1:, 1:]
+                cov_xx_inv = torch.linalg.inv(cov_xx)
+
+                cov_ygivenx = sigma - torch.matmul(cov_yx, torch.matmul(cov_xx_inv, cov_yx))
+                cond_mean_tmp = torch.matmul(cov_yx, cov_xx_inv)
+                log_det = torch.log(cov_ygivenx)
+            
+                cov_map[(time_idx,index)] = {
+                    'tmp1': tmp1,
+                    'cov_xx_inv': cov_xx_inv,
+                    'cov_matrix': cov_matrix,
+                    'cov_ygivenx': cov_ygivenx,
+                    'cond_mean_tmp': cond_mean_tmp,
+                    'log_det': log_det,
+                    'locs': locs
+                }
+        return cov_map
+
+    def vecchia_efficient2(self, params: torch.Tensor, covariance_function, cov_map) -> torch.Tensor:
+
+        cut_line= self.nheads
+        key_list = list(self.input_map.keys())
+
+        neg_log_lik = 0.0
+        heads = self.input_map[key_list[0]][:cut_line,:]
+        for time_idx in range(1, len(self.input_map)):
+            tmp = self.input_map[key_list[time_idx]][:cut_line,:]
+            heads = torch.cat( (heads,tmp), dim=0)
+
+        neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
+        
+        for time_idx in range(0,len(self.input_map)):
+            current_np = self.input_map[key_list[time_idx]]
+
+            # Use below when working on local computer to avoid singular matrix
+            for index in range(cut_line, self.size_per_hour):
+                current_row = current_np[index].reshape(1, -1)
+                current_y = current_row[0, 2]
+
+                # Construct conditioning set
+                mm_neighbors = self.nns_map[index]
+                past = list(mm_neighbors) 
+                data_list = []
+
+                if past:
+                    data_list.append(current_np[past])  
+          
+                cov_matrix = cov_map[(time_idx,index)]['cov_matrix']
+                tmp1 = cov_map[(time_idx,index)]['tmp1']
+                cov_xx_inv = cov_map[(time_idx,index)]['cov_xx_inv']
+                cov_ygivenx = cov_map[(time_idx,index)]['cov_ygivenx']
+                cond_mean_tmp = cov_map[(time_idx,index)]['cond_mean_tmp']
+                log_det = cov_map[(time_idx,index)]['log_det']
+                locs = cov_map[(time_idx,index)]['locs']
+        
+
+                if time_idx >= 1:
+                    one_hour_lag = self.input_map[key_list[time_idx - 1]]
+                    past_conditioning_data = one_hour_lag[past + [index], :]
+                    data_list.append(past_conditioning_data)
+                
+                if time_idx > 1:
+                    two_hour_lag = self.input_map[key_list[time_idx - 2]]
+                    past_conditioning_data = two_hour_lag[past + [index], :]
+                    data_list.append(past_conditioning_data)
+    
+                if data_list:
+                    conditioning_data = torch.vstack(data_list)
+                else:
+                    conditioning_data = torch.empty((0, current_row.shape[1]), dtype=torch.float64)
+
+                aggregated_arr = torch.vstack((current_row, conditioning_data))
+                aggregated_y = aggregated_arr[:, 2]
+
+                cov_yx = cov_matrix[0, 1:]
+
+                tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, aggregated_y))
+                
+                beta = torch.linalg.solve(tmp1, tmp2)
+           
+                mu = torch.matmul(locs, beta)
+                mu_current = mu[0]
+                mu_neighbors = mu[1:]
+                
+                # Mean and variance of y|x
+                cond_mean = mu_current + torch.matmul(cond_mean_tmp, (aggregated_y[1:] - mu_neighbors))
+                alpha = current_y - cond_mean
+                quad_form = alpha**2 * (1 / cov_ygivenx)
+                neg_log_lik += 0.5 * (log_det + quad_form)
+        return neg_log_lik
+  
+
+    def vecchia_efficient(self, params: torch.Tensor, covariance_function, cov_map) -> torch.Tensor:
+
+        cut_line= self.nheads
+        key_list = list(self.input_map.keys())
+
+        neg_log_lik = 0.0
+        heads = self.input_map[key_list[0]][:cut_line,:]
+        for time_idx in range(1, len(self.input_map)):
+            tmp = self.input_map[key_list[time_idx]][:cut_line,:]
+            heads = torch.cat( (heads,tmp), dim=0)
+
+        neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
+        
+        for time_idx in range(0,len(self.input_map)):
+            current_np = self.input_map[key_list[time_idx]]
+
+            # Use below when working on local computer to avoid singular matrix
+            for index in range(cut_line, self.size_per_hour):
+                current_row = current_np[index].reshape(1, -1)
+                current_y = current_row[0, 2]
+
+                # Construct conditioning set
+                mm_neighbors = self.nns_map[index]
+                past = list(mm_neighbors) 
+                data_list = []
+
+                if past:
+                    data_list.append(current_np[past])  
+                if time_idx < 2:
+                    cov_matrix = cov_map[(time_idx,index)]['cov_matrix']
+                    tmp1 = cov_map[(time_idx,index)]['tmp1']
+                    cov_xx_inv = cov_map[(time_idx,index)]['cov_xx_inv']
+                    cov_ygivenx = cov_map[(time_idx,index)]['cov_ygivenx']
+                    cond_mean_tmp = cov_map[(time_idx,index)]['cond_mean_tmp']
+                    log_det = cov_map[(time_idx,index)]['log_det']
+                    locs = cov_map[(time_idx,index)]['locs']
+                else:
+                    cov_matrix = cov_map[(2,index)]['cov_matrix']
+                    tmp1 = cov_map[(2,index)]['tmp1']
+                    cov_xx_inv = cov_map[(2,index)]['cov_xx_inv']
+                    cov_ygivenx = cov_map[(2,index)]['cov_ygivenx']
+                    cond_mean_tmp = cov_map[(2,index)]['cond_mean_tmp']
+                    log_det = cov_map[(2,index)]['log_det']
+                    locs = cov_map[(2,index)]['locs']
+
+                if time_idx >= 1:
+                    one_hour_lag = self.input_map[key_list[time_idx - 1]]
+                    past_conditioning_data = one_hour_lag[past + [index], :]
+                    data_list.append(past_conditioning_data)
+                
+                if time_idx > 1:
+                    two_hour_lag = self.input_map[key_list[time_idx - 2]]
+                    past_conditioning_data = two_hour_lag[past + [index], :]
+                    data_list.append(past_conditioning_data)
+    
+                if data_list:
+                    conditioning_data = torch.vstack(data_list)
+                else:
+                    conditioning_data = torch.empty((0, current_row.shape[1]), dtype=torch.float64)
+
+                aggregated_arr = torch.vstack((current_row, conditioning_data))
+                aggregated_y = aggregated_arr[:, 2]
+
+                cov_yx = cov_matrix[0, 1:]
+
+                tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, aggregated_y))
+                
+                beta = torch.linalg.solve(tmp1, tmp2)
+           
+                mu = torch.matmul(locs, beta)
+                mu_current = mu[0]
+                mu_neighbors = mu[1:]
+                
+                # Mean and variance of y|x
+                cond_mean = mu_current + torch.matmul(cond_mean_tmp, (aggregated_y[1:] - mu_neighbors))
+                alpha = current_y - cond_mean
+                quad_form = alpha**2 * (1 / cov_ygivenx)
+                neg_log_lik += 0.5 * (log_det + quad_form)
+        return neg_log_lik
 
     def vecchia_local_full_cond(self, params: torch.Tensor, covariance_function) -> torch.Tensor:
         neg_log_lik = 0.0
@@ -844,7 +1069,6 @@ class vecchia_experiment(likelihood_function):
             #     raise ValueError("Covariance matrix is not positive definite")
         
             # Compute beta
-
 
             tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
             tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, y_and_neighbors))
@@ -1018,9 +1242,9 @@ class model_fitting(vecchia_experiment):
         return vecc_nll
     
     # Example function to compute out1
-    def compute_vecc_nll_testing(self,params, covariance_function):
+    def compute_vecc_nll_testing(self,params, covariance_function, cov_map):
 
-        vecc_nll = self.vecchia_contender(params, covariance_function)
+        vecc_nll = self.vecchia_efficient2(params, covariance_function, cov_map)
         return vecc_nll
 
     def compute_vecc_nll_extrapolate(self,params , covariance_function):
@@ -1099,14 +1323,14 @@ class model_fitting(vecchia_experiment):
 
         return params.detach().numpy().tolist() + [ loss.item()], epoch
 
-    def run_vecc_testing(self, params, optimizer, scheduler,  covariance_function, epochs=10):
+    def run_vecc_testing(self, params, optimizer, scheduler,  covariance_function, cov_map,epochs=10):
         prev_loss= float('inf')
 
         tol = 1e-4  # Convergence tolerance
         for epoch in range(epochs):  # Number of epochs
             optimizer.zero_grad()  # Zero the gradients 
             
-            loss = self.compute_vecc_nll_testing(params, covariance_function)
+            loss = self.compute_vecc_nll_testing(params, covariance_function, cov_map)
             loss.backward()  # Backpropagate the loss
             
             # Print gradients and parameters every 10th epoch

@@ -107,7 +107,7 @@ class load_data:
         return analysis_data_map, aggregated_data
 
 
-    def reorder_data(self, analysis_data_map, aggregated_data, key_order):
+    def reorder_data(self, analysis_data_map, key_order):
         # key_order = [0, 1, 2, 4, 3, 5, 7, 6]
         keys = list(analysis_data_map.keys())
         reordered_dict = {keys[key]: analysis_data_map[keys[key]] for key in key_order}
@@ -176,7 +176,6 @@ class alg_optimization:
         self.lat_lon_resolution = lat_lon_resolution
         self.lr = lr
         self.stepsize = stepsize
-        
         self.sigma = params[0]
         self.range_lat = params[1]
         self.range_lon = params[2]

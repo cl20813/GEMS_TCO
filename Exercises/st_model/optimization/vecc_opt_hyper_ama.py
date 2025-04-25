@@ -98,13 +98,11 @@ def cli(
     map, ord_mm, nns_map = instance.load_mm20k_data_bymonthyear(lat_lon_resolution=lat_lon_resolution, mm_cond_number=mm_cond_number, years_=years, months_=month_range)
         
     for day in range(12,13):
-        
         idx_for_datamap= [8*day,8*(day+1)]   
-        # data
-
+   
         analysis_data_map, aggregated_data = instance.load_working_data_byday(map, ord_mm, nns_map, idx_for_datamap=idx_for_datamap)
         lenth_of_analysis =idx_for_datamap[1]-idx_for_datamap[0]
-        print(f'2025-07-{day+1}, data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}, smooth: {v}')
+        print(f'2024-07-{day+1}, data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}, smooth: {v}')
         
         params_item = list(df_1250.iloc[day][:-1])
         params = torch.tensor(params_item, dtype=torch.float64, requires_grad=True)

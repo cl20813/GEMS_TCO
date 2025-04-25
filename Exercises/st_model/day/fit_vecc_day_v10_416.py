@@ -19,7 +19,7 @@ from GEMS_TCO import kernels
 from GEMS_TCO import orbitmap 
 from GEMS_TCO import kernels 
 from GEMS_TCO import orderings as _orderings 
-from GEMS_TCO import load_data_amarel
+from GEMS_TCO import load_data
 from GEMS_TCO import alg_optimization, alg_opt_Encoder
 
 from typing import Optional, List, Tuple
@@ -85,7 +85,9 @@ def cli(
     years = ['2024']
     month_range =[7,8]
     
-    instance = load_data_amarel()
+    basic_path = "/home/jl2815/tco/data/pickle_data"
+    instance = load_data(basic_path)
+
     map, ord_mm, nns_map= instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number= mm_cond_number ,years_=years, months_=month_range)
    
 
@@ -106,7 +108,7 @@ def cli(
         # different approximations 
         key_order = [0,1,2,4,3,5,7,6]
 
-        reordered_dict, reordered_df = instance.reorder_data(analysis_data_map, aggregated_data, key_order)
+        reordered_dict, reordered_df = instance.reorder_data(analysis_data_map, key_order)
 
         model_instance = kernels.model_fitting(
                 smooth=v,
@@ -120,14 +122,19 @@ def cli(
         start_time = time.time()
         # optimizer = optim.Adam([params], lr=0.01)  # For Adam
         optimizer, scheduler = model_instance.optimizer_fun(params, lr= lr , betas=(0.9, 0.8), eps=1e-8, step_size= step, gamma=0.9)    
-        out, epoch = model_instance.run_vecc_testing(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_kv, epochs=epochs)
+
+        instance_map = kernels.vecchia_experiment(0.5, reordered_dict, reordered_df, nns_map,mm_cond_number, nheads)
+        cov_map =  instance_map.cov_structure_saver(params, instance.matern_cov_anisotropy_kv)   
+
+        out, epoch = model_instance.run_vecc_testing(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_kv, cov_map, epochs=epochs)
+
         end_time = time.time()
         epoch_time = end_time - start_time
-        print(f"2025-07-{day+1}", "vecchia_v10", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
+        print(f"2024-07-{day+1}", "vecchia_v10", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
         
         input_filepath = input_path / f"vecchia_v10_{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
         
-        res = alg_optimization( f"2025-07-{day+1}", "Vecc_contender", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
+        res = alg_optimization( f"2024-07-{day+1}", "Vecc_contender", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
         loaded_data = res.load(input_filepath)
         loaded_data.append( res.toJSON() )
         res.save(input_filepath,loaded_data)
