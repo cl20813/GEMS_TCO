@@ -1,4 +1,0 @@
-[
-    "{\"day\": \"2025-04-19\", \"cov_name\": \"Algorithm1\", \"lat_lon_resolution\": 50, \"lr\": 0.01, \"stepsize\": 20, \"sigma\": 24, \"range_lat\": 2, \"range_lon\": 3, \"advec_lat\": 0.002, \"advec_lon\": -0.2, \"beta\": 0.1, \"nugget\": 3.5, \"loss\": 150, \"time\": 25, \"epoch\": 100}",
-    "{\"day\": \"2025-04-19\", \"cov_name\": \"Algorithm1\", \"lat_lon_resolution\": 50, \"lr\": 0.01, \"stepsize\": 20, \"sigma\": 24, \"range_lat\": 2, \"range_lon\": 3, \"advec_lat\": 0.002, \"advec_lon\": -0.2, \"beta\": 0.1, \"nugget\": 3.5, \"loss\": 150, \"time\": 25, \"epoch\": 100}"
-]

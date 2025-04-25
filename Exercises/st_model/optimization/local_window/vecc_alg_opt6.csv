@@ -1,3 +1,0 @@
-day,cov_name,lat_lon_resolution,lr,stepsize,sigma,range_lat,range_lon,advec_lat,advec_lon,beta,nugget,loss,time,epoch
-2025-04-19,Algorithm1,50,0.01,20,24,2,3,0.002,-0.2,0.1,3.5,150,25,100
-2025-04-19,Algorithm1,50,0.01,20,24,2,3,0.002,-0.2,0.1,3.5,150,25,100
