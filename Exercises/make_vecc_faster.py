@@ -26,7 +26,7 @@ from json import JSONEncoder
 
 import time
 
-from line_profiler import LineProfiler
+
      
 # kernprof -l script_to_profile.py
 # C:\Users\joonw\anaconda3\envs\faiss_env\python.exe -m kernprof -l "C:\Users\joonw\tco\GEMS_TCO-2\Exercises\make_vecc_faster.py"  window
