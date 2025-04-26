@@ -876,17 +876,17 @@ class vecchia_experiment(likelihood_function):
                 log_det = torch.log(cov_ygivenx)
             
                 cov_map[(time_idx,index)] = {
-                    'tmp1': tmp1.clone(),
-                    'cov_xx_inv': cov_xx_inv.clone(),
-                    'cov_matrix': cov_matrix.clone(),
-                    'cov_ygivenx': cov_ygivenx.clone(),
-                    'cond_mean_tmp': cond_mean_tmp.clone(),
-                    'log_det': log_det.clone(),
-                    'locs': locs.clone()
+                    'tmp1': tmp1.clone().detach(),
+                    'cov_xx_inv': cov_xx_inv.clone().detach(),
+                    'cov_matrix': cov_matrix.clone().detach(),
+                    'cov_ygivenx': cov_ygivenx.clone().detach(),
+                    'cond_mean_tmp': cond_mean_tmp.clone().detach(),
+                    'log_det': log_det.clone().detach(),
+                    'locs': locs.clone().detach()
                 }
         return cov_map
 
-    def vecchia_efficient2(self, params: torch.Tensor, covariance_function, cov_map) -> torch.Tensor:
+    def vecchia_reorder(self, params: torch.Tensor, covariance_function, cov_map) -> torch.Tensor:
 
         cut_line= self.nheads
         key_list = list(self.input_map.keys())
@@ -960,7 +960,7 @@ class vecchia_experiment(likelihood_function):
         return neg_log_lik
   
 
-    def vecchia_efficient(self, params: torch.Tensor, covariance_function, cov_map) -> torch.Tensor:
+    def vecchia_ori_order(self, params: torch.Tensor, covariance_function, cov_map) -> torch.Tensor:
 
         cut_line= self.nheads
         key_list = list(self.input_map.keys())
@@ -1242,14 +1242,14 @@ class model_fitting(vecchia_experiment):
         return vecc_nll
     
     # Example function to compute out1
-    def compute_vecc_nll_testing(self,params, covariance_function, cov_map):
+    def compute_vecc_nll_reorder(self,params, covariance_function, cov_map):
 
-        vecc_nll = self.vecchia_efficient2(params, covariance_function, cov_map)
+        vecc_nll = self.vecchia_reorder(params, covariance_function, cov_map)
         return vecc_nll
 
-    def compute_vecc_nll_extrapolate(self,params , covariance_function):
+    def compute_vecc_nll_ori_order(self,params , covariance_function, cov_map):
    
-        vecc_nll = self.vecchia_b2(params, covariance_function)
+        vecc_nll = self.vecchia_ori_order(params, covariance_function, cov_map)
         return vecc_nll
 
     def compute_full_nll(self,params, covariance_function):
@@ -1323,14 +1323,14 @@ class model_fitting(vecchia_experiment):
 
         return params.detach().numpy().tolist() + [ loss.item()], epoch
 
-    def run_vecc_testing(self, params, optimizer, scheduler,  covariance_function, cov_map,epochs=10):
+    def run_vecc_reorder(self, params, optimizer, scheduler,  covariance_function, cov_map,epochs=10):
         prev_loss= float('inf')
 
         tol = 1e-4  # Convergence tolerance
         for epoch in range(epochs):  # Number of epochs
             optimizer.zero_grad()  # Zero the gradients 
             
-            loss = self.compute_vecc_nll_testing(params, covariance_function, cov_map)
+            loss = self.compute_vecc_nll_reorder(params, covariance_function, cov_map)
             loss.backward(retain_graph=True) # Backpropagate the loss with retain_graph=True
             # loss.backward()
 
@@ -1355,37 +1355,36 @@ class model_fitting(vecchia_experiment):
         return params.detach().numpy().tolist() + [ loss.item()], epoch
     
 
-    def run_vecc_extrapolate(self, params, optimizer, scheduler,covariance_function, epochs=10):
+    def run_vecc_ori_order(self, params, optimizer, scheduler,  covariance_function, cov_map,epochs=10):
         prev_loss= float('inf')
 
         tol = 1e-4  # Convergence tolerance
         for epoch in range(epochs):  # Number of epochs
             optimizer.zero_grad()  # Zero the gradients 
             
-            loss = self.compute_vecc_nll_extrapolate(params , covariance_function)
-            loss.backward()  # Backpropagate the loss
-            
+            loss = self.compute_vecc_nll_ori_order(params, covariance_function, cov_map)
+            loss.backward(retain_graph=True) # Backpropagate the loss with retain_graph=True
+            # loss.backward()
+
             # Print gradients and parameters every 10th epoch
-            if epoch % 100 == 0:
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            # if epoch % 500 == 0:
+            #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             optimizer.step()  # Update the parameters
             scheduler.step()  # Update the learning rate
+
             # Check for convergence
             if abs(prev_loss - loss.item()) < tol:
                 print(f"Converged at epoch {epoch}")
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
-            
+                print(f'Epoch {epoch+1},  \n vecc Parameters: {params.detach().numpy()}')
                 break
-            
+
             prev_loss = loss.item()
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
 
-        print(f'Final State: Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, vecc Parameters: {params.detach().numpy()}')
-        print('Training vecchia likelihood complete.') 
-
-        return params.detach().numpy().tolist() + [ loss.item()]
+        return params.detach().numpy().tolist() + [ loss.item()], epoch
 
 
 ####################
