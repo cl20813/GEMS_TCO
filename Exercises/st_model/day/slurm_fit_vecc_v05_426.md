@@ -17,7 +17,6 @@ scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_vecc_day_
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_vecc_day_v05_ori_ord_416.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 
-
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_vecc_day_v10_416.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 # window
@@ -25,7 +24,17 @@ scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\fit_st_torch_327.py" jl281
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/vecc_extra_estimates_1250_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"
+# 1250
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vecchia_v05_reord_1250.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"  
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vecchia_v05_ori_ord_1250.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"  
+
+# 5000
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vecchia_v05_reord_5000.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/" 
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vecchia_v05_ori_ord5000.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/" 
+
+
 
 ### Run this part
 ```ssh jl2815@amarel.rutgers.edu```
@@ -78,7 +87,6 @@ echo "Current date and time: $(date)"
 echo "fit_vecc_v05_reorder_1250_save_estimates"
 
 srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_reord_416.py --v 0.5 --lr 0.02 --step 80 --epochs 3000 --space "4, 4" --days 31 --mm-cond-number 10 --nheads 300
-
 
 ```
 
@@ -162,17 +170,17 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v10_416.py --v 1.
 
 #######  5000 data
 
-```  nano fit_vecc_5000.sh  ```    
+```  nano fit_day_vecc_v05_reorder5000.sh  ``` 
+```  sbatch fit_day_vecc_v05_reorder5000.sh  ``` 
 
 ``` 
-
 #!/bin/bash
-#SBATCH --job-name=fit_v5000                        # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_v5000_%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_v5000_%j.err  # Standard error file (%j = JobID)
+#SBATCH --job-name=vec_Drev05_5000                         # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/vec_Drev05_5000_%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/vec_Drev05_5000_%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
-#SBATCH --ntasks=1                                                 # Number of tasks
-#SBATCH --cpus-per-task=40                                         # Number of CPU cores per task
+#SBATCH --ntasks=1                                                # Number of tasks
+#SBATCH --cpus-per-task=40                                        # Number of CPU cores per task
 #SBATCH --mem=400G                                                 # Memory per node
 #SBATCH --partition=mem                                            # Partition name
 
@@ -186,9 +194,42 @@ eval "$(conda shell.bash hook)"
 conda activate faiss_env
 
 echo "Current date and time: $(date)"
-echo "fit_st_vecc_5000_save_estimates"
+echo "fit_vecc_v05_reorder_1250_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_st_torch_v_int414.py --v 0.5 --lr 0.01 --epochs 3000 --space "2, 2" --days 31 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"  
+srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_reord_416.py --v 0.5 --lr 0.02 --step 80 --epochs 3000 --space "2, 2" --days 31 --mm-cond-number 10 --nheads 300
+
+```
+
+## original ordering
+
+```  nano fit_day_vecc_v05_oriorder5000.sh  ``` 
+```  sbatch fit_day_vecc_v05_oriorder5000.sh  ``` 
+
+``` 
+#!/bin/bash
+#SBATCH --job-name=vec_Doriv05_5000                         # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/vec_Doriv05_5000_%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/vec_Doriv05_5000_%j.err # Standard error file (%j = JobID)
+#SBATCH --time=72:00:00                                            # Time limit
+#SBATCH --ntasks=1                                                # Number of tasks
+#SBATCH --cpus-per-task=40                                        # Number of CPU cores per task
+#SBATCH --mem=400G                                                 # Memory per node
+#SBATCH --partition=mem                                            # Partition name
+
+#### Load the Anaconda module to use srun 
+module purge                                              
+module use /projects/community/modulefiles                 
+module load anaconda/2024.06-ts840 
+
+#### Initialize conda for the current shell session if not already done for the current shell session.
+eval "$(conda shell.bash hook)"
+conda activate faiss_env
+
+echo "Current date and time: $(date)"
+echo "fit_vecc_v05_order_1250_save_estimates"
+
+srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_ori_ord_416.py --v 0.5 --lr 0.02 --step 80 --epochs 3000 --space "2, 2" --days 31 --mm-cond-number 10 --nheads 300
+
 
 ```
 

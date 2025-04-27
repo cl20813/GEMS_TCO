@@ -20,7 +20,7 @@ scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/optimization/vecc
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/full_v(0.5)_estimation_1250_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/optimization/output/hyper_parm_opt_1250.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/from_amarel"
 
 
 ## window
@@ -83,8 +83,8 @@ srun python /home/jl2815/tco/exercise_25/st_model/vecc_alg_opt_ama.py --v 0.5 --
 ```
 
 ```  cd ./jobscript/tco/gp_exercise  ```  
-```  nano vecc_hyp_opt.sh  ```        
- ```   sbatch vecc_hyp_opt.sh   ```
+```  nano vecc_hyp_opt2.sh  ```        
+ ```   sbatch vecc_hyp_opt2.sh   ```
 
 ``` 
 #!/bin/bash
@@ -110,7 +110,7 @@ echo "Current date and time: $(date)"
 
 echo "fit_hyper_opt"
 
-srun python /home/jl2815/tco/exercise_25/st_model/vecc_opt_hyper_ama.py --v 0.5 --lr 0.02 --epochs 2500 --space "4, 4" --days 1 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34" 
+srun python /home/jl2815/tco/exercise_25/st_model/vecc_opt_hyper_ama.py --v 0.5 --lr 0.02 --epochs 700 --space "4, 4" --days 1 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34" 
 
 ```
 
