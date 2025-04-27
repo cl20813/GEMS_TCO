@@ -21,6 +21,7 @@ import torch
 from torch.func import grad, hessian, jacfwd, jacrev
 from torch.optim.lr_scheduler import StepLR
 import torch.optim as optim
+import torch.nn as nn
 
 import copy    
 import logging     # for logging
@@ -505,6 +506,9 @@ class model_fitting(vecchia_experiment):
             loss.backward()  # Backpropagate the loss
             
             # Print gradients and parameters every 10th epoch
+            if epoch % 10 == 0:
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
             # if epoch % 500 == 0:
             #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
@@ -585,5 +589,92 @@ class model_fitting(vecchia_experiment):
 
         return params.detach().numpy().tolist() + [ loss.item()], epoch
 
+    def run_vecc_ori_order_grad_tracker(self, params, optimizer, scheduler,  covariance_function, cov_map,epochs=10):
+        prev_loss= float('inf')
 
+        tol = 1e-4  # Convergence tolerance
+        for epoch in range(epochs):  # Number of epochs
+            optimizer.zero_grad()  # Zero the gradients 
+            
+            loss = self.compute_vecc_nll_ori_order(params, covariance_function, cov_map)
+            loss.backward(retain_graph=True) # Backpropagate the loss with retain_graph=True
+            # loss.backward()
+
+            # Print gradients and parameters every 10th epoch
+            if epoch % 10 == 0:
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            optimizer.step()  # Update the parameters
+            scheduler.step()  # Update the learning rate
+
+            # Check for convergence
+            if abs(prev_loss - loss.item()) < tol:
+                print(f"Converged at epoch {epoch}")
+                print(f'Epoch {epoch+1},  \n vecc Parameters: {params.detach().numpy()}')
+                break
+
+            prev_loss = loss.item()
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
+
+        return params.detach().numpy().tolist() + [ loss.item()], epoch
+
+    def run_vecc_ori_order_grad_tracker(self, params, optimizer, scheduler, covariance_function, cov_map, epochs=10, early_stopping=None):
+        prev_loss = float('inf')
+        tol = 1e-4  # Convergence tolerance
+
+        for epoch in range(epochs):  # Number of epochs
+            optimizer.zero_grad()  # Zero the gradients
+            
+            loss = self.compute_vecc_nll_ori_order(params, covariance_function, cov_map)
+            loss.backward(retain_graph=True)  # Backpropagate the loss with retain_graph=True
+            
+            # Print gradients and parameters every 10th epoch
+            if epoch % 10 == 0:
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            optimizer.step()  # Update the parameters
+            scheduler.step()  # Update the learning rate
+
+            # Check for convergence
+            if abs(prev_loss - loss.item()) < tol:
+                print(f"Converged at epoch {epoch}")
+                print(f'Epoch {epoch+1},  \n vecc Parameters: {params.detach().numpy()}')
+                break
+
+            prev_loss = loss.item()
+
+            # Early stopping check
+            if early_stopping and early_stopping(loss.item()):
+                print(f"Early stopping at epoch {epoch}")
+                break
+
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
+        return params.detach().numpy().tolist() + [loss.item()], epoch
+
+class EarlyStopping:
+    def __init__(self, patience=10, delta=0):
+        """
+        Args:
+            patience (int): Number of epochs with no improvement after which training will be stopped.
+            delta (float): Minimum change in the validation loss to qualify as an improvement.
+        """
+        self.patience = patience
+        self.delta = delta
+        self.counter = 0
+        self.best_loss = float('inf')
+        self.early_stop = False
+
+    def __call__(self, val_loss):
+        if val_loss < self.best_loss - self.delta:
+            self.best_loss = val_loss
+            self.counter = 0  # Reset counter when we have improvement
+        else:
+            self.counter += 1
+        
+        if self.counter >= self.patience:
+            self.early_stop = True
+        return self.early_stop
+    
 ####################
