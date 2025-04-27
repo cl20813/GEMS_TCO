@@ -12,12 +12,13 @@ Then in Amarel Rutgers
 
  Maybe I should ask the creator to use the pandas version which my project is using. 
  I just sent csv files to Amarel, then made pickle files in there again. 
+
+## Typer: parsing paramteres:     
+1. Parser type: mm_cond_number should be written as mm-cond-number.    
+2. Typer can't handle negative integers, so put them in a list of strings.     
  
 ## 1. Mismatch python and conda
-This happens when I can find package using ```conda list torch``` but cannot find the package in python from         
-```python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"```            
-```which python``` should return ```/home/jl2815/.conda/envs/gems_tco/bin/python```                
-Problem is solved. See -[Install mypackage on Amarel](install_mypackage_amarel.md)     
+This problem is solved. See how I compiled c++ file.  
 
 ## 2. Cannot find GEMS_TCO package
 
