@@ -185,9 +185,11 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         spline_values_np = splev(flat_distances_np, spline_params)
 
         # Convert spline values back to PyTorch tensor and reshape
-        spline_values = torch.tensor(spline_values_np, dtype=torch.float64).reshape(distance.shape)
+        spline_values = torch.tensor(spline_values_np, dtype=torch.float64, requires_grad=True).reshape(distance.shape)
 
         return spline_values
+
+
 
     
 class likelihood_function(spatio_temporal_kernels):

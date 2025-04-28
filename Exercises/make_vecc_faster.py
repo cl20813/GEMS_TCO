@@ -37,13 +37,13 @@ import time
 
 df = pd.read_csv("/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/full_estimates_1250_july24.csv") 
 
-lat_lon_resolution = [4,4]
+lat_lon_resolution = [10,10]  # 4,4 to coarse factor 2 // 2,2 to 4  5 is worse
 
 years = ['2024']
 month_range =[7,8]
 nheads = 2
 
-for day in range(1,2):
+for day in range(5,6):
     print(f'\n Day {day} data size per day: { (200/lat_lon_resolution[0])*(100/lat_lon_resolution[0])  } \n')
 
     # parameters
@@ -69,14 +69,14 @@ for day in range(1,2):
     instance_ori = kernels.vecchia_experiment(0.5, analysis_data_map, aggregated_data,nns_map,mm_cond_number, nheads)
     instance = kernels.vecchia_experiment(0.5, reordered_dict, reordered_df, nns_map,mm_cond_number, nheads)
 
-     
+    
     start_time = time.time()
     out1 = instance.full_likelihood(params, aggregated_data[:,:4],aggregated_data[:,2], instance_ori.matern_cov_anisotropy_v05)
     end_time = time.time()
     epoch_time1 = end_time - start_time
     print(f'full full: {out1} took {epoch_time1:.2f}') 
     
-
+    
     cov_map_ori = instance_ori.cov_structure_saver(params, instance_ori.matern_cov_anisotropy_v05)
     cov_map_new = instance.cov_structure_saver(params, instance.matern_cov_anisotropy_v05)
 

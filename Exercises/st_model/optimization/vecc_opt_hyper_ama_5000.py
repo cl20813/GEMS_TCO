@@ -123,7 +123,6 @@ def cli(
                 nheads = nheads
             )
         
-
         input_path = Path("/home/jl2815/tco/exercise_output/optimization/output/")
         input_filepath = input_path / f"hyper_parm_opt3_{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
         lr_list = [0.02,0.01, 0.005, 0.001, 0.0005, 0.0001]
