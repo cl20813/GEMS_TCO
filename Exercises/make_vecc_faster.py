@@ -37,12 +37,13 @@ import time
 
 df = pd.read_csv("/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/full_estimates_1250_july24.csv") 
 
-lat_lon_resolution = [6,6]
+lat_lon_resolution = [4,4]
+
 years = ['2024']
 month_range =[7,8]
 nheads = 2
 
-for day in range(1,3):
+for day in range(1,2):
     print(f'\n Day {day} data size per day: { (200/lat_lon_resolution[0])*(100/lat_lon_resolution[0])  } \n')
 
     # parameters
@@ -59,6 +60,7 @@ for day in range(1,3):
     instance = load_data(input_path)
     map, ord_mm, nns_map= instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
     analysis_data_map, aggregated_data = instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap= idx_for_datamap)
+
 
 
     # different approximations
@@ -79,29 +81,17 @@ for day in range(1,3):
     cov_map_new = instance.cov_structure_saver(params, instance.matern_cov_anisotropy_v05)
 
     start_time = time.time()
-    out2 = instance_ori.vecchia_b2(params, instance.matern_cov_anisotropy_v05)
+    out2 = instance_ori.vecchia_ori_order(params, instance_ori.matern_cov_anisotropy_kv, cov_map_ori)
     end_time = time.time()
     epoch_time2 = end_time - start_time
-    print(f'vecc two cahce: {out2} took {epoch_time2:.2f}') 
+    print(f'vecc kv: {out2} took {epoch_time2:.2f}') 
 
     start_time = time.time()
-    out2 = instance_ori.vecchia_efficient(params, instance_ori.matern_cov_anisotropy_v05, cov_map_ori)
+    out2 = instance_ori.vecchia_ori_order(params, instance_ori.matern_cov_anisotropy_spline, cov_map_ori)
     end_time = time.time()
     epoch_time2 = end_time - start_time
-    print(f'vecc efficient: {out2} took {epoch_time2:.2f}') 
+    print(f'vecc spline: {out2} took {epoch_time2:.2f}') 
 
-
-    start_time = time.time()
-    out2 = instance.vecchia_b2(params, instance.matern_cov_anisotropy_v05)
-    end_time = time.time()
-    epoch_time2 = end_time - start_time
-    print(f'vecc two lags map: {out2} took {epoch_time2:.2f}') 
-  
-    start_time = time.time()
-    out3 = instance.vecchia_efficient2(params, instance.matern_cov_anisotropy_v05, cov_map_new)
-    end_time = time.time()
-    epoch_time3 = end_time - start_time
-    print(f'vecc efficient2: {out3}took {epoch_time3:.2f}') 
 
 
 
