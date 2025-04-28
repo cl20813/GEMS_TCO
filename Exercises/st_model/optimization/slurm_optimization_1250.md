@@ -8,7 +8,7 @@ scp -r "C:\Users\joonw\tco\GEMS_TCO-2\src\GEMS_TCO" jl2815@amarel.rutgers.edu:/h
 ### Copy run file from ```local``` to ```Amarel HPC```
 # mac
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/optimization/vecc_opt_hyper_ama.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/optimization/vecc_opt_hyper_ama_1250.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 # window
 
@@ -44,14 +44,14 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/optimization/outp
 # 1250
 
 ```  cd ./jobscript/tco/gp_exercise  ```  
-```  nano vecc_hyp_opt2.sh  ```        
- ```   sbatch vecc_hyp_opt2.sh   ```
+```  nano vecc_hyp_opt_1250_427.sh  ```        
+ ```   sbatch vecc_hyp_opt_1250_427.sh   ```
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=vecc_hyp_opt                             # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/vecc_hyp_opt_%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/vecc_hyp_opt_%j.err # Standard error file (%j = JobID)
+#SBATCH --job-name=vecc_hyp_opt_1250                             # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/vecc_hyp_opt_1250_%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/vecc_hyp_opt_1250_%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
@@ -71,7 +71,7 @@ echo "Current date and time: $(date)"
 
 echo "fit_hyper_opt"
 
-srun python /home/jl2815/tco/exercise_25/st_model/vecc_opt_hyper_ama.py --v 0.5 --lr 0.02 --epochs 2500 --space "4, 4" --days 1 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34" 
+srun python /home/jl2815/tco/exercise_25/st_model/vecc_opt_hyper_ama_1250.py --v 0.5 --lr 0.001 --epochs 1000 --space "4, 4" --days 1 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34" 
 
 ```
 
