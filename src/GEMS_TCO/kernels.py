@@ -22,6 +22,8 @@ from torch.func import grad, hessian, jacfwd, jacrev
 from torch.optim.lr_scheduler import StepLR
 import torch.optim as optim
 import torch.nn as nn
+from scipy.interpolate import splrep, splev
+
 
 import copy    
 import logging     # for logging
@@ -141,6 +143,52 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         out += torch.eye(out.shape[0], dtype=torch.float64) * nugget
 
         return out
+
+
+
+    def matern_cov_anisotropy_spline(self, params: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
+
+        # Precompute anisotropic distances
+        distance, non_zero_indices = self.precompute_coords_anisotropy(params, x, y)
+
+        coarse_factor = 4  # Increase coarse_factor to reduce the number of points
+        flat_distances = distance.flatten()
+
+     
+        x2 = x[::(coarse_factor)]
+        y2 = y[::(coarse_factor)]
+        print( x.shape, y.shape)
+        print(f' x2 shape {x2.shape} y2 shape {y2.shape}')
+
+        # Generate coarse distances for spline fitting
+        fit_distances = torch.linspace(0.001, distance.max(), len(flat_distances) // coarse_factor**2)
+
+        print(len(fit_distances))
+        # Convert fit_distances to NumPy array for spline fitting
+        fit_distances_np = fit_distances.detach().numpy()
+
+        # Compute exact values using coarse distances
+        exact_values_np = self.matern_cov_anisotropy_kv(params, x2, y2).detach().numpy()
+        exact_values_np = exact_values_np.flatten()
+        print(exact_values_np.shape)
+        # Sort fit_distances_np and reorder exact_values_np to match
+        sorted_indices = np.argsort(fit_distances_np)
+        fit_distances_np = fit_distances_np[sorted_indices]
+        exact_values_np = exact_values_np[sorted_indices]
+
+        # Fit a cubic spline to the exact values
+        spline_params = splrep(fit_distances_np, exact_values_np, k=3)
+
+        # Evaluate spline at dense distances
+        flat_distances_np = flat_distances.detach().numpy()
+        spline_values_np = splev(flat_distances_np, spline_params)
+
+        # Convert spline values back to PyTorch tensor and reshape
+        spline_values = torch.tensor(spline_values_np, dtype=torch.float64).reshape(distance.shape)
+
+        return spline_values
+
     
 class likelihood_function(spatio_temporal_kernels):
     def __init__(self, smooth, input_map, aggregated_data, nns_map, mm_cond_number, nheads):
