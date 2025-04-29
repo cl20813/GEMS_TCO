@@ -25,6 +25,15 @@ scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_full_day_
 
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/full_v(0.5)_estimation_1250_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"
 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/saved/full_v15_1250.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/full_day_v10_1250.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/saved/full_v05_1250.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"
+
+
+
+
 # window
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/full_v10_1250.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"  "C:\\Users\\joonw\\tco\\GEMS_TCO-2\\Exercises\\from_amarel"
 
