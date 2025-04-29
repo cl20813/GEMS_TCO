@@ -238,9 +238,36 @@ class CrossVariogram:
         
         return torch.sqrt(d), out
 
+    def theoretical_gammma_kv(self,params, lat_diff, lon_diff, time_diff):
+        sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
+
+        # Calculate the spatial-temporal differences
+        tmp1 = lat_diff - advec_lat * time_diff
+        tmp2 = lon_diff - advec_lon * time_diff
+        tmp3 = beta * time_diff
+        
+        d = tmp1**2/range_lat**2 + tmp2**2/range_lon**2 + tmp3**2
+        
+        # Convert d into a tensor (if it's not already) and compute the semivariogram
+        d = d.clone().detach()
+        
+        # Compute the covariance for non-zero distances
+       
+        # since d is tensor, kv() returns tensor
+        tmp = kv(self.smooth, np.sqrt(d)).clone().detach()
+        out_tmp = (sigmasq * (2**(1-self.smooth)) / gamma(self.smooth) *
+                                    (torch.sqrt(d) )**self.smooth *
+                                    tmp)
+        
+        out = (nugget + sigmasq) - out_tmp
+        return torch.sqrt(d), out
+
     def squared_formatter(self,x, pos):
         return f'{np.sqrt(x):.2f}'
 
+    '''
+    plot_lon_sem(), plot_lat_sem() is the old version scatter plots
+    '''
     def plot_lon_sem(self, lon_lag_sem, days, deltas):
         fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
@@ -371,8 +398,6 @@ class CrossVariogram:
             ticks = [ str( round(x,1)) for x in x_values]
             ax.set_xticklabels(ticks)
             ax.set_ylim(1e-4, 30)
-
-
         # Rotate x-axis labels by 45 degrees
             plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
 
@@ -387,74 +412,12 @@ class CrossVariogram:
 
 
 
-
-
-class CrossVariogram:
-    def __init__(self, save_path, length_of_analysis):
-        self.save_path = save_path
-        self.length_of_analysis = length_of_analysis
-        
-
-    def cross_lon_lat(self, deltas, map, days, tolerance):
-        lon_lag_sem = {}
-        lon_lag_sem[0] = deltas
-        for index, day in enumerate(days):
-            lon_lag_sem[day] = [[0]*len(deltas) for _ in range(7)]
-            t = day - 1
-            ori_semi_var_timeseries = [[0] * len(deltas) for _ in range(7)]
-            key_list = sorted(map)
-            
-            for i in range(8 * t, 8 * t + 7):  # change 7 to 6
-                cur_data = map[key_list[i]]
-                next_data = map[key_list[i+1]]
-                coordinates = cur_data[:, :2]
-                cur_values = cur_data[:, 2] - torch.mean(cur_data[:, 2])
-                next_values = next_data[:, 2] - torch.mean(next_data[:, 2])
-                lat_diffs = coordinates[:, None, 0] - coordinates[None, :, 0]
-                lon_diffs = coordinates[:, None, 1] - coordinates[None, :, 1]
-
-                for j, (delta_lat, delta_lon) in enumerate(deltas):
-                    valid_pairs = np.where(
-                        (np.abs(lat_diffs - delta_lat) <= tolerance) & 
-                        (np.abs(lon_diffs - delta_lon) <= tolerance)
-                    )
-            
-                    if len(valid_pairs[0]) == 0:
-                        print(f"No valid pairs found for t{j+1:02d}_{i+1} at delta ({delta_lat}, {delta_lon})")
-                        ori_semi_var_timeseries[i % 8][j] = np.nan
-                        continue
-                    semivariances = 0.5 * torch.mean((cur_values[valid_pairs[1]] - next_values[valid_pairs[0]]) ** 2)
-                    lon_lag_sem[day][i % 8][j] = semivariances.item()
-                    ori_semi_var_timeseries[i % 8][j] = semivariances.item()
-        return lon_lag_sem
-
-
-    def theoretical_gamma_ani_st(self,params, lat_diff, lon_diff, time_diff):
-        # Unpack parameters
-        sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
-        
-        # Calculate the spatial-temporal differences
-        tmp1 = lat_diff - advec_lat * time_diff
-        tmp2 = lon_diff - advec_lon * time_diff
-        tmp3 = beta * time_diff
-        
-        d = tmp1**2/range_lat**2 + tmp2**2/range_lon**2 + tmp3**2
-        
-        # Convert d into a tensor (if it's not already) and compute the semivariogram
-        d = d.clone().detach()
-
-        out = nugget + sigmasq * (1 - torch.exp(- torch.sqrt(d) ) )
-        
-        return torch.sqrt(d), out
-
-    def squared_formatter(self,x, pos):
-        return f'{np.sqrt(x):.2f}'
-    
 class CrossVariogram_emp_theory(CrossVariogram):
-    def __init__(self, save_path, length_of_analysis):
+    def __init__(self, save_path, length_of_analysis, smooth):
         super().__init__(save_path, length_of_analysis)
+        self.smooth = smooth
         
-    def plot_lon_emp_the(self, lon_lag_sem, days, deltas,df):
+    def plot_lon_emp_the(self, lon_lag_sem, days, deltas,df, cov_func):
         fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
         # https://betterfigures.org/2015/06/23/picking-a-colour-scale-for-scientific-graphics/
@@ -490,7 +453,7 @@ class CrossVariogram_emp_theory(CrossVariogram):
             d_values = []
             for delta in deltas2:
             # Calculate theoretical semivariogram for this distance and time lag
-                d, gamma = self.theoretical_gamma_ani_st(params, 0.00001, delta, 1)
+                d, gamma = cov_func(params, 0.00001, delta, 1)
         
                 gamma_values.append(gamma.item()**2)  # Convert tensor to scalar for plotting
                 d_values.append(d.item())
@@ -523,7 +486,7 @@ class CrossVariogram_emp_theory(CrossVariogram):
         plt.show()
 
 
-    def plot_lat_emp_the(self, lon_lag_sem, days, deltas,df):
+    def plot_lat_emp_the(self, lon_lag_sem, days, deltas,df, cov_func):
         fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
         # https://betterfigures.org/2015/06/23/picking-a-colour-scale-for-scientific-graphics/
@@ -568,7 +531,7 @@ class CrossVariogram_emp_theory(CrossVariogram):
             d_values = []
             for delta in deltas2:
             # Calculate theoretical semivariogram for this distance and time lag
-                d, gamma = self.theoretical_gamma_ani_st(params,delta, 0.00001, 1)
+                d, gamma =  cov_func(params,delta, 0.00001, 1)
         
                 gamma_values.append(gamma.item()**2)  # Convert tensor to scalar for plotting
                 d_values.append(d.item())
