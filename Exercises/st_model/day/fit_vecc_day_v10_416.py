@@ -47,8 +47,8 @@ def cli(
 ) -> None:
       
     lat_lon_resolution = [int(s) for s in space[0].split(',')]
-    days_list = [int(s) for s in days[0].split(',')]
-
+    days_s_e = list(map(int, days[0].split(',')))
+    days_list = list(range(days_s_e[0], days_s_e[1]))
 
     rho_lat = lat_lon_resolution[0]
     rho_lon = lat_lon_resolution[1]

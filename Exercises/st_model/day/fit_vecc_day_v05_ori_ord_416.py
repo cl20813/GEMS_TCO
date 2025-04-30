@@ -38,7 +38,8 @@ def cli(
     lr: float = typer.Option(0.01, help="learning rate"),
     step: int = typer.Option(200, help="Number of iterations in optimization"),
     space: List[str] = typer.Option(['20', '20'], help="spatial resolution"),
-    days: List[str] = typer.Option(['20', '20'], help="Number of nearest neighbors in Vecchia approx."),
+    days: List[str] = typer.Option(['0', '31'], help="Number of nearest neighbors in Vecchia approx."),
+    
     mm_cond_number: int = typer.Option(1, help="Number of nearest neighbors in Vecchia approx."),
     params: List[str] = typer.Option(['20', '8.25', '5.25', '.2', '.2', '.05', '5'], help="Initial parameters"),
     ## mm-cond-number should be called in command line
@@ -48,7 +49,12 @@ def cli(
 ) -> None:
       
     lat_lon_resolution = [int(s) for s in space[0].split(',')]
-    days_list = [int(s) for s in days[0].split(',')]
+
+    
+    days_s_e = list(map(int, days[0].split(',')))
+    days_list = list(range(days_s_e[0], days_s_e[1]))
+
+
     # parsed_params = [float(p) for p in params[0].split(',')]
     # params = torch.tensor(parsed_params, requires_grad=True)
 
