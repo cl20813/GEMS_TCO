@@ -44,7 +44,9 @@ def cli(
     step: int = typer.Option(80, help="Number of iterations in optimization"),
     gamma_par: float = typer.Option(0.5, help="decreasing factor for learning rate"),
     space: List[str] = typer.Option(['20', '20'], help="spatial resolution"),
-    days: int = typer.Option(1, help="Number of nearest neighbors in Vecchia approx."),
+    days: List[str] = typer.Option(['0', '31'], help="Number of nearest neighbors in Vecchia approx."),
+    
+    
     mm_cond_number: int = typer.Option(1, help="Number of nearest neighbors in Vecchia approx."),
     params: List[str] = typer.Option(['20', '8.25', '5.25', '.2', '.2', '.05', '5'], help="Initial parameters"),
     ## mm-cond-number should be called in command line
@@ -86,6 +88,12 @@ def cli(
 
     # Set spaital coordinates
     lat_lon_resolution = [int(s) for s in space[0].split(',')]
+
+    
+    days_s_e = list(map(int, days[0].split(',')))
+    days_list = list(range(days_s_e[0], days_s_e[1]))
+
+
     years = ['2024']
     month_range =[7,8]
     
@@ -98,7 +106,7 @@ def cli(
 
     input_path = Path("/home/jl2815/tco/exercise_output/estimates/day/")
     
-    for day in range(days):
+    for day in days_list:
         idx_for_datamap= [8*day,8*(day+1)]
         analysis_data_map, aggregated_data = instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
 
