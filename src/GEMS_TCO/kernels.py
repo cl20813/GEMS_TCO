@@ -280,13 +280,18 @@ class vecchia_experiment(likelihood_function):
             hessian_matrix =  torch.func.hessian(compute_loss_full)(full_params)
             cond_number = torch.linalg.cond(hessian_matrix)
             print(f'cond_number of hessian {cond_number}')
-
+            
         except Exception as e:
             print(f'Error computing Hessian: {e}')
+
+        return hessian_matrix, cond_number
+        ''' 
+
 
         statistic  = torch.matmul(gradient, torch.linalg.solve(hessian_matrix, gradient))
         # print(f' statistic is {statistic}')
         return statistic
+        '''
     
     def cov_structure_saver(self, params: torch.Tensor, covariance_function) -> None:
         
