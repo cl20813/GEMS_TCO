@@ -549,7 +549,7 @@ class CrossVariogram_emp_theory(CrossVariogram):
             ax.set_xticks(x_values)
             ticks = [str(round(x, 1)) for x in x_values]
             ax.set_xticklabels(ticks)
-            ax.set_ylim(1e-4, 3000)
+            ax.set_ylim(1e-4, 670)
             plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
 
             # Add vertical red line at x=0
@@ -598,7 +598,6 @@ class CrossVariogram_emp_theory(CrossVariogram):
             # Separate positive and negative lags and assign appropriate indices
         
             
-
             deltas2 = torch.linspace(-2,2, 40)
             params1 = list(df1.iloc[day - 1][:-1])
             params2 = list(df2.iloc[day - 1][:-1])
