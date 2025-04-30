@@ -21,7 +21,6 @@ from GEMS_TCO import kernels
 from GEMS_TCO import orderings as _orderings 
 from GEMS_TCO import load_data
 from GEMS_TCO import alg_optimization, alg_opt_Encoder
-from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingLR
 
 from typing import Optional, List, Tuple
 from pathlib import Path
@@ -49,10 +48,13 @@ def cli(
       
     lat_lon_resolution = [int(s) for s in space[0].split(',')]
     days_list = [int(s) for s in days[0].split(',')]
-    # parsed_params = [float(p) for p in params[0].split(',')]
-    # params = torch.tensor(parsed_params, requires_grad=True)
+
+
+    rho_lat = lat_lon_resolution[0]
+    rho_lon = lat_lon_resolution[1]
 
     ############################## 
+
     ## load initial estimates 
 
     input_path = "/home/jl2815/tco/exercise_output/estimates/day/saved/"
@@ -81,7 +83,7 @@ def cli(
     # Set spaital coordinates
     years = ['2024']
     month_range =[7,8]
-
+    
     basic_path = "/home/jl2815/tco/data/pickle_data"
     instance = load_data(basic_path)
 
@@ -95,12 +97,17 @@ def cli(
         analysis_data_map, aggregated_data = instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
 
         lenth_of_analysis =idx_for_datamap[1]-idx_for_datamap[0]
-        print(f'2024-07-{day+1}, data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}, smooth: {v}')
+        print(f'2025-07-{day+1}, data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}, smooth: {v}')
         
         params_item = list(df_1250.iloc[day][:-1])
         params = torch.tensor(params_item, dtype=torch.float64, requires_grad=True)
         
         print(f'mm_cond_number {mm_cond_number}, params: {params} ')
+
+        # different approximations 
+        # ey_order = [0,1,2,4,3,5,7,6]
+
+        # reordered_dict, reordered_df = instance.reorder_data(analysis_data_map, key_order)
 
         model_instance = kernels.model_fitting(
                 smooth=v,
@@ -111,26 +118,30 @@ def cli(
                 nheads = nheads 
             )
  
+
         start_time = time.time()
         # optimizer = optim.Adam([params], lr=0.01)  # For Adam
-        optimizer, scheduler = model_instance.optimizer_fun(params, lr=lr, betas=(0.9, 0.99), eps=1e-8, step_size=step, gamma=0.1) 
+        optimizer, scheduler = model_instance.optimizer_fun(params, lr= lr , betas=(0.9, 0.99), eps=1e-8, step_size= step, gamma=0.1)    
 
         instance_map = kernels.vecchia_experiment(0.5, analysis_data_map, aggregated_data, nns_map,mm_cond_number, nheads)
-        cov_map =  instance_map.cov_structure_saver(params, instance_map.matern_cov_anisotropy_v05)   
-        out, epoch = model_instance.run_vecc_ori_order(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, cov_map, epochs=epochs)
+        cov_map =  instance_map.cov_structure_saver(params, model_instance.matern_cov_anisotropy_v15)   
+
+        out, epoch = model_instance.run_vecc_ori_order(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v15, cov_map, epochs=epochs)
+
         end_time = time.time()
         epoch_time = end_time - start_time
-        print(f"2024-07-{day+1}", "vecchia_v05_ori_ord", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
+        print(f"2024-07-{day+1}", "vecchia_v15", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
         
-        input_filepath = input_path / f"vecchia_v05_ori_ord{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
+        input_filepath = input_path / f"vecchia_v15_{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
         
         res = alg_optimization( f"2024-07-{day+1}", "Vecc_contender", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
         loaded_data = res.load(input_filepath)
         loaded_data.append( res.toJSON() )
         res.save(input_filepath,loaded_data)
-        fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'epoch']
 
-        csv_filepath = input_path/f"vecchia_v05_ori_ord{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0])}.csv"
+        fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'epoch']
+        
+        csv_filepath = input_path/f"vecchia_v15_{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0])}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
 if __name__ == "__main__":
