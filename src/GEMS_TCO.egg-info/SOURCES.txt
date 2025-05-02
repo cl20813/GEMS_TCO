@@ -4,7 +4,6 @@ GEMS_TCO/__init__.py
 GEMS_TCO/download_data.py
 GEMS_TCO/evaluate.py
 GEMS_TCO/kernels.py
-GEMS_TCO/kernels_250322_copy.py
 GEMS_TCO/orbitmap.py
 GEMS_TCO/orderings.py
 GEMS_TCO/setup.py
