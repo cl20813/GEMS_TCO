@@ -128,7 +128,7 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
 
         distance, non_zero_indices = self.precompute_coords_anisotropy(params, x,y)
-        out = torch.zeros_like(distance)
+        out = torch.zeros_like(distance, dtype= torch.float64)
         
         # Compute the covariance for non-zero distances
         non_zero_indices = distance != 0
@@ -143,7 +143,6 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         out += torch.eye(out.shape[0], dtype=torch.float64) * nugget
 
         return out
-
 
 
     def matern_cov_anisotropy_spline(self, params: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
