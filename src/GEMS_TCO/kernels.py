@@ -313,7 +313,7 @@ class spline(spatio_temporal_kernels):
         return  neg_log_lik
 
     def compute_full_nll(self, params, cov_matrix): 
-        nll = self.full_likelihood_using_spline(self, params, cov_matrix)
+        nll = self.full_likelihood_using_spline( params, cov_matrix)
         return nll
 
     def optimizer_fun(self, params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=40, gamma=0.5):
@@ -330,15 +330,13 @@ class spline(spatio_temporal_kernels):
             optimizer.zero_grad()  # Zero the gradients 
             
             loss = self.compute_full_nll(params, cov_matrix)
-            loss.backward()  # Backpropagate the loss
-            
+            loss.backward(retain_graph=True)  # Backpropagate the loss
             # Print gradients and parameters every 10th epoch
             if epoch % 10 == 0:
                 print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             # if epoch % 500 == 0:
             #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
-            
             optimizer.step()  # Update the parameters
             scheduler.step()  # Update the learning rate
             # Check for convergence
@@ -350,8 +348,6 @@ class spline(spatio_temporal_kernels):
             prev_loss = loss.item()
         print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
         return params.detach().numpy().tolist() + [ loss.item()], epoch
-
-    
 
 ####################
 
