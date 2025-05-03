@@ -24,6 +24,11 @@ import torch.optim as optim
 import torch.nn as nn
 from scipy.interpolate import splrep, splev
 
+# Fit your "spline" by just storing the x and y
+import torch.nn.functional as F
+from torchcubicspline import natural_cubic_spline_coeffs, NaturalCubicSpline
+
+
 
 import copy    
 import logging     # for logging
@@ -67,7 +72,6 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         distance = (spatial_diff**2 + temporal_diff**2)  # move torch.sqrt to covariance function to track gradients of beta and avec
         return distance
     
-
     def precompute_coords_anisotropy(self, params, y: torch.Tensor, x: torch.Tensor)-> torch.Tensor:
         sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
 
@@ -228,6 +232,125 @@ class likelihood_function(spatio_temporal_kernels):
         neg_log_lik = 0.5 * (log_det + quad_form)
      
         return  neg_log_lik 
+
+class spline(spatio_temporal_kernels):
+    def __init__(self, epsilon, coarse_factor, k, smooth, input_map, aggregated_data, nns_map, mm_cond_number):
+        super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
+        self.smooth = torch.tensor(smooth, dtype= torch.float64)
+        self.k = k
+        self.coarse_factor = coarse_factor
+        self.epsilon = epsilon
+    
+    def fit_cublic_spline(self, params):
+        sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
+        distances, non_zero_indices = self.precompute_coords_anisotropy(params, self.aggregated_data[:,:4], self.aggregated_data[:,:4])
+        
+        flat_distances = distances.flatten()
+        fit_distances = torch.linspace(self.epsilon, torch.max(flat_distances), len(flat_distances) // self.coarse_factor)
+
+        # fit_distances = torch.zeros_like(distances)
+        # print(fit_distances.shape)
+        # Compute the covariance for non-zero distances
+        non_zero_indices = fit_distances != 0
+        out = torch.zeros_like(fit_distances, dtype= torch.float64)
+
+        if torch.any(non_zero_indices):
+            tmp = kv(self.smooth, torch.sqrt(fit_distances[non_zero_indices])).double().clone()
+            out[non_zero_indices] = (1 * (2**(1-self.smooth)) / gamma(self.smooth) *
+                                    (torch.sqrt(fit_distances[non_zero_indices]) ) ** self.smooth *
+                                    tmp)
+        out[~non_zero_indices] = 1
+
+        # print(out.shape)
+        #         
+        # Compute spline coefficients
+        coeffs = natural_cubic_spline_coeffs(fit_distances, out.unsqueeze(1))
+
+        # Create spline object
+        spline = NaturalCubicSpline(coeffs)
+            # Interpolate using the spline
+
+        return spline, distances 
+
+    def interpolate_cubic_spline(self, params, spline, distances):
+        sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
+
+        out = spline.evaluate(distances)
+        out = out.reshape(distances.shape)
+        out *= sigmasq
+        out += torch.eye(out.shape[0], dtype=torch.float64) * nugget 
+
+        return out
+
+    def full_likelihood_using_spline(self, params, cov_matrix):
+
+        input_arr = self.aggregated_data[:,:4] ##  aggregated data over a day.
+        y_arr = self.aggregated_data[:,2] 
+
+        # Compute the log determinant of the covariance matrix
+        sign, log_det = torch.slogdet(cov_matrix)
+        # if sign <= 0:
+        #     raise ValueError("Covariance matrix is not positive definite")
+        
+        # Extract locations
+        locs = input_arr[:, :2]
+
+        # Compute beta
+        tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
+        tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, y_arr))
+        beta = torch.linalg.solve(tmp1, tmp2)
+
+        # Compute the mean
+        mu = torch.matmul(locs, beta)
+        y_mu = y_arr - mu
+
+        # Compute the quadratic form
+        quad_form = torch.matmul(y_mu, torch.linalg.solve(cov_matrix, y_mu))
+
+        # Compute the negative log likelihood
+        neg_log_lik = 0.5 * (log_det + quad_form)
+     
+        return  neg_log_lik
+
+    def compute_full_nll(self, params, cov_matrix): 
+        nll = self.full_likelihood_using_spline(self, params, cov_matrix)
+        return nll
+
+    def optimizer_fun(self, params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=40, gamma=0.5):
+        optimizer = torch.optim.Adam([params], lr=lr, betas=betas, eps=eps)
+        scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)  # Decrease LR by a factor of 0.1 every 10 epochs
+        return optimizer, scheduler
+
+   # use adpating lr
+    def run_full(self, params, optimizer, scheduler,  cov_matrix, epochs=10 ):
+        prev_loss= float('inf')
+
+        tol = 1e-4  # Convergence tolerance
+        for epoch in range(epochs):  # Number of epochs
+            optimizer.zero_grad()  # Zero the gradients 
+            
+            loss = self.compute_full_nll(params, cov_matrix)
+            loss.backward()  # Backpropagate the loss
+            
+            # Print gradients and parameters every 10th epoch
+            if epoch % 10 == 0:
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            # if epoch % 500 == 0:
+            #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            optimizer.step()  # Update the parameters
+            scheduler.step()  # Update the learning rate
+            # Check for convergence
+            if abs(prev_loss - loss.item()) < tol:
+                print(f"Converged at epoch {epoch}")
+                print(f'Epoch {epoch+1}, : Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
+                break
+
+            prev_loss = loss.item()
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
+        return params.detach().numpy().tolist() + [ loss.item()], epoch
+
     
 
 ####################
