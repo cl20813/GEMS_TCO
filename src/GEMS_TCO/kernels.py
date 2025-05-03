@@ -28,7 +28,7 @@ from scipy.interpolate import splrep, splev
 import torch.nn.functional as F
 from torchcubicspline import natural_cubic_spline_coeffs, NaturalCubicSpline
 
-
+from typing import Dict, Any, Callable
 
 import copy    
 import logging     # for logging
@@ -39,13 +39,16 @@ sys.path.append("/cache/home/jl2815/tco")
 log_file_path = '/home/jl2815/tco/exercise_25/st_models/log/fit_st_by_latitude_11_14.log'
 
 class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
-    def __init__(self, smooth, input_map, aggregated_data, nns_map, mm_cond_number):
+    def __init__(self, smooth:float, input_map: Dict[str, Any], aggregated_data: torch.Tesnor, nns_map:Dict[str, Any], mm_cond_number: int):
         # self.smooth = torch.tensor(smooth,dtype=torch.float64 )
         self.smooth = smooth
         self.input_map = input_map
         self.aggregated_data = aggregated_data[:,:4]
         self.aggregated_response = aggregated_data[:,2]
+        self.aggregated_locs = aggregated_data[:,:2]
 
+
+        
         self.key_list = list(input_map.keys())
         self.number_of_timestamps = len(self.key_list)
 
@@ -64,7 +67,7 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         self.nns_map = nns_map
     
     ## The torch.sqrt() is moved to the covariance function to track gradients of beta and avec
-    def custom_distance_matrix(self, U, V):
+    def custom_distance_matrix(self, U:torch.Tensor, V:torch.Tensor):
         # Efficient distance computation with broadcasting
         spatial_diff = torch.norm(U[:, :2].unsqueeze(1) - V[:, :2].unsqueeze(0), dim=2)
 
@@ -72,19 +75,14 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         distance = (spatial_diff**2 + temporal_diff**2)  # move torch.sqrt to covariance function to track gradients of beta and avec
         return distance
     
-    def precompute_coords_anisotropy(self, params, y: torch.Tensor, x: torch.Tensor)-> torch.Tensor:
+    def precompute_coords_anisotropy(self, params:torch.Tensor, y: torch.Tensor, x: torch.Tensor)-> torch.Tensor:
         sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
 
         if y is None or x is None:
             raise ValueError("Both y and x_df must be provided.")
 
-        x1 = x[:, 0]
-        y1 = x[:, 1]
-        t1 = x[:, 3]
-
-        x2 = y[:, 0]
-        y2 = y[:, 1]
-        t2 = y[:, 3]
+        x1, y1, t1 = x[:, 0], x[:, 1], x[:, 3]
+        x2, y2, t2 = y[:, 0], y[:, 1], y[:, 3]
 
         # spat_coord1 = torch.stack((self.x1 , self.y1 - advec * self.t1), dim=-1)
         spat_coord1 = torch.stack(( (x1 - advec_lat * t1)/range_lat, (y1 - advec_lon * t1)/range_lon ), dim=-1)
@@ -196,61 +194,54 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
 
     
 class likelihood_function(spatio_temporal_kernels):
-    def __init__(self, smooth, input_map, aggregated_data, nns_map, mm_cond_number, nheads):
+    def __init__(self, smooth:float, input_map: Dict[str, Any], aggregated_data: torch.Tensor, nns_map: Dict[str, Any], mm_cond_number:int, nheads:int):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
         self.nheads = nheads
-        # Any additional initialization for dignosis class can go here
               
-    def full_likelihood(self,params: torch.Tensor, input_np: torch.Tensor, y: torch.Tensor, covariance_function) -> torch.Tensor:
-        input_arr = input_np[:, :4]  ## input_np is aggregated data over a day.
-        y_arr = y
-
-        # Compute the covariance matrix
-        cov_matrix = covariance_function(params=params, y=input_arr, x=input_arr)
-        
+    def full_likelihood(self,params: torch.Tensor, input_np: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
+   
+        cov_matrix = covariance_function(params=params, y= self.aggregated_data, x= self.aggregated_data)
         # Compute the log determinant of the covariance matrix
         sign, log_det = torch.slogdet(cov_matrix)
         # if sign <= 0:
         #     raise ValueError("Covariance matrix is not positive definite")
         
-        # Extract locations
-        locs = input_arr[:, :2]
-
         # Compute beta
-        tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
-        tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, y_arr))
+        tmp1 = torch.matmul(self.aggregated_locs.T, torch.linalg.solve(cov_matrix, self.aggregated_locs))
+        tmp2 = torch.matmul(self.aggregated_locs.T, torch.linalg.solve(cov_matrix, self.aggregated_response))
         beta = torch.linalg.solve(tmp1, tmp2)
 
         # Compute the mean
-        mu = torch.matmul(locs, beta)
-        y_mu = y_arr - mu
+        mu = torch.matmul(self.aggregated_locs, beta)
+        y_mu = self.aggregated_response - mu
 
         # Compute the quadratic form
         quad_form = torch.matmul(y_mu, torch.linalg.solve(cov_matrix, y_mu))
 
         # Compute the negative log likelihood
         neg_log_lik = 0.5 * (log_det + quad_form)
-     
         return  neg_log_lik 
 
 class spline(spatio_temporal_kernels):
-    def __init__(self, epsilon, coarse_factor, k, smooth, input_map, aggregated_data, nns_map, mm_cond_number):
+    def __init__(self, epsilon:float, coarse_factor:int, k:int, smooth:float, input_map: Dict[str, Any], aggregated_data:torch.Tensor, nns_map: Dict[str, Any], mm_cond_number:int):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
         self.smooth = torch.tensor(smooth, dtype= torch.float64)
         self.k = k
         self.coarse_factor = coarse_factor
         self.epsilon = epsilon
     
-    def fit_cublic_spline(self, params):
-        sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
-        distances, non_zero_indices = self.precompute_coords_anisotropy(params, self.aggregated_data[:,:4], self.aggregated_data[:,:4])
-        
-        flat_distances = distances.flatten()
-        fit_distances = torch.linspace(self.epsilon, torch.max(flat_distances), len(flat_distances) // self.coarse_factor)
+    def fit_cubic_spline(self, params: torch.Tensor):
+        """
+        Fit a natural cubic spline coefficients.
 
-        # fit_distances = torch.zeros_like(distances)
-        # print(fit_distances.shape)
-        # Compute the covariance for non-zero distances
+        Args:
+            params (tuple): Parameters for the spline fitting.
+
+        Returns:
+            NaturalCubicSpline: The fitted spline object with coefficients.
+        """
+        #  fit_distances should be 1 d array to be used in natural_cubic_spline_coeffs
+        fit_distances = torch.linspace(self.epsilon, self.max_distance, self.max_distance_len// self.coarse_factor)
         non_zero_indices = fit_distances != 0
         out = torch.zeros_like(fit_distances, dtype= torch.float64)
 
@@ -261,48 +252,52 @@ class spline(spatio_temporal_kernels):
                                     tmp)
         out[~non_zero_indices] = 1
 
-        # print(out.shape)
-        #         
-        # Compute spline coefficients
+        # Compute spline coefficients. If input is tensor, so is output.
+        # natural_cubic_spline_coeffs(t,x), t should be 1-d array (n,) and x should be (n,channels)
+        # where channels reoresent number of features. out.unsquueze(1) makes (n,1).
         coeffs = natural_cubic_spline_coeffs(fit_distances, out.unsqueeze(1))
-
+        
         # Create spline object
         spline = NaturalCubicSpline(coeffs)
-            # Interpolate using the spline
+        return spline
 
-        return spline, distances 
+    def interpolate_cubic_spline(self, params:torch.Tensor, distances:torch.Tensor):
+    
+        """
+        Interpolate using the fitted cubic spline.
 
-    def interpolate_cubic_spline(self, params, spline, distances):
-        sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
+        Args:
+            params (tuple): Parameters for the interpolation.
+            distances (torch.Tensor): Distances to interpolate.
 
-        out = spline.evaluate(distances)
-        out = out.reshape(distances.shape)
-        out *= sigmasq
-        out += torch.eye(out.shape[0], dtype=torch.float64) * nugget 
+        Returns:
+            torch.Tensor: Interpolated values.
+        """
+        sigmasq, _, _, _, _, _, nugget = params
 
-        return out
+        cov_1d = self.spline_object.evaluate(distances)
+        cov_matrix = cov_1d.reshape(distances.shape)
+        cov_matrix = cov_matrix * sigmasq
+        cov_matrix = cov_matrix + torch.eye(cov_matrix.shape[0], dtype=torch.float64) * nugget 
 
-    def full_likelihood_using_spline(self, params, cov_matrix):
+        return cov_matrix
 
-        input_arr = self.aggregated_data[:,:4] ##  aggregated data over a day.
-        y_arr = self.aggregated_data[:,2] 
+    def full_likelihood_using_spline(self, params:torch.Tensor, distances:torch.Tensor):
 
+        cov_matrix = self.interpolate_cubic_spline(params, distances)
         # Compute the log determinant of the covariance matrix
         sign, log_det = torch.slogdet(cov_matrix)
         # if sign <= 0:
         #     raise ValueError("Covariance matrix is not positive definite")
-        
-        # Extract locations
-        locs = input_arr[:, :2]
 
         # Compute beta
-        tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
-        tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, y_arr))
+        tmp1 = torch.matmul(self.aggregated_locs.T, torch.linalg.solve(cov_matrix, self.aggregated_locs))
+        tmp2 = torch.matmul(self.aggregated_locs.T, torch.linalg.solve(cov_matrix, self.aggregated_response))
         beta = torch.linalg.solve(tmp1, tmp2)
 
         # Compute the mean
-        mu = torch.matmul(locs, beta)
-        y_mu = y_arr - mu
+        mu = torch.matmul(self.aggregated_locs, beta)
+        y_mu = self.aggregated_response - mu
 
         # Compute the quadratic form
         quad_form = torch.matmul(y_mu, torch.linalg.solve(cov_matrix, y_mu))
@@ -312,26 +307,41 @@ class spline(spatio_temporal_kernels):
      
         return  neg_log_lik
 
-    def compute_full_nll(self, params, cov_matrix): 
-        nll = self.full_likelihood_using_spline( params, cov_matrix)
+    def compute_full_nll(self, params:torch.Tensor, distances:torch.Tensor): 
+        nll = self.full_likelihood_using_spline( params, distances)
         return nll
 
-    def optimizer_fun(self, params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=40, gamma=0.5):
+    def optimizer_fun(self, params:torch.Tensor, lr:float =0.01, betas: tuple=(0.9, 0.8), eps:float=1e-8, step_size:int=40, gamma:float=0.5):
         optimizer = torch.optim.Adam([params], lr=lr, betas=betas, eps=eps)
         scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)  # Decrease LR by a factor of 0.1 every 10 epochs
         return optimizer, scheduler
 
-   # use adpating lr
-    def run_full(self, params, optimizer, scheduler,  cov_matrix, epochs=10 ):
-        prev_loss= float('inf')
+    def run_full(self, params:torch.Tensor, optimizer:torch.optim.Optimizer, scheduler:torch.optim.lr_scheduler, epochs:int=10 ):
 
-        tol = 1e-4  # Convergence tolerance
-        for epoch in range(epochs):  # Number of epochs
+        """
+        Run the training loop for the full likelihood model.
+
+        Args:
+            params (torch.Tensor): Model parameters.
+            optimizer (torch.optim.Optimizer): Optimizer for updating parameters.
+            scheduler (torch.optim.lr_scheduler): Learning rate scheduler.
+            epochs (int): Number of epochs to train.
+
+        Returns:
+            list: Final parameters and loss.
+            int: Number of epochs run.
+        """
+        prev_loss= float('inf')
+        # 1e-3: Faster convergence, slightly lower accuracy than 1e-4
+        tol = 1e-3  # Convergence tolerance
+        for epoch in range(epochs):  
             optimizer.zero_grad()  # Zero the gradients 
+            distances, non_zero_indices = self.precompute_coords_anisotropy(params, self.aggregated_data[:,:4], self.aggregated_data[:,:4])
             
-            loss = self.compute_full_nll(params, cov_matrix)
-            loss.backward(retain_graph=True)  # Backpropagate the loss
-            # Print gradients and parameters every 10th epoch
+            loss = self.compute_full_nll(params, distances)
+            loss.backward()  # Backpropagate the loss
+
+            # Gradient and Parameter Logging for every 10th epoch
             if epoch % 10 == 0:
                 print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
@@ -339,20 +349,22 @@ class spline(spatio_temporal_kernels):
             #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             optimizer.step()  # Update the parameters
             scheduler.step()  # Update the learning rate
-            # Check for convergence
+
+            # Convergence Check
             if abs(prev_loss - loss.item()) < tol:
                 print(f"Converged at epoch {epoch}")
                 print(f'Epoch {epoch+1}, : Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
                 break
 
             prev_loss = loss.item()
+
         print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
         return params.detach().numpy().tolist() + [ loss.item()], epoch
 
 ####################
 
 class vecchia_experiment(likelihood_function):
-    def __init__(self, smooth, input_map, aggregated_data, nns_map, mm_cond_number, nheads):
+    def __init__(self, smooth:float, input_map :Dict[str,Any], aggregated_data: torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number, nheads)
      
 
@@ -411,7 +423,7 @@ class vecchia_experiment(likelihood_function):
         return statistic
         '''
     
-    def cov_structure_saver(self, params: torch.Tensor, covariance_function) -> None:
+    def cov_structure_saver(self, params: torch.Tensor, covariance_function: Callable) -> None:
         
         cov_map = defaultdict(lambda: defaultdict(dict))
         cut_line= self.nheads
@@ -485,7 +497,7 @@ class vecchia_experiment(likelihood_function):
                 }
         return cov_map
 
-    def vecchia_reorder(self, params: torch.Tensor, covariance_function, cov_map) -> torch.Tensor:
+    def vecchia_reorder(self, params: torch.Tensor, covariance_function: Callable, cov_map:Dict[str,Any]) -> torch.Tensor:
 
         cut_line= self.nheads
         key_list = list(self.input_map.keys())
@@ -559,7 +571,7 @@ class vecchia_experiment(likelihood_function):
         return neg_log_lik
   
 
-    def vecchia_ori_order(self, params: torch.Tensor, covariance_function, cov_map) -> torch.Tensor:
+    def vecchia_ori_order(self, params: torch.Tensor, covariance_function: Callable, cov_map:Dict[str,Any]) -> torch.Tensor:
 
         cut_line= self.nheads
         key_list = list(self.input_map.keys())
@@ -641,7 +653,7 @@ class vecchia_experiment(likelihood_function):
 
     
 class model_fitting(vecchia_experiment): 
-    def __init__(self, smooth, input_map, aggregated_data, nns_map, mm_cond_number, nheads):
+    def __init__(self, smooth:float, input_map:Dict[str,Any], aggregated_data:torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number, nheads)
      
     # Example function to compute out1
