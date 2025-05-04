@@ -39,7 +39,7 @@ sys.path.append("/cache/home/jl2815/tco")
 log_file_path = '/home/jl2815/tco/exercise_25/st_models/log/fit_st_by_latitude_11_14.log'
 
 class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
-    def __init__(self, smooth:float, input_map: Dict[str, Any], aggregated_data: torch.Tesnor, nns_map:Dict[str, Any], mm_cond_number: int):
+    def __init__(self, smooth:float, input_map: Dict[str, Any], aggregated_data: torch.Tensor, nns_map:Dict[str, Any], mm_cond_number: int):
         # self.smooth = torch.tensor(smooth,dtype=torch.float64 )
         self.smooth = smooth
         self.input_map = input_map

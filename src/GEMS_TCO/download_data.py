@@ -15,12 +15,9 @@ class Download_file:
         
         self.output_folder = f'D:\\GEMS_UNZIPPED\\{self.year}{self.month:02d}{self.days[0]:02d}{self.days[-1]:02d}' if len(self.days) > 1 else f'D:\\GEMS_UNZIPPED\\{self.year}{self.month:02d}{self.days[0]:02d}'
 
-       
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder)
 
-
-    # 파일 다운로드 함수
     def download_file(self, url, file_name):
         response = requests.get(url, stream=True)
         if response.status_code == 200:
@@ -35,6 +32,5 @@ class Download_file:
     def run(self):
         for date in self.dates:
             url = f'{self.base_url}?date={date}&key={self.api_key}'
-            file_name = f'{date[:8]}_{date[8:]}.nc'  # 저장할 파일 이름 (확장자는 실제 API의 파일 형식에 맞게 변경)
-            print(f"Downloading data for {date}...")
+            file_name = f'{date[:8]}_{date[8:]}.nc'  # name of the file to be saved
             self.download_file(url, file_name)

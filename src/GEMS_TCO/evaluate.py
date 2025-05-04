@@ -102,11 +102,6 @@ class diagnosis(spatio_temporal_kernels):
         return res
     
 
-
-
-
-
-
 class CrossVariogram:
     def __init__(self, save_path, length_of_analysis):
         self.save_path = save_path
@@ -187,7 +182,6 @@ class CrossVariogram:
                     filtered_lat_diffs = lat_diffs*direction_filtered
                     filtered_lon_diffs = lon_diffs*direction_filtered
 
-            
                     # Check if we have valid filtered lat/lon diffs
                     # print(filtered_lat_diffs,filtered_lat_diffs.shape)  # Check the filtered lat diffs before the comparison
 
