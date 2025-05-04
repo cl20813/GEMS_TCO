@@ -8,7 +8,9 @@ Go to terminal in VSCode.
 ```conda install pybind11```      # comfile c++ file       
 ```conda install numpy pandas matplotlib seaborn scikit-learn ```         
 ```conda install pytorch::pytorch torchvision torchaudio -c pytorch```     
-``` pip install typer```   conda manages dependencies for a wide range of software, not just Python packages. This can sometimes lead to conflicts or delays in updating packages. pip
+``` pip install typer```   conda manages dependencies for a wide range of software, not just Python packages. This can sometimes lead to conflicts or delays in updating packages. pip   
+Also I need to install torch spline library.   
+``` pip install git+https://github.com/patrick-kidger/torchcubicspline.git ```   
 
 ### Install gems_tco packge on my macbook. 
 ```cd /Users/joonwonlee/Documents/GEMS_TCO-1/src```    
