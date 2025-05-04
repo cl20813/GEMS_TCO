@@ -55,20 +55,20 @@ def cli(
 ) -> None:
     ############################## 
 
-    ## load initial estimates 
-    data_load_instance = load_data(config.amarel_data_load_path)
-    estimates_df = data_load_instance.read_pickle(config.amarel_estimates_day_path,config.amarel_full_day_v05_pickle)
-    map, ord_mm, nns_map= data_load_instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
-
-    # Set spaital coordinates
+    # initialization
     lat_lon_resolution = [int(s) for s in space[0].split(',')]
     days_s_e = list(map(int, days[0].split(',')))
     days_list = list(range(days_s_e[0], days_s_e[1]))
     years = ['2024']
     month_range =[7,8]
-    
-
     output_path = input_path = Path(config.amarel_estimates_day_path)
+
+    ## load initial estimates 
+    data_load_instance = load_data(config.amarel_data_load_path)
+    estimates_df = data_load_instance.read_pickle(config.amarel_estimates_day_path,config.amarel_full_day_v05_pickle)
+    df_map, ord_mm, nns_map= data_load_instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
+
+
 
     for day in days_list:
         params = list(estimates_df.iloc[day-1][:-1])
@@ -77,7 +77,7 @@ def cli(
         print(f'mm_cond_number: {mm_cond_number},\ninitial parameters: \n {params}')
                 
         idx_for_datamap= [8*day,8*(day+1)]
-        analysis_data_map, aggregated_data = data_load_instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap= idx_for_datamap)
+        analysis_data_map, aggregated_data = data_load_instance.load_working_data_byday( df_map, ord_mm, nns_map, idx_for_datamap= idx_for_datamap)
 
         spline_instance = kernels.spline(
                 epsilon = 1e-17, 
