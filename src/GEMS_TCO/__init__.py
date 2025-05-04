@@ -10,6 +10,10 @@ from pathlib import Path
 import json
 from json import JSONEncoder
 import csv
+from typing import List, Tuple, Dict, Any
+
+
+
 
 
 gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
@@ -23,15 +27,62 @@ from GEMS_TCO import orderings as _orderings
 
 ###
 
+
+
 class load_data:
     def __init__(self, datapath):
         self.datapath = datapath
     
-    def load_mm20k_data_bymonthyear(self, lat_lon_resolution= [10,10], mm_cond_number=10, years_=['2024'], months_=[7,8]):
+    def read_pickle(self,folder_path, filename):
+        input_filepath = os.path.join(folder_path, filename)
+        # Load pickle
+        with open(input_filepath, 'rb') as pickle_file:
+            df_map = pickle.load(pickle_file)
+        df = pd.DataFrame()
+        for key in df_map:
+            tmp = pd.DataFrame(df_map[key][0].reshape(1, -1), columns=['sigmasq', 'range_lat', 'range_lon', 'advec_lat', 'advec_lon', 'beta', 'nugget'])
+            tmp['loss'] = df_map[key][1]
+            df = pd.concat((df, tmp), axis=0)
 
-        ## Load the one dictionary to set spaital coordinates
-        # filepath = "C:/Users/joonw/TCO/GEMS_data/data_2023/sparse_cen_map23_01.pkl"
-        filepath =  Path(self.datapath) / "pickle_2023/coarse_cen_map23_01.pkl"
+        date_range = pd.date_range(start='07-01-24', end='07-31-24')
+    
+        # Ensure the number of dates matches the number of rows in df_1250
+        if len(date_range) == len(df):
+            df.index = date_range
+        else:
+            print("The number of dates does not match the number of rows in the DataFrame.")
+
+        # Save DataFrame to CSV
+        output_filename = 'full_estimates_1250_july24.csv'
+        output_csv_path = os.path.join(folder_path, output_filename)
+        df.to_csv(output_csv_path, index=False)
+
+        return df
+
+    def load_mm20k_data_bymonthyear(
+        self, 
+        lat_lon_resolution: List[int] = [10, 10], 
+        mm_cond_number: int = 10, 
+        years_: List[str] = ['2024'], 
+        months_: List[int] = [7, 8]
+    ) -> Tuple[Dict[str, pd.DataFrame], np.ndarray, np.ndarray]:
+        """
+        Load and process data by month and year.
+
+        Parameters:
+        - lat_lon_resolution (List[int]): Resolution for latitude and longitude. Default is [10, 10].
+        - mm_cond_number (int): Maximum number of nearest neighbors. Default is 10.
+        - years_ (List[str]): List of years to process. Default is ['2024'].
+        - months_ (List[int]): List of months to process. Default is [7, 8].
+
+        Returns:
+        - Tuple[Dict[str, pd.DataFrame], np.ndarray, np.ndarray]: 
+            - coarse_dicts: Dictionary of processed dataframes.
+            - ord_mm: Array of ordered indices.
+            - nns_map: Array of nearest neighbors.
+        """
+        # Load the dictionary to set spatial coordinates
+        filepath = Path(self.datapath) / "pickle_2023/coarse_cen_map23_01.pkl"
         
         with open(filepath, 'rb') as pickle_file:
             coarse_dict_24_1 = pickle.load(pickle_file)
@@ -51,7 +102,6 @@ class load_data:
         years = years_
         for year in years:
             for month in range(months_[0], months_[1]):  # Iterate over all months
-                # filepath = f"C:/Users/joonw/TCO/GEMS_data/data_{year}/sparse_cen_map{year[2:]}_{month:02d}.pkl"
                 filepath = Path(self.datapath) / f"pickle_{year}/coarse_cen_map{year[2:]}_{month:02d}.pkl"
                 with open(filepath, 'rb') as pickle_file:
                     loaded_map = pickle.load(pickle_file)
@@ -64,48 +114,65 @@ class load_data:
         if not key_idx:
             raise ValueError("coarse_dicts is empty")
 
-        # extract first hour data because all data shares the same spatial grid
+        # Extract first hour data because all data shares the same spatial grid
         data_for_coord = coarse_dicts[key_idx[0]]
         x1 = data_for_coord['Longitude'].values
         y1 = data_for_coord['Latitude'].values 
         coords1 = np.stack((x1, y1), axis=-1)
 
-        # instance = orbitmap.MakeOrbitdata(data_for_coord, lat_s=5, lat_e=10, lon_s=110, lon_e=120)
-        # s_dist = cdist(coords1, coords1, 'euclidean')
-        # ord_mm, _ = instance.maxmin_naive(s_dist, 0)
-
         ord_mm = _orderings.maxmin_cpp(coords1)
         data_for_coord = data_for_coord.iloc[ord_mm].reset_index(drop=True)
         coords1_reordered = np.stack((data_for_coord['Longitude'].values, data_for_coord['Latitude'].values), axis=-1)
-        # nns_map = instance.find_nns_naive(locs=coords1_reordered, dist_fun='euclidean', max_nn=mm_cond_number)
-        nns_map=_orderings.find_nns_l2(locs= coords1_reordered  ,max_nn = mm_cond_number)
+        nns_map = _orderings.find_nns_l2(locs=coords1_reordered, max_nn=mm_cond_number)
         return coarse_dicts, ord_mm, nns_map
 
-    def load_working_data_byday(self, coarse_dicts,  ord_mm, nns_map, idx_for_datamap=[0,8]):
+
+    def load_working_data_byday(
+        self, 
+        coarse_dicts: Dict[str, pd.DataFrame],  
+        ord_mm: np.ndarray, 
+        nns_map: np.ndarray, 
+        idx_for_datamap: List[int] = [0, 8]
+    ) -> Tuple[Dict[str, torch.Tensor], torch.Tensor]:
+        """
+        Load and process working data by day.
+
+        Parameters:
+        - coarse_dicts (Dict[str, pd.DataFrame]): Dictionary of processed dataframes.
+        - ord_mm (np.ndarray): Array of ordered indices.
+        - nns_map (np.ndarray): Array of nearest neighbors.
+        - idx_for_datamap (List[int]): Indices for the data map. Default is [0, 8].
+
+        Returns:
+        - Tuple[Dict[str, torch.Tensor], torch.Tensor]: 
+            - analysis_data_map: Dictionary of tensors for analysis.
+            - aggregated_data: Aggregated tensor data.
+        """
         key_idx = sorted(coarse_dicts)
         if not key_idx:
             raise ValueError("coarse_dicts is empty")
+        
         analysis_data_map = {}
-        for i in range(idx_for_datamap[0],idx_for_datamap[1]):
+        for i in range(idx_for_datamap[0], idx_for_datamap[1]):
             tmp = coarse_dicts[key_idx[i]].copy()
-            tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed']-477700)
+            tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'] - 477700)
             tmp = tmp.iloc[ord_mm, :4].to_numpy()  # reorder the data
             tmp = torch.from_numpy(tmp).double()
             analysis_data_map[key_idx[i]] = tmp
 
         aggregated_data = pd.DataFrame()
-        for i in range(idx_for_datamap[0],idx_for_datamap[1]):
+        for i in range(idx_for_datamap[0], idx_for_datamap[1]):
             tmp = coarse_dicts[key_idx[i]].copy()
-            tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed']-477700)
+            tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'] - 477700)
             tmp = tmp.iloc[ord_mm].reset_index(drop=True)  
             aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
 
         aggregated_data = aggregated_data.iloc[:, :4].to_numpy()
-        #aggregated_data = torch.from_numpy(aggregated_data).float() 
         aggregated_data = torch.from_numpy(aggregated_data).double()
 
         return analysis_data_map, aggregated_data
 
+    ## maybe I should delete reorder_data someday
 
     def reorder_data(self, analysis_data_map, key_order):
         # key_order = [0, 1, 2, 4, 3, 5, 7, 6]
@@ -130,8 +197,31 @@ class load_data:
         return reordered_dict, reordered_df
 
 
+    def load_working_data_by_quarterday(
+        self, 
+        coarse_dicts: Dict[str, pd.DataFrame], 
+        ord_mm: np.ndarray, 
+        nns_map: np.ndarray, 
+        which_group: int, 
+        qrt_idx: int, 
+        avg_days: int
+    ) -> Tuple[Dict[str, torch.Tensor], torch.Tensor]:
+        """
+        Load and process working data by quarter day.
 
-    def load_working_data_by_quarterday(self, coarse_dicts, ord_mm, nns_map, which_group, qrt_idx, avg_days):
+        Parameters:
+        - coarse_dicts (Dict[str, pd.DataFrame]): Dictionary of processed dataframes.
+        - ord_mm (np.ndarray): Array of ordered indices.
+        - nns_map (np.ndarray): Array of nearest neighbors.
+        - which_group (int): Group index to process.
+        - qrt_idx (int): Quarter index (1, 2, 3, 4).
+        - avg_days (int): Number of days to average.
+
+        Returns:
+        - Tuple[Dict[str, torch.Tensor], torch.Tensor]: 
+            - analysis_data_map: Dictionary of tensors for analysis.
+            - entire_data: Aggregated tensor data.
+        """
         keys = sorted(coarse_dicts)
         if not keys:
             raise ValueError("coarse_dicts is empty")
@@ -141,7 +231,7 @@ class load_data:
         entire_data = []
 
         # qrt_idx takes 1, 2, 3, 4 for 4 quarters
-        for i in range(which_group-1, which_group ):
+        for i in range(which_group - 1, which_group):
             idx_quarter = [[avg_idx * i + 8 * j + 2 * (qrt_idx - 1), avg_idx * i + 8 * j + (2 * qrt_idx - 1)] for j in range(avg_days)]
             idx_quarter = [item for sublist in idx_quarter for item in sublist]
 
@@ -152,7 +242,7 @@ class load_data:
                 tmp['new_key'] = key_idx % 8
                 aggregated_data.append(tmp)
                 
-                tmp = tmp.iloc[ord_mm, [0,1,2,3,5]  ].to_numpy()
+                tmp = tmp.iloc[ord_mm, [0, 1, 2, 3, 5]].to_numpy()
                 tmp = torch.from_numpy(tmp).double()
                 analysis_data_map[f'unit_{i}_quarter_{key_idx % 8}'] = tmp
 
@@ -160,7 +250,7 @@ class load_data:
             aggregated_data = aggregated_data[['Latitude', 'Longitude', 'ColumnAmountO3', 'new_key']].groupby(['Latitude', 'Longitude', 'new_key']).mean().reset_index()
             aggregated_data['quarter'] = qrt_idx
         
-            aggregated_data = aggregated_data.iloc[:, :5 ].to_numpy()
+            aggregated_data = aggregated_data.iloc[:, :5].to_numpy()
             aggregated_data = torch.from_numpy(aggregated_data).double()
             entire_data.append(aggregated_data)
 
@@ -168,9 +258,22 @@ class load_data:
         entire_data = entire_data[:, [0, 1, 3, 2]]
         return analysis_data_map, entire_data
 
-    
+
 class alg_optimization:
-    def __init__(self,  day, cov_name, lat_lon_resolution, lr, stepsize, params, time, epoch):
+    def __init__(self, day: int, cov_name: str, lat_lon_resolution: List[int], lr: float, stepsize: float, params: List[float], time: float, epoch: int):
+        """
+        Initialize the optimization algorithm parameters.
+
+        Parameters:
+        - day (int): Day of the optimization.
+        - cov_name (str): Name of the covariance model.
+        - lat_lon_resolution (List[int]): Resolution for latitude and longitude.
+        - lr (float): Learning rate.
+        - stepsize (float): Step size for the optimization.
+        - params (List[float]): List of parameters for the model.
+        - time (float): Time parameter.
+        - epoch (int): Number of epochs.
+        """
         self.day = day
         self.cov_name = cov_name
         self.lat_lon_resolution = lat_lon_resolution
@@ -186,15 +289,37 @@ class alg_optimization:
         self.loss = params[7]
         self.time = time
         self.epoch = epoch
-    def toJSON(self):
+
+    def toJSON(self) -> str:
+        """
+        Convert the object to a JSON string.
+
+        Returns:
+        - str: JSON representation of the object.
+        """
         return json.dumps(self, cls=alg_opt_Encoder, sort_keys=False)
 
-    def save(self, input_filepath, data):
-        # Save the aggregated data back to the JSON file
+    def save(self, input_filepath: Path, data: Any) -> None:
+        """
+        Save the aggregated data back to the JSON file.
+
+        Parameters:
+        - input_filepath (Path): Path to the JSON file.
+        - data (Any): Data to be saved.
+        """
         with input_filepath.open('w', encoding='utf-8') as json_file:
             json_file.write(json.dumps(data, separators=(",", ":"), indent=4))
 
-    def load(self, input_filepath):
+    def load(self, input_filepath: Path) -> Any:
+        """
+        Load data from a JSON file.
+
+        Parameters:
+        - input_filepath (Path): Path to the JSON file.
+
+        Returns:
+        - Any: Loaded data.
+        """
         try:
             with input_filepath.open('r', encoding='utf-8') as f:
                 loaded_data = json.load(f)
@@ -202,25 +327,54 @@ class alg_optimization:
             loaded_data = []
         return loaded_data
     
-    def tocsv(self, jsondata, fieldnames, csv_filepath):
+    def tocsv(self, jsondata: List[str], fieldnames: List[str], csv_filepath: Path) -> None:
+        """
+        Convert JSON data to CSV format.
+
+        Parameters:
+        - jsondata (List[str]): List of JSON strings.
+        - fieldnames (List[str]): List of field names for the CSV.
+        - csv_filepath (Path): Path to the CSV file.
+        """
         data_dicts = [json.loads(data) for data in jsondata]
-        # convert json string into dictionary list
-        fieldnames = fieldnames
-        with open(csv_filepath, mode='w', newline='') as file:
+        with csv_filepath.open(mode='w', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=fieldnames)
             writer.writeheader()
             for data in data_dicts:
                 writer.writerow(data)
+                
 
 class alg_opt_Encoder(JSONEncoder):
-    def default(self, o):
+    """
+    Custom JSON encoder for alg_optimization objects.
+    """
+    def default(self, o: Any) -> Dict[str, Any]:
+        """
+        Override the default method to handle alg_optimization objects.
+
+        Parameters:
+        - o (Any): Object to be encoded.
+
+        Returns:
+        - Dict[str, Any]: Dictionary representation of the object.
+        """
         if isinstance(o, alg_optimization):
             return o.__dict__
         return super().default(o)  # delegates the serialization process to the standard JSONEncoder
 
 
 class likelihood_comparison:
-    def __init__(self,  day, cov_name, lat_lon_resolution, params, time):
+    def __init__(self, day: int, cov_name: str, lat_lon_resolution: List[int], params: List[float], time: float):
+        """
+        Initialize the likelihood comparison parameters.
+
+        Parameters:
+        - day (int): Day of the comparison.
+        - cov_name (str): Name of the covariance model.
+        - lat_lon_resolution (List[int]): Resolution for latitude and longitude.
+        - params (List[float]): List of parameters for the model.
+        - time (float): Time parameter.
+        """
         self.day = day
         self.cov_name = cov_name
         self.lat_lon_resolution = lat_lon_resolution
@@ -235,15 +389,36 @@ class likelihood_comparison:
         self.loss = params[7]
         self.time = time
    
-    def toJSON(self):
-        return json.dumps(self, cls= likelihood_comp_Encoder, sort_keys=False)
+    def toJSON(self) -> str:
+        """
+        Convert the object to a JSON string.
 
-    def save(self, input_filepath, data):
-        # Save the aggregated data back to the JSON file
+        Returns:
+        - str: JSON representation of the object.
+        """
+        return json.dumps(self, cls=likelihood_comp_Encoder, sort_keys=False)
+
+    def save(self, input_filepath: Path, data: Any) -> None:
+        """
+        Save the aggregated data back to the JSON file.
+
+        Parameters:
+        - input_filepath (Path): Path to the JSON file.
+        - data (Any): Data to be saved.
+        """
         with input_filepath.open('w', encoding='utf-8') as json_file:
             json_file.write(json.dumps(data, separators=(",", ":"), indent=4))
 
-    def load(self, input_filepath):
+    def load(self, input_filepath: Path) -> Any:
+        """
+        Load data from a JSON file.
+
+        Parameters:
+        - input_filepath (Path): Path to the JSON file.
+
+        Returns:
+        - Any: Loaded data.
+        """
         try:
             with input_filepath.open('r', encoding='utf-8') as f:
                 loaded_data = json.load(f)
@@ -251,21 +426,34 @@ class likelihood_comparison:
             loaded_data = []
         return loaded_data
     
-    def tocsv(self, jsondata, fieldnames, csv_filepath):
+    def tocsv(self, jsondata: List[str], fieldnames: List[str], csv_filepath: Path) -> None:
+        """
+        Convert JSON data to CSV format.
+
+        Parameters:
+        - jsondata (List[str]): List of JSON strings.
+        - fieldnames (List[str]): List of field names for the CSV.
+        - csv_filepath (Path): Path to the CSV file.
+        """
         data_dicts = [json.loads(data) for data in jsondata]
-        # convert json string into dictionary list
-        fieldnames = fieldnames
-        with open(csv_filepath, mode='w', newline='') as file:
+        with csv_filepath.open(mode='w', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=fieldnames)
             writer.writeheader()
             for data in data_dicts:
                 writer.writerow(data)
 
 class likelihood_comp_Encoder(JSONEncoder):
-    def default(self, o):
+    def default(self, o: Any) -> Dict[str, Any]:
+        """
+        Custom JSON encoder for likelihood_comparison objects.
+
+        Parameters:
+        - o (Any): Object to be encoded.
+
+        Returns:
+        - Dict[str, Any]: Dictionary representation of the object.
+        """
         if isinstance(o, likelihood_comparison):
             return o.__dict__
         return super().default(o)  # delegates the serialization process to the standard JSONEncoder
 
-if __name__ == "__main__": 
-    pass
