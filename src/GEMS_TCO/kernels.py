@@ -27,7 +27,6 @@ from scipy.interpolate import splrep, splev
 # Fit your "spline" by just storing the x and y
 import torch.nn.functional as F
 from torchcubicspline import natural_cubic_spline_coeffs, NaturalCubicSpline
-
 from typing import Dict, Any, Callable
 
 import copy    
@@ -47,11 +46,8 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         self.aggregated_response = aggregated_data[:,2]
         self.aggregated_locs = aggregated_data[:,:2]
 
-
-        
         self.key_list = list(input_map.keys())
         self.number_of_timestamps = len(self.key_list)
-
         sample_df = input_map[self.key_list[0]]
 
         self.size_per_hour = len(sample_df)
@@ -70,7 +66,6 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
     def custom_distance_matrix(self, U:torch.Tensor, V:torch.Tensor):
         # Efficient distance computation with broadcasting
         spatial_diff = torch.norm(U[:, :2].unsqueeze(1) - V[:, :2].unsqueeze(0), dim=2)
-
         temporal_diff = torch.abs(U[:, 2].unsqueeze(1) - V[:, 2].unsqueeze(0))
         distance = (spatial_diff**2 + temporal_diff**2)  # move torch.sqrt to covariance function to track gradients of beta and avec
         return distance
@@ -95,7 +90,6 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         non_zero_indices = distance != 0
         return distance, non_zero_indices
  
-
     def matern_cov_anisotropy_v05(self,params: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
         
@@ -114,7 +108,6 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
     def matern_cov_anisotropy_v15(self,params: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
         
-
         distance, non_zero_indices = self.precompute_coords_anisotropy(params, x,y)
         out = torch.zeros_like(distance)
 
@@ -143,7 +136,6 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
 
         # Add a small jitter term to the diagonal for numerical stability
         out += torch.eye(out.shape[0], dtype=torch.float64) * nugget
-
         return out
 
 
@@ -156,7 +148,6 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         coarse_factor = 4  # Increase coarse_factor to reduce the number of points
         flat_distances = distance.flatten()
 
-     
         x2 = x[::(coarse_factor)]
         y2 = y[::(coarse_factor)]
         print( x.shape, y.shape)
@@ -191,8 +182,6 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         return spline_values
 
 
-
-    
 class likelihood_function(spatio_temporal_kernels):
     def __init__(self, smooth:float, input_map: Dict[str, Any], aggregated_data: torch.Tensor, nns_map: Dict[str, Any], mm_cond_number:int, nheads:int):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
@@ -205,7 +194,7 @@ class likelihood_function(spatio_temporal_kernels):
         sign, log_det = torch.slogdet(cov_matrix)
         # if sign <= 0:
         #     raise ValueError("Covariance matrix is not positive definite")
-        
+
         # Compute beta
         tmp1 = torch.matmul(self.aggregated_locs.T, torch.linalg.solve(cov_matrix, self.aggregated_locs))
         tmp2 = torch.matmul(self.aggregated_locs.T, torch.linalg.solve(cov_matrix, self.aggregated_response))
@@ -223,14 +212,22 @@ class likelihood_function(spatio_temporal_kernels):
         return  neg_log_lik 
 
 class spline(spatio_temporal_kernels):
-    def __init__(self, epsilon:float, coarse_factor:int, k:int, smooth:float, input_map: Dict[str, Any], aggregated_data:torch.Tensor, nns_map: Dict[str, Any], mm_cond_number:int):
+    def __init__(self, params: torch.Tensor,epsilon:float, coarse_factor:int, k:int, smooth:float, input_map: Dict[str, Any], aggregated_data:torch.Tensor, nns_map: Dict[str, Any], mm_cond_number:int):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
         self.smooth = torch.tensor(smooth, dtype= torch.float64)
         self.k = k
         self.coarse_factor = coarse_factor
         self.epsilon = epsilon
-    
-    def fit_cubic_spline(self, params: torch.Tensor):
+
+        self.distances, self.non_zero_indices =self.precompute_coords_anisotropy(params, self.aggregated_data, self.aggregated_data )
+
+        flat_distances = self.distances.flatten()
+        self.max_distance = torch.max(self.distances).clone().detach()
+        self.max_distance_len = len(flat_distances)
+        self.spline_object = self.fit_cubic_spline()
+
+    def fit_cubic_spline(self):
+
         """
         Fit a natural cubic spline coefficients.
 
@@ -240,7 +237,8 @@ class spline(spatio_temporal_kernels):
         Returns:
             NaturalCubicSpline: The fitted spline object with coefficients.
         """
-        #  fit_distances should be 1 d array to be used in natural_cubic_spline_coeffs
+
+        # fit_distances should be 1 d array to be used in natural_cubic_spline_coeffs
         fit_distances = torch.linspace(self.epsilon, self.max_distance, self.max_distance_len// self.coarse_factor)
         non_zero_indices = fit_distances != 0
         out = torch.zeros_like(fit_distances, dtype= torch.float64)
@@ -256,7 +254,6 @@ class spline(spatio_temporal_kernels):
         # natural_cubic_spline_coeffs(t,x), t should be 1-d array (n,) and x should be (n,channels)
         # where channels reoresent number of features. out.unsquueze(1) makes (n,1).
         coeffs = natural_cubic_spline_coeffs(fit_distances, out.unsqueeze(1))
-        
         # Create spline object
         spline = NaturalCubicSpline(coeffs)
         return spline
@@ -347,6 +344,7 @@ class spline(spatio_temporal_kernels):
             
             # if epoch % 500 == 0:
             #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
             optimizer.step()  # Update the parameters
             scheduler.step()  # Update the learning rate
 
@@ -361,7 +359,7 @@ class spline(spatio_temporal_kernels):
         print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
         return params.detach().numpy().tolist() + [ loss.item()], epoch
 
-####################
+############################################################
 
 class vecchia_experiment(likelihood_function):
     def __init__(self, smooth:float, input_map :Dict[str,Any], aggregated_data: torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int):

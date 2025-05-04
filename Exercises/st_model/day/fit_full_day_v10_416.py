@@ -24,10 +24,8 @@ from GEMS_TCO import kernels
 from GEMS_TCO import orderings as _orderings 
 from GEMS_TCO import load_data
 from GEMS_TCO import alg_optimization, alg_opt_Encoder
+from GEMS_TCO import configuration as config
 
-# Configure logging to a specific file path
-log_file_path = '/home/jl2815/tco/exercise_output/logs/fit_full.log'
-logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(message)s')
 
 from typing import Optional, List, Tuple
 from pathlib import Path
@@ -54,92 +52,55 @@ def cli(
     epochs: int = typer.Option(100, help="Number of iterations in optimization"),
     nheads: int = typer.Option(200, help="Number of iterations in optimization")
 
-
 ) -> None:
-
- 
     ############################## 
 
     ## load initial estimates 
-
-
-    input_path = "/home/jl2815/tco/exercise_output/estimates/day/saved/"
-    input_filename = "full_day_v(0.5)_1250_july24.pkl"
-    input_filepath = os.path.join(input_path, input_filename)
-    # Load pickle
-    with open(input_filepath, 'rb') as pickle_file:
-        amarel_map1250= pickle.load(pickle_file)
-   
-    df_1250 = pd.DataFrame()
-    for key in amarel_map1250:
-        tmp = pd.DataFrame(amarel_map1250[key][0].reshape(1, -1), columns=['sigmasq', 'range_lat', 'range_lon', 'advec_lat', 'advec_lon', 'beta', 'nugget'])
-        tmp['loss'] = amarel_map1250[key][1]
-        df_1250 = pd.concat((df_1250, tmp), axis=0)
-
-    date_range = pd.date_range(start='07-01-24', end='07-31-24')
-
-    # Ensure the number of dates matches the number of rows in df_1250
-    if len(date_range) == len(df_1250):
-        df_1250.index = date_range
-    else:
-        print("The number of dates does not match the number of rows in the DataFrame.")
-
-    ##
+    data_load_instance = load_data(config.amarel_data_load_path)
+    estimates_df = data_load_instance.read_pickle(config.amarel_estimates_day_path,config.amarel_full_day_v05_pickle)
+    map, ord_mm, nns_map= data_load_instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
 
     # Set spaital coordinates
     lat_lon_resolution = [int(s) for s in space[0].split(',')]
-
-    
     days_s_e = list(map(int, days[0].split(',')))
     days_list = list(range(days_s_e[0], days_s_e[1]))
-
-
     years = ['2024']
     month_range =[7,8]
     
-    basic_path = "/home/jl2815/tco/data/pickle_data"
-    instance = load_data(basic_path)
-    map, ord_mm, nns_map= instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
-    
-    result = {}
 
+    output_path = input_path = Path(config.amarel_estimates_day_path)
 
-    input_path = Path("/home/jl2815/tco/exercise_output/estimates/day/")
-    
     for day in days_list:
+        params = list(estimates_df.iloc[day-1][:-1])
+        params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
+        print(f'2024-07-{day+1}, data size per day: { (200/lat_lon_resolution[0])*(100/lat_lon_resolution[0]) }, smooth: {v}')
+        print(f'mm_cond_number: {mm_cond_number},\ninitial parameters: \n {params}')
+                
         idx_for_datamap= [8*day,8*(day+1)]
-        analysis_data_map, aggregated_data = instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
+        analysis_data_map, aggregated_data = data_load_instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap= idx_for_datamap)
 
-        lenth_of_analysis =idx_for_datamap[1]-idx_for_datamap[0]
-        print(f'2024-07-{day+1}, data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}, smooth: {v}')
-        
-        params_item = list(df_1250.iloc[day][:-1])
-        params = torch.tensor(params_item, dtype=torch.float64, requires_grad=True)
-        
-        print(f'mm_cond_number {mm_cond_number}, params: {params} ')
+        spline_instance = kernels.spline(
+                epsilon = 1e-17, 
+                params = params,
+                coarse_factor=5, 
+                k=3, 
+                smooth = 0.5, 
+                input_map= analysis_data_map, 
+                aggregated_data= aggregated_data, 
+                nns_map=nns_map, 
+                mm_cond_number=10)
 
-        model_instance = kernels.model_fitting(
-                smooth=v,
-                input_map=analysis_data_map,
-                aggregated_data=aggregated_data,
-                nns_map=nns_map,
-                mm_cond_number=mm_cond_number,
-                nheads = nheads
-            )
 
         start_time = time.time()
-        # optimizer = optim.Adam([params], lr=0.01)  # For Adam
-        optimizer, scheduler = model_instance.optimizer_fun(params, lr=lr, betas=(0.9, 0.99), eps=1e-8, step_size=step, gamma = gamma_par)    
-        out, epoch = model_instance.run_full(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_kv, epochs=epochs)
-        result[day+1] = out
-
+        optimizer, scheduler = spline_instance.optimizer_fun(params, lr=0.03, betas=(0.9, 0.99), eps=1e-8, step_size=100, gamma=0.9)  
+        out, epoch = spline_instance.run_full(params, optimizer,scheduler, epochs=500)
         end_time = time.time()
         epoch_time = end_time - start_time
-        print(f'day {day + 1} for lr:{lr}, step size {step}, betas(_,b2):{0.99}, gamma:{gamma_par} took {epoch_time:.2f}, epoch {epochs}')
+        print(f'End 2024-07-{day+1} for lr:{lr}, step size {step}, betas(_,b2):{0.99}, gamma:{gamma_par} took {epoch_time:.2f}, epoch {epochs}')
         print(f'params and loss {out}')
 
 
-        input_filepath = input_path / f"full_day_v10_{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
+        input_filepath = input_path / f"full_day_v10_spline{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
         
         res = alg_optimization( f"2024-07-{day+1}", f"Vecc_b2 and b2{0.99}", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
         loaded_data = res.load(input_filepath)
@@ -147,7 +108,7 @@ def cli(
         res.save(input_filepath,loaded_data)
         fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'epoch']
 
-        csv_filepath = input_path/f"full_day_v10_{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0])}.csv"
+        csv_filepath = output_path/f"full_day_v10_spline{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0])}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
 if __name__ == '__main__':
