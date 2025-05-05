@@ -40,6 +40,8 @@ def cli(
     v: float = typer.Option(0.5, help="smooth"),
     lr: float = typer.Option(0.01, help="learning rate"),
     step: int = typer.Option(80, help="Number of iterations in optimization"),
+    coarse_factor: int = typer.Option(100, help="coarse factor in spline learning"),
+
     gamma_par: float = typer.Option(0.5, help="decreasing factor for learning rate"),
     space: List[str] = typer.Option(['20', '20'], help="spatial resolution"),
     days: List[str] = typer.Option(['0', '31'], help="Number of nearest neighbors in Vecchia approx."),
@@ -82,17 +84,17 @@ def cli(
         spline_instance = kernels.spline(
                 epsilon = 1e-17, 
                 params = params,
-                coarse_factor=5, 
+                coarse_factor= coarse_factor, 
                 k=3, 
-                smooth = 0.5, 
+                smooth = v, 
                 input_map= analysis_data_map, 
                 aggregated_data= aggregated_data, 
                 nns_map=nns_map, 
-                mm_cond_number=10)
+                mm_cond_number= mm_cond_number)
 
 
         start_time = time.time()
-        optimizer, scheduler = spline_instance.optimizer_fun(params, lr=0.03, betas=(0.9, 0.99), eps=1e-8, step_size=100, gamma=0.9)  
+        optimizer, scheduler = spline_instance.optimizer_fun(params, lr= lr , betas=(0.9, 0.99), eps=1e-8, step_size= step, gamma= gamma_par)  
         out, epoch = spline_instance.run_full(params, optimizer,scheduler, epochs=500)
         end_time = time.time()
         epoch_time = end_time - start_time
