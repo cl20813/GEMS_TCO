@@ -38,10 +38,6 @@ log_file_path = '/home/jl2815/tco/exercise_25/st_models/log/evaluate.log'
 from GEMS_TCO.kernels import spatio_temporal_kernels
 
 class diagnosis(spatio_temporal_kernels):
-    ''' 
-    Investigate the value  (Data - conditional mean from Vecchia)/ Conditional sd from Vecchia
-    See if these are standard normal
-    '''
     def __init__(self, smooth, input_map, nns_map, mm_cond_number):
         super().__init__(smooth, input_map, nns_map, mm_cond_number)
         # Any additional initialization for dignosis class can go here
@@ -218,117 +214,56 @@ class CrossVariogram:
         return directional_sem
 
 
-    def theoretical_gamma_kv(self, params: torch.Tensor, lat_diff: torch.Tensor, lon_diff: torch.Tensor, time_diff: torch.Tensor) -> (torch.Tensor, torch.Tensor):
-        """
-        Computes the covariance for anisotropic spatial-temporal data using the Matérn covariance function.
-
-        Parameters:
-        - params (torch.Tensor): Tensor containing [sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget].
-        - lat_diff (torch.Tensor): Tensor of latitude differences.
-        - lon_diff (torch.Tensor): Tensor of longitude differences.
-        - time_diff (torch.Tensor): Tensor of time differences.
-
-        Returns:
-        - torch.Tensor: Spatial-temporal differences.
-        - torch.Tensor: Covariance values.
-        """
+    def theoretical_gamma_ani_st(self,params, lat_diff, lon_diff, time_diff):
+        # Unpack parameters
         sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
         
+        # Calculate the spatial-temporal differences
         tmp1 = lat_diff - advec_lat * time_diff
         tmp2 = lon_diff - advec_lon * time_diff
         tmp3 = beta * time_diff
         
         d = tmp1**2/range_lat**2 + tmp2**2/range_lon**2 + tmp3**2
         
+        # Convert d into a tensor (if it's not already) and compute the semivariogram
         d = d.clone().detach()
 
-         # since d is tensor, kv() returns tensor
+        out = nugget + sigmasq * (1 - torch.exp(- torch.sqrt(d) ) )
+        
+        return torch.sqrt(d), out
+
+    def theoretical_gammma_kv(self,params, lat_diff, lon_diff, time_diff):
+        sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
+
+        # Calculate the spatial-temporal differences
+        tmp1 = lat_diff - advec_lat * time_diff
+        tmp2 = lon_diff - advec_lon * time_diff
+        tmp3 = beta * time_diff
+        
+        d = tmp1**2/range_lat**2 + tmp2**2/range_lon**2 + tmp3**2
+        
+        # Convert d into a tensor (if it's not already) and compute the semivariogram
+        d = d.clone().detach()
+        
+        # Compute the covariance for non-zero distances
+       
+        # since d is tensor, kv() returns tensor
         tmp = kv(self.smooth, np.sqrt(d)).clone().detach()
         out_tmp = (sigmasq * (2**(1-self.smooth)) / gamma(self.smooth) *
-                (torch.sqrt(d))**self.smooth * tmp)
+                                    (torch.sqrt(d) )**self.smooth *
+                                    tmp)
         
         out = (nugget + sigmasq) - out_tmp
         return torch.sqrt(d), out
-        
-    def squared_formatter(self, x: float, pos: int) -> str:
-        """
-        Formats the input value by taking its square root and returning it as a string.
 
-        Parameters:
-        - x (float): Input value.
-        - pos (int): Position (unused in the function).
-
-        Returns:
-        - str: Formatted string of the square root of x.
-        """
+    def squared_formatter(self,x, pos):
         return f'{np.sqrt(x):.2f}'
 
-
-class CrossVariogram_empirical(CrossVariogram):
-    def __init__(self, save_path, length_of_analysis, smooth):
-        super().__init__(save_path, length_of_analysis)
-        self.smooth = smooth
-        
-    def plot_lon_empirical(self, lon_lag_sem, days, deltas):
+    '''
+    plot_lon_sem(), plot_lat_sem() is the old version scatter plots
+    '''
+    def plot_lon_sem(self, lon_lag_sem, days, deltas):
         fig, axs = plt.subplots(2, 2, figsize=(15, 10))
-
-        # https://betterfigures.org/2015/06/23/picking-a-colour-scale-for-scientific-graphics/
-        colors = [
-            (222/255, 235/255, 247/255),
-            (198/255, 219/255, 239/255),
-            (158/255, 202/255, 225/255),
-            (107/255, 174/255, 214/255),
-            (66/255, 146/255, 198/255),
-            (33/255, 113/255, 181/255),
-            (8/255, 69/255, 148/255)
-        ]
-
-        for index, day in enumerate(days):
-            ax = axs[index // 2, index % 2]
-
-            lon_lags = [lon for lat, lon in deltas]
-
-            for i in range(7):
-                y_values = [y**2 for y in lon_lag_sem[day][i]]
-                ax.plot(lon_lags, y_values, color=colors[i], label=f'Empirical CV Hour {i + 1} to {i+2}')
-                ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
-                
-            ax.grid(True)
-            ax.set_xlabel('Longitude Lags', fontsize=12)
-            ax.set_ylabel('Cross-variogram Values', fontsize=12)
-            ax.set_title(f'Cross-Variogram on 2024-07-{day:02d} ({self.length_of_analysis})', fontsize=14)
-            ax.set_xscale('linear')
-            # ax.set_yscale('linear')
-            ax.set_xticks(lon_lags)
-            ticks = [str(round(x, 1)) for x in lon_lags]
-            ax.set_xticklabels(ticks)
-            ax.set_ylim(1e-4, 670)
-            plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
-
-            # Add vertical red line at x=0
-            ax.axvline(x=0, color='red', linestyle='--') # , label='x=0'
-            ax.legend()
-
-        plt.tight_layout()
-        # plt.savefig(f'/Users/joonwonlee/Documents/GEMS_TCO-1/plots/directional_semivariograms/dir_sem_longitude_days{days[0]}_{days[-1]}.png')
-        save_path = Path(self.save_path) / f'dir_sem_longitude_days{days[0]}_{days[-1]}.png'
-        plt.savefig(save_path)
-        plt.show()
-
-
-    def plot_lat_empirical(self, lat_lag_sem, days, deltas):
-        fig, axs = plt.subplots(2, 2, figsize=(15, 10))
-
-        # https://betterfigures.org/2015/06/23/picking-a-colour-scale-for-scientific-graphics/
-        colors = [
-            (222/255, 235/255, 247/255),
-            (198/255, 219/255, 239/255),
-            (158/255, 202/255, 225/255),
-            (107/255, 174/255, 214/255),
-            (66/255, 146/255, 198/255),
-            (33/255, 113/255, 181/255),
-            (8/255, 69/255, 148/255)
-        ]
 
         for index, day in enumerate(days):
             # t = day - 1
@@ -338,83 +273,129 @@ class CrossVariogram_empirical(CrossVariogram):
             ax = axs[index // 2, index % 2]
 
             # Separate positive and negative lags and assign appropriate indices
-        
-            lat_lags = [lat for lat, lon in deltas]
-
-            # for j, (lat, lon) in enumerate(deltas):
-            #    x_values.append(lat)  # Use negative index for negative lags
+            x_values = []
+            for j, (lat, lon) in enumerate(deltas):
+                x_values.append(lon)  # Use negative index for negative lags
             # weight = [-0.55, -0.5, -0.25, -0.15, -0.05, 0, 0.05, 0.15, 0.25, 0.5, 0.55]
             # weight2 = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]
 
             # Plotting for each orbit
             for i in range(7):
-                y_values = [y**2 for y in lat_lag_sem[day][i]]
+                for j, (x, y) in enumerate(zip(x_values, lon_lag_sem[day][i])):
+                    ax.scatter(x, y, marker='o', s=9, color='black')
+                    # ax.text(x + weight2[i] * 1.5, y + weight[j] * 0.5, str(i + 1), fontsize=9, color='blue', ha='center', va='bottom')
 
-                ax.plot(lat_lags, y_values, color=colors[i], label=f'Empirical CV Hour {i + 1} to {i+2}')
+                # Apply offset using transforms
+                    offset = transforms.ScaledTranslation(0.04 * i, 0.04 * j, fig.dpi_scale_trans)
+                    
+                    trans = ax.transData + offset
+                    ax.text(x, y, str(i + 1), fontsize=9, color='blue', ha='center', va='bottom', transform=trans)
 
-                ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
-                
             ax.grid(True)
-            ax.set_xlabel('Latitude Lags', fontsize=12)
-            ax.set_ylabel('Cross-variogram Values', fontsize=12)
-            ax.set_title(f'Cross-Variogram on 2024-07-{day:02d} ({self.length_of_analysis})', fontsize=14)
-            ax.set_xscale('linear')
-            # ax.set_yscale('linear')
-            ax.set_xticks(lat_lags)
-            ticks = [str(round(x, 1)) for x in lat_lags]
+            ax.set_xlabel('Longitude Lags', fontsize=12)
+            ax.set_ylabel('Cross-Variogram Value', fontsize=12)
+            ax.set_title(f'Cross-Variogram on 2024-07-{day:02d}', fontsize=14)
+            ax.set_xscale('linear')  # Linear scale for x-axis
+            ax.set_yscale('linear')  # Linear scale for y-axis
+            ax.set_xticks(x_values)
+            ticks = [ str( round(x,1)) for x in x_values]
             ax.set_xticklabels(ticks)
-            ax.set_ylim(1e-4, 670)
+            ax.set_ylim(1e-4, 30)
+            # Rotate x-axis labels by 45 degrees
             plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
 
             # Add vertical red line at x=0
-            ax.axvline(x=0, color='red', linestyle='--') # , label='x=0'
-            ax.legend()
+            ax.axvline(x=0, color='red', linestyle='--', label='x=0')
 
         plt.tight_layout()
-        save_path = Path(self.save_path) / f'dir_sem_latitude_days{days[0]}_{days[-1]}.png'
-        plt.savefig(save_path)
-        # plt.savefig(f'/Users/joonwonlee/Documents/GEMS_TCO-1/plots/directional_semivariograms/dir_sem_latitude_days{days[0]}_{days[-1]}.png')
+        plt.savefig(f'/Users/joonwonlee/Documents/GEMS_TCO-1/plots/directional_semivariograms/dir_sem_longitude_days{days[0]}_{days[-1]}.png')
         plt.show()
 
-    def plot_directional_sem_empirical(self, deltas,direictional_sem, days, direction1, direction2):
+    def plot_lat_sem(self, lon_lag_sem, days, deltas):
         fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
-        colors = [
-            (222/255, 235/255, 247/255),
-            (198/255, 219/255, 239/255),
-            (158/255, 202/255, 225/255),
-            (107/255, 174/255, 214/255),
-            (66/255, 146/255, 198/255),
-            (33/255, 113/255, 181/255),
-            (8/255, 69/255, 148/255)
-        ]
+        for index, day in enumerate(days):
+            # t = day - 1
+            # key_list = sorted(map)
 
-        tmp = np.concatenate((np.linspace(-2, -0.2, 10), [-0.1, 0, 0.1], np.linspace(0.2, 2, 10)))
+            # Create a 2x2 plot
+            ax = axs[index // 2, index % 2]
 
+            # Separate positive and negative lags and assign appropriate indices
+            x_values = []
+            for j, (lat, lon) in enumerate(deltas):
+                x_values.append(lat)  # Use negative index for negative lags
+            # weight = [-0.55, -0.5, -0.25, -0.15, -0.05, 0, 0.05, 0.15, 0.25, 0.5, 0.55]
+            # weight2 = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]
+
+            # Plotting for each orbit
+            for i in range(7):
+                for j, (x, y) in enumerate(zip(x_values, lon_lag_sem[day][i])):
+                    ax.scatter(x, y, marker='o', s=9, color='black')
+                    # ax.text(x + weight2[i] * 1.5, y + weight[j] * 0.5, str(i + 1), fontsize=9, color='blue', ha='center', va='bottom')
+
+                    offset = transforms.ScaledTranslation(0.04 * i, 0.04 * j, fig.dpi_scale_trans)
+                    
+                    trans = ax.transData + offset
+                    ax.text(x, y, str(i + 1), fontsize=9, color='blue', ha='center', va='bottom', transform=trans)
+
+
+            ax.grid(True)
+            ax.set_xlabel('Latitude Lags', fontsize=12)
+            ax.set_ylabel('Cross-Variogram Value', fontsize=12)
+            ax.set_title(f'Cross-Variogram on 2024-07-{day:02d}', fontsize=14)
+            ax.set_xscale('linear')  # Linear scale for x-axis
+            ax.set_yscale('linear')  # Linear scale for y-axis
+            ax.set_xticks(x_values)
+            ticks = [ str( round(x,1)) for x in x_values]
+            ax.set_xticklabels(ticks)
+            ax.set_ylim(1e-4, 60)
+        # Rotate x-axis labels by 45 degrees
+            plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
+
+            # Add vertical red line at x=0
+            ax.axvline(x=0, color='red', linestyle='--', label='x=0')
+
+        plt.tight_layout()
+        plt.savefig(f'/Users/joonwonlee/Documents/GEMS_TCO-1/plots/directional_semivariograms/dir_sem_latitude_days{days[0]}_{days[-1]}.png')
+        plt.show()
+
+
+    def plot_directional_sem(self,x_values,direictional_sem, days, direction1, direction2):
+        fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
         for index, day in enumerate(days):
             # Create a 2x2 plot
             ax = axs[index // 2, index % 2]
 
+            # weight = [-0.55, -0.5, -0.25, -0.15, -0.05, 0, 0.05, 0.15, 0.25, 0.5, 0.55]
+            # weight2 = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]
+
             # Plotting for each orbit
             for i in range(7):
-                y_values = [y**2 for y in direictional_sem[day][i]]
-                sign_distance = deltas
-                ax.plot(sign_distance, y_values, color=colors[i], label=f'Empirical CV Hour {i + 1} to {i+2}')
-                ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
-                
+                for j, (x, y) in enumerate(zip(x_values, direictional_sem[day][i])):
+                    ax.scatter(x, y, marker='o', s=9, color='black')
+                   # ax.text(x + weight2[i] * 1.5, y + weight[j] * 0.5, str(i + 1), fontsize=9, color='blue', ha='center', va='bottom')
+                    offset = transforms.ScaledTranslation(0.04 * i, 0.04 * j, fig.dpi_scale_trans)
+                    
+                    
+                    trans = ax.transData + offset
+                    ax.text(x, y, str(i + 1), fontsize=9, color='blue', ha='center', va='bottom', transform=trans)
+
             ax.grid(True)
-            ax.set_xlabel('sign*Euclidean disstance', fontsize=12)
+            ax.set_xlabel('Euclidean disstance', fontsize=12)
             ax.set_ylabel('Cross-Variogram Value', fontsize=12)
             ax.set_title(f'Directional Cross-Variogram {direction1*(180/np.pi)}_{direction2*(180/np.pi)} on 2024-07-{day:02d}', fontsize=14)
             ax.set_xscale('linear')  # Linear scale for x-axis
             ax.set_yscale('linear')  # Linear scale for y-axis
-            ax.set_xticks(deltas)
-            ticks = [ str( round(x,1)) for x in deltas]
+            ax.set_xticks(x_values)
+            ticks = [ str( round(x,1)) for x in x_values]
             ax.set_xticklabels(ticks)
-            ax.set_ylim(1e-4, 670)
-
+            ax.set_ylim(1e-4, 30)
+        # Rotate x-axis labels by 45 degrees
             plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
+
+            # Add vertical red line at x=0
             ax.axvline(x=0, color='red', linestyle='--', label='x=0')
 
         plt.tight_layout()
