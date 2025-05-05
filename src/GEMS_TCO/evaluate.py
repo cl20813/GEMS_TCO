@@ -102,10 +102,8 @@ class diagnosis(spatio_temporal_kernels):
                 # print(f'cond_mean{mean_z}')
 
                 res[time_idx,index ] = (current_y - mean_ygivenx)/ sd_ygivenx
-        
         return res
     
-
 class CrossVariogram:
     def __init__(self, save_path, length_of_analysis):
         self.save_path = save_path
