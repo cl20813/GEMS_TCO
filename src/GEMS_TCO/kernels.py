@@ -280,13 +280,11 @@ class spline(spatio_temporal_kernels):
         return cov_matrix
 
     def full_likelihood_using_spline(self, params:torch.Tensor, distances:torch.Tensor):
-
         cov_matrix = self.interpolate_cubic_spline(params, distances)
         # Compute the log determinant of the covariance matrix
         sign, log_det = torch.slogdet(cov_matrix)
         # if sign <= 0:
         #     raise ValueError("Covariance matrix is not positive definite")
-
         # Compute beta
         tmp1 = torch.matmul(self.aggregated_locs.T, torch.linalg.solve(cov_matrix, self.aggregated_locs))
         tmp2 = torch.matmul(self.aggregated_locs.T, torch.linalg.solve(cov_matrix, self.aggregated_response))
@@ -295,13 +293,10 @@ class spline(spatio_temporal_kernels):
         # Compute the mean
         mu = torch.matmul(self.aggregated_locs, beta)
         y_mu = self.aggregated_response - mu
-
         # Compute the quadratic form
         quad_form = torch.matmul(y_mu, torch.linalg.solve(cov_matrix, y_mu))
-
         # Compute the negative log likelihood
         neg_log_lik = 0.5 * (log_det + quad_form)
-     
         return  neg_log_lik
 
     def compute_full_nll(self, params:torch.Tensor, distances:torch.Tensor): 
