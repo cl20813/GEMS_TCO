@@ -309,12 +309,12 @@ class spline(spatio_temporal_kernels):
         #     raise ValueError("Covariance matrix is not positive definite")
         # Compute beta
         tmp1 = torch.matmul(self.aggregated_locs.T, torch.linalg.solve(cov_matrix, self.aggregated_locs))
-        tmp2 = torch.matmul(self.aggregated_locs.T, torch.linalg.solve(cov_matrix, self.aggregated_response))
+        tmp2 = torch.matmul(self.aggregated_locs.T, torch.linalg.solve(cov_matrix, self.new_aggregated_response))
         beta = torch.linalg.solve(tmp1, tmp2)
 
         # Compute the mean
         mu = torch.matmul(self.aggregated_locs, beta)
-        y_mu = self.aggregated_response - mu
+        y_mu = self.new_aggregated_response - mu
         # Compute the quadratic form
         quad_form = torch.matmul(y_mu, torch.linalg.solve(cov_matrix, y_mu))
         # Compute the negative log likelihood
@@ -345,12 +345,13 @@ class spline(spatio_temporal_kernels):
             list: Final parameters and loss.
             int: Number of epochs run.
         """
+
         prev_loss= float('inf')
         # 1e-3: Faster convergence, slightly lower accuracy than 1e-4
         tol = 1e-3  # Convergence tolerance
         for epoch in range(epochs):  
             optimizer.zero_grad()  # Zero the gradients 
-            distances, non_zero_indices = self.precompute_coords_anisotropy(params, self.aggregated_data[:,:4], self.aggregated_data[:,:4])
+            distances, non_zero_indices = self.precompute_coords_anisotropy(params, self.new_aggregated_data[:,:4], self.new_aggregated_data[:,:4])
             
             loss = self.compute_full_nll(params, distances)
             loss.backward()  # Backpropagate the loss
@@ -372,9 +373,10 @@ class spline(spatio_temporal_kernels):
                 break
 
             prev_loss = loss.item()
-
-        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
-        return params.detach().numpy().tolist() + [ loss.item()], epoch
+        params = [torch.round(x*1000).detach().numpy()/1000 for x in params]
+        loss = (torch.round(loss*1000)/1000).item()
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {params}')
+        return params + [loss], epoch
 
 ############################################################
 

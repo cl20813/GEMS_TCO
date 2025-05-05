@@ -72,13 +72,18 @@ def cli(
     estimates_df = data_load_instance.read_pickle(config.amarel_estimates_day_path,config.amarel_full_day_v05_pickle)
     df_map, ord_mm, nns_map= data_load_instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
 
+
     # only fit spline once because space are all same
+
+    # load first data of analysis_data_map and aggregated_data to initialize spline_instance
+    first_day_idx_for_datamap= [0,8]
+    first_day_analysis_data_map, first_day_aggregated_data = data_load_instance.load_working_data_byday(df_map, ord_mm, nns_map, idx_for_datamap= first_day_idx_for_datamap)
     spline_instance = kernels.spline(
             epsilon = 1e-17, 
             coarse_factor= coarse_factor, 
             smooth = v, 
-            input_map= analysis_data_map, 
-            aggregated_data= aggregated_data, 
+            input_map= first_day_analysis_data_map, 
+            aggregated_data= first_day_aggregated_data, 
             nns_map=nns_map, 
             mm_cond_number= mm_cond_number)
     
@@ -90,6 +95,9 @@ def cli(
                 
         idx_for_datamap= [8*day,8*(day+1)]
         analysis_data_map, aggregated_data = data_load_instance.load_working_data_byday( df_map, ord_mm, nns_map, idx_for_datamap= idx_for_datamap)
+
+        spline_instance.new_aggregated_data = aggregated_data[:,:4]
+        spline_instance.new_aggregated_response = aggregated_data[:,2]
 
         start_time = time.time()
         optimizer, scheduler = spline_instance.optimizer_fun(params, lr= lr , betas=(0.9, 0.99), eps=1e-8, step_size= step, gamma= gamma_par)  
