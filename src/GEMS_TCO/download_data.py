@@ -4,6 +4,9 @@ from tqdm import tqdm  # Progress bar
 
 
 class Download_file:
+    '''
+    This class is intended to download GEMS data. 
+    '''
     def __init__(self, year:int,month:int, days:list):
         self.year = year
         self.month = month
@@ -18,7 +21,7 @@ class Download_file:
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder)
 
-    def download_file(self, url, file_name):
+    def download_file(self, url:str, file_name:str):
         response = requests.get(url, stream=True)
         if response.status_code == 200:
             file_path = os.path.join(self.output_folder, file_name)

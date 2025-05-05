@@ -1,4 +1,3 @@
-
 import os
 import pickle
 import sys
@@ -12,28 +11,28 @@ from json import JSONEncoder
 import csv
 from typing import List, Tuple, Dict, Any
 
-
-
-
-
 gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
 sys.path.append(gems_tco_path)
+
 from GEMS_TCO import orderings as _orderings
+from GEMS_TCO import configuration as config
 
-### 
-
-
-    # print(f"lat_lon_resolution: {lat_lon_resolution}, mm_cond_number: {mm_cond_number}, params: {params}, v: {v}, lr: {lr}, epochs: {epochs}, nheads: {nheads}")
-
-###
 
 
 
 class load_data:
-    def __init__(self, datapath):
+    def __init__(self, datapath:str):
         self.datapath = datapath
     
-    def read_pickle(self,folder_path, filename):
+    def read_pickle(self,folder_path:str, filename:str):
+        ''' 
+        Load pickle data of estimates, then save it into a csv file.
+        This is for July 2024.
+        Each row contains 7 parameters and loss.
+        Returns:
+        pd.DataFrame: DataFrame containing the loaded data.
+
+        '''
         input_filepath = os.path.join(folder_path, filename)
         # Load pickle
         with open(input_filepath, 'rb') as pickle_file:
@@ -46,7 +45,7 @@ class load_data:
 
         date_range = pd.date_range(start='07-01-24', end='07-31-24')
     
-        # Ensure the number of dates matches the number of rows in df_1250
+        # Ensure the number of dates matches the number of rows
         if len(date_range) == len(df):
             df.index = date_range
         else:
@@ -56,7 +55,6 @@ class load_data:
         output_filename = 'full_estimates_1250_july24.csv'
         output_csv_path = os.path.join(folder_path, output_filename)
         df.to_csv(output_csv_path, index=False)
-
         return df
 
     def load_mm20k_data_bymonthyear(
@@ -169,7 +167,6 @@ class load_data:
 
         aggregated_data = aggregated_data.iloc[:, :4].to_numpy()
         aggregated_data = torch.from_numpy(aggregated_data).double()
-
         return analysis_data_map, aggregated_data
 
     ## maybe I should delete reorder_data someday
