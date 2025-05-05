@@ -212,19 +212,41 @@ class likelihood_function(spatio_temporal_kernels):
         return  neg_log_lik 
 
 class spline(spatio_temporal_kernels):
-    def __init__(self, params: torch.Tensor,epsilon:float, coarse_factor:int, k:int, smooth:float, input_map: Dict[str, Any], aggregated_data:torch.Tensor, nns_map: Dict[str, Any], mm_cond_number:int):
+    '''
+    fit_cublic_spline() for each data shares the common locations. Even though the
+    'distances' matrix is a function of parameters, we can make a common upper bound
+    by putting range parameters 0.5, advections 0, beta 2.
+    and we fit cubic_spline() for fixed smooth Matern model with range=1 and sigmasq=1.
+    Essentially, we are approximating simple Matern model for v=1.
+    
+    Any change in parameters will be reflected through "distances" matrix. So,
+    we define "distances" matrix for each epoch.
+    
+    '''
+    def __init__(self, epsilon:float, coarse_factor:int, smooth:float, input_map: Dict[str, Any], aggregated_data:torch.Tensor, nns_map: np.ndarray, mm_cond_number:int):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
         self.smooth = torch.tensor(smooth, dtype= torch.float64)
-        self.k = k
         self.coarse_factor = coarse_factor
         self.epsilon = epsilon
-
-        self.distances, self.non_zero_indices =self.precompute_coords_anisotropy(params, self.aggregated_data, self.aggregated_data )
-
+        sample_params = [25, 0.5, 0.5, 0, 0, 2, 5]
+        sample_params = torch.tensor(sample_params, dtype=torch.float64, requires_grad=True)
+        self.distances, self.non_zero_indices =self.precompute_coords_anisotropy(sample_params, self.aggregated_data, self.aggregated_data )
         flat_distances = self.distances.flatten()
         self.max_distance = torch.max(self.distances).clone().detach()
         self.max_distance_len = len(flat_distances)
         self.spline_object = self.fit_cubic_spline()
+
+        """
+        Initialize the class with given parameters.
+        Args:
+            epsilon (float): A small value for spline approximation
+            coarse_factor (int): Factor used for coarse-graining.
+            smooth (float): Smooth parameter in Matern model.
+            input_map (Dict[str, Any]): Dictionary containing input mappings.
+            aggregated_data (torch.Tensor): Tensor containing aggregated data.
+            nns_map (Dict[str, Any]): 2-d nd.array containing nearest neighbors mappings.
+            mm_cond_number (int): Condition number for Vecchia approximation
+        """
 
     def fit_cubic_spline(self):
 

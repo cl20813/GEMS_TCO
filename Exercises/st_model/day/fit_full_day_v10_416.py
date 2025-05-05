@@ -67,11 +67,21 @@ def cli(
 
     ## load initial estimates 
     data_load_instance = load_data(config.amarel_data_load_path)
+
+    # estimates from (v=0.5, resolution 1250 per hour, full likelihood) are used as initial parameters 
     estimates_df = data_load_instance.read_pickle(config.amarel_estimates_day_path,config.amarel_full_day_v05_pickle)
     df_map, ord_mm, nns_map= data_load_instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
 
-
-
+    # only fit spline once because space are all same
+    spline_instance = kernels.spline(
+            epsilon = 1e-17, 
+            coarse_factor= coarse_factor, 
+            smooth = v, 
+            input_map= analysis_data_map, 
+            aggregated_data= aggregated_data, 
+            nns_map=nns_map, 
+            mm_cond_number= mm_cond_number)
+    
     for day in days_list:
         params = list(estimates_df.iloc[day-1][:-1])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
@@ -81,21 +91,9 @@ def cli(
         idx_for_datamap= [8*day,8*(day+1)]
         analysis_data_map, aggregated_data = data_load_instance.load_working_data_byday( df_map, ord_mm, nns_map, idx_for_datamap= idx_for_datamap)
 
-        spline_instance = kernels.spline(
-                epsilon = 1e-17, 
-                params = params,
-                coarse_factor= coarse_factor, 
-                k=3, 
-                smooth = v, 
-                input_map= analysis_data_map, 
-                aggregated_data= aggregated_data, 
-                nns_map=nns_map, 
-                mm_cond_number= mm_cond_number)
-
-
         start_time = time.time()
         optimizer, scheduler = spline_instance.optimizer_fun(params, lr= lr , betas=(0.9, 0.99), eps=1e-8, step_size= step, gamma= gamma_par)  
-        out, epoch = spline_instance.run_full(params, optimizer,scheduler, epochs=500)
+        out, epoch = spline_instance.run_full(params, optimizer,scheduler, epochs= epochs)
         end_time = time.time()
         epoch_time = end_time - start_time
         print(f'End 2024-07-{day+1} for lr:{lr}, step size {step}, betas(_,b2):{0.99}, gamma:{gamma_par} took {epoch_time:.2f}, epoch {epochs}')
