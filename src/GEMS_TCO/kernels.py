@@ -281,10 +281,9 @@ class spline(spatio_temporal_kernels):
         return spline
 
     def interpolate_cubic_spline(self, params:torch.Tensor, distances:torch.Tensor):
-    
+
         """
         Interpolate using the fitted cubic spline.
-
         Args:
             params (tuple): Parameters for the interpolation.
             distances (torch.Tensor): Distances to interpolate.
@@ -292,8 +291,8 @@ class spline(spatio_temporal_kernels):
         Returns:
             torch.Tensor: Interpolated values.
         """
-        sigmasq, _, _, _, _, _, nugget = params
 
+        sigmasq, _, _, _, _, _, nugget = params
         cov_1d = self.spline_object.evaluate(distances)
         cov_matrix = cov_1d.reshape(distances.shape)
         cov_matrix = cov_matrix * sigmasq
@@ -433,8 +432,6 @@ class vecchia_experiment(likelihood_function):
 
         return hessian_matrix, cond_number
         ''' 
-
-
         statistic  = torch.matmul(gradient, torch.linalg.solve(hessian_matrix, gradient))
         # print(f' statistic is {statistic}')
         return statistic
@@ -479,7 +476,6 @@ class vecchia_experiment(likelihood_function):
                     conditioning_data = torch.empty((0, current_row.shape[1]), dtype=torch.float64)
 
                 aggregated_arr = torch.vstack((current_row, conditioning_data))
-            
                 locs = aggregated_arr[:, :2]
 
                 cov_matrix = covariance_function(params=params, y= aggregated_arr, x= aggregated_arr )
@@ -526,7 +522,6 @@ class vecchia_experiment(likelihood_function):
             heads = torch.cat( (heads,tmp), dim=0)
 
         neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
-        
         for time_idx in range(0,len(self.input_map)):
             current_np = self.input_map[key_list[time_idx]]
 
@@ -668,7 +663,6 @@ class vecchia_experiment(likelihood_function):
                 neg_log_lik += 0.5 * (log_det + quad_form)
         return neg_log_lik
 
-    
 class model_fitting(vecchia_experiment): 
     def __init__(self, smooth:float, input_map:Dict[str,Any], aggregated_data:torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number, nheads)
@@ -701,8 +695,8 @@ class model_fitting(vecchia_experiment):
         prev_loss= float('inf')
 
         tol = 1e-4  # Convergence tolerance
-        for epoch in range(epochs):  # Number of epochs
-            optimizer.zero_grad()  # Zero the gradients 
+        for epoch in range(epochs):  
+            optimizer.zero_grad()  
             
             loss = self.compute_full_nll(params, covariance_function)
             loss.backward()  # Backpropagate the loss
@@ -714,8 +708,8 @@ class model_fitting(vecchia_experiment):
             # if epoch % 500 == 0:
             #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
-            optimizer.step()  # Update the parameters
-            scheduler.step()  # Update the learning rate
+            optimizer.step()  
+            scheduler.step()  
             # Check for convergence
             if abs(prev_loss - loss.item()) < tol:
                 print(f"Converged at epoch {epoch}")
@@ -726,7 +720,6 @@ class model_fitting(vecchia_experiment):
         print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
     
         return params.detach().numpy().tolist() + [ loss.item()], epoch
-
 
     def run_vecc_reorder(self, params, optimizer, scheduler,  covariance_function, cov_map,epochs=10):
         prev_loss= float('inf')
@@ -739,14 +732,13 @@ class model_fitting(vecchia_experiment):
             loss.backward(retain_graph=True) # Backpropagate the loss with retain_graph=True
             # loss.backward()
 
-            # Print gradients and parameters every 10th epoch
             # if epoch % 500 == 0:
             #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
-            optimizer.step()  # Update the parameters
-            scheduler.step()  # Update the learning rate
+            optimizer.step()  
+            scheduler.step()  
    
             # Check for convergence
             if abs(prev_loss - loss.item()) < tol:
@@ -756,17 +748,13 @@ class model_fitting(vecchia_experiment):
 
             prev_loss = loss.item()
         print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
-
         return params.detach().numpy().tolist() + [ loss.item()], epoch
     
-
     def run_vecc_ori_order(self, params, optimizer, scheduler,  covariance_function, cov_map,epochs=10):
         prev_loss= float('inf')
-
         tol = 1e-4  # Convergence tolerance
-        for epoch in range(epochs):  # Number of epochs
-            optimizer.zero_grad()  # Zero the gradients 
-            
+        for epoch in range(epochs):  
+            optimizer.zero_grad()  
             loss = self.compute_vecc_nll_ori_order(params, covariance_function, cov_map)
             loss.backward(retain_graph=True) # Backpropagate the loss with retain_graph=True
             # loss.backward()
@@ -774,8 +762,6 @@ class model_fitting(vecchia_experiment):
             # Print gradients and parameters every 10th epoch
             # if epoch % 500 == 0:
             #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
-            
-            # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             optimizer.step()  # Update the parameters
             scheduler.step()  # Update the learning rate
@@ -788,7 +774,6 @@ class model_fitting(vecchia_experiment):
 
             prev_loss = loss.item()
         print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
-
         return params.detach().numpy().tolist() + [ loss.item()], epoch
 
     def run_vecc_ori_order_grad_tracker(self, params, optimizer, scheduler,  covariance_function, cov_map,epochs=10):
