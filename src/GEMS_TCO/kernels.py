@@ -370,7 +370,6 @@ class spline(spatio_temporal_kernels):
 
                 # if sign <= 0:
                 #     raise ValueError("Covariance matrix is not positive definite")
-            
                 # Compute beta
                 tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
             
@@ -394,7 +393,7 @@ class spline(spatio_temporal_kernels):
                 }
         return cov_map
 
-    def vecchia_ori_order(self, params: torch.Tensor, cov_map:Dict[str,Any]) -> torch.Tensor:
+    def vecchia_nll_using_spline(self, params: torch.Tensor, cov_map:Dict[str,Any]) -> torch.Tensor:
 
         cut_line= self.nheads
         key_list = list(self.input_map.keys())
@@ -495,11 +494,13 @@ class spline(spatio_temporal_kernels):
                 neg_log_lik += 0.5 * (log_det + quad_form)
         return neg_log_lik
 
-
-
-    
     def compute_full_nll(self, params:torch.Tensor, distances:torch.Tensor): 
         nll = self.full_likelihood_using_spline( params, distances)
+        return nll
+
+    def compute_vecchia_nll(self, params:torch.Tensor): 
+        cov_map = self.cov_structure_saver(params)
+        nll = self.vecchia_nll_using_spline(params, cov_map)
         return nll
 
     def optimizer_fun(self, params:torch.Tensor, lr:float =0.01, betas: tuple=(0.9, 0.8), eps:float=1e-8, step_size:int=40, gamma:float=0.5):
@@ -531,6 +532,57 @@ class spline(spatio_temporal_kernels):
             distances, non_zero_indices = self.precompute_coords_anisotropy(params, self.new_aggregated_data[:,:4], self.new_aggregated_data[:,:4])
             
             loss = self.compute_full_nll(params, distances)
+            loss.backward()  # Backpropagate the loss
+
+            # Gradient and Parameter Logging for every 10th epoch
+            if epoch % 10 == 0:
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            # if epoch % 500 == 0:
+            #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            optimizer.step()  # Update the parameters
+            scheduler.step()  # Update the learning rate
+
+            # Convergence Check
+            if abs(prev_loss - loss.item()) < tol:
+                print(f"Converged at epoch {epoch}")
+                print(f'Epoch {epoch+1}, : Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
+                break
+
+            prev_loss = loss.item()
+        params = [torch.round(x*1000).detach().numpy()/1000 for x in params]
+        loss = (torch.round(loss*1000)/1000).item()
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {params}')
+        return params + [loss], epoch
+
+    def fit_vecchia(self, params:torch.Tensor, optimizer:torch.optim.Optimizer, scheduler:torch.optim.lr_scheduler, epochs:int=10 ):
+
+        """
+        Run the training loop for the full likelihood model.
+
+        Args:
+            params (torch.Tensor): Model parameters.
+            optimizer (torch.optim.Optimizer): Optimizer for updating parameters.
+            scheduler (torch.optim.lr_scheduler): Learning rate scheduler.
+            epochs (int): Number of epochs to train.
+
+        Returns:
+            list: Final parameters and loss.
+            int: Number of epochs run.
+        """
+
+        prev_loss= float('inf')
+        # 1e-3: Faster convergence, slightly lower accuracy than 1e-4
+        tol = 1e-3  # Convergence tolerance
+
+
+        for epoch in range(epochs):  
+            optimizer.zero_grad()  # Zero the gradients 
+            # distance is a function of parameters
+            # distances, non_zero_indices = self.precompute_coords_anisotropy(params, self.new_aggregated_data[:,:4], self.new_aggregated_data[:,:4])
+            
+            loss = self.compute_vecchia_nll(params)
             loss.backward()  # Backpropagate the loss
 
             # Gradient and Parameter Logging for every 10th epoch
