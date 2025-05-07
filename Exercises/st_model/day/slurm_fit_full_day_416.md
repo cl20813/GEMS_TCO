@@ -120,7 +120,7 @@ echo "Current date and time: $(date)"
 
 echo "fit_full_day_v10_1250"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v10_416.py --v 1.0 --lr 0.02 --step 100 --coarse-factor 1000 --gamma-par 0.2 --epochs 1500 --space "4, 4" --days "1,31" --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34" 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v10_416.py --v 1.0 --lr 0.02 --step 100 --coarse-factor 1000 --gamma-par 0.2 --epochs 1500 --space "4, 4" --days "0,1" --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34" 
 
 
 ```
