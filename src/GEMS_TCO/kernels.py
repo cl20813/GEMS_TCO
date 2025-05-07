@@ -326,14 +326,12 @@ class spline(spatio_temporal_kernels):
         cut_line= self.nheads
         key_list = list(self.input_map.keys())
 
-        for time_idx in range(0,8):
+        for time_idx in range(0,3):
             current_np = self.input_map[key_list[time_idx]]
 
             # Use below when working on local computer to avoid singular matrix
             for index in range(cut_line, self.size_per_hour):
                 current_row = current_np[index].reshape(1, -1)
-             
-                # Construct conditioning set
                 mm_neighbors = self.nns_map[index]
                 past = list(mm_neighbors) 
                 data_list = []
@@ -342,42 +340,28 @@ class spline(spatio_temporal_kernels):
                     data_list.append(current_np[past])
 
                 if time_idx > 0:
-                    last_hour_np = self.input_map[key_list[time_idx - 1]]
-                    past_conditioning_data = last_hour_np[past + [index], :]
-                    data_list.append(past_conditioning_data)
+                    one_hour_lag = self.input_map[key_list[time_idx - 1]]
+                    data_list.append(one_hour_lag[past + [index], :])
 
                 if time_idx > 1:
-                    last_hour_np = self.input_map[key_list[time_idx -2]]
-                    # if index==200:
-                    #     print(self.input_map[self.key_list[time_idx-6]])
-                    past_conditioning_data = last_hour_np[past + [index], :]
-                    data_list.append(past_conditioning_data)
+                    two_hour_lag = self.input_map[key_list[time_idx -2]]
+                    data_list.append(two_hour_lag [past + [index], :])
                 
-                if data_list:
-                    conditioning_data = torch.vstack(data_list)
-                else:
-                    conditioning_data = torch.empty((0, current_row.shape[1]), dtype=torch.float64)
-
+                conditioning_data = torch.vstack(data_list) if data_list else torch.empty((0, current_row.shape[1]), dtype=torch.float64)
                 aggregated_arr = torch.vstack((current_row, conditioning_data))
                 locs = aggregated_arr[:, :2]
 
                 distances, non_zero_indices = self.precompute_coords_anisotropy(params, aggregated_arr,aggregated_arr)
                 cov_matrix = self.interpolate_cubic_spline(params, distances)
-                # print(f'Condition number: {torch.linalg.cond(cov_matrix)}')
+      
                 cov_yx = cov_matrix[0, 1:]
-                        # Compute the log determinant of the covariance matrix
                 sign, log_det = torch.slogdet(cov_matrix)
-
-                # if sign <= 0:
-                #     raise ValueError("Covariance matrix is not positive definite")
-                # Compute beta
                 tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
             
                 # Mean and variance of y|x
                 sigma = cov_matrix[0, 0]
                 cov_xx = cov_matrix[1:, 1:]
                 cov_xx_inv = torch.linalg.inv(cov_xx)
-
                 cov_ygivenx = sigma - torch.matmul(cov_yx, torch.matmul(cov_xx_inv, cov_yx))
                 cond_mean_tmp = torch.matmul(cov_yx, cov_xx_inv)
                 log_det = torch.log(cov_ygivenx)
@@ -408,34 +392,25 @@ class spline(spatio_temporal_kernels):
         cov_matrix = self.interpolate_cubic_spline(params, distances_heads)
 
         sign, log_det = torch.slogdet(cov_matrix)
-        # if sign <= 0:
-        #     raise ValueError("Covariance matrix is not positive definite")
-        # Compute beta
+
         locs = heads[:,:2]
         new_response = heads[:, 2]
         tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
         tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, new_response))
         beta = torch.linalg.solve(tmp1, tmp2)
 
-        # Compute the mean
         mu = torch.matmul(locs, beta)
         y_mu = new_response - mu
-        # Compute the quadratic form
         quad_form = torch.matmul(y_mu, torch.linalg.solve(cov_matrix, y_mu))
-        # Compute the negative log likelihood
         neg_log_lik += 0.5 * (log_det + quad_form)
     
-        # neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
-        
         for time_idx in range(0,len(self.input_map)):
             current_np = self.input_map[key_list[time_idx]]
 
-            # Use below when working on local computer to avoid singular matrix
             for index in range(cut_line, self.size_per_hour):
                 current_row = current_np[index].reshape(1, -1)
                 current_y = current_row[0, 2]
 
-                # Construct conditioning set
                 mm_neighbors = self.nns_map[index]
                 past = list(mm_neighbors) 
                 data_list = []
@@ -478,11 +453,8 @@ class spline(spatio_temporal_kernels):
                 aggregated_y = aggregated_arr[:, 2]
 
                 cov_yx = cov_matrix[0, 1:]
-
                 tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, aggregated_y))
-                
                 beta = torch.linalg.solve(tmp1, tmp2)
-        
                 mu = torch.matmul(locs, beta)
                 mu_current = mu[0]
                 mu_neighbors = mu[1:]
@@ -575,7 +547,6 @@ class spline(spatio_temporal_kernels):
         prev_loss= float('inf')
         # 1e-3: Faster convergence, slightly lower accuracy than 1e-4
         tol = 1e-3  # Convergence tolerance
-
 
         for epoch in range(epochs):  
             optimizer.zero_grad()  # Zero the gradients 
