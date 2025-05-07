@@ -88,8 +88,6 @@ def cli(
     instance = load_data(basic_path)
 
     map, ord_mm, nns_map= instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number= mm_cond_number ,years_=years, months_=month_range)
-   
-
     input_path = Path("/home/jl2815/tco/exercise_output/estimates/day/")
 
     for day in days_list:
@@ -121,9 +119,9 @@ def cli(
 
         start_time = time.time()
         # optimizer = optim.Adam([params], lr=0.01)  # For Adam
-        optimizer, scheduler = model_instance.optimizer_fun(params, lr= lr , betas=(0.9, 0.99), eps=1e-8, step_size= step, gamma=0.1)    
+        optimizer, scheduler = model_instance.optimizer_fun(params, lr= lr, betas=(0.9, 0.99), eps=1e-8, step_size=step, gamma=0.1)    
 
-        instance_map = kernels.vecchia_experiment(0.5, analysis_data_map, aggregated_data, nns_map,mm_cond_number, nheads)
+        instance_map = kernels.vecchia_experiment(v, analysis_data_map, aggregated_data, nns_map,mm_cond_number, nheads)
         cov_map =  instance_map.cov_structure_saver(params, model_instance.matern_cov_anisotropy_v15)   
 
         out, epoch = model_instance.run_vecc_ori_order(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v15, cov_map, epochs=epochs)

@@ -123,7 +123,7 @@ def cli(
         # optimizer = optim.Adam([params], lr=0.01)  # For Adam
         optimizer, scheduler = model_instance.optimizer_fun(params, lr= lr , betas=(0.9, 0.99), eps=1e-8, step_size= step, gamma=0.1)    
 
-        instance_map = kernels.vecchia_experiment(0.5, analysis_data_map, aggregated_data, nns_map,mm_cond_number, nheads)
+        instance_map = kernels.vecchia_experiment(v, analysis_data_map, aggregated_data, nns_map,mm_cond_number, nheads)
         cov_map =  instance_map.cov_structure_saver(params, model_instance.matern_cov_anisotropy_kv)   
 
         out, epoch = model_instance.run_vecc_ori_order(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_kv, cov_map, epochs=epochs)
