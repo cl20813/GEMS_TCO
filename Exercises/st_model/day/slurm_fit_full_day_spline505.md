@@ -124,6 +124,40 @@ echo "fit_full_day_v03_1250 using cubic spline"
 
 srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v04_506.py --v 0.3 --lr 0.02 --step 100 --coarse-factor 1000 --gamma-par 0.2 --epochs 1500 --space "4, 4" --days "0,31"
 
+```
+
+
+```  cd ./jobscript/tco/gp_exercise  ```   
+```  nano fit_full_day_v035_v045_1250.sh  ```        
+ ```   sbatch fit_full_day_v035_v045_1250.sh   ```
+
+``` 
+#!/bin/bash
+#SBATCH --job-name=ful_v03545_day_1250                             # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/fit_full_day_v03545_1250_%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/fit_full_day_v03545_1250_%j.err # Standard error file (%j = JobID)
+#SBATCH --time=72:00:00                                            # Time limit
+#SBATCH --ntasks=2                                                # Number of tasks
+#SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
+#SBATCH --mem=300G                                                 # Memory per node
+#SBATCH --partition=mem                                            # Partition name
+
+#### Load the Anaconda module to use srun 
+module purge                                              
+module use /projects/community/modulefiles                 
+module load anaconda/2024.06-ts840 
+
+#### Initialize conda for the current shell session if not already done for the current shell session.
+eval "$(conda shell.bash hook)"
+conda activate faiss_env
+
+echo "Current date and time: $(date)"
+
+echo "fit_full_day_v03_1250 using cubic spline"
+
+srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v04_506.py --v 0.35 --lr 0.02 --step 100 --coarse-factor 1000 --gamma-par 0.2 --epochs 1500 --space "4, 4" --days "0,31"
+
+srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v04_506.py --v 0.45 --lr 0.02 --step 100 --coarse-factor 1000 --gamma-par 0.2 --epochs 1500 --space "4, 4" --days "0,31"
 
 ```
 
