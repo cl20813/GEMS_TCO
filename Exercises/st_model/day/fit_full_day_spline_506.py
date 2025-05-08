@@ -82,7 +82,7 @@ def cli(
             mm_cond_number= mm_cond_number)
     
     for day in days_list:
-        params = list(estimates_df.iloc[day-1][:-1])
+        params = list(estimates_df.iloc[day][:-1])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
         print(f'2024-07-{day+1}, data size per day: { (200/lat_lon_resolution[0])*(100/lat_lon_resolution[0]) }, smooth: {v}')
         print(f'mm_cond_number: {mm_cond_number},\ninitial parameters: \n {params}')
@@ -101,7 +101,7 @@ def cli(
         print(f'End 2024-07-{day+1} for lr:{lr}, step size {step}, betas(_,b2):{0.99}, gamma:{gamma_par} took {epoch_time:.2f}, epoch {epochs}')
         print(f'params and loss {out}')
 
-        input_filepath = input_path / f"full_day_v{int(v*100):03d}_spline{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
+        input_filepath = output_path / f"full_day_v{int(v*100):03d}_spline{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
         
         res = alg_optimization( f"2024-07-{day+1}", f"Vecc_b2 and b2{0.99}", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
         loaded_data = res.load(input_filepath)
