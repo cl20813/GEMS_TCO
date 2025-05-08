@@ -893,9 +893,24 @@ class model_fitting(vecchia_experiment):
 
     # use adpating lr
     def run_full(self, params, optimizer, scheduler,  covariance_function, epochs=10 ):
+        
+        """
+        Run the training loop for the full likelihood model.
+
+        Args:
+            params (torch.Tensor): Model parameters.
+            optimizer (torch.optim.Optimizer): Optimizer for updating parameters.
+            scheduler (torch.optim.lr_scheduler): Learning rate scheduler.
+            epochs (int): Number of epochs to train.
+
+        Returns:
+            list: Final parameters and loss.
+            int: Number of epochs run.
+        """
+
         prev_loss= float('inf')
 
-        tol = 1e-4  # Convergence tolerance
+        tol = 1e-3  # Convergence tolerance
         for epoch in range(epochs):  
             optimizer.zero_grad()  
             
@@ -918,9 +933,11 @@ class model_fitting(vecchia_experiment):
                 break
 
             prev_loss = loss.item()
-        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
-    
-        return params.detach().numpy().tolist() + [ loss.item()], epoch
+
+        params = [torch.round(x*1000).detach().numpy()/1000 for x in params]
+        loss = (torch.round(loss*1000)/1000).item()
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {params}')
+        return params + [loss], epoch
 
     def run_vecc_reorder(self, params, optimizer, scheduler,  covariance_function, cov_map,epochs=10):
         prev_loss= float('inf')
@@ -948,8 +965,10 @@ class model_fitting(vecchia_experiment):
                 break
 
             prev_loss = loss.item()
-        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
-        return params.detach().numpy().tolist() + [ loss.item()], epoch
+        params = [torch.round(x*1000).detach().numpy()/1000 for x in params]
+        loss = (torch.round(loss*1000)/1000).item()
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {params}')
+        return params + [loss], epoch
     
     def run_vecc_ori_order(self, params, optimizer, scheduler,  covariance_function, cov_map,epochs=10):
         prev_loss= float('inf')
@@ -974,9 +993,11 @@ class model_fitting(vecchia_experiment):
                 break
 
             prev_loss = loss.item()
-        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
-        return params.detach().numpy().tolist() + [ loss.item()], epoch
-
+        params = [torch.round(x*1000).detach().numpy()/1000 for x in params]
+        loss = (torch.round(loss*1000)/1000).item()
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {params}')
+        return params + [loss], epoch
+    
     def run_vecc_ori_order_grad_tracker(self, params, optimizer, scheduler,  covariance_function, cov_map,epochs=10):
         prev_loss= float('inf')
 
@@ -1004,10 +1025,11 @@ class model_fitting(vecchia_experiment):
                 break
 
             prev_loss = loss.item()
-        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
-
-        return params.detach().numpy().tolist() + [ loss.item()], epoch
-
+        params = [torch.round(x*1000).detach().numpy()/1000 for x in params]
+        loss = (torch.round(loss*1000)/1000).item()
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {params}')
+        return params + [loss], epoch
+    
     def run_vecc_ori_order_grad_tracker(self, params, optimizer, scheduler, covariance_function, cov_map, epochs=10, early_stopping=None):
         prev_loss = float('inf')
         tol = 1e-4  # Convergence tolerance
@@ -1038,9 +1060,11 @@ class model_fitting(vecchia_experiment):
                 print(f"Early stopping at epoch {epoch}")
                 break
 
-        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
-        return params.detach().numpy().tolist() + [loss.item()], epoch
-
+        params = [torch.round(x*1000).detach().numpy()/1000 for x in params]
+        loss = (torch.round(loss*1000)/1000).item()
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {params}')
+        return params + [loss], epoch
+    
 class EarlyStopping:
     def __init__(self, patience=10, delta=0):
         """

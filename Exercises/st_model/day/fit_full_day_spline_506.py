@@ -64,10 +64,12 @@ def cli(
 
     ## load ozone data from amarel
     data_load_instance = load_data(config.amarel_data_load_path)
+    df_map, ord_mm, nns_map= data_load_instance.load_mm20k_data_bymonthyear(lat_lon_resolution = lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)  
 
-    estimates_df = data_load_instance.read_pickle(config.amarel_estimates_day_path,config.amarel_full_day_v05_pickle)
-    df_map, ord_mm, nns_map= data_load_instance.load_mm20k_data_bymonthyear(lat_lon_resolution = lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
-
+    # 5/09/24 try larger range parameters
+    init_estimates =  Path(config.amarel_estimates_day_saved_path) / config.amarel_full_day_v05_range_plus2_csv
+    estimates_df = pd.read_csv(init_estimates)
+    
     # only fit spline once because space are all same
     # load first data of analysis_data_map and aggregated_data to initialize spline_instance
     first_day_idx_for_datamap= [0,8]
@@ -82,7 +84,7 @@ def cli(
             mm_cond_number= mm_cond_number)
     
     for day in days_list:
-        params = list(estimates_df.iloc[day][:-1])
+        params = list(estimates_df.iloc[day][5:-3])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
         print(f'2024-07-{day+1}, data size per day: { (200/lat_lon_resolution[0])*(100/lat_lon_resolution[0]) }, smooth: {v}')
         print(f'mm_cond_number: {mm_cond_number},\ninitial parameters: \n {params}')
