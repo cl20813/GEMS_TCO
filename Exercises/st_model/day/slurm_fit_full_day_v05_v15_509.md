@@ -84,7 +84,6 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v05_416.py --v 1.
 
 ```
 
-
 ### I add +2 for each range parameters to change search area in optimization
 
 ```  cd ./jobscript/tco/gp_exercise  ```   
