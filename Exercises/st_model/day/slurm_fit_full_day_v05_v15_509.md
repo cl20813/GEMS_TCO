@@ -48,7 +48,6 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/ful
 
 ```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v05_509.py --v 0.5 --lr 0.02 --step 100 --gamma-par 0.5 --epochs 1000 --space "20, 20" --days "0,1" ```
 
-
 ### Job Order SLURM for both vecchia and full
 ```mkdir -p ./jobscript/tco/gp_exercise```     
 
