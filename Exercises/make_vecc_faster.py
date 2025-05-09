@@ -92,25 +92,14 @@ for day in range(5,6):
     epoch_time2 = end_time - start_time
     print(f'Vecchia likelihood: {out2},  time: {epoch_time2:.2f}') 
 
+    start_time = time.time()
+    out2 = instance_ori.vecchia_grouping(params, instance_ori.matern_cov_anisotropy_kv, cov_map_ori)
+    end_time = time.time()
+    epoch_time2 = end_time - start_time
+    print(f'Vecchia grouping: {out2},  time: {epoch_time2:.2f}') 
     
-    
-    import torch
-    import time
-    from torch.profiler import profile, record_function, ProfilerActivity
 
-    with profile(activities=[ProfilerActivity.CPU], record_shapes=True) as prof:
-        with record_function("full_likelihood"):
-            start_time = time.time()
-            out1 = instance.full_likelihood(params, aggregated_data[:,:4], aggregated_data[:,2], instance_ori.matern_cov_anisotropy_v05)
-            end_time = time.time()
-            epoch_time1 = end_time - start_time
-            print(f'Exact likelihood: {out1} time: {epoch_time1:.2f}')
-
-    print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
-    prof.export_chrome_trace("trace_full_likelihood.json")
-
-
-    
+    ''' 
     with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True, with_stack=True) as prof:
         with record_function("vecchia_ori_order"):
             start_time = time.time()
@@ -121,6 +110,18 @@ for day in range(5,6):
 
     print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
     prof.export_chrome_trace("trace_vecchia_ori_order.json")
+
+    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True, with_stack=True) as prof:
+        with record_function("vecchia_ori_order"):
+            start_time = time.time()
+            out2 = instance_ori.vecchia_grouping(params, instance_ori.matern_cov_anisotropy_kv, cov_map_ori)
+            end_time = time.time()
+            epoch_time2 = end_time - start_time
+            print(f'Vecchia likelihood: {out2},  time: {epoch_time2:.2f}')
+
+    print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
+    prof.export_chrome_trace("trace_vecchia_ori_order.json")
+    '''
 
 
 
