@@ -711,7 +711,7 @@ class vecchia_experiment(likelihood_function):
                 }
         return cov_map
 
-    def vecchia_reorder(self, params: torch.Tensor, covariance_function: Callable, cov_map:Dict[str,Any]) -> torch.Tensor:
+    def vecchia_grouping(self, params: torch.Tensor, covariance_function: Callable, cov_map:Dict[str,Any]) -> torch.Tensor:
 
         cut_line= self.nheads
         key_list = list(self.input_map.keys())
@@ -723,13 +723,14 @@ class vecchia_experiment(likelihood_function):
             heads = torch.cat( (heads,tmp), dim=0)
 
         neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
+        
         for time_idx in range(0,len(self.input_map)):
             current_np = self.input_map[key_list[time_idx]]
 
             # Use below when working on local computer to avoid singular matrix
-            for index in range(cut_line, self.size_per_hour):
-                current_row = current_np[index].reshape(1, -1)
-                current_y = current_row[0, 2]
+            for index in range(cut_line, self.size_per_hour, 10):
+                current_row = current_np[index:10,:]
+                current_y = current_row[:, 2]
 
                 # Construct conditioning set
                 mm_neighbors = self.nns_map[index]
@@ -738,15 +739,7 @@ class vecchia_experiment(likelihood_function):
 
                 if past:
                     data_list.append(current_np[past])  
-          
-                cov_matrix = cov_map[(time_idx,index)]['cov_matrix']
-                tmp1 = cov_map[(time_idx,index)]['tmp1']
-                cov_xx_inv = cov_map[(time_idx,index)]['cov_xx_inv']
-                cov_ygivenx = cov_map[(time_idx,index)]['cov_ygivenx']
-                cond_mean_tmp = cov_map[(time_idx,index)]['cond_mean_tmp']
-                log_det = cov_map[(time_idx,index)]['log_det']
-                locs = cov_map[(time_idx,index)]['locs']
-        
+ 
 
                 if time_idx >= 1:
                     one_hour_lag = self.input_map[key_list[time_idx - 1]]
@@ -765,17 +758,29 @@ class vecchia_experiment(likelihood_function):
 
                 aggregated_arr = torch.vstack((current_row, conditioning_data))
                 aggregated_y = aggregated_arr[:, 2]
+                locs = aggregated_arr[:, :2]
+                cov_matrix = covariance_function(params=params, y= aggregated_arr, x= aggregated_arr)
 
                 cov_yx = cov_matrix[0, 1:]
+                sign, log_det = torch.slogdet(cov_matrix)
 
-                tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, aggregated_y))
-                
+                tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
+                tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, aggregated_arr))
                 beta = torch.linalg.solve(tmp1, tmp2)
-           
+
                 mu = torch.matmul(locs, beta)
-                mu_current = mu[0]
-                mu_neighbors = mu[1:]
-                
+                mu_current = mu[:10]
+                mu_neighbors = mu[10:]
+
+                # Mean and variance of y|x
+                sigma = cov_matrix[:10, :10]
+                cov_xx = cov_matrix[10:, 10:]
+                cov_xx_inv = torch.linalg.inv(cov_xx)
+
+                cov_ygivenx = sigma - torch.matmul(cov_yx, torch.matmul(cov_xx_inv, cov_yx))
+                cond_mean_tmp = torch.matmul(cov_yx, cov_xx_inv)
+
+      
                 # Mean and variance of y|x
                 cond_mean = mu_current + torch.matmul(cond_mean_tmp, (aggregated_y[1:] - mu_neighbors))
                 alpha = current_y - cond_mean
