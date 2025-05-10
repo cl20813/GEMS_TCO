@@ -7,7 +7,7 @@ scp -r "C:\Users\joonw\TCO\GEMS_TCO-1\GEMS_TCO" jl2815@amarel.rutgers.edu:/home/
 
 ### Copy run file from ```local``` to ```Amarel HPC```
 # mac
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_vecc_day_v05_ori_ord_416.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_vecc_day_v05_may9.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_vecc_day_v10_416.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
