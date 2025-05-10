@@ -187,22 +187,24 @@ class likelihood_function(spatio_temporal_kernels):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
         self.nheads = nheads
               
-    def full_likelihood(self,params: torch.Tensor, input_np: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
+    def full_likelihood(self,params: torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
    
-        cov_matrix = covariance_function(params=params, y= self.aggregated_data, x= self.aggregated_data)
+        cov_matrix = covariance_function(params=params, y= input_data, x= input_data)
         # Compute the log determinant of the covariance matrix
         sign, log_det = torch.slogdet(cov_matrix)
         # if sign <= 0:
         #     raise ValueError("Covariance matrix is not positive definite")
 
+        locs = input_data[:,:2]
+        response = input_data[:,2]
         # Compute beta
-        tmp1 = torch.matmul(self.aggregated_locs.T, torch.linalg.solve(cov_matrix, self.aggregated_locs))
-        tmp2 = torch.matmul(self.aggregated_locs.T, torch.linalg.solve(cov_matrix, self.aggregated_response))
+        tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
+        tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, response))
         beta = torch.linalg.solve(tmp1, tmp2)
 
         # Compute the mean
-        mu = torch.matmul(self.aggregated_locs, beta)
-        y_mu = self.aggregated_response - mu
+        mu = torch.matmul(locs, beta)
+        y_mu = response - mu
 
         # Compute the quadratic form
         quad_form = torch.matmul(y_mu, torch.linalg.solve(cov_matrix, y_mu))
@@ -353,7 +355,9 @@ class spline(spatio_temporal_kernels):
 
                 distances, non_zero_indices = self.precompute_coords_anisotropy(params, aggregated_arr,aggregated_arr)
                 cov_matrix = self.interpolate_cubic_spline(params, distances)
-      
+                # if sign <= 0:
+                #     raise ValueError("Covariance matrix is not positive definite")
+
                 cov_yx = cov_matrix[0, 1:]
                 sign, log_det = torch.slogdet(cov_matrix)
                 tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
@@ -637,7 +641,95 @@ class vecchia_experiment(likelihood_function):
         # print(f' statistic is {statistic}')
         return statistic
         '''
-    
+    def vecchia_grouping(self, params: torch.Tensor, covariance_function: Callable, cov_map:Dict[str,Any]) -> torch.Tensor:
+
+        cut_line= self.nheads
+        key_list = list(self.input_map.keys())
+
+        neg_log_lik = 0.0
+        heads = self.input_map[key_list[0]][:cut_line,:]
+        for time_idx in range(1, len(self.input_map)):
+            tmp = self.input_map[key_list[time_idx]][:cut_line,:]
+            heads = torch.cat( (heads,tmp), dim=0)
+
+        
+        neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
+        
+        st = 5
+        for time_idx in range(0,len(self.input_map)):
+            current_np = self.input_map[key_list[time_idx]]
+
+            # Use below when working on local computer to avoid singular matrix
+            
+            for index in range(cut_line, self.size_per_hour, st):
+                current_row = current_np[index: (index+st),:]
+                current_y = current_row[:, 2]
+                
+                # Construct conditioning set
+                mm_neighbors = self.nns_map[index]
+                past = list(mm_neighbors) 
+                data_list = []
+
+                if past:
+                    data_list.append(current_np[past])  
+
+                combined_indices = past + list(range(index, index + st))
+
+                if time_idx > 0:
+                    one_hour_lag = self.input_map[key_list[time_idx - 1]]
+                    data_list.append(one_hour_lag[combined_indices, :])
+                 
+                
+                if time_idx > 1:
+                    two_hour_lag = self.input_map[key_list[time_idx - 2]]
+                    data_list.append(two_hour_lag[combined_indices, :])
+                 
+                conditioning_data = torch.vstack(data_list) if data_list else torch.empty((0, current_row.shape[1]), dtype=torch.float64)
+                aggregated_arr = torch.vstack((current_row, conditioning_data))
+                aggregated_y = aggregated_arr[:, 2]
+                locs = aggregated_arr[:, :2]
+
+                cov_matrix = covariance_function(params=params, y= aggregated_arr, x= aggregated_arr)
+
+                sign, log_det = torch.slogdet(cov_matrix)
+
+                tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
+                tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, aggregated_y))
+                beta = torch.linalg.solve(tmp1, tmp2)
+
+                mu = torch.matmul(locs, beta)
+                mu_current = mu[:st]
+                mu_neighbors = mu[st:]
+            
+                # Mean and variance of y|x
+                cov_yx = cov_matrix[:st, st:]
+                # cov_yx = cov_matrix[0, 1:]
+        
+                cov_yy = cov_matrix[:st, :st]
+                cov_xx = cov_matrix[st:, st:]
+                cov_xx_inv = torch.linalg.inv(cov_xx)
+          
+                cov_ygivenx = cov_yy - torch.matmul(cov_yx, torch.matmul(cov_xx_inv, cov_yx.T))
+           
+                cond_mean_tmp = torch.matmul(cov_yx, cov_xx_inv)
+
+                # Mean and variance of y|x
+                cond_mean = mu_current + torch.matmul(cond_mean_tmp, (aggregated_y[st:] - mu_neighbors))
+                alpha = current_y - cond_mean
+            
+
+                quad_form = torch.matmul( alpha, torch.linalg.solve(cov_ygivenx, alpha )  )
+                
+                if st==1:
+                    log_det = torch.log(cov_ygivenx[0]).item()
+                else: 
+                    _, log_det = torch.slogdet( cov_ygivenx)
+                    
+           
+                neg_log_lik += 0.5 * (log_det + quad_form)
+           
+        return neg_log_lik
+
     def cov_structure_saver(self, params: torch.Tensor, covariance_function: Callable) -> None:
         
         cov_map = defaultdict(lambda: defaultdict(dict))
@@ -660,42 +752,32 @@ class vecchia_experiment(likelihood_function):
                     data_list.append(current_np[past])
 
                 if time_idx > 0:
-                    last_hour_np = self.input_map[key_list[time_idx - 1]]
-                    past_conditioning_data = last_hour_np[past + [index], :]
-                    data_list.append(past_conditioning_data)
+                    one_hour_lag = self.input_map[key_list[time_idx - 1]]
+                    data_list.append(one_hour_lag[past + [index], :])
 
                 if time_idx > 1:
-                    last_hour_np = self.input_map[key_list[time_idx -2]]
-                    # if index==200:
-                    #     print(self.input_map[self.key_list[time_idx-6]])
-                    past_conditioning_data = last_hour_np[past + [index], :]
-                    data_list.append(past_conditioning_data)
-                
-                if data_list:
-                    conditioning_data = torch.vstack(data_list)
-                else:
-                    conditioning_data = torch.empty((0, current_row.shape[1]), dtype=torch.float64)
+                    two_hour_lag = self.input_map[key_list[time_idx -2]]
+                    data_list.append(two_hour_lag [past + [index], :])
 
+    
+                conditioning_data = torch.vstack(data_list) if data_list else torch.empty((0, current_row.shape[1]), dtype=torch.float64)
                 aggregated_arr = torch.vstack((current_row, conditioning_data))
                 locs = aggregated_arr[:, :2]
 
                 cov_matrix = covariance_function(params=params, y= aggregated_arr, x= aggregated_arr )
-                # print(f'Condition number: {torch.linalg.cond(cov_matrix)}')
-                cov_yx = cov_matrix[0, 1:]
-                        # Compute the log determinant of the covariance matrix
-                sign, log_det = torch.slogdet(cov_matrix)
-
+                
                 # if sign <= 0:
                 #     raise ValueError("Covariance matrix is not positive definite")
-            
-                # Compute beta
+
+                cov_yx = cov_matrix[0, 1:]
+                sign, log_det = torch.slogdet(cov_matrix)
                 tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
             
                 # Mean and variance of y|x
                 sigma = cov_matrix[0, 0]
                 cov_xx = cov_matrix[1:, 1:]
                 cov_xx_inv = torch.linalg.inv(cov_xx)
-
+          
                 cov_ygivenx = sigma - torch.matmul(cov_yx, torch.matmul(cov_xx_inv, cov_yx))
                 cond_mean_tmp = torch.matmul(cov_yx, cov_xx_inv)
                 log_det = torch.log(cov_ygivenx)
@@ -711,95 +793,15 @@ class vecchia_experiment(likelihood_function):
                 }
         return cov_map
 
-    def vecchia_grouping(self, params: torch.Tensor, covariance_function: Callable, cov_map:Dict[str,Any]) -> torch.Tensor:
+
+    def vecchia_may9(self, params: torch.Tensor, covariance_function: Callable, cov_map:Dict[str,Any]) -> torch.Tensor:
 
         cut_line= self.nheads
         key_list = list(self.input_map.keys())
 
         neg_log_lik = 0.0
         heads = self.input_map[key_list[0]][:cut_line,:]
-        for time_idx in range(1, len(self.input_map)):
-            tmp = self.input_map[key_list[time_idx]][:cut_line,:]
-            heads = torch.cat( (heads,tmp), dim=0)
 
-        neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
-        
-        for time_idx in range(0,len(self.input_map)):
-            current_np = self.input_map[key_list[time_idx]]
-
-            # Use below when working on local computer to avoid singular matrix
-            for index in range(cut_line, self.size_per_hour, 10):
-                current_row = current_np[index: (index+10),:]
-                current_y = current_row[:, 2]
-
-                # Construct conditioning set
-                mm_neighbors = self.nns_map[index]
-                past = list(mm_neighbors) 
-                data_list = []
-
-                if past:
-                    data_list.append(current_np[past])  
- 
-
-                if time_idx >= 1:
-                    one_hour_lag = self.input_map[key_list[time_idx - 1]]
-                    past_conditioning_data = one_hour_lag[past + [index], :]
-                    data_list.append(past_conditioning_data)
-                
-                if time_idx > 1:
-                    two_hour_lag = self.input_map[key_list[time_idx - 2]]
-                    past_conditioning_data = two_hour_lag[past + [index], :]
-                    data_list.append(past_conditioning_data)
-    
-                if data_list:
-                    conditioning_data = torch.vstack(data_list)
-                else:
-                    conditioning_data = torch.empty((0, current_row.shape[1]), dtype=torch.float64)
-          
-                aggregated_arr = torch.vstack((current_row, conditioning_data))
-                aggregated_y = aggregated_arr[:, 2]
-                locs = aggregated_arr[:, :2]
-
-   
-                cov_matrix = covariance_function(params=params, y= aggregated_arr, x= aggregated_arr)
-
-           
-                cov_yx = cov_matrix[:10, 10:]
-          
-                sign, log_det = torch.slogdet(cov_matrix)
-
-                tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
-                tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, aggregated_y))
-                beta = torch.linalg.solve(tmp1, tmp2)
-
-                mu = torch.matmul(locs, beta)
-                mu_current = mu[:10]
-                mu_neighbors = mu[10:]
-            
-                # Mean and variance of y|x
-                cov_yy = cov_matrix[:10, :10]
-                cov_xx = cov_matrix[10:, 10:]
-                cov_xx_inv = torch.linalg.inv(cov_xx)
-
-                cov_ygivenx = cov_yy - torch.matmul(cov_yx, torch.matmul(cov_xx_inv, cov_yx.T))
-                cond_mean_tmp = torch.matmul(cov_yx, cov_xx_inv)
-
-                # Mean and variance of y|x
-                cond_mean = mu_current + torch.matmul(cond_mean_tmp, (aggregated_y[10:] - mu_neighbors))
-                alpha = current_y - cond_mean
-                quad_form = torch.matmul( alpha, torch.linalg.solve(cov_ygivenx, alpha )  )
-                # quad_form = alpha**2 * (1 / cov_ygivenx)
-                neg_log_lik += 0.5 * (log_det + quad_form)
-        return neg_log_lik
-  
-
-    def vecchia_ori_order(self, params: torch.Tensor, covariance_function: Callable, cov_map:Dict[str,Any]) -> torch.Tensor:
-
-        cut_line= self.nheads
-        key_list = list(self.input_map.keys())
-
-        neg_log_lik = 0.0
-        heads = self.input_map[key_list[0]][:cut_line,:]
         for time_idx in range(1, len(self.input_map)):
             tmp = self.input_map[key_list[time_idx]][:cut_line,:]
             heads = torch.cat( (heads,tmp), dim=0)
@@ -830,13 +832,13 @@ class vecchia_experiment(likelihood_function):
                     log_det = cov_map[(time_idx,index)]['log_det']
                     locs = cov_map[(time_idx,index)]['locs']
                 else:
-                    cov_matrix = cov_map[(2, index)]['cov_matrix']
-                    tmp1 = cov_map[(2, index)]['tmp1']
-                    cov_xx_inv = cov_map[(2, index)]['cov_xx_inv']
-                    cov_ygivenx = cov_map[(2, index)]['cov_ygivenx']
-                    cond_mean_tmp = cov_map[(2, index)]['cond_mean_tmp']
-                    log_det = cov_map[(2, index)]['log_det']
-                    locs = cov_map[(2, index)]['locs']
+                    cov_matrix = cov_map[(2,index)]['cov_matrix']
+                    tmp1 = cov_map[(2,index)]['tmp1']
+                    cov_xx_inv = cov_map[(2,index)]['cov_xx_inv']
+                    cov_ygivenx = cov_map[(2,index)]['cov_ygivenx']
+                    cond_mean_tmp = cov_map[(2,index)]['cond_mean_tmp']
+                    log_det = cov_map[(2,index)]['log_det']
+                    locs = cov_map[(2,index)]['locs']
 
                 if time_idx >= 1:
                     one_hour_lag = self.input_map[key_list[time_idx - 1]]
@@ -857,11 +859,8 @@ class vecchia_experiment(likelihood_function):
                 aggregated_y = aggregated_arr[:, 2]
 
                 cov_yx = cov_matrix[0, 1:]
-
                 tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, aggregated_y))
-                
                 beta = torch.linalg.solve(tmp1, tmp2)
-           
                 mu = torch.matmul(locs, beta)
                 mu_current = mu[0]
                 mu_neighbors = mu[1:]
@@ -870,8 +869,47 @@ class vecchia_experiment(likelihood_function):
                 cond_mean = mu_current + torch.matmul(cond_mean_tmp, (aggregated_y[1:] - mu_neighbors))
                 alpha = current_y - cond_mean
                 quad_form = alpha**2 * (1 / cov_ygivenx)
+
+            
                 neg_log_lik += 0.5 * (log_det + quad_form)
         return neg_log_lik
+
+    def vecchia_local_full_cond(self, params: torch.Tensor, covariance_function) -> torch.Tensor:
+        neg_log_lik = 0.0
+
+        print(self.aggregated_data.shape)
+        for idx in range(0, len(self.aggregated_data)):
+            current_row = self.aggregated_data[idx,:4]
+            current_y = self.aggregated_data[idx,2]
+            conditioning_data = self.aggregated_data[:idx,:4]
+
+            torch_arr = torch.vstack((current_row, conditioning_data))
+            y_and_neighbors = torch_arr[:, 2]
+            locs = torch_arr[:, :2]
+
+            cov_matrix = covariance_function(params=params, y= torch_arr, x= torch_arr)
+            cov_yx = cov_matrix[0, 1:]
+            cov_xx = cov_matrix[1:, 1:]
+   
+            tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
+            tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, y_and_neighbors))   
+            beta = torch.linalg.solve(tmp1, tmp2)
+
+            mu = torch.matmul(locs, beta)
+            mu_current = mu[0]
+            mu_neighbors = mu[1:]
+
+            sigma = cov_matrix[0, 0]
+            cov_ygivenx = sigma - torch.matmul(cov_yx, torch.linalg.solve(cov_xx, cov_yx))
+            cond_mean = mu_current + torch.matmul(cov_yx, torch.linalg.solve( cov_xx,(y_and_neighbors[1:] - mu_neighbors) ) )
+            
+            alpha = current_y - cond_mean
+            quad_form = alpha**2 * (1 / cov_ygivenx)
+            log_det = torch.log(cov_ygivenx)
+     
+            neg_log_lik += 0.5 * (log_det + quad_form) 
+        return neg_log_lik
+
 
 class model_fitting(vecchia_experiment): 
     def __init__(self, smooth:float, input_map:Dict[str,Any], aggregated_data:torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int):
