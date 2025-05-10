@@ -644,7 +644,7 @@ class vecchia_experiment(likelihood_function):
         cut_line= self.nheads
         key_list = list(self.input_map.keys())
 
-        for time_idx in range(0,8):
+        for time_idx in range(0,3):
             current_np = self.input_map[key_list[time_idx]]
 
             # Use below when working on local computer to avoid singular matrix
@@ -830,13 +830,13 @@ class vecchia_experiment(likelihood_function):
                     log_det = cov_map[(time_idx,index)]['log_det']
                     locs = cov_map[(time_idx,index)]['locs']
                 else:
-                    cov_matrix = cov_map[(2,index)]['cov_matrix']
-                    tmp1 = cov_map[(2,index)]['tmp1']
-                    cov_xx_inv = cov_map[(2,index)]['cov_xx_inv']
-                    cov_ygivenx = cov_map[(2,index)]['cov_ygivenx']
-                    cond_mean_tmp = cov_map[(2,index)]['cond_mean_tmp']
-                    log_det = cov_map[(2,index)]['log_det']
-                    locs = cov_map[(2,index)]['locs']
+                    cov_matrix = cov_map[(2, index)]['cov_matrix']
+                    tmp1 = cov_map[(2, index)]['tmp1']
+                    cov_xx_inv = cov_map[(2, index)]['cov_xx_inv']
+                    cov_ygivenx = cov_map[(2, index)]['cov_ygivenx']
+                    cond_mean_tmp = cov_map[(2, index)]['cond_mean_tmp']
+                    log_det = cov_map[(2, index)]['log_det']
+                    locs = cov_map[(2, index)]['locs']
 
                 if time_idx >= 1:
                     one_hour_lag = self.input_map[key_list[time_idx - 1]]

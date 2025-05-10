@@ -69,13 +69,13 @@ for day in range(5,6):
     analysis_data_map, aggregated_data = instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap= idx_for_datamap)
 
 
-
     # different approximations
     # key_order = [0,1,2,4,3,5,7,6]
     # reordered_dict, reordered_df = instance.reorder_data(analysis_data_map, key_order)
-    instance_ori = kernels.vecchia_experiment(0.5, analysis_data_map, aggregated_data,nns_map,mm_cond_number, nheads)
+   
     # instance = kernels.vecchia_experiment(0.5, reordered_dict, reordered_df, nns_map,mm_cond_number, nheads)
 
+    instance_ori = kernels.vecchia_experiment(0.5, analysis_data_map, aggregated_data,nns_map,mm_cond_number, nheads)
     
     start_time = time.time()
     out1 = instance_ori.full_likelihood(params, aggregated_data[:,:4],aggregated_data[:,2], instance_ori.matern_cov_anisotropy_v05)
