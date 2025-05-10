@@ -52,13 +52,17 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/ful
 ```mkdir -p ./jobscript/tco/gp_exercise```     
 
 ```  cd ./jobscript/tco/gp_exercise  ```   
-```  nano fit_full_day_v05_1250_estimates.sh  ```        
- ```   sbatch fit_full_day_v05_1250_estimates.sh   ```
+```  nano fit_full_day_v05_1250_r2s10_may9.sh  ```        
+ ```   sbatch fit_full_day_v05_1250_r2s10_may9.sh   ```
+
+### I add +2 for each range parameters  and -10 to sigma to change search area in optimization
+
+### actually i used empirival variance as initial sigma not -10 to previous initial estimates
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=ful_v05_day_1250                             # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_full_day_v05_1250_%j.out     # Standard output file (%j = JobID)
+#SBATCH --job-name=ful_v05_day_1250_r2s10                             # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/fit_full_day_v05_1250_r2s10%j.out     # Standard output file (%j = JobID)
 #SBATCH --error=/home/jl2815/tco/exercise_output/fit_full_day_v05_1250_%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
@@ -79,7 +83,7 @@ echo "Current date and time: $(date)"
 
 echo "fit_full_day_v05_1250"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v05_416.py --v 1.0 --lr 0.005 --step 100 --gamma-par 0.5 --epochs 1000 --space "4, 4" --days 31 --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"
+srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v05_509.py --v 0.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "4, 4" --days "0,31" 
 
 ```
 
