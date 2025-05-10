@@ -95,6 +95,7 @@ def cli(
         start_time = time.time()
         # optimizer = optim.Adam([params], lr=0.01)  # For Adam
         optimizer, scheduler = model_instance.optimizer_fun(params, lr=lr, betas=(0.9, 0.99), eps=1e-8, step_size=step, gamma = gamma_par)    
+        
         out, epoch = model_instance.run_full(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, epochs=epochs)
         end_time = time.time()
         epoch_time = end_time - start_time

@@ -3,6 +3,8 @@ import sys
 # Add your custom path
 sys.path.append("/cache/home/jl2815/tco")
 import os
+import logging
+import argparse # Argument parsing
 
 # Data manipulation and analysis
 import pandas as pd
@@ -21,13 +23,13 @@ from GEMS_TCO import kernels
 from GEMS_TCO import orderings as _orderings 
 from GEMS_TCO import load_data
 from GEMS_TCO import alg_optimization, alg_opt_Encoder
-from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingLR
 
 from typing import Optional, List, Tuple
 from pathlib import Path
 import typer
 import json
 from json import JSONEncoder
+from GEMS_TCO import configuration as config
 
 
 app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
@@ -36,7 +38,10 @@ app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
 def cli(
     v: float = typer.Option(0.5, help="smooth"),
     lr: float = typer.Option(0.01, help="learning rate"),
-    step: int = typer.Option(200, help="Number of iterations in optimization"),
+    step: int = typer.Option(80, help="Number of iterations in optimization"),
+    coarse_factor: int = typer.Option(100, help="coarse factor in spline learning"),
+
+    gamma_par: float = typer.Option(0.5, help="decreasing factor for learning rate"),
     space: List[str] = typer.Option(['20', '20'], help="spatial resolution"),
     days: List[str] = typer.Option(['0', '31'], help="Number of nearest neighbors in Vecchia approx."),
     
@@ -46,6 +51,7 @@ def cli(
     ## negative number can be a problem when parsing with typer
     epochs: int = typer.Option(100, help="Number of iterations in optimization"),
     nheads: int = typer.Option(200, help="Number of iterations in optimization")
+
 ) -> None:
       
     lat_lon_resolution = [int(s) for s in space[0].split(',')]
@@ -59,54 +65,36 @@ def cli(
     # params = torch.tensor(parsed_params, requires_grad=True)
 
     ############################## 
-    ## load initial estimates 
-
-    input_path = "/home/jl2815/tco/exercise_output/estimates/day/saved/"
-    input_filename = "full_day_v(0.5)_1250_july24.pkl"
-    input_filepath = os.path.join(input_path, input_filename)
-    # Load pickle
-    with open(input_filepath, 'rb') as pickle_file:
-        amarel_map1250= pickle.load(pickle_file)
-
-    df_1250 = pd.DataFrame()
-    for key in amarel_map1250:
-        tmp = pd.DataFrame(amarel_map1250[key][0].reshape(1, -1), columns=['sigmasq', 'range_lat', 'range_lon', 'advec_lat', 'advec_lon', 'beta', 'nugget'])
-        tmp['loss'] = amarel_map1250[key][1]
-        df_1250 = pd.concat((df_1250, tmp), axis=0)
-
-    date_range = pd.date_range(start='07-01-24', end='07-31-24')
-
-    # Ensure the number of dates matches the number of rows in df_1250
-    if len(date_range) == len(df_1250):
-        df_1250.index = date_range
-    else:
-        print("The number of dates does not match the number of rows in the DataFrame.")
-
-    ######
-
-    # Set spaital coordinates
+    ## initialize setting
+    lat_lon_resolution = [int(s) for s in space[0].split(',')]
+    days_s_e = list(map(int, days[0].split(',')))
+    days_list = list(range(days_s_e[0], days_s_e[1]))
     years = ['2024']
     month_range =[7,8]
+    output_path = input_path = Path(config.amarel_estimates_day_path)
 
-    basic_path = "/home/jl2815/tco/data/pickle_data"
-    instance = load_data(basic_path)
 
-    map, ord_mm, nns_map= instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number= mm_cond_number ,years_=years, months_=month_range)
-   
+    data_load_instance = load_data(config.amarel_data_load_path)
+    df_map, ord_mm, nns_map= data_load_instance.load_mm20k_data_bymonthyear(lat_lon_resolution = lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
 
-    input_path = Path("/home/jl2815/tco/exercise_output/estimates/day/")
+    # 5/09/24 try larger range parameters
+    # init_estimates =  Path(config.amarel_estimates_day_saved_path) / config.amarel_full_day_v05_range_plus2_csv
+    init_estimates =  Path(config.amarel_estimates_day_saved_path) / config.amarel_full_day_v05_range_plus2_sigma_n10_csv
+    
+    estimates_df = pd.read_csv(init_estimates)
+
+    print(estimates_df.head(), estimates_df.shape)
+
 
     for day in days_list:
-        idx_for_datamap= [8*day,8*(day+1)]
-        analysis_data_map, aggregated_data = instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
 
-        lenth_of_analysis =idx_for_datamap[1]-idx_for_datamap[0]
-        print(f'2024-07-{day+1}, data size per hour: {aggregated_data.shape[0]/lenth_of_analysis}, smooth: {v}')
-        
-        params_item = list(df_1250.iloc[day][:-1])
-        params = torch.tensor(params_item, dtype=torch.float64, requires_grad=True)
-        
-        print(f'mm_cond_number {mm_cond_number}, params: {params} ')
+        params = list(estimates_df.iloc[day][5:-3])
+        params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
+        print(f'2024-07-{day+1}, data size per day: { (200/lat_lon_resolution[0])*(100/lat_lon_resolution[0]) }, smooth: {v}')
+        print(f'mm_cond_number: {mm_cond_number},\ninitial parameters: \n {params}')
+                
+        idx_for_datamap= [8*day,8*(day+1)]
+        analysis_data_map, aggregated_data = data_load_instance.load_working_data_byday( df_map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
 
         model_instance = kernels.model_fitting(
                 smooth=v,
@@ -119,16 +107,18 @@ def cli(
  
         start_time = time.time()
         # optimizer = optim.Adam([params], lr=0.01)  # For Adam
-        optimizer, scheduler = model_instance.optimizer_fun(params, lr=lr, betas=(0.9, 0.99), eps=1e-8, step_size=step, gamma=0.1) 
-
-        instance_map = kernels.vecchia_experiment(0.5, analysis_data_map, aggregated_data, nns_map,mm_cond_number, nheads)
+        optimizer, scheduler = model_instance.optimizer_fun(params, lr=lr, betas=(0.9, 0.99), eps=1e-8, step_size=step, gamma = gamma_par)    
+        
+        instance_map = kernels.vecchia_experiment(v, analysis_data_map, aggregated_data, nns_map,mm_cond_number, nheads)
         cov_map =  instance_map.cov_structure_saver(params, instance_map.matern_cov_anisotropy_v05)   
-        out, epoch = model_instance.run_vecc_ori_order(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, cov_map, epochs=epochs)
+        
+        out, epoch = model_instance.run_vecc_may9(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, cov_map, epochs=epochs)
         end_time = time.time()
         epoch_time = end_time - start_time
-        print(f"2024-07-{day+1}", "vecchia_v05_ori_ord", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
-        
-        input_filepath = input_path / f"vecchia_v05_ori_ord{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
+        print(f'End 2024-07-{day+1} for lr:{lr}, step size {step}, betas(_,b2):{0.99}, gamma:{gamma_par} took {epoch_time:.2f}, epoch {epochs}')
+        print(f'params and loss {out}')
+
+        input_filepath = output_path / f"full_day_v05_r2s10_{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
         
         res = alg_optimization( f"2024-07-{day+1}", "Vecc_contender", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
         loaded_data = res.load(input_filepath)
