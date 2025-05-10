@@ -43,17 +43,18 @@ from torch.profiler import profile, record_function, ProfilerActivity
 
 df = pd.read_csv("/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/full_estimates_1250_july24.csv") 
 
-lat_lon_resolution = [10,10]  # 4,4 to coarse factor 2 // 2,2 to 4  5 is worse
+lat_lon_resolution = [14,14]  # 4,4 to coarse factor 2 // 2,2 to 4  5 is worse
 
 years = ['2024']
 month_range =[7,8]
-nheads = 2
+nheads = 30
+mm_cond_number = 10
 
 for day in range(5,6):
     print(f'\n Day {day} data size per day: { (200/lat_lon_resolution[0])*(100/lat_lon_resolution[0])  } \n')
 
     # parameters
-    mm_cond_number = 10
+    
     idx_for_datamap= [ 8*(day-1),8*day]
     # params = [ 27.25, 2.18, 2.294, 4.099e-4, -0.07915, 0.0999, 3.65]   #200
     params = list(df.iloc[day-1][:-1])
@@ -70,36 +71,39 @@ for day in range(5,6):
 
 
     # different approximations
-    key_order = [0,1,2,4,3,5,7,6]
-    reordered_dict, reordered_df = instance.reorder_data(analysis_data_map, key_order)
+    # key_order = [0,1,2,4,3,5,7,6]
+    # reordered_dict, reordered_df = instance.reorder_data(analysis_data_map, key_order)
     instance_ori = kernels.vecchia_experiment(0.5, analysis_data_map, aggregated_data,nns_map,mm_cond_number, nheads)
-    instance = kernels.vecchia_experiment(0.5, reordered_dict, reordered_df, nns_map,mm_cond_number, nheads)
+    # instance = kernels.vecchia_experiment(0.5, reordered_dict, reordered_df, nns_map,mm_cond_number, nheads)
 
     
     start_time = time.time()
-    out1 = instance.full_likelihood(params, aggregated_data[:,:4],aggregated_data[:,2], instance_ori.matern_cov_anisotropy_v05)
+    out1 = instance_ori.full_likelihood(params, aggregated_data[:,:4],aggregated_data[:,2], instance_ori.matern_cov_anisotropy_v05)
     end_time = time.time()
     epoch_time1 = end_time - start_time
     print(f'Exact likelihood: {out1} time: {epoch_time1:.2f}') 
     
     
     cov_map_ori = instance_ori.cov_structure_saver(params, instance_ori.matern_cov_anisotropy_v05)
-    cov_map_new = instance.cov_structure_saver(params, instance.matern_cov_anisotropy_v05)
+    # cov_map_new = instance.cov_structure_saver(params, instance.matern_cov_anisotropy_v05)
 
     start_time = time.time()
-    out2 = instance_ori.vecchia_ori_order(params, instance_ori.matern_cov_anisotropy_kv, cov_map_ori)
+    out2 = instance_ori.vecchia_ori_order(params, instance_ori.matern_cov_anisotropy_v05, cov_map_ori)
     end_time = time.time()
     epoch_time2 = end_time - start_time
     print(f'Vecchia likelihood: {out2},  time: {epoch_time2:.2f}') 
 
+
+    
+
+    ''' 
     start_time = time.time()
     out2 = instance_ori.vecchia_grouping(params, instance_ori.matern_cov_anisotropy_kv, cov_map_ori)
     end_time = time.time()
     epoch_time2 = end_time - start_time
     print(f'Vecchia grouping: {out2},  time: {epoch_time2:.2f}') 
-    
 
-    ''' 
+
     with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True, with_stack=True) as prof:
         with record_function("vecchia_ori_order"):
             start_time = time.time()
