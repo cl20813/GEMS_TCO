@@ -915,13 +915,8 @@ class model_fitting(vecchia_experiment):
     def __init__(self, smooth:float, input_map:Dict[str,Any], aggregated_data:torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number, nheads)
      
-    # Example function to compute out1
-    def compute_vecc_nll_reorder(self,params, covariance_function, cov_map):
-        vecc_nll = self.vecchia_reorder(params, covariance_function, cov_map)
-        return vecc_nll
-
-    def compute_vecc_nll_ori_order(self,params , covariance_function, cov_map):
-        vecc_nll = self.vecchia_ori_order(params, covariance_function, cov_map)
+    def compute_vecc_nll_may9(self,params , covariance_function, cov_map):
+        vecc_nll = self.vecchia_may9(params, covariance_function, cov_map)
         return vecc_nll
 
     def compute_full_nll(self,params, covariance_function):
@@ -929,11 +924,6 @@ class model_fitting(vecchia_experiment):
         return full_nll
     
     def optimizer_fun(self, params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=40, gamma=0.5):
-        optimizer = torch.optim.Adam([params], lr=lr, betas=betas, eps=eps)
-        scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)  # Decrease LR by a factor of 0.1 every 10 epochs
-        return optimizer, scheduler
-
-    def optimizer_testing(self, params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=40, gamma=0.5):
         optimizer = torch.optim.Adam([params], lr=lr, betas=betas, eps=eps)
         scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)  # Decrease LR by a factor of 0.1 every 10 epochs
         return optimizer, scheduler
@@ -986,43 +976,14 @@ class model_fitting(vecchia_experiment):
         print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {params}')
         return params + [loss], epoch
 
-    def run_vecc_reorder(self, params, optimizer, scheduler,  covariance_function, cov_map,epochs=10):
-        prev_loss= float('inf')
 
-        tol = 1e-4  # Convergence tolerance
-        for epoch in range(epochs):  # Number of epochs
-            optimizer.zero_grad()  # Zero the gradients 
-            
-            loss = self.compute_vecc_nll_reorder(params, covariance_function, cov_map)
-            loss.backward(retain_graph=True) # Backpropagate the loss with retain_graph=True
-            # loss.backward()
-
-            # if epoch % 500 == 0:
-            #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
-            
-            # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
-            
-            optimizer.step()  
-            scheduler.step()  
-   
-            # Check for convergence
-            if abs(prev_loss - loss.item()) < tol:
-                print(f"Converged at epoch {epoch}")
-                print(f'Epoch {epoch+1},  \n vecc Parameters: {params.detach().numpy()}')
-                break
-
-            prev_loss = loss.item()
-        params = [torch.round(x*1000).detach().numpy()/1000 for x in params]
-        loss = (torch.round(loss*1000)/1000).item()
-        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {params}')
-        return params + [loss], epoch
     
-    def run_vecc_ori_order(self, params, optimizer, scheduler,  covariance_function, cov_map,epochs=10):
+    def run_vecc_may9(self, params, optimizer, scheduler,  covariance_function, cov_map,epochs=10):
         prev_loss= float('inf')
         tol = 1e-4  # Convergence tolerance
         for epoch in range(epochs):  
             optimizer.zero_grad()  
-            loss = self.compute_vecc_nll_ori_order(params, covariance_function, cov_map)
+            loss = self.compute_vecc_nll_may9(params, covariance_function, cov_map)
             loss.backward(retain_graph=True) # Backpropagate the loss with retain_graph=True
             # loss.backward()
 
@@ -1044,74 +1005,7 @@ class model_fitting(vecchia_experiment):
         loss = (torch.round(loss*1000)/1000).item()
         print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {params}')
         return params + [loss], epoch
-    
-    def run_vecc_ori_order_grad_tracker(self, params, optimizer, scheduler,  covariance_function, cov_map,epochs=10):
-        prev_loss= float('inf')
-
-        tol = 1e-4  # Convergence tolerance
-        for epoch in range(epochs):  # Number of epochs
-            optimizer.zero_grad()  # Zero the gradients 
-            
-            loss = self.compute_vecc_nll_ori_order(params, covariance_function, cov_map)
-            loss.backward(retain_graph=True) # Backpropagate the loss with retain_graph=True
-            # loss.backward()
-
-            # Print gradients and parameters every 10th epoch
-            if epoch % 10 == 0:
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
-            
-            # print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
-            
-            optimizer.step()  # Update the parameters
-            scheduler.step()  # Update the learning rate
-
-            # Check for convergence
-            if abs(prev_loss - loss.item()) < tol:
-                print(f"Converged at epoch {epoch}")
-                print(f'Epoch {epoch+1},  \n vecc Parameters: {params.detach().numpy()}')
-                break
-
-            prev_loss = loss.item()
-        params = [torch.round(x*1000).detach().numpy()/1000 for x in params]
-        loss = (torch.round(loss*1000)/1000).item()
-        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {params}')
-        return params + [loss], epoch
-    
-    def run_vecc_ori_order_grad_tracker(self, params, optimizer, scheduler, covariance_function, cov_map, epochs=10, early_stopping=None):
-        prev_loss = float('inf')
-        tol = 1e-4  # Convergence tolerance
-
-        for epoch in range(epochs):  # Number of epochs
-            optimizer.zero_grad()  # Zero the gradients
-            
-            loss = self.compute_vecc_nll_ori_order(params, covariance_function, cov_map)
-            loss.backward(retain_graph=True)  # Backpropagate the loss with retain_graph=True
-            
-            # Print gradients and parameters every 10th epoch
-            if epoch % 10 == 0:
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
-            
-            optimizer.step()  # Update the parameters
-            scheduler.step()  # Update the learning rate
-
-            # Check for convergence
-            if abs(prev_loss - loss.item()) < tol:
-                print(f"Converged at epoch {epoch}")
-                print(f'Epoch {epoch+1},  \n vecc Parameters: {params.detach().numpy()}')
-                break
-
-            prev_loss = loss.item()
-
-            # Early stopping check
-            if early_stopping and early_stopping(loss.item()):
-                print(f"Early stopping at epoch {epoch}")
-                break
-
-        params = [torch.round(x*1000).detach().numpy()/1000 for x in params]
-        loss = (torch.round(loss*1000)/1000).item()
-        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {params}')
-        return params + [loss], epoch
-    
+        
 class EarlyStopping:
     def __init__(self, patience=10, delta=0):
         """

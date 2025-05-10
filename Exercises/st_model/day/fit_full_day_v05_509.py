@@ -67,7 +67,9 @@ def cli(
     df_map, ord_mm, nns_map= data_load_instance.load_mm20k_data_bymonthyear(lat_lon_resolution = lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
 
     # 5/09/24 try larger range parameters
-    init_estimates =  Path(config.amarel_estimates_day_saved_path) / config.amarel_full_day_v05_range_plus2_csv
+    # init_estimates =  Path(config.amarel_estimates_day_saved_path) / config.amarel_full_day_v05_range_plus2_csv
+    init_estimates =  Path(config.amarel_estimates_day_saved_path) / config.amarel_full_day_v05_range_plus2_sigma_n10_csv
+    
     estimates_df = pd.read_csv(init_estimates)
 
     print(estimates_df.head(), estimates_df.shape)
@@ -100,7 +102,7 @@ def cli(
         print(f'params and loss {out}')
 
 
-        input_filepath = output_path / f"full_day_v05_{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
+        input_filepath = output_path / f"full_day_v05_r2s10_{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
         
         res = alg_optimization( f"2024-07-{day+1}", f"Vecc_b2 and b2{0.99}", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
         loaded_data = res.load(input_filepath)
@@ -108,7 +110,7 @@ def cli(
         res.save(input_filepath,loaded_data)
         fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'epoch']
 
-        csv_filepath = output_path/f"full_day_v05_{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0])}.csv"
+        csv_filepath = output_path/f"full_day_v05_r2s10_{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0])}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
 if __name__ == '__main__':
