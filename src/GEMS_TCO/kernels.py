@@ -729,7 +729,7 @@ class vecchia_experiment(likelihood_function):
 
             # Use below when working on local computer to avoid singular matrix
             for index in range(cut_line, self.size_per_hour, 10):
-                current_row = current_np[index:10,:]
+                current_row = current_np[index: (index+10),:]
                 current_y = current_row[:, 2]
 
                 # Construct conditioning set
@@ -755,36 +755,40 @@ class vecchia_experiment(likelihood_function):
                     conditioning_data = torch.vstack(data_list)
                 else:
                     conditioning_data = torch.empty((0, current_row.shape[1]), dtype=torch.float64)
-
+          
                 aggregated_arr = torch.vstack((current_row, conditioning_data))
                 aggregated_y = aggregated_arr[:, 2]
                 locs = aggregated_arr[:, :2]
+
+   
                 cov_matrix = covariance_function(params=params, y= aggregated_arr, x= aggregated_arr)
 
-                cov_yx = cov_matrix[0, 1:]
+           
+                cov_yx = cov_matrix[:10, 10:]
+          
                 sign, log_det = torch.slogdet(cov_matrix)
 
                 tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
-                tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, aggregated_arr))
+                tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, aggregated_y))
                 beta = torch.linalg.solve(tmp1, tmp2)
 
                 mu = torch.matmul(locs, beta)
                 mu_current = mu[:10]
                 mu_neighbors = mu[10:]
-
+            
                 # Mean and variance of y|x
-                sigma = cov_matrix[:10, :10]
+                cov_yy = cov_matrix[:10, :10]
                 cov_xx = cov_matrix[10:, 10:]
                 cov_xx_inv = torch.linalg.inv(cov_xx)
 
-                cov_ygivenx = sigma - torch.matmul(cov_yx, torch.matmul(cov_xx_inv, cov_yx))
+                cov_ygivenx = cov_yy - torch.matmul(cov_yx, torch.matmul(cov_xx_inv, cov_yx.T))
                 cond_mean_tmp = torch.matmul(cov_yx, cov_xx_inv)
 
-      
                 # Mean and variance of y|x
-                cond_mean = mu_current + torch.matmul(cond_mean_tmp, (aggregated_y[1:] - mu_neighbors))
+                cond_mean = mu_current + torch.matmul(cond_mean_tmp, (aggregated_y[10:] - mu_neighbors))
                 alpha = current_y - cond_mean
-                quad_form = alpha**2 * (1 / cov_ygivenx)
+                quad_form = torch.matmul( alpha, torch.linalg.solve(cov_ygivenx, alpha )  )
+                # quad_form = alpha**2 * (1 / cov_ygivenx)
                 neg_log_lik += 0.5 * (log_det + quad_form)
         return neg_log_lik
   
