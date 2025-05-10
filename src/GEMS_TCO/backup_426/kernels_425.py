@@ -1248,6 +1248,8 @@ class model_fitting(vecchia_experiment):
         vecc_nll = self.vecchia_ori_order(params, covariance_function, cov_map)
         return vecc_nll
 
+
+
     def compute_full_nll(self,params, covariance_function):
         full_nll = self.full_likelihood(params=params, input_np=self.aggregated_data, y=self.aggregated_response, covariance_function= covariance_function) 
         return full_nll

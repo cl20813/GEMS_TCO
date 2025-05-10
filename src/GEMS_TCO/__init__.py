@@ -19,7 +19,6 @@ from GEMS_TCO import configuration as config
 
 
 
-
 class load_data:
     def __init__(self, datapath:str):
         self.datapath = datapath
