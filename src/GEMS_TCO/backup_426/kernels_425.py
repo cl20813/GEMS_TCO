@@ -1063,19 +1063,15 @@ class vecchia_experiment(likelihood_function):
 
             cov_yx = cov_matrix[0, 1:]
 
-                    # Compute the log determinant of the covariance matrix
+            # Compute the log determinant of the covariance matrix
             # sign, log_det = torch.slogdet(cov_matrix)
             # if sign <= 0:
             #     raise ValueError("Covariance matrix is not positive definite")
         
             # Compute beta
-
             tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
             tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, y_and_neighbors))
-            
-
             beta = torch.linalg.solve(tmp1, tmp2)
-
             mu = torch.matmul(locs, beta)
             mu_current = mu[0]
             mu_neighbors = mu[1:]

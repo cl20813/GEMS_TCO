@@ -29,10 +29,6 @@ import time
 import torchvision.models as models
 from torch.profiler import profile, record_function, ProfilerActivity
 
-
-
-
-
      
 # kernprof -l script_to_profile.py
 # C:\Users\joonw\anaconda3\envs\faiss_env\python.exe -m kernprof -l "C:\Users\joonw\tco\GEMS_TCO-2\Exercises\make_vecc_faster.py"  window
@@ -43,19 +39,19 @@ from torch.profiler import profile, record_function, ProfilerActivity
 
 df = pd.read_csv("/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/full_estimates_1250_july24.csv") 
 
-lat_lon_resolution = [14,14]  # 4,4 to coarse factor 2 // 2,2 to 4  5 is worse
+lat_lon_resolution = [15,15]  # 4,4 to coarse factor 2 // 2,2 to 4  5 is worse
 
 years = ['2024']
 month_range =[7,8]
-nheads = 30
+nheads = 50
 mm_cond_number = 10
 
-for day in range(5,6):
+for day in range(1,2):
     print(f'\n Day {day} data size per day: { (200/lat_lon_resolution[0])*(100/lat_lon_resolution[0])  } \n')
 
     # parameters
     
-    idx_for_datamap= [ 8*(day-1),8*day]
+    idx_for_datamap= [ 8*(day),8*(day+1)]
     # params = [ 27.25, 2.18, 2.294, 4.099e-4, -0.07915, 0.0999, 3.65]   #200
     params = list(df.iloc[day-1][:-1])
     params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
@@ -64,9 +60,9 @@ for day in range(5,6):
     # input_path = Path("C:\\Users\\joonw\\tco\\Extracted_data")  # window
 
     input_path = Path("/Users/joonwonlee/Documents/GEMS_DATA")  # mac
-    instance = load_data(input_path)
-    map, ord_mm, nns_map= instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
-    analysis_data_map, aggregated_data = instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap= idx_for_datamap)
+    data_load_instance = load_data(input_path)
+    map, ord_mm, nns_map= data_load_instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
+    analysis_data_map, aggregated_data = data_load_instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap= idx_for_datamap)
 
 
     # different approximations
@@ -88,22 +84,21 @@ for day in range(5,6):
     # cov_map_new = instance.cov_structure_saver(params, instance.matern_cov_anisotropy_v05)
 
     start_time = time.time()
-    out2 = instance_ori.vecchia_ori_order(params, instance_ori.matern_cov_anisotropy_v05, cov_map_ori)
+    out2 = instance_ori.vecchia_may9(params, instance_ori.matern_cov_anisotropy_v05, cov_map_ori)
     end_time = time.time()
     epoch_time2 = end_time - start_time
     print(f'Vecchia likelihood: {out2},  time: {epoch_time2:.2f}') 
 
+    start_time = time.time()
+    out3 = instance_ori.vecchia_local_full_cond(params, instance_ori.matern_cov_anisotropy_v05)
+    end_time = time.time()
+    epoch_time2 = end_time - start_time
+    print(f'Vecchia full cond likelihood: {out3},  time: {epoch_time2:.2f}') 
 
     
 
-    ''' 
-    start_time = time.time()
-    out2 = instance_ori.vecchia_grouping(params, instance_ori.matern_cov_anisotropy_kv, cov_map_ori)
-    end_time = time.time()
-    epoch_time2 = end_time - start_time
-    print(f'Vecchia grouping: {out2},  time: {epoch_time2:.2f}') 
 
-
+    '''
     with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True, with_stack=True) as prof:
         with record_function("vecchia_ori_order"):
             start_time = time.time()
