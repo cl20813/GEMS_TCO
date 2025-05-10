@@ -920,7 +920,7 @@ class model_fitting(vecchia_experiment):
         return vecc_nll
 
     def compute_full_nll(self,params, covariance_function):
-        full_nll = self.full_likelihood(params=params, input_np=self.aggregated_data, y=self.aggregated_response, covariance_function= covariance_function) 
+        full_nll = self.full_likelihood(params=params, input_data=self.aggregated_data, y=self.aggregated_response, covariance_function= covariance_function) 
         return full_nll
     
     def optimizer_fun(self, params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=40, gamma=0.5):

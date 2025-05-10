@@ -37,19 +37,19 @@ app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
 
 def cli(
     v: float = typer.Option(0.5, help="smooth"),
-    lr: float = typer.Option(0.01, help="learning rate"),
+    lr: float = typer.Option(0.02, help="learning rate"),
     step: int = typer.Option(80, help="Number of iterations in optimization"),
     coarse_factor: int = typer.Option(100, help="coarse factor in spline learning"),
 
-    gamma_par: float = typer.Option(0.5, help="decreasing factor for learning rate"),
+    gamma_par: float = typer.Option(0.3, help="decreasing factor for learning rate"),
     space: List[str] = typer.Option(['20', '20'], help="spatial resolution"),
     days: List[str] = typer.Option(['0', '31'], help="Number of nearest neighbors in Vecchia approx."),
     
-    mm_cond_number: int = typer.Option(1, help="Number of nearest neighbors in Vecchia approx."),
+    mm_cond_number: int = typer.Option(10, help="Number of nearest neighbors in Vecchia approx."),
     params: List[str] = typer.Option(['20', '8.25', '5.25', '.2', '.2', '.05', '5'], help="Initial parameters"),
     ## mm-cond-number should be called in command line
     ## negative number can be a problem when parsing with typer
-    epochs: int = typer.Option(100, help="Number of iterations in optimization"),
+    epochs: int = typer.Option(1500, help="Number of iterations in optimization"),
     nheads: int = typer.Option(200, help="Number of iterations in optimization")
 
 ) -> None:
