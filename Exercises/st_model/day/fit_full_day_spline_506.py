@@ -105,7 +105,7 @@ def cli(
 
         input_filepath = output_path / f"full_day_v{int(v*100):03d}_spline{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
         
-        res = alg_optimization( f"2024-07-{day+1}", f"Vecc_b2 and b2{0.99}", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
+        res = alg_optimization( f"2024-07-{day+1}", f"full likelihood", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
         loaded_data = res.load(input_filepath)
         loaded_data.append( res.toJSON() )
         res.save(input_filepath,loaded_data)
