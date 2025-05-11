@@ -96,8 +96,6 @@ for day in range(1,2):
     print(f'Vecchia full cond likelihood: {out3},  time: {epoch_time2:.2f}') 
 
     
-
-
     '''
     with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True, with_stack=True) as prof:
         with record_function("vecchia_ori_order"):
