@@ -793,7 +793,6 @@ class vecchia_experiment(likelihood_function):
                 }
         return cov_map
 
-
     def vecchia_may9(self, params: torch.Tensor, covariance_function: Callable, cov_map:Dict[str,Any]) -> torch.Tensor:
 
         cut_line= self.nheads
