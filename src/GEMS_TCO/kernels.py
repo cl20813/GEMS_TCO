@@ -655,7 +655,7 @@ class vecchia_experiment(likelihood_function):
         
         neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
         
-        st = 5
+        st = 10
         for time_idx in range(0,len(self.input_map)):
             current_np = self.input_map[key_list[time_idx]]
 
@@ -666,23 +666,30 @@ class vecchia_experiment(likelihood_function):
                 current_y = current_row[:, 2]
                 
                 # Construct conditioning set
-                mm_neighbors = self.nns_map[index]
-                past = list(mm_neighbors) 
+                past = []
+                for index in range(index,index+st):
+                    mm_neighbors = self.nns_map[index]
+                    past += list(mm_neighbors) 
+                past = list(set(past))
+
+                #print(len(past))
+                # mm_neighbors = self.nns_map[index]
+                # past = list(mm_neighbors) 
                 data_list = []
 
                 if past:
                     data_list.append(current_np[past])  
 
-                combined_indices = past + list(range(index, index + st))
+                tmp = list(range(index, index+st ))
+                combined_indices = past + tmp
 
                 if time_idx > 0:
                     one_hour_lag = self.input_map[key_list[time_idx - 1]]
-                    data_list.append(one_hour_lag[combined_indices, :])
+                    data_list.append(one_hour_lag[past, :])
                  
-                
-                if time_idx > 1:
-                    two_hour_lag = self.input_map[key_list[time_idx - 2]]
-                    data_list.append(two_hour_lag[combined_indices, :])
+                #if time_idx > 1:
+                #    two_hour_lag = self.input_map[key_list[time_idx - 2]]
+                #    data_list.append(two_hour_lag[past, :])
                  
                 conditioning_data = torch.vstack(data_list) if data_list else torch.empty((0, current_row.shape[1]), dtype=torch.float64)
                 aggregated_arr = torch.vstack((current_row, conditioning_data))
@@ -725,7 +732,6 @@ class vecchia_experiment(likelihood_function):
                 else: 
                     _, log_det = torch.slogdet( cov_ygivenx)
                     
-           
                 neg_log_lik += 0.5 * (log_det + quad_form)
            
         return neg_log_lik
@@ -918,6 +924,10 @@ class model_fitting(vecchia_experiment):
         vecc_nll = self.vecchia_may9(params, covariance_function, cov_map)
         return vecc_nll
 
+    def compute_vecc_nll_grp9(self,params , covariance_function, cov_map):
+        vecc_nll = self.vecchia_grouping(params, covariance_function, cov_map)
+        return vecc_nll
+
     def compute_full_nll(self,params, covariance_function):
         full_nll = self.full_likelihood(params=params, input_data=self.aggregated_data, y=self.aggregated_response, covariance_function= covariance_function) 
         return full_nll
@@ -983,6 +993,34 @@ class model_fitting(vecchia_experiment):
         for epoch in range(epochs):  
             optimizer.zero_grad()  
             loss = self.compute_vecc_nll_may9(params, covariance_function, cov_map)
+            loss.backward(retain_graph=True) # Backpropagate the loss with retain_graph=True
+            # loss.backward()
+
+            # Print gradients and parameters every 10th epoch
+            # if epoch % 500 == 0:
+            #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            optimizer.step()  # Update the parameters
+            scheduler.step()  # Update the learning rate
+
+            # Check for convergence
+            if abs(prev_loss - loss.item()) < tol:
+                print(f"Converged at epoch {epoch}")
+                print(f'Epoch {epoch+1},  \n vecc Parameters: {params.detach().numpy()}')
+                break
+
+            prev_loss = loss.item()
+        params = [torch.round(x*1000).detach().numpy()/1000 for x in params]
+        loss = (torch.round(loss*1000)/1000).item()
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {params}')
+        return params + [loss], epoch
+
+    def run_vecc_grp9(self, params, optimizer, scheduler,  covariance_function, cov_map,epochs=10):
+        prev_loss= float('inf')
+        tol = 1e-4  # Convergence tolerance
+        for epoch in range(epochs):  
+            optimizer.zero_grad()  
+            loss = self.compute_vecc_nll_grp9(params, covariance_function, cov_map)
             loss.backward(retain_graph=True) # Backpropagate the loss with retain_graph=True
             # loss.backward()
 

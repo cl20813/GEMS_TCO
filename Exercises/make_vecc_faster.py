@@ -39,11 +39,11 @@ from torch.profiler import profile, record_function, ProfilerActivity
 
 df = pd.read_csv("/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/full_estimates_1250_july24.csv") 
 
-lat_lon_resolution = [15,15]  # 4,4 to coarse factor 2 // 2,2 to 4  5 is worse
+lat_lon_resolution = [4,4]  # 4,4 to coarse factor 2 // 2,2 to 4  5 is worse
 
 years = ['2024']
 month_range =[7,8]
-nheads = 50
+nheads = 200
 mm_cond_number = 10
 
 for day in range(1,2):
@@ -64,7 +64,6 @@ for day in range(1,2):
     map, ord_mm, nns_map= data_load_instance.load_mm20k_data_bymonthyear( lat_lon_resolution= lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
     analysis_data_map, aggregated_data = data_load_instance.load_working_data_byday( map, ord_mm, nns_map, idx_for_datamap= idx_for_datamap)
 
-
     # different approximations
     # key_order = [0,1,2,4,3,5,7,6]
     # reordered_dict, reordered_df = instance.reorder_data(analysis_data_map, key_order)
@@ -73,52 +72,31 @@ for day in range(1,2):
 
     instance_ori = kernels.vecchia_experiment(0.5, analysis_data_map, aggregated_data,nns_map,mm_cond_number, nheads)
     
+    '''   12663
     start_time = time.time()
     out1 = instance_ori.full_likelihood(params, aggregated_data[:,:4],aggregated_data[:,2], instance_ori.matern_cov_anisotropy_v05)
     end_time = time.time()
     epoch_time1 = end_time - start_time
     print(f'Exact likelihood: {out1} time: {epoch_time1:.2f}') 
-    
-    
+    '''
     cov_map_ori = instance_ori.cov_structure_saver(params, instance_ori.matern_cov_anisotropy_v05)
     # cov_map_new = instance.cov_structure_saver(params, instance.matern_cov_anisotropy_v05)
-
+    
     start_time = time.time()
     out2 = instance_ori.vecchia_may9(params, instance_ori.matern_cov_anisotropy_v05, cov_map_ori)
     end_time = time.time()
     epoch_time2 = end_time - start_time
-    print(f'Vecchia likelihood: {out2},  time: {epoch_time2:.2f}') 
+    print(f'Vecchia may 9 likelihood: {out2},  time: {epoch_time2:.2f}') 
+
+
 
     start_time = time.time()
-    out3 = instance_ori.vecchia_local_full_cond(params, instance_ori.matern_cov_anisotropy_v05)
+    out2 = instance_ori.vecchia_grouping(params, instance_ori.matern_cov_anisotropy_kv, cov_map_ori)
     end_time = time.time()
     epoch_time2 = end_time - start_time
-    print(f'Vecchia full cond likelihood: {out3},  time: {epoch_time2:.2f}') 
+    print(f'Vecchia grouping likelihood: {out2},  time: {epoch_time2:.2f}')
 
-    
-    '''
-    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True, with_stack=True) as prof:
-        with record_function("vecchia_ori_order"):
-            start_time = time.time()
-            out2 = instance_ori.vecchia_ori_order(params, instance_ori.matern_cov_anisotropy_kv, cov_map_ori)
-            end_time = time.time()
-            epoch_time2 = end_time - start_time
-            print(f'Vecchia likelihood: {out2},  time: {epoch_time2:.2f}')
-
-    print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
-    prof.export_chrome_trace("trace_vecchia_ori_order.json")
-
-    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True, with_stack=True) as prof:
-        with record_function("vecchia_ori_order"):
-            start_time = time.time()
-            out2 = instance_ori.vecchia_grouping(params, instance_ori.matern_cov_anisotropy_kv, cov_map_ori)
-            end_time = time.time()
-            epoch_time2 = end_time - start_time
-            print(f'Vecchia likelihood: {out2},  time: {epoch_time2:.2f}')
-
-    print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
-    prof.export_chrome_trace("trace_vecchia_ori_order.json")
-    '''
+  
 
 
 
