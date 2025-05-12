@@ -90,7 +90,6 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v04_506.py --v 0.
 
 ```
 
-
 ```  cd ./jobscript/tco/gp_exercise  ```   
 ```  nano fit_full_day_v03_1250_estimates.sh  ```        
  ```   sbatch fit_full_day_v03_1250_estimates.sh   ```
@@ -122,7 +121,6 @@ echo "fit_full_day_v03_1250 using cubic spline"
 srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v04_506.py --v 0.3 --lr 0.02 --step 100 --coarse-factor 1000 --gamma-par 0.2 --epochs 1500 --space "4, 4" --days "0,31"
 
 ```
-
 
 ```  cd ./jobscript/tco/gp_exercise  ```   
 ```  nano fit_full_day_v045_1250.sh  ```        
