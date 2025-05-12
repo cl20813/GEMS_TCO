@@ -67,7 +67,7 @@ def cli(
     df_map, ord_mm, nns_map= data_load_instance.load_mm20k_data_bymonthyear(lat_lon_resolution = lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)  
 
     # 5/09/24 try larger range parameters
-    init_estimates =  Path(config.amarel_estimates_day_saved_path) / config.amarel_full_day_v05_range_plus2_csv
+    init_estimates =  Path(config.amarel_estimates_day_saved_path) / config.amarel_full_day_v05_range_plus2_sigma_n10_csv
     estimates_df = pd.read_csv(init_estimates)
     
     # only fit spline once because space are all same

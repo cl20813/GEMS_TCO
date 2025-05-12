@@ -79,7 +79,7 @@ echo "fit_vecc_v05_may9_1250_save_estimates"
 srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_may9.py --v 0.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "4, 4" --days "0,31" --mm-cond-number 10 --nheads 200
 
 ```
-
+``` cd ./jobscript/tco/gp_exercise ```
 ```  nano fit_day_vecc_v05_may9_5000.sh  ``` 
 ```  sbatch fit_day_vecc_v05_may9_5000.sh  ``` 
 
@@ -112,7 +112,7 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_may9.py --v 0
 
 
 # 20000
-
+``` cd ./jobscript/tco/gp_exercise ```
 ```  nano fit_day_vecc_v05_may9_20000.sh  ``` 
 ```  sbatch fit_day_vecc_v05_may9_20000.sh  ``` 
 
@@ -139,6 +139,6 @@ conda activate faiss_env
 echo "Current date and time: $(date)"
 echo "fit_vecc_v05_may09_20000_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_may9.py --v 0.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "1, 1" --days "0,4" --mm-cond-number 10 --nheads 300
+srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_may9.py --v 0.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "1, 1" --days "4,14" --mm-cond-number 10 --nheads 300
 
 ```
