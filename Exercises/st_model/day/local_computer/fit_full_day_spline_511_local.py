@@ -31,9 +31,7 @@ import typer
 import json
 from json import JSONEncoder
 
-# /opt/anaconda3/envs/faiss_env/bin/python /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/fit_vecc_day_v05_425_local.py --v 0.5 --lr 0.03 --step 100 --space "20,20" --days "0,1" --mm-cond-number 10 --params 20,8.25,5.25,.2,.2,.05,5 --epochs 500 --nheads 200
-
-
+# /opt/anaconda3/envs/faiss_env/bin/python /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/fit_full_day_spline_511_local.py --v 0.5 --lr 0.03 --step 100 --space "20,20" --days "0,1" --mm-cond-number 10 --params 20,8.25,5.25,.2,.2,.05,5 --epochs 500 --nheads 200
 
 
 app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
@@ -71,7 +69,20 @@ def cli(
     df_map, ord_mm, nns_map= data_load_instance.load_mm20k_data_bymonthyear(lat_lon_resolution = lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)  
     init_estimates =  Path(config.mac_estimates_day_path) / config.mac_full_day_v05_csv
     estimates_df = pd.read_csv(init_estimates)
-
+    
+    # only fit spline once because space are all same
+    # load first data of analysis_data_map and aggregated_data to initialize spline_instance
+    first_day_idx_for_datamap= [0,8]
+    first_day_analysis_data_map, first_day_aggregated_data = data_load_instance.load_working_data_byday(df_map, ord_mm, nns_map, idx_for_datamap= first_day_idx_for_datamap)
+    spline_instance = kernels.spline(
+            epsilon = 1e-17, 
+            coarse_factor= coarse_factor, 
+            smooth = v, 
+            input_map= first_day_analysis_data_map, 
+            aggregated_data= first_day_aggregated_data, 
+            nns_map=nns_map, 
+            mm_cond_number= mm_cond_number)
+    
     for day in days_list:  
         params = list(estimates_df.iloc[day][:-1])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
@@ -81,40 +92,29 @@ def cli(
         idx_for_datamap= [8*day,8*(day+1)]
         analysis_data_map, aggregated_data = data_load_instance.load_working_data_byday( df_map, ord_mm, nns_map, idx_for_datamap= idx_for_datamap)
 
-        model_instance = kernels.model_fitting(
-                smooth = v,
-                input_map = analysis_data_map,
-                aggregated_data = aggregated_data,
-                nns_map = nns_map,
-                mm_cond_number = mm_cond_number,
-                nheads = nheads 
-            )
- 
-        start_time = time.time()
-        # optimizer = optim.Adam([params], lr=0.01)  # For Adam
-        optimizer, scheduler = model_instance.optimizer_fun(params, lr=lr, betas=(0.9, 0.8), eps=1e-8, step_size=step, gamma=0.9) 
+        spline_instance.new_aggregated_data = aggregated_data[:,:4]
+        spline_instance.new_aggregated_response = aggregated_data[:,2]
 
-        instance_map = kernels.vecchia_experiment(0.5, analysis_data_map,aggregated_data, nns_map,mm_cond_number, nheads)
-        cov_map =  instance_map.cov_structure_saver(params, instance_map.matern_cov_anisotropy_v05)   
-        out, epoch = model_instance.run_vecc_may9(params, optimizer,scheduler, model_instance.matern_cov_anisotropy_v05, cov_map, epochs=epochs)
+        start_time = time.time()
+        optimizer, scheduler = spline_instance.optimizer_fun(params, lr= lr , betas=(0.9, 0.99), eps=1e-8, step_size= step, gamma= gamma_par)  
+        out, epoch = spline_instance.run_full(params, optimizer,scheduler, epochs= epochs)
         end_time = time.time()
         epoch_time = end_time - start_time
-        print(f"2024-07-{day+1}", "vecchia_v05", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
-        
-        out_filepath = output_path / f"vecchia_v05_{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
+        print(f'End 2024-07-{day+1} for lr:{lr}, step size {step}, betas(_,b2):{0.99}, gamma:{gamma_par} took {epoch_time:.2f}, epoch {epochs}')
+        print(f'params and loss {out}')
 
-        res = alg_optimization( f"2024-07-{day+1}", "Vecc_contender", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
-        loaded_data = res.load(out_filepath)
+        input_filepath = output_path / f"full_day_v{int(v*100):03d}_spline{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
+        
+        res = alg_optimization( f"2024-07-{day+1}", f"full likelihood", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
+        loaded_data = res.load(input_filepath)
         loaded_data.append( res.toJSON() )
-        res.save(out_filepath,loaded_data)
+        res.save(input_filepath,loaded_data)
         fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'epoch']
 
-        csv_filepath = output_path / f"vecchia_v05_{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0])}.csv"
+        csv_filepath = output_path/f"full_day_v{int(v*100):03d}_spline{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0])}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     app()
-
 
 
