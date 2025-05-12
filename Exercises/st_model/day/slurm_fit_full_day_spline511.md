@@ -8,7 +8,7 @@ scp -r "C:\Users\joonw\TCO\GEMS_TCO-1\GEMS_TCO" jl2815@amarel.rutgers.edu:/home/
 ### Copy run file from ```local``` to ```Amarel HPC```
 # mac
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_full_day_spline_506.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_full_day_spline_511.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 # window
 
@@ -154,7 +154,7 @@ echo "Current date and time: $(date)"
 echo "fit_full_day_v045_1250 using cubic spline"
 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_spline_506.py --v 0.45 --lr 0.02 --step 100 --coarse-factor 1000 --gamma-par 0.2 --epochs 1500 --space "4, 4" --days "0,31" 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_spline_511.py --v 0.45 --lr 0.03 --step 100 --coarse-factor 1000 --gamma-par 0.3 --epochs 1500 --space "4, 4" --days "0,31" 
 
 ```
 
