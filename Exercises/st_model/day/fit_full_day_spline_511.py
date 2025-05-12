@@ -53,7 +53,6 @@ def cli(
 
 ) -> None:
     ############################## 
-
     # initialization
     lat_lon_resolution = [int(s) for s in space[0].split(',')]
     days_s_e = list(map(int, days[0].split(',')))
@@ -83,7 +82,7 @@ def cli(
             nns_map=nns_map, 
             mm_cond_number= mm_cond_number)
     
-    for day in days_list:
+    for day in days_list:  
         params = list(estimates_df.iloc[day][5:-3])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
         print(f'2024-07-{day+1}, data size per day: { (200/lat_lon_resolution[0])*(100/lat_lon_resolution[0]) }, smooth: {v}')
