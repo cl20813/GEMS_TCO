@@ -511,8 +511,8 @@ class spline(spatio_temporal_kernels):
             loss.backward()  # Backpropagate the loss
 
             # Gradient and Parameter Logging for every 10th epoch
-            if epoch % 10 == 0:
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            #if epoch % 10 == 0:
+            #    print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             # if epoch % 500 == 0:
             #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
@@ -964,8 +964,8 @@ class model_fitting(vecchia_experiment):
             loss.backward()  # Backpropagate the loss
             
             # Print gradients and parameters every 10th epoch
-            if epoch % 10 == 0:
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            #if epoch % 10 == 0:
+            #    print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             # if epoch % 500 == 0:
             #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
