@@ -31,7 +31,11 @@ import typer
 import json
 from json import JSONEncoder
 
-# /opt/anaconda3/envs/faiss_env/bin/python /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/fit_full_day_spline_511_local.py --v 0.5 --lr 0.03 --step 100 --space "20,20" --days "0,1" --mm-cond-number 10 --params 20,8.25,5.25,.2,.2,.05,5 --epochs 500 --nheads 200
+# 20, 20
+# /opt/anaconda3/envs/faiss_env/bin/python /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/fit_full_day_spline_511_local.py --v 0.5 --lr 0.03 --step 100 --space "20,20" --days "0,1" --mm-cond-number 10 --params 20,8.25,5.25,.2,.2,.05,5 --epochs 700 --nheads 200
+
+# 10, 10 
+# /opt/anaconda3/envs/faiss_env/bin/python /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/fit_full_day_spline_511_local.py --v 0.5 --lr 0.03 --step 100 --space "10,10" --days "0,1" --mm-cond-number 10 --params 20,8.25,5.25,.2,.2,.05,5 --epochs 700 --nheads 200
 
 
 app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})

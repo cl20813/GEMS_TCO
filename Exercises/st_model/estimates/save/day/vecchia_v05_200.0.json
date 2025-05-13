@@ -1,0 +1,5 @@
+[
+    "{\"day\": \"2024-07-1\", \"cov_name\": \"Vecc_contender\", \"lat_lon_resolution\": 200.0, \"lr\": 0.03, \"stepsize\": 100, \"sigma\": 26.354, \"range_lat\": 2.187, \"range_lon\": 2.311, \"advec_lat\": -0.003, \"advec_lon\": -0.083, \"beta\": 0.098, \"nugget\": 3.806, \"loss\": 2547.98, \"time\": 6.6005470752716064, \"epoch\": 51}",
+    "{\"day\": \"2024-07-1\", \"cov_name\": \"Vecc_contender\", \"lat_lon_resolution\": 200.0, \"lr\": 0.03, \"stepsize\": 100, \"sigma\": 25.901, \"range_lat\": 2.123, \"range_lon\": 2.265, \"advec_lat\": -0.005, \"advec_lon\": -0.082, \"beta\": 0.103, \"nugget\": 3.799, \"loss\": 2548.357, \"time\": 4.797868013381958, \"epoch\": 36}",
+    "{\"day\": \"2024-07-1\", \"cov_name\": \"Vecc_contender\", \"lat_lon_resolution\": 200.0, \"lr\": 0.03, \"stepsize\": 100, \"sigma\": 40.632, \"range_lat\": 1.756, \"range_lon\": 1.704, \"advec_lat\": -0.082, \"advec_lon\": -0.106, \"beta\": 0.204, \"nugget\": 0.011, \"loss\": 154.229, \"time\": 204.66445183753967, \"epoch\": 699}"
+]

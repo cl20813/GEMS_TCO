@@ -1,0 +1,3 @@
+[
+    "{\"day\": \"2024-07-1\", \"cov_name\": \"full likelihood\", \"lat_lon_resolution\": 200.0, \"lr\": 0.03, \"stepsize\": 100, \"sigma\": 27.975, \"range_lat\": 2.925, \"range_lon\": 3.324, \"advec_lat\": 0.036, \"advec_lon\": -0.069, \"beta\": 0.079, \"nugget\": 5.012, \"loss\": 2542.138, \"time\": 21.779525995254517, \"epoch\": 182}"
+]
