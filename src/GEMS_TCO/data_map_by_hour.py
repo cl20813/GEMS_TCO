@@ -4,6 +4,8 @@ import numpy as np
 from collections import defaultdict
 import sklearn
 from sklearn.neighbors import BallTree
+import xarray as xr # for netCDF4 
+from netCDF4 import Dataset
 
 # from scipy.optimize import minimize
 # from scipy.spatial.distance import cdist  # For space and time distance
@@ -11,8 +13,59 @@ from sklearn.neighbors import BallTree
 
 from typing import Callable, Union, Tuple
 
+class gems_ORI_tocsv:          
+    def __init__(self, file_path,lat_s,lat_e,lon_s,lon_e):
+        self.file_path = file_path       
+        self.lat_s = lat_s 
+        self.lat_e = lat_e  
+        self.lon_s = lon_s
+        self.lon_e = lon_e                         
+  
+    def extract_data(self,file_path):
+        location = xr.open_dataset(file_path, group='Geolocation Fields')
+        Z = xr.open_dataset(file_path, group='Data Fields')
+        
+        location_variables = ['Latitude', 'Longitude', 'Time']
+        tmp1 = location[location_variables]
+
+        location_df = tmp1.to_dataframe().reset_index() # Convert xarray.Dataset to pandas DataFrame
+        location_df = location_df[location_variables]   # remove spatial (2048), image (695) indices
+
+        Z_variables = ['ColumnAmountO3','FinalAlgorithmFlags']
+        tmp2 = Z[Z_variables]
+
+        Z_df = tmp2.to_dataframe().reset_index()      
+        Z_df = Z_df[Z_variables]
+
+        mydata = pd.concat([location_df, Z_df], axis=1) # both rows are 2048*695
+  
+        # Close the NetCDF file
+        location.close()
+        Z.close()
+        return mydata
+    
+    def dropna(self):
+        mydata = self.extract_data(self.file_path)
+        mydata = mydata.dropna(subset=['Latitude', 'Longitude','Time','ColumnAmountO3','FinalAlgorithmFlags'])
+        return mydata
+
+    def result(self):
+
+        df = self.dropna()  
+        truncated_df = df[ (df['Latitude']<= self.lat_e) & (df['Latitude']>= self.lat_s) & (df['Longitude']>= self.lon_s) & (df['Longitude']<= self.lon_e) ]
+        
+        # Cut off missing values
+        truncated_df= truncated_df[truncated_df.iloc[:,3]<1000]    
+
+        truncated_df['Time'] = np.mean(truncated_df.iloc[:,2])
+
+        # Convert 'Time' to datetime type
+        truncated_df['Time'] = pd.to_datetime(truncated_df['Time'], unit='h')
+        truncated_df['Time'] = truncated_df['Time'].dt.floor('min')  
+        return truncated_df
+    
  
-class MakeOrbitdata():
+class center_matching_hour():
     """
     Processes orbit data by averaging over specified spatial regions and resolutions.
 
@@ -28,20 +81,17 @@ class MakeOrbitdata():
     def __init__(
         self, 
         df:pd.DataFrame=None, 
-        lat_s:int =5,
-        lat_e:int =10, 
-        lon_s:int =110,
-        lon_e:int =120, 
+        lat_s:float =5,
+        lat_e:float =10, 
+        lon_s:float =110,
+        lon_e:float =120, 
         lat_resolution:float=None, 
         lon_resolution:float =None
     ):
         # Input validation
         if df is not None:
             assert isinstance(df, pd.DataFrame), "df must be a pandas DataFrame"
-        assert isinstance(lat_s, int), "lat_s must be int"
-        assert isinstance(lat_e, int), "lat_e must be int"
-        assert isinstance(lon_s, int), "lon_s must be int"
-        assert isinstance(lon_e, int), "lon_e must be int"
+
         if lat_resolution is not None:
             assert isinstance(lat_resolution, float), "lat_resolution must be a float"
         if lon_resolution is not None:
