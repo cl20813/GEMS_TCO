@@ -6,7 +6,7 @@ import os
 #  sys.path
 # !pip install numpy==2.0
 
-from GEMS_TCO import orbitmap
+from GEMS_TCO import data_map_by_hour
 
 # Base file path and settings
 base_path = "/home/jl2815/tco/data/pickle_data"
@@ -34,7 +34,7 @@ for year in years:
             df = pd.read_csv(input_filepath)
             
             # Process data
-            instance = orbitmap.MakeOrbitdata(df, lat_start, lat_end, lon_start, lon_end)
+            instance = data_map_by_hour.MakeOrbitdata(df, lat_start, lat_end, lon_start, lon_end)
             orbit_map = instance.group_data_by_orbits()
             
             output_path = os.path.join(base_path, f'pickle_{year}')
@@ -59,7 +59,7 @@ for year in years:
 
 
 df = pd.read_csv("/home/jl2815/tco/data/pickle_data/data_2024/data_24_07_0131_N510_E110120.csv")
-instance = orbitmap.MakeOrbitdata(df, 5,10,110,120)  
+instance = data_map_by_hour.MakeOrbitdata(df, 5,10,110,120)  
 
 for year in years:        # years = [2023,2024]
     for month in range(1, 13):  

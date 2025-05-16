@@ -33,7 +33,7 @@ from typing import Callable, Union, Tuple
 sys.path.append("/cache/home/jl2815/tco")
 
 # Custom imports
-from GEMS_TCO import orbitmap
+from GEMS_TCO import data_map_by_hour
 from GEMS_TCO import kernels
 
 
@@ -76,7 +76,7 @@ def main():
     # df = pd.read_csv('/home/jl2815/tco/data/data_N2530_E95110/data_24_07_0130_N2530_E95110.csv')
     
     # make coarse set
-    instance = orbitmap.MakeOrbitdata(df, 5,10,110,120)
+    instance = data_map_by_hour.MakeOrbitdata(df, 5,10,110,120)
     orbit_map24_7 = instance.makeorbitmap()
     resolution_uni = 0.05 
     sparse_map_24_7 = instance.make_sparsemap(orbit_map24_7, resolution_uni)
@@ -84,7 +84,7 @@ def main():
     coarse_map24_7 =  instance.make_coarsemap(sparse_map_24_7,rho)  
 
     # reorder data and initiate parallel computing functions
-    databyday_instance = orbitmap.databyday_24July()
+    databyday_instance = data_map_by_hour.databyday_24July()
     grp, baseset_from_maxmin, nns_map  = databyday_instance.process(coarse_map24_7,lat_idx,mm_cond_number)
     matern_st_11 = kernels.matern_st_11(smooth)
 

@@ -33,7 +33,7 @@ from scipy.optimize import differential_evolution
 from typing import Callable, Union, Tuple
 
 # Custom imports
-from GEMS_TCO import orbitmap
+from GEMS_TCO import data_map_by_hour
 from GEMS_TCO import kernels
 # Initiate instance
 
@@ -62,7 +62,7 @@ def main():
 
     df = pd.read_csv('/home/jl2815/tco/data/pickle_data/data_2024/data_24_07_0131_N510_E110120.csv')
     # df = pd.read_csv("C:\\Users\\joonw\\TCO\\data_engineering\\data_2024\\data_24_07_0131_N510_E110120.csv")
-    instance = orbitmap.MakeOrbitdata(df, 5,10,110,120)
+    instance = data_map_by_hour.MakeOrbitdata(df, 5,10,110,120)
 
     # Load the one dictionary to set spaital coordinates
     filepath = "/home/jl2815/tco/data/pickle_data/pickle_2023/coarse_cen_map23_01.pkl"

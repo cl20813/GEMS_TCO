@@ -6,7 +6,7 @@ import os
 #  sys.path
 # !pip install numpy==2.0
 
-from GEMS_TCO import orbitmap
+from GEMS_TCO import data_map_by_hour
 from GEMS_TCO.smoothspace import space_average
 
 
@@ -17,7 +17,7 @@ lat_start, lat_end, lon_start, lon_end = 5, 10, 110, 120
 # Base file path and settings
 
 df = pd.read_csv("/home/jl2815/tco/data/pickle_data/data_2024/data_24_07_0131_N510_E110120.csv")
-instance = orbitmap.MakeOrbitdata(df, 5,10,110,120)  
+instance = data_map_by_hour.MakeOrbitdata(df, 5,10,110,120)  
 
 years = [2023,2024]
 # Loop through months

@@ -22,7 +22,7 @@ import seaborn as sns
 # Custom imports
 import GEMS_TCO
 from GEMS_TCO import kernels
-from GEMS_TCO import orbitmap 
+from GEMS_TCO import data_map_by_hour 
 from GEMS_TCO import kernels 
 from GEMS_TCO import evaluate
 from GEMS_TCO import orderings as _orderings 
