@@ -36,7 +36,7 @@ from typing import Callable, Union, Tuple
 sys.path.append("/cache/home/jl2815/tco")
 
 # Custom imports
-from GEMS_TCO import data_map_by_hour 
+from GEMS_TCO import data_preprocess 
 from GEMS_TCO import kernels 
 
 import pickle
@@ -122,7 +122,7 @@ def main():
     y1 = data_for_coord['Latitude'].values 
     coords1 = np.stack((x1, y1), axis=-1)
 
-    instance = data_map_by_hour.MakeOrbitdata()
+    instance = data_preprocess.MakeOrbitdata()
     s_dist = cdist(coords1, coords1, 'euclidean')
     ord_mm, _ = instance.maxmin_naive(s_dist, 0)
 
