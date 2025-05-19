@@ -18,7 +18,7 @@ import time
 # Custom imports
 import GEMS_TCO
 from GEMS_TCO import kernels
-from GEMS_TCO import data_map_by_hour 
+from GEMS_TCO import data_preprocess 
 from GEMS_TCO import kernels 
 from GEMS_TCO import orderings as _orderings 
 from GEMS_TCO import load_data_amarel

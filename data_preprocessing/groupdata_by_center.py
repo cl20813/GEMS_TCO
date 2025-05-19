@@ -8,7 +8,7 @@ from pathlib import Path
 # !pip install numpy==2.0
 
 from GEMS_TCO import configuration as config
-from GEMS_TCO import data_map_by_hour as dmbh
+from GEMS_TCO import data_preprocess as dmbh
 
 '''
 1. Transfer csv file into amarel
