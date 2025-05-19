@@ -109,6 +109,10 @@ class center_matching_hour():
         """
         Groups data into a dictionary based on unique orbit timestamps.
 
+        Input:
+            Time: String. When saving data into csv file, time object file becomes string
+            beause csv file is a plain text file. 
+        
         Returns:
             dict: A dictionary where keys represent formatted orbit identifiers 
                 and values are DataFrames corresponding to each orbit.
