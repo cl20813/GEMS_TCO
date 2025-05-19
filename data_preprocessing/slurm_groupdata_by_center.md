@@ -7,42 +7,47 @@ scp -r "/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO" jl2815@amarel.rutge
 # window
 scp -r "C:\Users\joonw\TCO\GEMS_TCO-1\GEMS_TCO" jl2815@amarel.rutgers.edu:/home/jl2815/tco 
 
+
+## I need to upload cvs files
+
+scp "/Users/joonwonlee/Documents/GEMS_DATA/data_2024/data_24_07_0131_N05_E123133.csv" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/data_2024
+
 ### Copy run file from ```local``` to ```Amarel HPC```
 # mac
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_full_day_spline_511.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/data_preprocessing/groupdata_by_center.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data_preprocessing/
 
 
 
+``` cd ./jobscript/tco/gp_exercise ```
+```  nano groupdata_bycenter.sh  ``` 
+```  sbatch groupdata_bycenter.sh  ```    
 
-cd ./jobscript/tco/dl          
-nano tmp_dataprocess.sh          (rm tmp_dataprocess.sh)      # open a new text editor         
-
-```
+``` 
 #!/bin/bash
 #SBATCH --job-name=tmp_dataprocess.sh                                       # Job name
 #SBATCH --output=/home/jl2815/tco/model_output/data_preprocess1_%j.out            # Standard output file (%j = JobID)
 #SBATCH --error=/home/jl2815/tco/model_output/data_preprocess1_%j.err              # Standard error file (%j = JobID)
-#SBATCH --time=72:00:00                
+#SBATCH --time=5:00:00                
 #SBATCH --ntasks=1                       
-#SBATCH --cpus-per-task=8                 
-#SBATCH --mem=200G                          
+#SBATCH --cpus-per-task=16                
+#SBATCH --mem=40G                          
 #SBATCH --partition=mem                    
 
 #### Load the Anaconda module to use srun 
 module purge                                              
 module use /projects/community/modulefiles                 
-module load anaconda/2024.06-ts840
+module load anaconda/2024.06-ts840 
 
 #### Initialize conda for the current shell session if not already done for the current shell session.
 eval "$(conda shell.bash hook)"
-conda activate gems_tco
+conda activate faiss_env
 
 echo "Current date and time: $(date)"
+echo "data preprocess to make pickle files"
 
 #### Run the Python script  
-srun python /home/jl2815/tco/data_preprocessing/groupdata_by_center.py 
-srun python /home/jl2815/tco/data_preprocessing/groupdata_by_center.py  
+srun python /home/jl2815/tco/data_preprocessing/groupdata_by_center.py
+
 ```
-cd ./jobscript/tco/dl
-sbath tmp_datapreprocess.sh
+
