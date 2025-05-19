@@ -79,15 +79,17 @@ class load_data:
             - nns_map: Array of nearest neighbors.
         """
         # Load the dictionary to set spatial coordinates
-        filepath = Path(self.datapath) / "pickle_2023/coarse_cen_map23_01.pkl"
+        filepath = Path(self.datapath) / "pickle_2024/coarse_cen_map24_07.pkl"
         
         with open(filepath, 'rb') as pickle_file:
             coarse_dict_24_1 = pickle.load(pickle_file)
 
-        sample_df = coarse_dict_24_1['y23m01day01_hm02:12']
-        sample_key = coarse_dict_24_1.get('y23m01day01_hm02:12')
+        keys = list(coarse_dict_24_1.keys())
+
+        sample_df = coarse_dict_24_1[keys[0]]
+        sample_key = coarse_dict_24_1.get(keys[0])
         if sample_key is None:
-            print("Key 'y23m01day01_hm02:12' not found in the dictionary.")
+            print(f"Key {keys[0]} not found in the dictionary.")
 
         rho_lat = lat_lon_resolution[0]          
         rho_lon = lat_lon_resolution[1]
