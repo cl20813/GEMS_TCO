@@ -6,7 +6,7 @@ Go to terminal in VSCode.
 ```conda activate faiss_env```       
 ```conda install -c pytorch faiss-cpu```       # order matters, install this first because it's a core dependency.    
 ```conda install pybind11```      # comfile c++ file       
-```conda install numpy pandas matplotlib seaborn scikit-learn ```         
+```conda install numpy pandas matplotlib seaborn scikit-learn xarray netCDF4 ```            
 ```conda install pytorch::pytorch torchvision torchaudio -c pytorch```     
 ``` pip install typer```   conda manages dependencies for a wide range of software, not just Python packages. This can sometimes lead to conflicts or delays in updating packages. pip   
 Also I need to install torch spline library.   
