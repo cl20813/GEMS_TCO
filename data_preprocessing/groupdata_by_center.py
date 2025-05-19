@@ -3,94 +3,61 @@ import pandas as pd
 import pickle
 import sys 
 import os
+from pathlib import Path
 #  sys.path
 # !pip install numpy==2.0
 
-from GEMS_TCO import data_map_by_hour
+from GEMS_TCO import configuration as config
+from GEMS_TCO import data_map_by_hour as dmbh
 
-# Base file path and settings
-base_path = "/home/jl2815/tco/data/pickle_data"
-lat_start, lat_end, lon_start, lon_end = 5, 10, 110, 120
+'''
+1. Transfer csv file into amarel
+2. Transform csv into ORI data map
+3. Transform ORI denset data map into coarse data map
+'''
+# "/home/jl2815/tco/data/pickle_data/" this is amarel_data_load_path
+amarel_data_path =  config.amarel_data_load_path
+lat_start, lat_end, lon_start, lon_end = 0, 5, 123, 133
 
-years = [2023,2024]
-# Loop through months
+years, months = [2024], list( range(7,8))  # years = [2023,2024]
+
+# save ORI dense data map in pickle file
+instance = dmbh.MonthAggregatedHashmap(lat_start, lat_end, lon_start, lon_end, years, months)
+instance.aggregate_july24topickle(csvfilepath = amarel_data_path)
+
+
+# transform ORI dense data into coarse map
+step_lat, step_lon = 0.022, 0.066
+df = pd.read_csv( Path(amarel_data_path) /f'data_2024/data_24_07_0131_N05_E123133.csv')  # MAC
+instance = dmbh.center_matching_hour(df, lat_start, lat_end, lon_start, lon_end)  
+
 for year in years:
-    for month in range(1, 13):  
+    for month in months:
+        month_str = f"{month:02d}" 
         try:
-            # Construct filenames dynamically
-            month_str = f"{month:02d}"  # Ensure month is zero-padded
-            if month == 2 and year==2023:
-                day_str = "0128"  # Handle February specifically
-            elif month ==2 and year==2024:
-                day_str = "0129"
-            else:
-                day_str = "0131" if (month in [1, 3, 5, 7, 8, 10, 12]) else "0130"
-    
-            input_filename = f"data_{year}/data_{str(year)[2:]}_{month_str}_{day_str}_N510_E110120.csv"
-            input_filepath = os.path.join(base_path, input_filename)
-            
-            # Read data
-            print(f"Reading file: {input_filepath}")
-            df = pd.read_csv(input_filepath)
-            
-            # Process data
-            instance = data_map_by_hour.MakeOrbitdata(df, lat_start, lat_end, lon_start, lon_end)
-            orbit_map = instance.group_data_by_orbits()
-            
-            output_path = os.path.join(base_path, f'pickle_{year}')
-
-            # Ensure output directory exists
-            if not os.path.exists(output_path):
-                os.makedirs(output_path)
-            # Save pickle
-            output_filename = f"orbit_map{str(year)[2:]}_{month_str}.pkl"
-            output_filepath = os.path.join(output_path, output_filename)
-            with open(output_filepath, 'wb') as pickle_file:
-                pickle.dump(orbit_map, pickle_file)
-            
-            print(f"Successfully processed and saved data for year {str(year)[2:]} month {month_str}.")
-        
-        except FileNotFoundError:
-            print(f"Warning: File {input_filename} not found. Skipping.")
-        except Exception as e:
-            print(f"Error processing file {input_filename}: {e}")
-
-### Now make coarse set
-
-
-df = pd.read_csv("/home/jl2815/tco/data/pickle_data/data_2024/data_24_07_0131_N510_E110120.csv")
-instance = data_map_by_hour.MakeOrbitdata(df, 5,10,110,120)  
-
-for year in years:        # years = [2023,2024]
-    for month in range(1, 13):  
-        try:
-            # Construct filenames dynamically
-            month_str = f"{month:02d}"  # Ensure month is zero-padded
-            if month == 2 and year==2023:
-                day_str = "0128"  # Handle February specifically
-            elif month ==2 and year==2024:
-                day_str = "0129"
-            else:
-                day_str = "0131" if (month in [1, 3, 5, 7, 8, 10, 12]) else "0130"
-
-            # load pickle
-            output_path = os.path.join(base_path, f'pickle_{year}')
+            # load pickle (dense ORI data)
+            pickle_path = os.path.join(amarel_data_path, f'pickle_{year}')
             input_filename = f"orbit_map{str(year)[2:]}_{month_str}.pkl"
-            input_filepath = os.path.join(output_path, input_filename)
+            input_filepath = os.path.join(pickle_path, input_filename)
             with open(input_filepath, 'rb') as pickle_file:
                 loaded_map = pickle.load(pickle_file)
-            center_points = instance.make_center_points(step=0.05)
+            center_points = instance.make_center_points(step_lat = step_lat, step_lon= step_lon)
             coarse_cen_map = instance.coarse_by_center(loaded_map, center_points)
 
-            # Save pickle
+            # Save pickle (coarse data)
             output_filename = f"coarse_cen_map{str(year)[2:]}_{month_str}.pkl"
-            output_filepath = os.path.join(output_path, output_filename)
+            output_filepath = os.path.join(pickle_path, output_filename)
             with open(output_filepath, 'wb') as pickle_file:
                 pickle.dump(coarse_cen_map, pickle_file)
             
             print(f"Successfully processed and saved data for year {str(year)[2:]} month {month_str}.")
-        
         except FileNotFoundError:
             print(f"Warning: File {input_filename} not found. Skipping.")
         except Exception as e:
             print(f"Error processing file {input_filename}: {e}")
+
+
+### Now make coarse set
+
+
+

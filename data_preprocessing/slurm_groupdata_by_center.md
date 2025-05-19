@@ -1,4 +1,19 @@
-### Job Order SLURM: groupdata_by_center.py (make 20,000 rows per hour)
+### Job Order SLURM: groupdata_by_center.py 
+
+### Update my packages
+# mac
+scp -r "/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO" jl2815@amarel.rutgers.edu:/home/jl2815/tco
+
+# window
+scp -r "C:\Users\joonw\TCO\GEMS_TCO-1\GEMS_TCO" jl2815@amarel.rutgers.edu:/home/jl2815/tco 
+
+### Copy run file from ```local``` to ```Amarel HPC```
+# mac
+
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_full_day_spline_511.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+
+
+
 
 cd ./jobscript/tco/dl          
 nano tmp_dataprocess.sh          (rm tmp_dataprocess.sh)      # open a new text editor         

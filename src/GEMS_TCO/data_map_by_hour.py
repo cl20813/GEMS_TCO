@@ -228,10 +228,6 @@ class center_matching_hour():
         """
         Groups data into a dictionary based on unique orbit timestamps.
 
-        Input:
-            Time: String. When saving data into csv file, time object file becomes string
-            beause csv file is a plain text file. 
-        
         Returns:
             dict: A dictionary where keys represent formatted orbit identifiers 
                 and values are DataFrames corresponding to each orbit.
@@ -244,57 +240,88 @@ class center_matching_hour():
             orbit_map[orbit_key] = self.df.loc[self.df['Orbit'] == orbit].reset_index(drop=True)
         return orbit_map
     
-    def make_center_points(self, step:float=0.05) -> pd.DataFrame:
-        assert isinstance(step, float), "step must be a float"
-        # Create grid coordinates
-        lat_coords = np.arange(self.lat_s, self.lat_e, step)
-        lon_coords = np.arange(self.lon_s, self.lon_e, step)
-        center_points = []
-        for lat in lat_coords:
-            for lon in lon_coords:
-                center_lat = lat + step / 2
-                center_lon = lon + step / 2
-                center_points.append([center_lat, center_lon])
+    def make_center_points(self, step_lat:float=0.022, step_lon:float=0.063) -> pd.DataFrame:
+        lat_coords = np.arange( self.lat_e-step_lat- 0.0002, self.lat_s -step_lat, -step_lat)
+        lon_coords = np.arange( self.lon_e-step_lon- 0.0002, self.lon_s-step_lon, -step_lon)
 
-        center_points= pd.DataFrame(center_points,columns=['lat','lon'])
-        return center_points
+        # Apply the shift as in the original code
+        # These are the unique lat/lon values for the "center_points" grid
+        final_lat_values = lat_coords + step_lat 
+        final_lon_values = lon_coords + step_lon 
+        
+        # Create 2D grid with broadcasting
+        decrement = 0.0001
+        lat_grid = final_lat_values[:, None] + np.arange(len(final_lon_values)) * decrement  # shape: (228, 152)
 
-    def coarse_by_center(self, orbit_map:dict, center_points:pd.DataFrame) -> dict:
+        # Flatten row-wise (C order)
+        center_lats = lat_grid.flatten()
+
+        # Create matching longitude grid
+        center_lons = np.tile(final_lon_values, len(final_lat_values))
+
+        # Now you can build your DataFrame
+        center_points_df = pd.DataFrame({'lat': center_lats, 'lon': center_lons})
+        return center_points_df
+    
+
+    '''  
+    coarse_by_center   allows duplicates while coarse_by_center_unique doesnt.
+    '''
+
+    def coarse_by_center(self, orbit_map: dict, center_points: pd.DataFrame) -> dict:
         assert isinstance(orbit_map, dict), "orbit_map must be a dict"
         assert isinstance(center_points, pd.DataFrame), "center_points must be a pd.DataFrame"
 
         coarse_map = {}
         key_list = sorted(orbit_map)
 
-        res = [0]* len(center_points) 
+        # Convert query points (lat, lon) to NumPy array
+        query_points = center_points[['lat', 'lon']].to_numpy()
+        query_points_rad = np.radians(query_points)  # if using haversine
+
+        num_center_points = len(center_points)
 
         for key in key_list:
             cur_data = orbit_map[key].reset_index(drop=True)
-            locs = cur_data[['Latitude','Longitude']]
-            locs = np.array(locs)
-            tree = BallTree(locs, metric='euclidean')
-            for i in range(len(center_points)):
-                target = center_points.iloc[i,:].to_numpy().reshape(1,-1)
-                dist, ind = tree.query(target, k=1)
-                res[i] = cur_data.loc[ind[0][0], 'ColumnAmountO3']
-            
-            res_series = pd.Series(res)
+            locs = cur_data[['Latitude', 'Longitude']].to_numpy()
 
-            coarse_map[key] = pd.DataFrame( 
-                {
-                    'Latitude':center_points.loc[:,'lat'], 
-                    'Longitude':center_points.loc[:,'lon'], 
-                    'ColumnAmountO3':res_series,  
-                    'Hours_elapsed': [cur_data['Hours_elapsed'][0]]* len(center_points), 
-                    'Time' : [cur_data['Time'][0]]* len(center_points) 
-                }
-            )
+            if locs.shape[0] == 0:
+                coarse_map[key] = pd.DataFrame({
+                    'Latitude': center_points['lat'],
+                    'Longitude': center_points['lon'],
+                    'ColumnAmountO3': [np.nan] * num_center_points,
+                    'Hours_elapsed': [np.nan] * num_center_points,
+                    'Time': [pd.NaT] * num_center_points,
+                    'Source_Latitude': [np.nan] * num_center_points,
+                    'Source_Longitude': [np.nan] * num_center_points
+                })
+                continue
 
+            # Use haversine
+            locs_rad = np.radians(locs)
+            tree = BallTree(locs_rad, metric='haversine')
+            dist, ind = tree.query(query_points_rad, k=1)
+
+            nearest_indices = ind.flatten()
+
+            # Extract values from the nearest source points
+            res_o3_values = cur_data.loc[nearest_indices, 'ColumnAmountO3'].values
+            source_lat = cur_data.loc[nearest_indices, 'Latitude'].values
+            source_lon = cur_data.loc[nearest_indices, 'Longitude'].values
+
+            hours_elapsed_val = cur_data['Hours_elapsed'].iloc[0] if not cur_data.empty else np.nan
+            time_val = cur_data['Time'].iloc[0] if not cur_data.empty else pd.NaT
+
+            coarse_map[key] = pd.DataFrame({
+                'Latitude': center_points['lat'].values,
+                'Longitude': center_points['lon'].values,
+                'ColumnAmountO3': res_o3_values,
+                'Hours_elapsed': [hours_elapsed_val] * num_center_points,
+                'Time': [time_val] * num_center_points,
+                'Source_Latitude': source_lat,
+                'Source_Longitude': source_lon
+            })
         return coarse_map
-
-
-
-
     
 
 
