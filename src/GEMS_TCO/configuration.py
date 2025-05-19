@@ -1,6 +1,6 @@
 # load_gems_data
 mac_data_load_path = "/Users/joonwonlee/Documents/GEMS_DATA/"
-amarel_data_load_path = "/home/jl2815/tco/data/pickle_data/"
+amarel_data_load_path = "/home/jl2815/tco/data/"
 window_data_load_path = "C:\\Users\\joonw\\tco\\Extracted_data/"
 
 # load full likelihood based estimates for a day
