@@ -240,7 +240,7 @@ class center_matching_hour():
             orbit_map[orbit_key] = self.df.loc[self.df['Orbit'] == orbit].reset_index(drop=True)
         return orbit_map
     
-    def make_center_points(self, step_lat:float=0.022, step_lon:float=0.063) -> pd.DataFrame:
+    def make_center_points(self, step_lat:float=0.042, step_lon:float=0.062) -> pd.DataFrame:
         lat_coords = np.arange( self.lat_e-step_lat- 0.0002, self.lat_s -step_lat, -step_lat)
         lon_coords = np.arange( self.lon_e-step_lon- 0.0002, self.lon_s-step_lon, -step_lon)
 
@@ -250,7 +250,7 @@ class center_matching_hour():
         final_lon_values = lon_coords + step_lon 
         
         # Create 2D grid with broadcasting
-        decrement = 0.0001
+        decrement = 0.00012
         lat_grid = final_lat_values[:, None] + np.arange(len(final_lon_values)) * decrement  # shape: (228, 152)
 
         # Flatten row-wise (C order)
