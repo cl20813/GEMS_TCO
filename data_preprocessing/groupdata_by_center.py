@@ -27,7 +27,7 @@ instance.aggregate_july24topickle(csvfilepath = amarel_data_path)
 
 
 # transform ORI dense data into coarse map
-step_lat, step_lon = 0.022, 0.066
+step_lat, step_lon = 0.044, 0.063
 df = pd.read_csv( Path(amarel_data_path) /f'data_2024/data_24_07_0131_N05_E123133.csv')  # MAC
 instance = dmbh.center_matching_hour(df, lat_start, lat_end, lon_start, lon_end)  
 
