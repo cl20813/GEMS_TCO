@@ -93,8 +93,16 @@ class load_data:
 
         rho_lat = lat_lon_resolution[0]          
         rho_lon = lat_lon_resolution[1]
-        lat_n = sample_df['Latitude'].unique()[::rho_lat]
-        lon_n = sample_df['Longitude'].unique()[::rho_lon]
+
+        #lat_n = sample_df['Latitude'].unique()[::rho_lat]
+        #lon_n = sample_df['Longitude'].unique()[::rho_lon]
+
+        unique_lats = sample_df['Latitude'].unique()
+        sorted_lats_descending = np.sort(unique_lats)[::-1] # Sorts ascending, then reverses
+        lat_n = sorted_lats_descending[::rho_lat]
+        unique_lons = sample_df['Longitude'].unique()
+        sorted_lons_descending = np.sort(unique_lons)[::-1] # Sorts ascending, then reverses
+        lon_n = sorted_lons_descending[::rho_lon]
 
         # Set spatial coordinates for each dataset
         coarse_dicts = {}
