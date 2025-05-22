@@ -139,6 +139,7 @@ class CrossVariogram:
                         lon_lag_sem[day + 1][i - 8 * day][j] = np.nan
                         continue
                     semivariances = 0.5 * torch.mean((cur_values[valid_pairs[1]] - cur_values[valid_pairs[0]]) ** 2)
+                    semivariances = torch.round(semivariances, decimals=4)
                     lon_lag_sem[day+1][i - 8*day][j] = semivariances.item()
         return lon_lag_sem
 
@@ -172,6 +173,7 @@ class CrossVariogram:
                         lon_lag_sem[day + 1][i - 8 * day][j] = np.nan
                         continue
                     semivariances = 0.5 * torch.mean((cur_values[valid_pairs[1]] - next_values[valid_pairs[0]]) ** 2)
+                    semivariances = torch.round(semivariances, decimals=4)
                     lon_lag_sem[day+1][i - 8*day][j] = semivariances.item()
         return lon_lag_sem
     
