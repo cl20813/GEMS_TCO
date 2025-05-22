@@ -265,6 +265,71 @@ class load_data:
         return analysis_data_map, entire_data
 
 
+class log_semivariograms:
+    def __init__(self, deltas: List[Tuple[float, float]], semivariograms, tolerance: float):
+        """
+        Initialize the log semivariograms parameters.
+
+        Parameters:
+        - deltas (List[Tuple[float, float]]): List of deltas for semivariogram calculation.
+        - tolerance (float): Tolerance level for semivariogram calculation.
+        """
+        self.deltas = deltas
+        self.tolerance = tolerance
+
+    def toJSON(self) -> str:
+        """
+        Convert the object to a JSON string.
+
+        Returns:
+        - str: JSON representation of the object.
+        """
+        return json.dumps(self, cls=alg_opt_Encoder, sort_keys=False)
+
+    def save(self, input_filepath: Path, data: Any) -> None:
+        """
+        Save the aggregated data back to the JSON file.
+
+        Parameters:
+        - input_filepath (Path): Path to the JSON file.
+        - data (Any): Data to be saved.
+        """
+        with input_filepath.open('w', encoding='utf-8') as json_file:
+            json_file.write(json.dumps(data, separators=(",", ":"), indent=4))
+
+    def load(self, input_filepath: Path) -> Any:
+        """
+        Load data from a JSON file.
+
+        Parameters:
+        - input_filepath (Path): Path to the JSON file.
+
+        Returns:
+        - Any: Loaded data.
+        """
+        try:
+            with input_filepath.open('r', encoding='utf-8') as f:
+                loaded_data = json.load(f)
+        except FileNotFoundError:
+            loaded_data = []
+        return loaded_data
+    
+    def tocsv(self, jsondata: List[str], fieldnames: List[str], csv_filepath: Path) -> None:
+        """
+        Convert JSON data to CSV format.
+
+        Parameters:
+        - jsondata (List[str]): List of JSON strings.
+        - fieldnames (List[str]): List of field names for the CSV.
+        - csv_filepath (Path): Path to the CSV file.
+        """
+        data_dicts = [json.loads(data) for data in jsondata]
+        with csv_filepath.open(mode='w', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            for data in data_dicts:
+                writer.writerow(data)
+
 class alg_optimization:
     def __init__(self, day: int, cov_name: str, lat_lon_resolution: List[int], lr: float, stepsize: float, params: List[float], time: float, epoch: int):
         """
