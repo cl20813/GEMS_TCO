@@ -1,10 +1,7 @@
 # Standard libraries
 import sys
 # Add your custom path
-
-gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
-sys.path.append(gems_tco_path)
-
+sys.path.append("/cache/home/jl2815/tco")
 import os
 import logging
 import argparse # Argument parsing
@@ -32,8 +29,6 @@ import json
 from json import JSONEncoder
 from GEMS_TCO import configuration as config
 
-# /opt/anaconda3/envs/faiss_env/bin/python /Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/semivariograms/mac/directional_emp_sem_mac.py --space "1, 1" --days "0, 1" 
-
 
 app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
 @app.command()
@@ -41,7 +36,7 @@ app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
 def cli(
     space: List[str] = typer.Option(['20', '20'], help="spatial resolution"),
     days: List[str] = typer.Option(['0', '31'], help="Number of nearest neighbors in Vecchia approx."),
-    mm_cond_number: int = typer.Option(1, help="Number of nearest neighbors in Vecchia approx.")
+    mm_cond_number: int = typer.Option(1, help="Number of nearest neighbors in Vecchia approx."),
 ) -> None:
     
     ## initialize setting
@@ -51,13 +46,13 @@ def cli(
     years = ['2024']
     month_range =[7,8]
 
-    data_load_instance = load_data(config.mac_data_load_path)
+    data_load_instance = load_data(config.amarel_data_load_path)
     df_map, ord_mm, nns_map= data_load_instance.load_mm20k_data_bymonthyear(lat_lon_resolution = lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
 
-                                    
+
     ############################## 
 
-    instance_sem = evaluate.CrossVariogram(config.mac_save_computed_semi_path,7)
+    instance_sem = evaluate.CrossVariogram(config.amarel_save_computed_semi_path,7)
 
     # load entire days in July
     idx_for_datamap= [0, 248]
@@ -78,9 +73,8 @@ def cli(
         np.arange(0.176, 2.3, 0.044 * 5)
     ])
 
-
-    lat_deltas = [ ( round(a,3),0 ) for a in tmp_lat]
     lon_deltas = [ (0, round(a,3)) for a in tmp_lon]
+    lat_deltas = [ ( round(a,3),0 ) for a in tmp_lat]
     tolerance = 0.02
     
     lat_lag_sem = instance_sem.compute_directional_semivariogram(lat_deltas, analysis_data_map, days_list, tolerance)
