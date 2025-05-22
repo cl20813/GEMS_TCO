@@ -71,8 +71,8 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/may
 ```mkdir -p ./jobscript/tco/gp_exercise```     
 
 ```  cd ./jobscript/tco/gp_exercise  ```          
-```  nano fit_day_vecc_v05_may9_1250.sh  ``` 
-```  sbatch fit_day_vecc_v05_may9_1250.sh  ``` 
+```  nano fit_day_vecc_v05_may21_1120.sh  ``` 
+```  sbatch fit_day_vecc_v05_may21_1120.sh  ``` 
 
 
 ``` 
@@ -102,15 +102,15 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_may9.py --v 0
 
 ```
 ``` cd ./jobscript/tco/gp_exercise ```
-```  nano fit_day_vecc_v05_may9_5000.sh  ``` 
-```  sbatch fit_day_vecc_v05_may9_5000.sh  ``` 
+```  nano fit_day_vecc_v05_may21_4560.sh  ``` 
+```  sbatch fit_day_vecc_v05_may21_4560.sh  ``` 
 
 ``` 
 
 #!/bin/bash
-#SBATCH --job-name=vec_v05_may9_5000                         # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/vec_may9_5000_%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/vec_may9_5000_%j.err # Standard error file (%j = JobID)
+#SBATCH --job-name=vec_v05_may21_4560                         # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/vec_may21_4560_%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/vec_may21_4560_%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                        # Number of CPU cores per task
@@ -133,16 +133,16 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_may9.py --v 0
 ```
 
 
-# 20000
+# 18126
 ``` cd ./jobscript/tco/gp_exercise ```
-```  nano fit_day_vecc_v05_may9_20000.sh  ``` 
-```  sbatch fit_day_vecc_v05_may9_20000.sh  ``` 
+```  nano fit_day_vecc_v05_may21_18126.sh  ``` 
+```  sbatch fit_day_vecc_v05_may21_18126.sh  ``` 
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=vec_v05_may9_20000                         # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/vec_may9_20000_%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/vec_may9_20000_%j.err # Standard error file (%j = JobID)
+#SBATCH --job-name=vec_v05_may9_18126                         # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/vec_may21_18126_%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/vec_may21_18126_%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                        # Number of CPU cores per task
@@ -161,6 +161,6 @@ conda activate faiss_env
 echo "Current date and time: $(date)"
 echo "fit_vecc_v05_may09_20000_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_may9.py --v 0.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "1, 1" --days "22,31" --mm-cond-number 10 --nheads 300
+srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_may9.py --v 0.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "1, 1" --days "0,6" --mm-cond-number 10 --nheads 300
 
 ```

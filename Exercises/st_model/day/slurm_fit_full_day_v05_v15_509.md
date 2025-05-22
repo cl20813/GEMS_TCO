@@ -52,8 +52,8 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/ful
 ```mkdir -p ./jobscript/tco/gp_exercise```     
 
 ```  cd ./jobscript/tco/gp_exercise  ```   
-```  nano fit_full_day_v05_1250_r2s10_may9.sh  ```        
- ```   sbatch fit_full_day_v05_1250_r2s10_may9.sh   ```
+```  nano fit_full_day_v05_1250_r2s10_may21.sh  ```        
+ ```   sbatch fit_full_day_v05_1250_r2s10_may21.sh   ```
 
 ### I add +2 for each range parameters  and -10 to sigma to change search area in optimization
 
@@ -83,7 +83,7 @@ echo "Current date and time: $(date)"
 
 echo "fit_full_day_v05_1250"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v05_509.py --v 0.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "4, 4" --days "0,31" 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v05_509.py --v 0.5 --lr 0.02 --step 100 --gamma-par 0.3 --epochs 1500 --space "4, 4" --days "0,31" 
 
 ```
 
@@ -98,7 +98,7 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v05_509.py --v 0.
 #SBATCH --job-name=ful_v05_day_1250_rplus2                             # Job name
 #SBATCH --output=/home/jl2815/tco/exercise_output/fit_full_day_v05_1250rplus2_%j.out     # Standard output file (%j = JobID)
 #SBATCH --error=/home/jl2815/tco/exercise_output/fit_full_day_v05_1250rplus2_%j.err # Standard error file (%j = JobID)
-#SBATCH --time=12:00:00                                            # Time limit
+#SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
 #SBATCH --mem=300G                                                 # Memory per node

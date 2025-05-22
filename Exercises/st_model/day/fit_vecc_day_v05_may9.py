@@ -118,15 +118,15 @@ def cli(
         print(f'End 2024-07-{day+1} for lr:{lr}, step size {step}, betas(_,b2):{0.99}, gamma:{gamma_par} took {epoch_time:.2f}, epoch {epochs}')
         print(f'params and loss {out}')
 
-        input_filepath = output_path / f"vecchia_day_v05_r2s10_{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
+        input_filepath = output_path / f"vecchia_day_v05_r2s10_{ ( int(158.7 / lat_lon_resolution[0] * (113.63 / lat_lon_resolution[0]) )) }.json"
         
-        res = alg_optimization( f"2024-07-{day+1}", "Vecc_may9", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
+        res = alg_optimization( f"2024-07-{day+1}", "Vecc_may9", ( int(158.7 / lat_lon_resolution[0] * (113.63 / lat_lon_resolution[0]) )) , lr,  step , out, epoch_time, epoch)
         loaded_data = res.load(input_filepath)
         loaded_data.append( res.toJSON() )
         res.save(input_filepath,loaded_data)
         fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'epoch']
 
-        csv_filepath = input_path/f"vecchia_v05_r2s10_{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0])}.csv"
+        csv_filepath = input_path/f"vecchia_v05_r2s10_{( int(158.7 / lat_lon_resolution[0] * (113.63 / lat_lon_resolution[0]) )) }.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
 if __name__ == "__main__":
