@@ -109,16 +109,51 @@ class CrossVariogram:
         self.save_path = save_path
         self.length_of_analysis = length_of_analysis
 
-    def cross_lon_lat(self, deltas, map, days, tolerance):
-        lon_lag_sem = {}
-        lon_lag_sem[0] = deltas
-        for index, day in enumerate(days):
-            lon_lag_sem[day] = [[0]*len(deltas) for _ in range(7)]
-            t = day - 1
-            ori_semi_var_timeseries = [[0] * len(deltas) for _ in range(7)]
-            key_list = sorted(map)
+    def compute_directional_semivariogram(self, deltas, map, days, tolerance):
+        lon_lag_sem = {0: deltas} # Save deltas for reference
+        num_lags = 8
+        key_list = sorted(map)
+        '''
+        days assume 0 based index, day 1 is index 0.
+        Ozone values are centered, it matters for short lags
+        '''
+        for day in days:
+            lon_lag_sem[day+1] = [[0]*len(deltas) for _ in range(num_lags)]
             
-            for i in range(8 * t, 8 * t + 7):  # change 7 to 6
+            for i in range(8 * day, 8 * day + num_lags):  
+                cur_data = map[key_list[i]]
+     
+                coordinates = cur_data[:, :2]
+                cur_values = cur_data[:, 2] - torch.mean(cur_data[:, 2])
+      
+                lat_diffs = coordinates[:, None, 0] - coordinates[None, :, 0]
+                lon_diffs = coordinates[:, None, 1] - coordinates[None, :, 1]
+
+                for j, (delta_lat, delta_lon) in enumerate(deltas):
+                    valid_pairs = np.where(
+                        (np.abs(lat_diffs - delta_lat) <= tolerance) & 
+                        (np.abs(lon_diffs - delta_lon) <= tolerance)
+                    )
+                    if len(valid_pairs[0]) == 0:
+                        print(f"No valid pairs found for day {day+1}, time step {i - 8 * day + 1}, delta ({delta_lat}, {delta_lon})")
+                        lon_lag_sem[day + 1][i - 8 * day][j] = np.nan
+                        continue
+                    semivariances = 0.5 * torch.mean((cur_values[valid_pairs[1]] - cur_values[valid_pairs[0]]) ** 2)
+                    lon_lag_sem[day+1][i - 8*day][j] = semivariances.item()
+        return lon_lag_sem
+
+    def compute_cross_lon_lat(self, deltas, map, days, tolerance):
+        lon_lag_sem = {0: deltas} # Save deltas for reference
+        num_lags = 7
+        key_list = sorted(map)
+        '''
+        days assume 0 based index, day 1 is index 0.
+        Ozone values are centered, it matters for short lags
+        '''
+        for day in days:
+            lon_lag_sem[day+1] = [[0]*len(deltas) for _ in range(num_lags)]
+            
+            for i in range(8 * day, 8 * day + num_lags):  # change 7 to 6
                 cur_data = map[key_list[i]]
                 next_data = map[key_list[i+1]]
                 coordinates = cur_data[:, :2]
@@ -132,14 +167,12 @@ class CrossVariogram:
                         (np.abs(lat_diffs - delta_lat) <= tolerance) & 
                         (np.abs(lon_diffs - delta_lon) <= tolerance)
                     )
-            
                     if len(valid_pairs[0]) == 0:
-                        print(f"No valid pairs found for t{j+1:02d}_{i+1} at delta ({delta_lat}, {delta_lon})")
-                        ori_semi_var_timeseries[i % 8][j] = np.nan
+                        print(f"No valid pairs found for day {day+1}, time step {i - 8 * day + 1}, delta ({delta_lat}, {delta_lon})")
+                        lon_lag_sem[day + 1][i - 8 * day][j] = np.nan
                         continue
                     semivariances = 0.5 * torch.mean((cur_values[valid_pairs[1]] - next_values[valid_pairs[0]]) ** 2)
-                    lon_lag_sem[day][i % 8][j] = semivariances.item()
-                    ori_semi_var_timeseries[i % 8][j] = semivariances.item()
+                    lon_lag_sem[day+1][i - 8*day][j] = semivariances.item()
         return lon_lag_sem
     
     def cross_directional_sem(self,deltas, map,  days, tolerance, direction1, direction2):

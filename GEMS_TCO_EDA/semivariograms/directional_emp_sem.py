@@ -45,12 +45,9 @@ def cli(
     days_list = list(range(days_s_e[0], days_s_e[1]))
     years = ['2024']
     month_range =[7,8]
-    output_path = input_path = Path(config.amarel_estimates_day_path)
-
 
     data_load_instance = load_data(config.amarel_data_load_path)
     df_map, ord_mm, nns_map= data_load_instance.load_mm20k_data_bymonthyear(lat_lon_resolution = lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)
-
 
    # rho_lat = lat_lon_resolution[0]          
    # rho_lon = lat_lon_resolution[1]
@@ -58,7 +55,6 @@ def cli(
 
     # Set the days of the month
     
-
     #############
     ############# longitude semivariogram 
 
@@ -66,12 +62,16 @@ def cli(
     for day in days_list:
         print(f'2024-07-{day+1}, data size per hour: { (int(158.7 / lat_lon_resolution[0] * (113.63 / lat_lon_resolution[0]))) } ')
         idx_for_datamap= [8*day,8*(day+1)]
-        analysis_data_map, aggregated_data = data_load_instance.load_working_data_byday( df_map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
+        analysis_data_map, _ = data_load_instance.load_working_data_byday( df_map, ord_mm, nns_map, idx_for_datamap = idx_for_datamap)
 
+        '''
+        In this study, the center matched data is used. 
+        '''
+        tmp_lon = np.concatenate((np.linspace(-2, -0.2, 10), [-0.12, -0.06, 0, 0.06, 0.12], np.linspace(0.2, 2, 10)))
+        tmp_lat = np.concatenate((np.linspace(-2, -0.2, 10), [-0.13, -0.04, 0, 0.04, 0.12], np.linspace(0.2, 2, 10)))
 
-        tmp = np.concatenate((np.linspace(-2, -0.2, 10), [-0.1, 0, 0.1], np.linspace(0.2, 2, 10)))
-        lon_deltas = [ (0, round(a,1)) for a in tmp]
-        lat_deltas = [ ( round(a,1),0 ) for a in tmp]
+        lon_deltas = [ (0, round(a,1)) for a in tmp_lon]
+        lat_deltas = [ ( round(a,1),0 ) for a in tmp_lat]
      
         tolerance = 0.02
         # days= list(np.arange(1,32))  # Example days you want to plot
@@ -79,13 +79,9 @@ def cli(
         lon_lag_sem = instance_sem.cross_lon_lat(lon_deltas, analysis_data_map, days, tolerance)
         lat_lag_sem = instance_sem.cross_lon_lat(lat_deltas, analysis_data_map, days, tolerance)
 
-        output_filename = f"empirical_lon_sem_{int((200/rho_lat)*(100/rho_lon))}_july24.pkl"
+        print(lon_lag_sem)
+        print(lat_lag_sem)
 
-        # base_path = "/home/jl2815/tco/data/pickle_data"
-        output_path = "/home/jl2815/tco/exercise_output/eda"
-        output_filepath = os.path.join(output_path, output_filename)
-        with open(output_filepath, 'wb') as pickle_file:
-            pickle.dump(lon_lag_sem, pickle_file)    
 
     #############
     ############# latitude semivariogram 
