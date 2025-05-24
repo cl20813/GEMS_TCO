@@ -302,7 +302,7 @@ class CrossVariogram_empirical(CrossVariogram):
         super().__init__(save_path, length_of_analysis)
         self.smooth = smooth
         
-    def plot_lon_empirical(self, lon_lag_sem, days, deltas):
+    def plot_cross_lon_empirical(self, lon_lag_sem, days, deltas):
         fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
         # https://betterfigures.org/2015/06/23/picking-a-colour-scale-for-scientific-graphics/
@@ -330,10 +330,11 @@ class CrossVariogram_empirical(CrossVariogram):
             ax.set_xlabel('Longitude Lags', fontsize=12)
             ax.set_ylabel('Cross-variogram Values', fontsize=12)
             ax.set_title(f'Cross-Variogram on 2024-07-{day:02d} ({self.length_of_analysis})', fontsize=14)
-            ax.set_xscale('linear')
+            ax.set_xscale('symlog', linthresh=0.95)
+            # ax.set_xscale('linear')
             # ax.set_yscale('linear')
             ax.set_xticks(lon_lags)
-            ticks = [str(round(x, 1)) for x in lon_lags]
+            ticks = [str(round(x, 2)) for x in lon_lags]
             ax.set_xticklabels(ticks)
             ax.set_ylim(1e-4, 670)
             plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
@@ -344,12 +345,12 @@ class CrossVariogram_empirical(CrossVariogram):
 
         plt.tight_layout()
         # plt.savefig(f'/Users/joonwonlee/Documents/GEMS_TCO-1/plots/directional_semivariograms/dir_sem_longitude_days{days[0]}_{days[-1]}.png')
-        save_path = Path(self.save_path) / f'dir_sem_longitude_days{days[0]}_{days[-1]}.png'
+        save_path = Path(self.save_path) / f'cross_sem_longitude_days{days[0]}_{days[-1]}.png'
         plt.savefig(save_path)
         plt.show()
 
 
-    def plot_lat_empirical(self, lat_lag_sem, days, deltas):
+    def plot_cross_lat_empirical(self, lat_lag_sem, days, deltas):
         fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
         # https://betterfigures.org/2015/06/23/picking-a-colour-scale-for-scientific-graphics/
@@ -391,23 +392,89 @@ class CrossVariogram_empirical(CrossVariogram):
             ax.set_xlabel('Latitude Lags', fontsize=12)
             ax.set_ylabel('Cross-variogram Values', fontsize=12)
             ax.set_title(f'Cross-Variogram on 2024-07-{day:02d} ({self.length_of_analysis})', fontsize=14)
-            ax.set_xscale('linear')
+            # ax.set_xscale('linear')
+            ax.set_xscale('symlog', linthresh=0.95)
             # ax.set_yscale('linear')
             ax.set_xticks(lat_lags)
-            ticks = [str(round(x, 1)) for x in lat_lags]
+            ticks = [str(round(x, 2)) for x in lat_lags]
             ax.set_xticklabels(ticks)
             ax.set_ylim(1e-4, 670)
-            plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
+            plt.setp(ax.get_xticklabels(), rotation=65, ha='right')
 
             # Add vertical red line at x=0
             ax.axvline(x=0, color='red', linestyle='--') # , label='x=0'
             ax.legend()
 
         plt.tight_layout()
-        save_path = Path(self.save_path) / f'dir_sem_latitude_days{days[0]}_{days[-1]}.png'
+        save_path = Path(self.save_path) / f'cross_sem_latitude_days{days[0]}_{days[-1]}.png'
         plt.savefig(save_path)
         # plt.savefig(f'/Users/joonwonlee/Documents/GEMS_TCO-1/plots/directional_semivariograms/dir_sem_latitude_days{days[0]}_{days[-1]}.png')
         plt.show()
+
+    def plot_lat_empirical(self, lat_lag_sem, days, deltas):
+        fig, axs = plt.subplots(2, 2, figsize=(15, 10))
+
+        # https://betterfigures.org/2015/06/23/picking-a-colour-scale-for-scientific-graphics/
+        colors = [
+            (222/255, 235/255, 247/255),
+            (198/255, 219/255, 239/255),
+            (158/255, 202/255, 225/255),
+            (107/255, 174/255, 214/255),
+            (66/255, 146/255, 198/255),
+            (33/255, 113/255, 181/255),
+            (8/255, 69/255, 148/255),
+            (0/255, 51/255, 128/255)  # New 8th color
+        ]
+
+
+        for index, day in enumerate(days):
+            # t = day - 1
+            # key_list = sorted(map)
+
+            # Create a 2x2 plot
+            ax = axs[index // 2, index % 2]
+
+            # Separate positive and negative lags and assign appropriate indices
+        
+            lat_lags = [lat for lat, lon in deltas]
+
+            # for j, (lat, lon) in enumerate(deltas):
+            #    x_values.append(lat)  # Use negative index for negative lags
+            # weight = [-0.55, -0.5, -0.25, -0.15, -0.05, 0, 0.05, 0.15, 0.25, 0.5, 0.55]
+            # weight2 = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]
+
+            # Plotting for each orbit
+            for i in range(8):
+                y_values = [y**2 for y in lat_lag_sem[day][i]]
+
+                ax.plot(lat_lags, y_values, color=colors[i], label=f'Empirical Sem. Hour {i + 1}')
+                ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
+                
+            ax.grid(True)
+            ax.set_xlabel('Latitude Lags', fontsize=12)
+            ax.set_ylabel('Variogram Values', fontsize=12)
+            ax.set_title(f'Empirical-Variogram on 2024-07-{day:02d} ({self.length_of_analysis})', fontsize=14)
+            # ax.set_xscale('linear')
+            ax.set_xscale('symlog', linthresh=0.95)
+            # ax.set_yscale('linear')
+            ax.set_xticks(lat_lags)
+            ticks = [str(round(x, 2)) for x in lat_lags]
+            ax.set_xticklabels(ticks)
+            ax.set_ylim(1e-4, 670)
+            plt.setp(ax.get_xticklabels(), rotation=65, ha='right')
+
+            # Add vertical red line at x=0
+            ax.axvline(x=0, color='red', linestyle='--') # , label='x=0'
+            ax.legend()
+
+        plt.tight_layout()
+        save_path = Path(self.save_path) / f'emp_sem_latitude_days{days[0]}_{days[-1]}.png'
+        plt.savefig(save_path)
+        # plt.savefig(f'/Users/joonwonlee/Documents/GEMS_TCO-1/plots/directional_semivariograms/dir_sem_latitude_days{days[0]}_{days[-1]}.png')
+        plt.show()
+
+
+
 
     def plot_directional_sem_empirical(self, deltas,direictional_sem, days, direction1, direction2):
         fig, axs = plt.subplots(2, 2, figsize=(15, 10))
@@ -447,7 +514,7 @@ class CrossVariogram_empirical(CrossVariogram):
             ax.set_xticklabels(ticks)
             ax.set_ylim(1e-4, 670)
 
-            plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
+            plt.setp(ax.get_xticklabels(), rotation=65, ha='right')
             ax.axvline(x=0, color='red', linestyle='--', label='x=0')
 
         plt.tight_layout()

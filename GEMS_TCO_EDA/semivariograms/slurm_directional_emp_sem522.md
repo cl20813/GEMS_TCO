@@ -19,8 +19,14 @@ scp "C:\Users\joonw\TCO\GEMS_TCO-1\Exercises\st_model\fit_st_torch_327.py" jl281
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
 ##### change name for directional semivariograms
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO_EDA/tmp_save/empirical_n135_45_sem_20000_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/tmp_save"  
 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO_EDA/tmp_save/empirical_cross_lat_sem_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/tmp_save"  
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO_EDA/tmp_save/empirical_cross_lon_sem_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/tmp_save"  
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO_EDA/tmp_save/empirical_lat_sem_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/tmp_save"  
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO_EDA/tmp_save/empirical_lon_sem_july24.pkl "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/tmp_save" 
 
 
 ### Run this part

@@ -77,8 +77,9 @@ def cli(
     lat_deltas = [ ( round(a,3),0 ) for a in tmp_lat]
     tolerance = 0.02
     
-    lat_lag_sem = instance_sem.compute_directional_semivariogram(lat_deltas, analysis_data_map, days_list, tolerance)
-    lon_lag_sem = instance_sem.compute_directional_semivariogram(lon_deltas, analysis_data_map, days_list, tolerance)
+    # Avoid redundant computation of symmetric semivariograms 
+    lat_lag_sem = instance_sem.compute_directional_semivariogram(lat_deltas[len(lat_deltas)//2 :], analysis_data_map, days_list, tolerance)
+    lon_lag_sem = instance_sem.compute_directional_semivariogram(lon_deltas[len(lon_deltas)//2 :], analysis_data_map, days_list, tolerance)
 
     cross_lat_lag_sem = instance_sem.compute_cross_lon_lat(lat_deltas, analysis_data_map, days_list, tolerance)
     cross_lon_lag_sem = instance_sem.compute_cross_lon_lat(lon_deltas, analysis_data_map, days_list, tolerance)
