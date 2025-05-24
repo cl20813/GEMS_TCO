@@ -117,7 +117,7 @@ echo "Current date and time: $(date)"
 
 echo "fit_full_day_v05_1250"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v05_509.py --v 0.5 --lr 0.02 --step 100 --gamma-par 0.2 --epochs 1500 --space "5, 5" --days "0,31" 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_v05_509.py --v 0.5 --lr 0.02 --step 100 --gamma-par 0.3 --epochs 1500 --space "5, 5" --days "0,31" 
 
 
 ```
