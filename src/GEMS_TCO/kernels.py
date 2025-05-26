@@ -225,10 +225,11 @@ class spline(spatio_temporal_kernels):
     we define "distances" matrix for each epoch.
     
     '''
-    def __init__(self, epsilon:float, coarse_factor:int, smooth:float, input_map: Dict[str, Any], aggregated_data:torch.Tensor, nns_map: np.ndarray, mm_cond_number:int):
+    def __init__(self, epsilon:float, coarse_factor_head:int, coarse_factor_cond:int, smooth:float, input_map: Dict[str, Any], aggregated_data:torch.Tensor, nns_map: np.ndarray, mm_cond_number:int):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
         self.smooth = torch.tensor(smooth, dtype= torch.float64)
-        self.coarse_factor = coarse_factor
+        self.coarse_factor = coarse_factor_head
+        self.coarse_factor_cond = coarse_factor_cond
         self.epsilon = epsilon
         sample_params = [25, 0.5, 0.5, 0, 0, 2, 5]
         sample_params = torch.tensor(sample_params, dtype=torch.float64, requires_grad=True)
@@ -236,7 +237,7 @@ class spline(spatio_temporal_kernels):
         flat_distances = self.distances.flatten()
         self.max_distance = torch.max(self.distances).clone().detach()
         self.max_distance_len = len(flat_distances)
-        self.spline_object = self.fit_cubic_spline()
+        self.spline_object = self.fit_cubic_spline()  # change here  
 
         """
         Initialize the class with given parameters.
@@ -250,7 +251,7 @@ class spline(spatio_temporal_kernels):
             mm_cond_number (int): Condition number for Vecchia approximation
         """
 
-    def fit_cubic_spline(self):
+    def fit_cubic_spline(self, s, e,  coarse_factor:int=4):
 
         """
         Fit a natural cubic spline coefficients.
@@ -263,7 +264,7 @@ class spline(spatio_temporal_kernels):
         """
 
         # fit_distances should be 1 d array to be used in natural_cubic_spline_coeffs
-        fit_distances = torch.linspace(self.epsilon, self.max_distance, self.max_distance_len// self.coarse_factor)
+        fit_distances = torch.linspace(s, e, self.max_distance_len// coarse_factor)
         non_zero_indices = fit_distances != 0
         out = torch.zeros_like(fit_distances, dtype= torch.float64)
 
@@ -392,6 +393,7 @@ class spline(spatio_temporal_kernels):
         for time_idx in range(1, len(self.input_map)):
             tmp = self.input_map[key_list[time_idx]][:cut_line,:]
             heads = torch.cat( (heads,tmp), dim=0)
+
         distances_heads, non_zero_indices = self.precompute_coords_anisotropy(params, heads, heads)
         cov_matrix = self.interpolate_cubic_spline(params, distances_heads)
 
