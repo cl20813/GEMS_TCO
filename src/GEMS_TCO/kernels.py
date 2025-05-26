@@ -504,8 +504,8 @@ class spline(spatio_temporal_kernels):
                 neg_log_lik += 0.5 * (log_det + quad_form)
         return neg_log_lik
 
-    def compute_full_nll(self, params:torch.Tensor, distances:torch.Tensor): 
-        nll = self.full_likelihood_using_spline( params, distances)
+    def compute_full_nll(self, params:torch.Tensor, aggregated_data, distances:torch.Tensor, spline_object): 
+        nll = self.full_likelihood_using_spline( params, aggregated_data[:,:4], aggregated_data[:,2], distances, spline_object)
         return nll
 
     def compute_vecchia_nll(self, params:torch.Tensor): 
@@ -518,7 +518,7 @@ class spline(spatio_temporal_kernels):
         scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)  # Decrease LR by a factor of 0.1 every 10 epochs
         return optimizer, scheduler
 
-    def run_full(self, params:torch.Tensor, optimizer:torch.optim.Optimizer, scheduler:torch.optim.lr_scheduler, epochs:int=10 ):
+    def run_full(self, params:torch.Tensor, aggregated_data, optimizer:torch.optim.Optimizer, scheduler:torch.optim.lr_scheduler, epochs:int=10 ):
 
         """
         Run the training loop for the full likelihood model.
@@ -539,17 +539,15 @@ class spline(spatio_temporal_kernels):
         tol = 1e-3  # Convergence tolerance
         for epoch in range(epochs):  
             optimizer.zero_grad()  # Zero the gradients 
-            distances, non_zero_indices = self.precompute_coords_anisotropy(params, self.new_aggregated_data[:,:4], self.new_aggregated_data[:,:4])
-            
-            loss = self.compute_full_nll(params, distances)
+            distances, non_zero_indices = self.precompute_coords_anisotropy(params, aggregated_data[:,:4], aggregated_data[:,:4])
+            spline_object = self.fit_cubic_spline( distances, self.coarse_factor_head)  # change here
+
+            loss = self.compute_full_nll(params, aggregated_data, distances, spline_object)
             loss.backward()  # Backpropagate the loss
 
             # Gradient and Parameter Logging for every 10th epoch
             #if epoch % 10 == 0:
             #    print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
-            
-            # if epoch % 500 == 0:
-            #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             optimizer.step()  # Update the parameters
             scheduler.step()  # Update the learning rate
