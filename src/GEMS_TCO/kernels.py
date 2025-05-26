@@ -190,13 +190,12 @@ class likelihood_function(spatio_temporal_kernels):
     def full_likelihood(self,params: torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
    
         cov_matrix = covariance_function(params=params, y= input_data, x= input_data)
-        # Compute the log determinant of the covariance matrix
         sign, log_det = torch.slogdet(cov_matrix)
         # if sign <= 0:
         #     raise ValueError("Covariance matrix is not positive definite")
 
         locs = input_data[:,:2]
-        response = input_data[:,2]
+        response = y
         # Compute beta
         tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
         tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, response))
@@ -228,21 +227,18 @@ class spline(spatio_temporal_kernels):
     def __init__(self, epsilon:float, coarse_factor_head:int, coarse_factor_cond:int, smooth:float, input_map: Dict[str, Any], aggregated_data:torch.Tensor, nns_map: np.ndarray, mm_cond_number:int):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
         self.smooth = torch.tensor(smooth, dtype= torch.float64)
-        self.coarse_factor = coarse_factor_head
-        self.coarse_factor_cond = coarse_factor_cond
-        self.epsilon = epsilon
-        sample_params = [25, 0.5, 0.5, 0, 0, 2, 5]
+        
+        self.epsilon = epsilon  # starting point for the spline fitting
+        sample_params = [25, 0.5, 0.5, 0, 0, 2, 5] # just random nuumber to initialize spline
         sample_params = torch.tensor(sample_params, dtype=torch.float64, requires_grad=True)
-        self.distances, self.non_zero_indices =self.precompute_coords_anisotropy(sample_params, self.aggregated_data, self.aggregated_data )
-        flat_distances = self.distances.flatten()
-        self.max_distance = torch.max(self.distances).clone().detach()
-        self.max_distance_len = len(flat_distances)
-        self.spline_object = self.fit_cubic_spline()  # change here  
+        
+        self.coarse_factor_head = coarse_factor_head
+ 
+        self.coarse_factor_cond = coarse_factor_cond
 
         """
         Initialize the class with given parameters.
         Args:
-            epsilon (float): A small value for spline approximation
             coarse_factor (int): Factor used for coarse-graining.
             smooth (float): Smooth parameter in Matern model.
             input_map (Dict[str, Any]): Dictionary containing input mappings.
@@ -251,7 +247,7 @@ class spline(spatio_temporal_kernels):
             mm_cond_number (int): Condition number for Vecchia approximation
         """
 
-    def fit_cubic_spline(self, s, e,  coarse_factor:int=4):
+    def fit_cubic_spline(self, target_distances, coarse_factor:int=4):
 
         """
         Fit a natural cubic spline coefficients.
@@ -263,8 +259,21 @@ class spline(spatio_temporal_kernels):
             NaturalCubicSpline: The fitted spline object with coefficients.
         """
 
+        def flat_distance_matrix(distances: torch.Tensor) -> torch.Tensor:
+            n = distances.size(0)
+            indices = torch.triu_indices(n, n, offset=1)
+            upper_tri = distances[indices[0], indices[1]]
+            unique_sorted = torch.unique(upper_tri, sorted=True)
+            flat_distances = torch.cat([torch.tensor([0.0], device=unique_sorted.device), unique_sorted])
+            max_distance = torch.max(flat_distances).clone().detach()
+            len_distance_arr = len(flat_distances)
+            
+            return max_distance, len_distance_arr
+        
+        max_distance, len_distance_arr = flat_distance_matrix(target_distances)
+
         # fit_distances should be 1 d array to be used in natural_cubic_spline_coeffs
-        fit_distances = torch.linspace(s, e, self.max_distance_len// coarse_factor)
+        fit_distances = torch.linspace(0, max_distance + 1e-6 , len_distance_arr// coarse_factor)
         non_zero_indices = fit_distances != 0
         out = torch.zeros_like(fit_distances, dtype= torch.float64)
 
@@ -283,64 +292,95 @@ class spline(spatio_temporal_kernels):
         spline = NaturalCubicSpline(coeffs)
         return spline
 
-    def interpolate_cubic_spline(self, params:torch.Tensor, distances:torch.Tensor):
+
+    def interpolate_cubic_spline(self, params:torch.Tensor, target_distances:torch.Tensor, spline_object) -> torch.Tensor:
 
         """
         Interpolate using the fitted cubic spline.
         Args:
             params (tuple): Parameters for the interpolation.
-            distances (torch.Tensor): Distances to interpolate.
+            target_distances (torch.Tensor): Distances to interpolate.
+            spline_object (NaturalCubicSpline): The fitted spline object.
 
         Returns:
             torch.Tensor: Interpolated values.
         """
-
+    
         sigmasq, _, _, _, _, _, nugget = params
-        cov_1d = self.spline_object.evaluate(distances)
-        cov_matrix = cov_1d.reshape(distances.shape)
+        n = target_distances.size(0)
+        indices = torch.triu_indices(n, n, offset=0)  # offset=0 to include diagonal
+
+        # Evaluate spline only on upper triangle
+        cov_upper = spline_object.evaluate(target_distances[indices[0], indices[1]])
+
+        # Create empty matrix and fill upper triangle
+        cov_matrix = torch.zeros_like(target_distances)
+
+        # spline_object.evaluate return [N,1] 
+        #print(cov_matrix.shape, cov_upper.shape, indices.shape, indices[0].shape)
+        #print(indices)
+        
+        cov_matrix[indices[0], indices[1]] = cov_upper.view(-1)
+
+        # Mirror to lower triangle
+        cov_matrix = cov_matrix + cov_matrix.T - torch.diag(torch.diag(cov_matrix))
+
+        # Apply scaling and nugget
+        cov_matrix = cov_matrix * sigmasq
+        cov_matrix = cov_matrix + torch.eye(n, dtype=torch.float64, device=cov_matrix.device) * nugget
+
+        ''' 
+        Before May26
+        sigmasq, _, _, _, _, _, nugget = params
+        cov_1d = spline_object.evaluate(target_distances)
+        cov_matrix = cov_1d.reshape(target_distances.shape)
         cov_matrix = cov_matrix * sigmasq
         cov_matrix = cov_matrix + torch.eye(cov_matrix.shape[0], dtype=torch.float64) * nugget 
+        '''
         return cov_matrix
-    
 
-    def full_likelihood_using_spline(self, params:torch.Tensor, distances:torch.Tensor):
-        cov_matrix = self.interpolate_cubic_spline(params, distances)
-        # Compute the log determinant of the covariance matrix
+
+    def full_likelihood_using_spline(self, params:torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, target_distances:torch.Tensor, spline_object):
+    
+        cov_matrix = self.interpolate_cubic_spline(params, target_distances, spline_object)
+
         sign, log_det = torch.slogdet(cov_matrix)
+
         # if sign <= 0:
         #     raise ValueError("Covariance matrix is not positive definite")
         # Compute beta
-        tmp1 = torch.matmul(self.aggregated_locs.T, torch.linalg.solve(cov_matrix, self.aggregated_locs))
-        tmp2 = torch.matmul(self.aggregated_locs.T, torch.linalg.solve(cov_matrix, self.new_aggregated_response))
+
+        locs = input_data[:,:2]
+        response = input_data[:,2]
+
+        tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
+        tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, response))
         beta = torch.linalg.solve(tmp1, tmp2)
 
-        # Compute the mean
-        mu = torch.matmul(self.aggregated_locs, beta)
-        y_mu = self.new_aggregated_response - mu
-        # Compute the quadratic form
+        mu = torch.matmul(locs, beta)
+        y_mu = response - mu
         quad_form = torch.matmul(y_mu, torch.linalg.solve(cov_matrix, y_mu))
-        # Compute the negative log likelihood
         neg_log_lik = 0.5 * (log_det + quad_form)
         return  neg_log_lik
 
-    def cov_structure_saver(self, params: torch.Tensor) -> None:
+    def cov_structure_saver_using_spline(self, params: torch.Tensor) -> None:
         
         cov_map = defaultdict(lambda: defaultdict(dict))
         cut_line= self.nheads
         key_list = list(self.input_map.keys())
 
         for time_idx in range(0,3):
-            current_np = self.input_map[key_list[time_idx]]
+            current_array = self.input_map[key_list[time_idx]]
 
             # Use below when working on local computer to avoid singular matrix
             for index in range(cut_line, self.size_per_hour):
-                current_row = current_np[index].reshape(1, -1)
+                current_row = current_array[index].reshape(1, -1)
                 mm_neighbors = self.nns_map[index]
                 past = list(mm_neighbors) 
                 data_list = []
 
                 if past:
-                    data_list.append(current_np[past])
+                    data_list.append(current_array[past])
 
                 if time_idx > 0:
                     one_hour_lag = self.input_map[key_list[time_idx - 1]]
@@ -354,8 +394,11 @@ class spline(spatio_temporal_kernels):
                 aggregated_arr = torch.vstack((current_row, conditioning_data))
                 locs = aggregated_arr[:, :2]
 
-                distances, non_zero_indices = self.precompute_coords_anisotropy(params, aggregated_arr,aggregated_arr)
-                cov_matrix = self.interpolate_cubic_spline(params, distances)
+                target_distances_for_cond, non_zero_indices = self.precompute_coords_anisotropy(params, aggregated_arr,aggregated_arr)
+
+                cond_spline_object = self.fit_cubic_spline(target_distances_for_cond, self.coarse_factor_cond )  # change here  
+                cov_matrix = self.interpolate_cubic_spline(params, target_distances_for_cond, cond_spline_object)
+
                 # if sign <= 0:
                 #     raise ValueError("Covariance matrix is not positive definite")
 
@@ -386,7 +429,6 @@ class spline(spatio_temporal_kernels):
 
         cut_line= self.nheads
         key_list = list(self.input_map.keys())
-
         neg_log_lik = 0.0
         heads = self.input_map[key_list[0]][:cut_line,:]
 
@@ -394,21 +436,11 @@ class spline(spatio_temporal_kernels):
             tmp = self.input_map[key_list[time_idx]][:cut_line,:]
             heads = torch.cat( (heads,tmp), dim=0)
 
-        distances_heads, non_zero_indices = self.precompute_coords_anisotropy(params, heads, heads)
-        cov_matrix = self.interpolate_cubic_spline(params, distances_heads)
+        print(heads.shape )
+        distances_heads, _ = self.precompute_coords_anisotropy(params, heads, heads)
+        spline_object_head = self.fit_cubic_spline( distances_heads, self.coarse_factor_head)  # change here
 
-        sign, log_det = torch.slogdet(cov_matrix)
-
-        locs = heads[:,:2]
-        new_response = heads[:, 2]
-        tmp1 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, locs))
-        tmp2 = torch.matmul(locs.T, torch.linalg.solve(cov_matrix, new_response))
-        beta = torch.linalg.solve(tmp1, tmp2)
-
-        mu = torch.matmul(locs, beta)
-        y_mu = new_response - mu
-        quad_form = torch.matmul(y_mu, torch.linalg.solve(cov_matrix, y_mu))
-        neg_log_lik += 0.5 * (log_det + quad_form)
+        neg_log_lik += self.full_likelihood_using_spline(params, heads[:,:4], heads[:,2], distances_heads, spline_object_head)
     
         for time_idx in range(0,len(self.input_map)):
             current_np = self.input_map[key_list[time_idx]]
