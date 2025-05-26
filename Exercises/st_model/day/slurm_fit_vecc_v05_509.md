@@ -135,8 +135,8 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_may9.py --v 0
 
 # 18126
 ``` cd ./jobscript/tco/gp_exercise ```
-```  nano fit_day_vecc_v05_may21_18126.sh  ``` 
-```  sbatch fit_day_vecc_v05_may21_18126.sh  ``` 
+```  nano fit_day_vecc_v05_may26_18126.sh  ``` 
+```  sbatch fit_day_vecc_v05_may26_18126.sh  ``` 
 
 ``` 
 #!/bin/bash
@@ -161,7 +161,7 @@ conda activate faiss_env
 echo "Current date and time: $(date)"
 echo "fit_vecc_v05_may09_20000_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_may9.py --v 0.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "1, 1" --days "24,30" --mm-cond-number 10 --nheads 300
+srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_may9.py --v 0.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "1, 1" --days "21,25" --mm-cond-number 10 --nheads 300
 
 
 ```
