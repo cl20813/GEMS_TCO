@@ -273,7 +273,7 @@ class spline(spatio_temporal_kernels):
         max_distance, len_distance_arr = flat_distance_matrix(target_distances)
 
         # fit_distances should be 1 d array to be used in natural_cubic_spline_coeffs
-        fit_distances = torch.linspace(0, max_distance + 1e-6 , len_distance_arr// coarse_factor)
+        fit_distances = torch.linspace(0, max_distance + 1e-6 , len_distance_arr//coarse_factor)
         non_zero_indices = fit_distances != 0
         out = torch.zeros_like(fit_distances, dtype= torch.float64)
 
@@ -436,7 +436,7 @@ class spline(spatio_temporal_kernels):
             tmp = self.input_map[key_list[time_idx]][:cut_line,:]
             heads = torch.cat( (heads,tmp), dim=0)
 
-        print(heads.shape )
+        
         distances_heads, _ = self.precompute_coords_anisotropy(params, heads, heads)
         spline_object_head = self.fit_cubic_spline( distances_heads, self.coarse_factor_head)  # change here
 
@@ -509,7 +509,7 @@ class spline(spatio_temporal_kernels):
         return nll
 
     def compute_vecchia_nll(self, params:torch.Tensor): 
-        cov_map = self.cov_structure_saver(params)
+        cov_map = self.cov_structure_saver_using_spline(params)
         nll = self.vecchia_nll_using_spline(params, cov_map)
         return nll
 
@@ -539,15 +539,15 @@ class spline(spatio_temporal_kernels):
         tol = 1e-3  # Convergence tolerance
         for epoch in range(epochs):  
             optimizer.zero_grad()  # Zero the gradients 
-            distances, non_zero_indices = self.precompute_coords_anisotropy(params, aggregated_data[:,:4], aggregated_data[:,:4])
+            distances, _ = self.precompute_coords_anisotropy(params, aggregated_data[:,:4], aggregated_data[:,:4])
             spline_object = self.fit_cubic_spline( distances, self.coarse_factor_head)  # change here
 
             loss = self.compute_full_nll(params, aggregated_data, distances, spline_object)
             loss.backward()  # Backpropagate the loss
 
             # Gradient and Parameter Logging for every 10th epoch
-            #if epoch % 10 == 0:
-            #    print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            if epoch % 100 == 0:
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             optimizer.step()  # Update the parameters
             scheduler.step()  # Update the learning rate
@@ -555,13 +555,13 @@ class spline(spatio_temporal_kernels):
             # Convergence Check
             if abs(prev_loss - loss.item()) < tol:
                 print(f"Converged at epoch {epoch}")
-                print(f'Epoch {epoch+1}, : Loss: {loss.item()}, \n vecc Parameters: {params.detach().numpy()}')
+                print(f'Epoch {epoch+1}, : Loss: {loss.item()}, \n full Parameters: {params.detach().numpy()}')
                 break
 
             prev_loss = loss.item()
         params = [torch.round(x*1000).detach().numpy()/1000 for x in params]
         loss = (torch.round(loss*1000)/1000).item()
-        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {params}')
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n full Parameters: {params}')
         return params + [loss], epoch
 
     def fit_vecchia(self, params:torch.Tensor, optimizer:torch.optim.Optimizer, scheduler:torch.optim.lr_scheduler, epochs:int=10 ):
@@ -593,7 +593,7 @@ class spline(spatio_temporal_kernels):
             loss.backward()  # Backpropagate the loss
 
             # Gradient and Parameter Logging for every 10th epoch
-            if epoch % 10 == 0:
+            if epoch % 100 == 0:
                 print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             # if epoch % 500 == 0:

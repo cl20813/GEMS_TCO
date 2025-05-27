@@ -44,10 +44,8 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/ful
 ## space 5 5: 5x10, 4 4: 25x50, 2 2: 50x100
 
 
-```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_full_day_spline_506.py --v 0.4 --lr 0.03 --step 100 --coarse-factor 10 --gamma-par 0.5 --epochs 1000 --space "20, 20" --days "1,2" --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"   ```
+```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_full_day_spline_506.py --v 1.0 --lr 0.02 --step 100 --coarse-factor-head 16 --coarse-factor-cond 1 --gamma-par 0.2 --epochs 1500 --space "4, 4" --days "0,31" "   ```
 
-
-```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_full_day_spline_506.py --v 0.45 --lr 0.03 --step 100 --coarse-factor 10 --gamma-par 0.5 --epochs 1000 --space "20, 20" --days "1,2" --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34" ```
 
 
 ### Job Order SLURM for both vecchia and full
@@ -81,8 +79,7 @@ echo "Current date and time: $(date)"
 
 echo "fit_full_day_v04_1250 using cubic spline"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_spline_523.py --v 1.0 --lr 0.02 --step 100 --coarse-factor 1000 --gamma-par 0.3 --epochs 1500 --space "4, 4" --days "0,31" 
-
+srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_spline_523.py --v 1.0 --lr 0.02 --step 100 --coarse-factor-head 16 --coarse-factor-cond 1 --gamma-par 0.2 --epochs 1500 --space "4, 4" --days "0,31" 
 ```
 
 
@@ -118,7 +115,7 @@ echo "Current date and time: $(date)"
 echo "fit_full_day_v045_1250 using cubic spline"
 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_spline_523.py --v 0.45 --lr 0.02 --step 100 --coarse-factor 1000 --gamma-par 0.3 --epochs 1500 --space "4, 4" --days "0,31" 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_spline_523.py --v 0.45 --lr 0.02 --step 100 --coarse-factor-head 16 --coarse-factor-cond 1 --gamma-par 0.2 --epochs 1500 --space "4, 4" --days "0,31"
 
 ```
 
@@ -154,7 +151,7 @@ echo "Current date and time: $(date)"
 echo "fit_full_day_v055_1250 using cubic spline"
 
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_spline_523.py --v 0.55 --lr 0.02 --step 100 --coarse-factor 1000 --gamma-par 0.3 --epochs 1500 --space "4, 4" --days "0,31" 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_full_day_spline_523.py --v 0.55 --lr 0.02 --step 100 --coarse-factor-head 16 --coarse-factor-cond 1 --gamma-par 0.2 --epochs 1500 --space "4, 4" --days "0,31" 
 
 ```
 
