@@ -38,7 +38,8 @@ def cli(
     v: float = typer.Option(0.5, help="smooth"),
     lr: float = typer.Option(0.01, help="learning rate"),
     step: int = typer.Option(80, help="Number of iterations in optimization"),
-    coarse_factor: int = typer.Option(100, help="coarse factor in spline learning"),
+    coarse_factor_head: int = typer.Option(100, help="coarse factor in spline learning"),
+    coarse_factor_cond: int = typer.Option(100, help="coarse factor in spline learning"),
 
     gamma_par: float = typer.Option(0.5, help="decreasing factor for learning rate"),
     space: List[str] = typer.Option(['20', '20'], help="spatial resolution"),
@@ -69,48 +70,46 @@ def cli(
     init_estimates =  Path(config.amarel_estimates_day_saved_path) / config.amarel_full_day_v05_range_plus2_sigma_n10_csv
     estimates_df = pd.read_csv(init_estimates)
     
-    # only fit spline once because space are all same
-    # load first data of analysis_data_map and aggregated_data to initialize spline_instance
-    first_day_idx_for_datamap= [0,8]
-    first_day_analysis_data_map, first_day_aggregated_data = data_load_instance.load_working_data_byday(df_map, ord_mm, nns_map, idx_for_datamap= first_day_idx_for_datamap)
-    spline_instance = kernels.spline(
-            epsilon = 1e-17, 
-            coarse_factor= coarse_factor, 
-            smooth = v, 
-            input_map= first_day_analysis_data_map, 
-            aggregated_data= first_day_aggregated_data, 
-            nns_map=nns_map, 
-            mm_cond_number= mm_cond_number)
     
     for day in days_list:  
+
         params = list(estimates_df.iloc[day][5:-3])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
-        print(f'2024-07-{day+1}, data size per day: { (200/lat_lon_resolution[0])*(100/lat_lon_resolution[0]) }, smooth: {v}')
+        print(f'2024-07-{day+1}, data size per day: { (int(158.7 / lat_lon_resolution[0] * (113.63 / lat_lon_resolution[0]))) }, smooth: {v}')
         print(f'mm_cond_number: {mm_cond_number},\ninitial parameters: \n {params}')
                 
         idx_for_datamap= [8*day,8*(day+1)]
         analysis_data_map, aggregated_data = data_load_instance.load_working_data_byday( df_map, ord_mm, nns_map, idx_for_datamap= idx_for_datamap)
 
-        spline_instance.new_aggregated_data = aggregated_data[:,:4]
-        spline_instance.new_aggregated_response = aggregated_data[:,2]
+        spline_instance = kernels.spline(
+                epsilon = 0, 
+                coarse_factor_head= coarse_factor_head, 
+                coarse_factor_cond=coarse_factor_cond,
+                smooth = v, 
+                input_map= analysis_data_map, 
+                aggregated_data= aggregated_data, 
+                nns_map=nns_map, 
+                mm_cond_number= mm_cond_number)
 
+        spline_instance.nheads= nheads
+     
         start_time = time.time()
         optimizer, scheduler = spline_instance.optimizer_fun(params, lr= lr , betas=(0.9, 0.99), eps=1e-8, step_size= step, gamma= gamma_par)  
-        out, epoch = spline_instance.run_full(params, optimizer,scheduler, epochs= epochs)
+        out, epoch = spline_instance.run_full(params, aggregated_data, optimizer,scheduler, epochs= epochs)
         end_time = time.time()
         epoch_time = end_time - start_time
         print(f'End 2024-07-{day+1} for lr:{lr}, step size {step}, betas(_,b2):{0.99}, gamma:{gamma_par} took {epoch_time:.2f}, epoch {epochs}')
         print(f'params and loss {out}')
 
-        input_filepath = output_path / f"full_day_r2s10_v{int(v*100):03d}_spline{ (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) }.json"
+        input_filepath = output_path / f"full_day_r2s10_v{int(v*100):03d}_spline{ (int(158.7 / lat_lon_resolution[0] * (113.63 / lat_lon_resolution[0]))) }.json"
         
-        res = alg_optimization( f"2024-07-{day+1}", f"full likelihood", (200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0]) , lr,  step , out, epoch_time, epoch)
+        res = alg_optimization( f"2024-07-{day+1}", f"full spline likelihood", (int(158.7 / lat_lon_resolution[0] * (113.63 / lat_lon_resolution[0]))) , lr,  step , out, epoch_time, epoch)
         loaded_data = res.load(input_filepath)
         loaded_data.append( res.toJSON() )
         res.save(input_filepath,loaded_data)
         fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'epoch']
 
-        csv_filepath = output_path/f"full_day_r2s10_v{int(v*100):03d}_spline{(200 / lat_lon_resolution[0]) * (100 / lat_lon_resolution[0])}.csv"
+        csv_filepath = output_path/f"full_day_r2s10_v{int(v*100):03d}_spline{ (int(158.7 / lat_lon_resolution[0] * (113.63 / lat_lon_resolution[0])))  }.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
 if __name__ == '__main__':
