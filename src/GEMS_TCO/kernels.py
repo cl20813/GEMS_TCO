@@ -224,7 +224,7 @@ class spline(spatio_temporal_kernels):
     we define "distances" matrix for each epoch.
     
     '''
-    def __init__(self, epsilon:float, coarse_factor_head:int, coarse_factor_cond:int, smooth:float, input_map: Dict[str, Any], aggregated_data:torch.Tensor, nns_map: np.ndarray, mm_cond_number:int):
+    def __init__(self, epsilon:float, coarse_factor:int, nheads:int, smooth:float, input_map: Dict[str, Any], aggregated_data:torch.Tensor, nns_map: np.ndarray, mm_cond_number:int):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
         self.smooth = torch.tensor(smooth, dtype= torch.float64)
         
@@ -232,9 +232,8 @@ class spline(spatio_temporal_kernels):
         sample_params = [25, 0.5, 0.5, 0, 0, 2, 5] # just random nuumber to initialize spline
         sample_params = torch.tensor(sample_params, dtype=torch.float64, requires_grad=True)
         
-        self.coarse_factor_head = coarse_factor_head
- 
-        self.coarse_factor_cond = coarse_factor_cond
+        self.coarse_factor = coarse_factor
+        self.nheads = nheads 
 
         """
         Initialize the class with given parameters.
@@ -246,6 +245,7 @@ class spline(spatio_temporal_kernels):
             nns_map (Dict[str, Any]): 2-d nd.array containing nearest neighbors mappings.
             mm_cond_number (int): Condition number for Vecchia approximation
         """
+
 
     def fit_cubic_spline(self, target_distances, coarse_factor:int=4):
 
@@ -273,10 +273,10 @@ class spline(spatio_temporal_kernels):
         max_distance, len_distance_arr = flat_distance_matrix(target_distances)
 
         # fit_distances should be 1 d array to be used in natural_cubic_spline_coeffs
-        fit_distances = torch.linspace(0, max_distance + 1e-6 , len_distance_arr//coarse_factor)
+        fit_distances = torch.linspace(0, max_distance*1.5 + 1e-6 , len_distance_arr//coarse_factor)
         non_zero_indices = fit_distances != 0
         out = torch.zeros_like(fit_distances, dtype= torch.float64)
-
+        # print(max_distance)
         if torch.any(non_zero_indices):
             tmp = kv(self.smooth, torch.sqrt(fit_distances[non_zero_indices])).double().clone()
             out[non_zero_indices] = (1 * (2**(1-self.smooth)) / gamma(self.smooth) *
@@ -363,6 +363,7 @@ class spline(spatio_temporal_kernels):
         neg_log_lik = 0.5 * (log_det + quad_form)
         return  neg_log_lik
 
+
     def cov_structure_saver_using_spline(self, params: torch.Tensor) -> None:
         
         cov_map = defaultdict(lambda: defaultdict(dict))
@@ -396,8 +397,8 @@ class spline(spatio_temporal_kernels):
 
                 target_distances_for_cond, non_zero_indices = self.precompute_coords_anisotropy(params, aggregated_arr,aggregated_arr)
 
-                cond_spline_object = self.fit_cubic_spline(target_distances_for_cond, self.coarse_factor_cond )  # change here  
-                cov_matrix = self.interpolate_cubic_spline(params, target_distances_for_cond, cond_spline_object)
+                # cond_spline_object = self.fit_cubic_spline(target_distances_for_cond, self.coarse_factor_cond )  # change here  
+                cov_matrix = self.interpolate_cubic_spline(params, target_distances_for_cond, self.spline_object)
 
                 # if sign <= 0:
                 #     raise ValueError("Covariance matrix is not positive definite")
@@ -438,9 +439,8 @@ class spline(spatio_temporal_kernels):
 
         
         distances_heads, _ = self.precompute_coords_anisotropy(params, heads, heads)
-        spline_object_head = self.fit_cubic_spline( distances_heads, self.coarse_factor_head)  # change here
-
-        neg_log_lik += self.full_likelihood_using_spline(params, heads[:,:4], heads[:,2], distances_heads, spline_object_head)
+        #spline_object_head = self.fit_cubic_spline( distances_heads, self.coarse_factor_head)  # change here
+        neg_log_lik += self.full_likelihood_using_spline(params, heads[:,:4], heads[:,2], distances_heads, self.spline_object)
     
         for time_idx in range(0,len(self.input_map)):
             current_np = self.input_map[key_list[time_idx]]
@@ -502,8 +502,9 @@ class spline(spatio_temporal_kernels):
                 alpha = current_y - cond_mean
                 quad_form = alpha**2 * (1 / cov_ygivenx)
                 neg_log_lik += 0.5 * (log_det + quad_form)
-        return neg_log_lik
 
+        return neg_log_lik
+    
     def compute_full_nll(self, params:torch.Tensor, aggregated_data, distances:torch.Tensor, spline_object): 
         nll = self.full_likelihood_using_spline( params, aggregated_data[:,:4], aggregated_data[:,2], distances, spline_object)
         return nll
@@ -537,10 +538,15 @@ class spline(spatio_temporal_kernels):
         prev_loss= float('inf')
         # 1e-3: Faster convergence, slightly lower accuracy than 1e-4
         tol = 1e-3  # Convergence tolerance
+
+        distances, _ = self.precompute_coords_anisotropy(params, aggregated_data[:,:4], aggregated_data[:,:4])
+        spline_object = self.fit_cubic_spline( distances, self.coarse_factor)  # change here
+        
         for epoch in range(epochs):  
             optimizer.zero_grad()  # Zero the gradients 
+            
             distances, _ = self.precompute_coords_anisotropy(params, aggregated_data[:,:4], aggregated_data[:,:4])
-            spline_object = self.fit_cubic_spline( distances, self.coarse_factor_head)  # change here
+            #spline_object = self.fit_cubic_spline( distances, self.coarse_factor)  # change here
 
             loss = self.compute_full_nll(params, aggregated_data, distances, spline_object)
             loss.backward()  # Backpropagate the loss
@@ -576,7 +582,7 @@ class spline(spatio_temporal_kernels):
             epochs (int): Number of epochs to train.
 
         Returns:
-            list: Final parameters and loss.
+            list: Final p arameters and loss.
             int: Number of epochs run.
         """
 
@@ -584,11 +590,17 @@ class spline(spatio_temporal_kernels):
         # 1e-3: Faster convergence, slightly lower accuracy than 1e-4
         tol = 1e-3  # Convergence tolerance
 
+        distances, _ = self.precompute_coords_anisotropy(params, self.aggregated_data[:,:4], self.aggregated_data[:,:4])
+        self.spline_object = self.fit_cubic_spline( distances, self.coarse_factor)  # change here
+        
         for epoch in range(epochs):  
             optimizer.zero_grad()  # Zero the gradients 
             # distance is a function of parameters
             # distances, non_zero_indices = self.precompute_coords_anisotropy(params, self.new_aggregated_data[:,:4], self.new_aggregated_data[:,:4])
             
+            distances, _ = self.precompute_coords_anisotropy(params, self.aggregated_data[:,:4], self.aggregated_data[:,:4])
+            #self.spline_object = copy.deepcopy(self.spline_object_base)
+
             loss = self.compute_vecchia_nll(params)
             loss.backward()  # Backpropagate the loss
 
