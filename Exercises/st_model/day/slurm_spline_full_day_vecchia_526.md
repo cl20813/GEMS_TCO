@@ -10,7 +10,6 @@ scp -r "C:\Users\joonw\TCO\GEMS_TCO-1\GEMS_TCO" jl2815@amarel.rutgers.edu:/home/
 
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/spline_full_day_vecchia_526.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/spline_vecchia_testing526.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 
 # window
@@ -57,8 +56,8 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/ful
 ```mkdir -p ./jobscript/tco/gp_exercise```     
 
 ```  cd ./jobscript/tco/gp_exercise  ```   
-```  nano spline_vecc_day_v04_526.sh  ```        
- ```   sbatch spline_vecc_day_v04_526.sh   ```
+```  nano spline_vecc_day_v04_528.sh  ```        
+ ```   sbatch spline_vecc_day_v04_528.sh   ```
 
 ``` 
 #!/bin/bash
@@ -67,9 +66,9 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/ful
 #SBATCH --error=/home/jl2815/tco/exercise_output/fit_full_day_v10_1127_523%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
-#SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
-#SBATCH --mem=300G                                                 # Memory per node
-#SBATCH --partition=mem                                            # Partition name
+#SBATCH --cpus-per-task=20                                       # Number of CPU cores per task
+#SBATCH --mem=250G                                                 # Memory per node
+#SBATCH --partition=main                                            # Partition name
 
 #### Load the Anaconda module to use srun 
 module purge                                              
@@ -84,7 +83,7 @@ echo "Current date and time: $(date)"
 
 echo "spline_vecc_day_v04_4400 using cubic spline"
 
-srun python /home/jl2815/tco/exercise_25/st_model/spline_full_day_vecchia_526.py --v 0.4 --lr 0.03 --step 100 --coarse-factor-head 4 --coarse-factor-cond 1 --gamma-par 0.2 --epochs 1000 --space "2, 2" --days "0,15" --mm-cond-number 10 --nheads 280 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"
+srun python /home/jl2815/tco/exercise_25/st_model/spline_full_day_vecchia_526.py --v 0.4 --lr 0.02 --step 100 --coarse-factor 4 --gamma-par 0.3 --epochs 1000 --space "2, 2" --days "0,31" --mm-cond-number 10 --nheads 300 
 
 ```
 
