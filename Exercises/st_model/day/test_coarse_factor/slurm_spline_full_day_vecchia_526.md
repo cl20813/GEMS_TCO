@@ -107,9 +107,9 @@ srun python /home/jl2815/tco/exercise_25/st_model/spline_vecchia_testing526.py -
 #SBATCH --error=/home/jl2815/tco/exercise_output/spline_vecc_coarse_testing18k%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
-#SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
-#SBATCH --mem=200G                                                 # Memory per node
-#SBATCH --partition=main                                            # Partition name
+#SBATCH --cpus-per-task=16                                       # Number of CPU cores per task
+#SBATCH --mem=350G                                                 # Memory per node
+#SBATCH --partition=mem                                            # Partition name
 
 #### Load the Anaconda module to use srun 
 module purge                                              
