@@ -10,6 +10,9 @@ scp -r "C:\Users\joonw\TCO\GEMS_TCO-1\GEMS_TCO" jl2815@amarel.rutgers.edu:/home/
 
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/spline_full_day_vecchia_526.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/spline_vecchia_testing526.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+
+
 # window
 
 scp "C:\Users\joonw\tco\GEMS_TCO-2\Exercises\st_model\day\fit_full_day_v10_416.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
@@ -45,6 +48,8 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/ful
 
 
 ```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/spline_full_day_vecchia_526.py --v 0.4 --lr 0.03 --step 100 --coarse-factor-head 1 --coarse-factor-cond 1 --gamma-par 0.2 --epochs 1000 --space "16, 16" --days "0,1" --mm-cond-number 10 --nheads 20 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"   ```
+
+```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/spline_vecchia_testing526.py --v 0.4 --coarse-factor 4 --space "16, 16" --days "0,1" --mm-cond-number 10 --nheads 20    ```
 
 
 
