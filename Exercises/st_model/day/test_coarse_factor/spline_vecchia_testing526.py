@@ -69,7 +69,6 @@ def cli(
     init_estimates =  Path(config.amarel_estimates_day_saved_path) / config.amarel_full_day_v05_range_plus2_sigma_n10_csv
     estimates_df = pd.read_csv(init_estimates)
     
-    
     for day in days_list:  
 
         params = list(estimates_df.iloc[day][5:-3])
@@ -80,39 +79,39 @@ def cli(
         idx_for_datamap= [8*day,8*(day+1)]
         analysis_data_map, aggregated_data = data_load_instance.load_working_data_byday( df_map, ord_mm, nns_map, idx_for_datamap= idx_for_datamap)
 
-
-        spline_instance = kernels.spline(
-                epsilon = 0, 
-                coarse_factor = coarse_factor, 
-                nheads = nheads,
-                smooth = v, 
-                input_map= analysis_data_map, 
-                aggregated_data= aggregated_data, 
-                nns_map=nns_map, 
-                mm_cond_number= mm_cond_number)
-
+        instance = kernels.vecchia_experiment(v, analysis_data_map, aggregated_data,nns_map,mm_cond_number, nheads)
         start_time = time.time()
-        optimizer, scheduler = spline_instance.optimizer_fun(params, lr= lr , betas=(0.9, 0.99), eps=1e-8, step_size= step, gamma= gamma_par)  
-        out, epoch = spline_instance.fit_vecchia(params, optimizer,scheduler, epochs=epochs)
+        cov_map = instance.cov_structure_saver(params, instance.matern_cov_anisotropy_kv)
+        vecc_ll = instance.vecchia_may9(params, instance.matern_cov_anisotropy_kv ,cov_map)
 
         end_time = time.time()
         epoch_time = end_time - start_time
-        print(f'End 2024-07-{day+1} for lr:{lr}, step size {step}, betas(_,b2):{0.99}, gamma:{gamma_par} took {epoch_time:.2f}, epoch {epochs}')
-        print(f'params and loss {out}')
+        print(f'End 2024-07-{day+1}, nheads: {nheads}, space: {lat_lon_resolution}, mm_cond_number: {mm_cond_number}, smooth: {v}')
+        for cfactor in [40, 50, 60, 64, 70, 80]:
+            spline_instance = kernels.spline(
+                    epsilon = 0, 
+                    coarse_factor = cfactor, 
+                    nheads = nheads,
+                    smooth = v, 
+                    input_map= analysis_data_map, 
+                    aggregated_data= aggregated_data, 
+                    nns_map=nns_map, 
+                    mm_cond_number= mm_cond_number)
+            
+            distances, _ = spline_instance.precompute_coords_anisotropy(params, aggregated_data, aggregated_data)
+            spline_instance.spline_object = spline_instance.fit_cubic_spline( distances, spline_instance.coarse_factor)  # change here
 
-        input_filepath = output_path / f"full_day_r2s10_v{int(v*100):03d}_spline{ (int(158.7 / lat_lon_resolution[0] * (113.63 / lat_lon_resolution[0]))) }.json"
-        
-        res = alg_optimization( f"2024-07-{day+1}", f"Vecc Spline likelihood", (int(158.7 / lat_lon_resolution[0] * (113.63 / lat_lon_resolution[0]))) , lr,  step , out, epoch_time, epoch)
-        loaded_data = res.load(input_filepath)
-        loaded_data.append( res.toJSON() )
-        res.save(input_filepath,loaded_data)
-        fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'epoch']
+            start_time = time.time()
+            cov_map_spline = spline_instance.cov_structure_saver_using_spline(params)
+            vecc_spline = spline_instance.vecchia_nll_using_spline(params, cov_map_spline)
+            end_time = time.time()
+            epoch_time2 = end_time - start_time
 
-        csv_filepath = output_path/f"full_day_r2s10_v{int(v*100):03d}_spline{ (int(158.7 / lat_lon_resolution[0] * (113.63 / lat_lon_resolution[0])))  }.csv"
-        res.tocsv( loaded_data, fieldnames,csv_filepath )
+            
+            print(f'Vecchia: {vecc_ll} took {epoch_time}, Spline_Vecc: {vecc_spline} took {epoch_time2}, coarse factor: {cfactor}')
+           
 
 if __name__ == '__main__':
     app()
-
 
 
