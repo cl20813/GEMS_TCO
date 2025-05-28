@@ -83,7 +83,7 @@ echo "Current date and time: $(date)"
 
 echo "spline_vecc_day_v04_4400 using cubic spline"
 
-srun python /home/jl2815/tco/exercise_25/st_model/spline_full_day_vecchia_526.py --v 0.4 --lr 0.02 --step 100 --coarse-factor 4 --gamma-par 0.3 --epochs 1000 --space "2, 2" --days "0,31" --mm-cond-number 10 --nheads 300 
+srun python /home/jl2815/tco/exercise_25/st_model/spline_full_day_vecchia_526.py --v 0.4 --lr 0.02 --step 100 --coarse-factor 35 --gamma-par 0.3 --epochs 1000 --space "2, 2" --days "0,31" --mm-cond-number 10 --nheads 300 
 
 ```
 
