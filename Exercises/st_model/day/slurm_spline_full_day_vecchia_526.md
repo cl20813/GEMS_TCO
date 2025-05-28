@@ -61,9 +61,9 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/ful
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=ful_v10_day_1127                             # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_full_day_v10_1127_523%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_full_day_v10_1127_523%j.err # Standard error file (%j = JobID)
+#SBATCH --job-name=vec_spl_v04_day_4k528                             # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/vec_spl_v04_day_4k528%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/vec_spl_v04_day_4k528%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=20                                       # Number of CPU cores per task
