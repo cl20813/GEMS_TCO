@@ -66,8 +66,8 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/ful
 #SBATCH --error=/home/jl2815/tco/exercise_output/vec_spl_v04_day_4k528%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
-#SBATCH --cpus-per-task=20                                       # Number of CPU cores per task
-#SBATCH --mem=250G                                                 # Memory per node
+#SBATCH --cpus-per-task=16                                       # Number of CPU cores per task
+#SBATCH --mem=240G                                                 # Memory per node
 #SBATCH --partition=main                                            # Partition name
 
 #### Load the Anaconda module to use srun 
