@@ -96,6 +96,41 @@ srun python /home/jl2815/tco/exercise_25/st_model/spline_vecchia_testing526.py -
 
 
 
+```  cd ./jobscript/tco/gp_exercise  ```   
+```  nano spline_vecc_coarse_testing18k.sh  ```        
+ ```   sbatch spline_vecc_coarse_testing18k.sh  ```
+
+``` 
+#!/bin/bash
+#SBATCH --job-name=spline_vecc_coarse_testing18k                            # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/spline_vecc_coarse_testing18k%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/spline_vecc_coarse_testing18k%j.err # Standard error file (%j = JobID)
+#SBATCH --time=24:00:00                                            # Time limit
+#SBATCH --ntasks=1                                                # Number of tasks
+#SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
+#SBATCH --mem=200G                                                 # Memory per node
+#SBATCH --partition=main                                            # Partition name
+
+#### Load the Anaconda module to use srun 
+module purge                                              
+module use /projects/community/modulefiles                 
+module load anaconda/2024.06-ts840 
+
+#### Initialize conda for the current shell session if not already done for the current shell session.
+eval "$(conda shell.bash hook)"
+conda activate faiss_env
+
+echo "Current date and time: $(date)"
+
+echo "spline_vecc_coarse_testing"
+
+srun python /home/jl2815/tco/exercise_25/st_model/spline_vecchia_testing526.py --v 0.4 --coarse-factor 4 --space "1, 1" --days "0,31" --mm-cond-number 10 --nheads 400
+
+```
+
+
+
+
 
 
 

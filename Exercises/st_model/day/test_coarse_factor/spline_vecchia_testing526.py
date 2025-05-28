@@ -87,7 +87,7 @@ def cli(
         end_time = time.time()
         epoch_time = end_time - start_time
         print(f'End 2024-07-{day+1}, nheads: {nheads}, space: {lat_lon_resolution}, mm_cond_number: {mm_cond_number}, smooth: {v}')
-        for cfactor in [40, 50, 60, 64, 70, 80]:
+        for cfactor in [120,140,160,170,180,200,220,240,260,280,300]:
             spline_instance = kernels.spline(
                     epsilon = 0, 
                     coarse_factor = cfactor, 
