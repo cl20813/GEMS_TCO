@@ -8,7 +8,7 @@ scp -r "C:\Users\joonw\TCO\GEMS_TCO-1\GEMS_TCO" jl2815@amarel.rutgers.edu:/home/
 ### Copy run file from ```local``` to ```Amarel HPC```
 # mac
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/spline_vecchia_testing526.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/test_coarse_factor/spline_vecchia_testing526.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 
 ### Run this part
@@ -62,15 +62,15 @@ srun python /home/jl2815/tco/exercise_25/st_model/spline_vecchia_testing526.py -
 
 
 ```  cd ./jobscript/tco/gp_exercise  ```   
-```  nano spline_vecc_coarse_testing.sh  ```        
- ```   sbatch spline_vecc_coarse_testing.sh  ```
+```  nano spline_vecc_coarse_testing4k.sh  ```        
+ ```   sbatch spline_vecc_coarse_testing4k.sh  ```
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=spline_vecc_coarse_testing                            # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/spline_vecc_coarse_testing%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/spline_vecc_coarse_testing%j.err # Standard error file (%j = JobID)
-#SBATCH --time=24:00:00                                            # Time limit
+#SBATCH --job-name=spline_vecc_coarse_testing4k                            # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/spline_vecc_coarse_testing4k%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/spline_vecc_coarse_testing4k%j.err # Standard error file (%j = JobID)
+#SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
 #SBATCH --mem=200G                                                 # Memory per node
@@ -89,7 +89,7 @@ echo "Current date and time: $(date)"
 
 echo "spline_vecc_coarse_testing"
 
-srun python /home/jl2815/tco/exercise_25/st_model/spline_vecchia_testing526.py --v 0.4 --coarse-factor 4 --space "2, 2" --days "0,10" --mm-cond-number 10 --nheads 300
+srun python /home/jl2815/tco/exercise_25/st_model/spline_vecchia_testing526.py --v 0.4 --coarse-factor 4 --space "2, 2" --days "0,31" --mm-cond-number 10 --nheads 300
 
 ```
 
@@ -105,7 +105,7 @@ srun python /home/jl2815/tco/exercise_25/st_model/spline_vecchia_testing526.py -
 #SBATCH --job-name=spline_vecc_coarse_testing18k                            # Job name
 #SBATCH --output=/home/jl2815/tco/exercise_output/spline_vecc_coarse_testing18k%j.out     # Standard output file (%j = JobID)
 #SBATCH --error=/home/jl2815/tco/exercise_output/spline_vecc_coarse_testing18k%j.err # Standard error file (%j = JobID)
-#SBATCH --time=24:00:00                                            # Time limit
+#SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
 #SBATCH --mem=200G                                                 # Memory per node
