@@ -24,8 +24,8 @@ scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/test_coarse_f
 ```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/spline_vecchia_testing526.py --v 0.4 --coarse-factor 4 --space "16, 16" --days "0,1" --mm-cond-number 10 --nheads 20    ```
 
 
-
 ### Job Order SLURM for both vecchia and full
+
 ```mkdir -p ./jobscript/tco/gp_exercise```     
 
 ```  cd ./jobscript/tco/gp_exercise  ```   
