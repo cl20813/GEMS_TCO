@@ -1,2 +1,0 @@
-day,cov_name,lat_lon_resolution,lr,stepsize,sigma,range_lat,range_lon,advec_lat,advec_lon,beta,nugget,loss,time,epoch
-2024-07-1,full likelihood,200.0,0.03,100,27.975,2.925,3.324,0.036,-0.069,0.079,5.012,2542.138,21.779525995254517,182
