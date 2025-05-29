@@ -1,3 +1,0 @@
-[
-    "{\"day\": \"2024-07-1\", \"cov_name\": \"Vecc Spline likelihood\", \"lat_lon_resolution\": 281, \"lr\": 0.02, \"stepsize\": 100, \"sigma\": 24.633, \"range_lat\": 1.69, \"range_lon\": 1.557, \"advec_lat\": 0.194, \"advec_lon\": -0.113, \"beta\": 0.276, \"nugget\": 2.877, \"loss\": 5099.139, \"time\": 28.680953979492188, \"epoch\": 111}"
-]

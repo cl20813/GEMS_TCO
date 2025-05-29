@@ -1,2 +1,0 @@
-day,cov_name,lat_lon_resolution,lr,stepsize,sigma,range_lat,range_lon,advec_lat,advec_lon,beta,nugget,loss,time,epoch
-2024-07-1,Vecc Spline likelihood,1127,0.02,100,26.436,1.437,1.791,0.023,-0.149,0.176,4.4,14773.478,1928.3913741111755,489

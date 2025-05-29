@@ -17,6 +17,10 @@ scp "C:\Users\joonw\tco\GEMS_TCO-2\Exercises\st_model\day\fit_vecc_day_v10_416.p
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
 
+scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/may_23 "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/tmp" 
+
+
+
 # 1250
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vecchia_v05_reord_1250.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/"  
 
