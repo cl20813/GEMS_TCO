@@ -90,7 +90,7 @@ def cli(
     for day in days_list:  
         params = list(estimates_df.iloc[day][:-1])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
-        print(f'2024-07-{day+1}, data size per day: { (200/lat_lon_resolution[0])*(100/lat_lon_resolution[0]) }, smooth: {v}')
+        print(f'2024-07-{day+1}, data size per day: { (int(158.7 / lat_lon_resolution[0] * (113.63 / lat_lon_resolution[0]))) }, smooth: {v}')
         print(f'mm_cond_number: {mm_cond_number},\ninitial parameters: \n {params}')
                 
         idx_for_datamap= [8*day,8*(day+1)]
