@@ -1,7 +1,8 @@
 # Standard libraries
 import sys
 # Add your custom path
-sys.path.append("/cache/home/jl2815/tco")
+gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
+sys.path.append(gems_tco_path)
 import os
 import logging
 import argparse # Argument parsing
@@ -31,6 +32,10 @@ import typer
 import json
 from json import JSONEncoder
 
+
+# /opt/anaconda3/envs/faiss_env/bin/python /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/spline_full_day_vecchia_526_local.py --v 0.5 --lr 0.02 --step 100 --space "4,4" --days "0,1" --mm-cond-number 10 --epochs 700 --nheads 200 --gamma-par 0.3 --coarse-factor 16
+
+
 app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
 @app.command()
 
@@ -40,7 +45,7 @@ def cli(
     step: int = typer.Option(80, help="Number of iterations in optimization"),
     coarse_factor: int = typer.Option(100, help="coarse factor in spline learning"),
 
-    gamma_par: float = typer.Option(0.5, help="decreasing factor for learning rate"),
+    gamma_par: float = typer.Option(0.3, help="decreasing factor for learning rate"),
     space: List[str] = typer.Option(['20', '20'], help="spatial resolution"),
     days: List[str] = typer.Option(['0', '31'], help="Number of nearest neighbors in Vecchia approx."),
     
@@ -59,20 +64,21 @@ def cli(
     days_list = list(range(days_s_e[0], days_s_e[1]))
     years = ['2024']
     month_range =[7,8]
-    output_path = input_path = Path(config.amarel_estimates_day_path)
+    output_path = input_path = Path(config.mac_estimates_day_path)
 
     ## load ozone data from amarel
-    data_load_instance = load_data(config.amarel_data_load_path)
+    data_load_instance = load_data(config.mac_data_load_path)
     df_map, ord_mm, nns_map= data_load_instance.load_mm20k_data_bymonthyear(lat_lon_resolution = lat_lon_resolution, mm_cond_number=mm_cond_number,years_=years, months_=month_range)  
 
     # 5/09/24 try larger range parameters
-    init_estimates =  Path(config.amarel_estimates_day_saved_path) / config.amarel_full_day_v05_range_plus2_sigma_n10_csv
+    init_estimates =  Path(config.mac_estimates_day_path) / config.mac_full_day_v05_csv
     estimates_df = pd.read_csv(init_estimates)
     
     
     for day in days_list:  
 
-        params = list(estimates_df.iloc[day][5:-3])
+        #params = list(estimates_df.iloc[day][5:-3])
+        params = list(estimates_df.iloc[day][:-1])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
         print(f'2024-07-{day+1}, data size per day: { (int(158.7 / lat_lon_resolution[0] * (113.63 / lat_lon_resolution[0]))) }, smooth: {v}')
         print(f'mm_cond_number: {mm_cond_number},\ninitial parameters: \n {params}')
