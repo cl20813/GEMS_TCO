@@ -39,7 +39,6 @@ def cli(
     v: float = typer.Option(0.5, help="smooth"),
     lr: float = typer.Option(0.02, help="learning rate"),
     step: int = typer.Option(80, help="Number of iterations in optimization"),
-    coarse_factor: int = typer.Option(100, help="coarse factor in spline learning"),
 
     gamma_par: float = typer.Option(0.3, help="decreasing factor for learning rate"),
     space: List[str] = typer.Option(['20', '20'], help="spatial resolution"),
@@ -47,7 +46,7 @@ def cli(
     
     mm_cond_number: int = typer.Option(10, help="Number of nearest neighbors in Vecchia approx."),
     params: List[str] = typer.Option(['20', '8.25', '5.25', '.2', '.2', '.05', '5'], help="Initial parameters"),
-    ## mm-cond-number should be called in command line
+    ## mm-cond-number should be called in command line not mm_cond_number
     ## negative number can be a problem when parsing with typer
     epochs: int = typer.Option(1500, help="Number of iterations in optimization"),
     nheads: int = typer.Option(200, help="Number of iterations in optimization")
@@ -55,8 +54,6 @@ def cli(
 ) -> None:
       
     lat_lon_resolution = [int(s) for s in space[0].split(',')]
-
-    
     days_s_e = list(map(int, days[0].split(',')))
     days_list = list(range(days_s_e[0], days_s_e[1]))
 
@@ -90,7 +87,7 @@ def cli(
 
         params = list(estimates_df.iloc[day][5:-3])
         params = torch.tensor(params, dtype=torch.float64, requires_grad=True)
-        print(f'2024-07-{day+1}, data size per day: { (200/lat_lon_resolution[0])*(100/lat_lon_resolution[0]) }, smooth: {v}')
+        print(f'2024-07-{day+1}, data size per day: { ( int(158.7 / lat_lon_resolution[0] * (113.63 / lat_lon_resolution[0]) )) }, smooth: {v}')
         print(f'mm_cond_number: {mm_cond_number},\ninitial parameters: \n {params}')
                 
         idx_for_datamap= [8*day,8*(day+1)]
@@ -126,7 +123,7 @@ def cli(
         res.save(input_filepath,loaded_data)
         fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'epoch']
 
-        csv_filepath = input_path/f"vecchia_v05_r2s10_{( int(158.7 / lat_lon_resolution[0] * (113.63 / lat_lon_resolution[0]) )) }.csv"
+        csv_filepath = input_path/f"vecchia_v{int(v*100):03d}_r2s10_{( int(158.7 / lat_lon_resolution[0] * (113.63 / lat_lon_resolution[0]) )) }.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
 if __name__ == "__main__":
