@@ -439,10 +439,10 @@ class CrossVariogram_empirical(CrossVariogram):
 
             # Plotting for each orbit
             for i in range(8):
-                y_values = [y**2 for y in lat_lag_sem[day][i]]
-
+                #y_values = [y**2 for y in lat_lag_sem[day][i]]
+                y_values = [y for y in lat_lag_sem[day][i]]
                 ax.plot(lat_lags, y_values, color=colors[i], label=f'Empirical Sem. Hour {i + 1}')
-                ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
+                #ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
                 
             ax.grid(True)
             ax.set_xlabel('Latitude Lags', fontsize=12)
@@ -450,11 +450,12 @@ class CrossVariogram_empirical(CrossVariogram):
             ax.set_title(f'Semi-Variogram on 2024-07-{day:02d} ({self.length_of_analysis})', fontsize=14)
             # ax.set_xscale('linear')
             ax.set_xscale('symlog', linthresh=0.95)
-            # ax.set_yscale('linear')
+
             ax.set_xticks(lat_lags)
             ticks = [str(round(x, 2)) for x in lat_lags]
             ax.set_xticklabels(ticks)
-            ax.set_ylim(1e-4, 670)
+            #ax.set_ylim(1e-4, 670)
+            ax.set_ylim(1e-4, 25)
             plt.setp(ax.get_xticklabels(), rotation=65, ha='right')
 
             # Add vertical red line at x=0
@@ -488,9 +489,10 @@ class CrossVariogram_empirical(CrossVariogram):
             lon_lags = [lon for lat, lon in deltas]
 
             for i in range(8):
-                y_values = [y**2 for y in lon_lag_sem[day][i]]
+                #y_values = [y**2 for y in lon_lag_sem[day][i]]
+                y_values = [y for y in lon_lag_sem[day][i]]
                 ax.plot(lon_lags, y_values, color=colors[i], label=f'Empirical Sem. Hour {i + 1}')
-                ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
+                #ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
                 
             ax.grid(True)
             ax.set_xlabel('Longitude Lags', fontsize=12)
@@ -502,7 +504,8 @@ class CrossVariogram_empirical(CrossVariogram):
             ax.set_xticks(lon_lags)
             ticks = [str(round(x, 2)) for x in lon_lags]
             ax.set_xticklabels(ticks)
-            ax.set_ylim(1e-4, 670)
+            #ax.set_ylim(1e-4, 670)
+            ax.set_ylim(1e-4, 25)
             plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
 
             # Add vertical red line at x=0
