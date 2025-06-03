@@ -33,7 +33,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vec
 ```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_may9.py --v 0.5 --lr 0.03 --step 80 --epochs 1000 --space "20, 20" --days "12,13" --mm-cond-number 10 --nheads 10 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"    ```
 
 
-```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v10_416.py --v 0.5 --lr 0.03 --step 80 --epochs 1000 --space "20, 20" --days "12,13" --mm-cond-number 10 --nheads 200 --params "24.42, 1.92, 1.92, 0.001, -0.045, 0.237, 3.34"    ```
+```    srun --cpus-per-task=3 --mem=16G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v15_530.py --v 1.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "16, 16" --days "0,31" --mm-cond-number 10 --nheads 30    ```
 
 
 
@@ -204,6 +204,7 @@ conda activate faiss_env
 
 echo "Current date and time: $(date)"
 echo "fit_vecc_v15_may30_1126_save_estimates"
+
 
 srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v15_530.py --v 1.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "2, 2" --days "0,31" --mm-cond-number 10 --nheads 300
 ```
