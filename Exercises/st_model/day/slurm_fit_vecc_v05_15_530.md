@@ -171,7 +171,7 @@ conda activate faiss_env
 echo "Current date and time: $(date)"
 echo "fit_vecc_v15_may30_1126_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v15_may30.py --v 1.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "4, 4" --days "0,31" --mm-cond-number 10 --nheads 200
+srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v15_530.py --v 1.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "4, 4" --days "0,31" --mm-cond-number 10 --nheads 200
 ```
 
 ### v15 4508
@@ -205,7 +205,7 @@ conda activate faiss_env
 echo "Current date and time: $(date)"
 echo "fit_vecc_v15_may30_1126_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v15_may30.py --v 1.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "2, 2" --days "0,31" --mm-cond-number 10 --nheads 300
+srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v15_530.py --v 1.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "2, 2" --days "0,31" --mm-cond-number 10 --nheads 300
 ```
 
 ### v15 18033
@@ -239,7 +239,7 @@ conda activate faiss_env
 echo "Current date and time: $(date)"
 echo "fit_vecc_v15_may30_18033_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v15_may30.py --v 1.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "1, 1" --days "0,15" --mm-cond-number 10 --nheads 300
+srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v15_530.py --v 1.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "1, 1" --days "0,15" --mm-cond-number 10 --nheads 300
 ```
 
 ## May 30, 2025 I ran days 0,15 and 15,31  43976579 for 15 and 31 43976576 for 0 and 15
