@@ -18,7 +18,14 @@ scp "C:\Users\joonw\tco\GEMS_TCO-2\Exercises\st_model\day\fit_vecc_day_v10_416.p
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
 
 # 1250
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vecchia_v05_r2s10_1250.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/may12" 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vecchia_v05_r2s10_1250.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/estimates/df_cv_smooth_05" 
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vecchia_v150_r2s10_1127.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/estimates/df_cv_smooth_15" 
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vecchia_v150_r2s10_4508.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/estimates/df_cv_smooth_15" 
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vecchia_v150_r2s10_18033.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/estimates/df_cv_smooth_15" 
+
 
 
 
@@ -240,7 +247,7 @@ conda activate faiss_env
 echo "Current date and time: $(date)"
 echo "fit_vecc_v15_may30_18033_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v15_530.py --v 1.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "1, 1" --days "9,31" --mm-cond-number 10 --nheads 300
+srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v15_530.py --v 1.5 --lr 0.03 --step 100 --gamma-par 0.3 --epochs 1500 --space "1, 1" --days "18,31" --mm-cond-number 10 --nheads 300
 ```
 
 ## May 30, 2025 I ran days 0,15 and 15,31  43976579 for 15 and 31 43976576 for 0 and 15
