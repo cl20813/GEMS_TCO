@@ -4,9 +4,9 @@ amarel_data_load_path = "/home/jl2815/tco/data/"
 window_data_load_path = "C:\\Users\\joonw\\tco\\Extracted_data/"
 
 # load full likelihood based estimates for a day
-mac_estimates_day_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/estimates/save/day"
-mac_full_day_v05_pickle = "full_estimates_1250_july24.pkl"
-mac_full_day_v05_csv = "full_estimates_1250_july24.csv"
+mac_estimates_day_path = "/Users/joonwonlee/Documents/GEMS_TCO-1//outputs/day/estimates/save/day"
+#mac_full_day_v05_pickle = "full_estimates_1250_july24.pkl"
+mac_full_day_v05_csv = "df_cv_smooth_05/full_day_v05_r2s10_1127.csv"
 
 amarel_estimates_day_path = "/home/jl2815/tco/exercise_output/estimates/day/"
 amarel_estimates_day_saved_path = "/home/jl2815/tco/exercise_output/estimates/day/saved/"
