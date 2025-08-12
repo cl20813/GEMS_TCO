@@ -1,14 +1,6 @@
 # GEMS Total Column Ozone Project (Package)
 
 ## Setup and Shortcuts
--[Create and share environment on a local computer](https://github.com/cl20813/Softwares_Setup/blob/main/install_python.md)        
-
--[Create an environment on Rutgers Amarel](https://github.com/cl20813/Softwares_Setup/blob/main/amarel_environment.md)
-
-
--[Install ```gems_tco``` package on local computer](https://github.com/cl20813/Software_Setup/blob/main/install_gems_tco_local.md)   
-
--[Install ```gems_tco``` package on Amarel](https://github.com/cl20813/Softwares_Setup/blob/main/install_mypackage_amarel.md)    
 
 -[Create an environment and Compile ```maxmin.cpp``` file on local, and AMAREL](faiss_env.md)      
 
