@@ -21,7 +21,7 @@ When activate the new environment for the first time, system will ask to install
 ``` C:\Users\joonw\anaconda3\envs\faiss_env\python.exe -m pip install -e . --use-pep517  ```        
 ``` C:\Users\joonw\AppData\Local\Programs\Python\Python312\python.exe -m pip install -e . --use-pep517 ```   I have to choose base python interpreter so that change is pulled.   
     
-### Check python interpreter because there might be a mismatch between the Python interpreter set in VS Code and the one in your conda environment.        
+### Check python interpreter because there might be a mismatch between the Python interpreter in VS Code and the one in your conda environment.        
 WINDOW:    
     
 For example, my ```python interpreter linked to VS code``` is located at ```C:\Users\joonw\AppData\Local\Programs\Python\Python312\python.exe```.     
