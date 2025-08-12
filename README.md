@@ -2,13 +2,11 @@
 
 ## Setup and Shortcuts
 
--[Create an environment and Compile ```maxmin.cpp``` file on local, and AMAREL](faiss_env.md)      
+-[Create Python Environment and Compile c++ file on local,and AMAREL](faiss_env.md)      
 
 -[Copy the dataset to Amarel HPC](copy_gemsdata_to_amarel)
 
 -[Amrel_guide](Amrel_guide)
-
--[Domain knowledge](references_domain_knowledge)
 
 -[Link to OnDemand HPC](http://ondemand.hpc.rutgers.edu )    
 
