@@ -17,28 +17,29 @@ Go to terminal in VSCode.
 When activate the new environment for the first time, system will ask to install ```ipkernel```.
 
 ### Install gems_tco packge on my window laptop.   
-``` cd "C:\Users\joonw\tco\GEMS_TCO-2\src" ```
-``` C:\Users\joonw\anaconda3\envs\faiss_env\python.exe -m pip install -e . --use-pep517  ```
-``` C:\Users\joonw\AppData\Local\Programs\Python\Python312\python.exe -m pip install -e . --use-pep517 ```   I have to choose base python interpreter so that change is pulled.
-### Check python interpreter because there might be a mismatch between the Python interpreter set in VS Code and the one in your conda environment.   
-WINDOW:
-
-For example, my ```python interpreter linked to VS code``` is located at ```C:\Users\joonw\AppData\Local\Programs\Python\Python312\python.exe```.
-- You can check this by typing ```where python``` in ```DEVELOPER COMMAND PROMPT FOR VS CODE```.
-- VS code terminal: Type ```conda activate environment``` first and then type ```python --v``` this will tell your ```python interpreter linked to the ENVIRONMENT``` in window computer. It should match with the environment.
-
-MAC:
+``` cd "C:\Users\joonw\tco\GEMS_TCO-2\src" ```     
+``` C:\Users\joonw\anaconda3\envs\faiss_env\python.exe -m pip install -e . --use-pep517  ```        
+``` C:\Users\joonw\AppData\Local\Programs\Python\Python312\python.exe -m pip install -e . --use-pep517 ```   I have to choose base python interpreter so that change is pulled.   
+    
+### Check python interpreter because there might be a mismatch between the Python interpreter set in VS Code and the one in your conda environment.        
+WINDOW:    
+    
+For example, my ```python interpreter linked to VS code``` is located at ```C:\Users\joonw\AppData\Local\Programs\Python\Python312\python.exe```.     
+- You can check this by typing ```where python``` in ```DEVELOPER COMMAND PROMPT FOR VS CODE```.          
+- VS code terminal: Type ```conda activate environment``` first and then type ```python --v``` this will tell your ```python interpreter linked to the ENVIRONMENT``` in window computer. It should match with the environment.      
+   
+MAC:    
 Just type ```where python``` or ```which python``` in terminal to check python linked to VS code. Then activate conda environment and do ```which python``` again to see python linked to your environment.   
 
-Press Ctrl + Shift + P (or Cmd + Shift + P on macOS) to open the Command Palette.        
-Select Interpreter: Type Python: Select Interpreter and select it from the dropdown list.        
-You will see a list of available Python interpreters. Choose the one associated with your faiss_env environment.        
+Press Ctrl + Shift + P (or Cmd + Shift + P on macOS) to open the Command Palette.           
+Select Interpreter: Type Python: Select Interpreter and select it from the dropdown list.           
+You will see a list of available Python interpreters. Choose the one associated with your faiss_env environment.              
 
-Sometimes, it takes a time for adjustment. If above doesn't work, then consider adding following path to my environment if my environment cannot read conda:
-```C:\Users\joonw\Anaconda3\Scripts```
-```C:\Users\joonw\Anaconda3\condabin```
+Sometimes, it takes a time for adjustment. If above doesn't work, then consider adding following path to my environment if my environment cannot read conda:   
+```C:\Users\joonw\Anaconda3\Scripts```   
+```C:\Users\joonw\Anaconda3\condabin```   
 
-### Comfile c++ file (after finishing above steps, you can do this)
+### Comfile c++ file (after finishing above steps, you can do this)     
 mac: ``` python3 -c "import platform; print(platform.machine())" ```   Verify yourself if it says ```arm64``` or others. My mac computer says arm64.
 mac:   
 ```cd /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/cpp_src/```  This is the location for .cpp files. Note that compiled c++ .so files are recommended to located at the package folder with other modules.
@@ -55,20 +56,20 @@ mingw32-base-bin: This package includes the basic tools required for MinGW.
 mingw32-gcc-g++-bin: This package includes the G++ compiler for C++.
 mingw32-gcc-bin: This package includes the GCC compiler for C.
 
-#### Verify 
-``` "C:\MinGW\bin\gcc.exe" --version ```    this should work
-``` gcc --version ```  this should also work if the PATH  "C:\MinGW\bin" is added under PATH system variable. Making other variable won't work!!
+#### Verify    
+``` "C:\MinGW\bin\gcc.exe" --version ```    this should work   
+``` gcc --version ```  this should also work if the PATH  "C:\MinGW\bin" is added under PATH system variable. Making other variable won't work!!    
 
 
-window:
-``` cd "C:\Users\joonw\tco\GEMS_TCO-2\src/GEMS_TCO/cpp_src/" ```
+window:   
+``` cd "C:\Users\joonw\tco\GEMS_TCO-2\src/GEMS_TCO/cpp_src/" ```   
 
-window:   You need to install MingW for c++ compiler. Install this and add path ```C:\MinGW\bin```.
+window:   You need to install MingW for c++ compiler. Install this and add path ```C:\MinGW\bin```.   
 
-#### Now check the location of -I<path_to_python_include> -I<path_to_pybind11_include> manually      
-Type below in VS code terminal.
-```conda activate faiss_env```    
-```python -m pybind11 --includes```
+#### Now check the location of -I<path_to_python_include> -I<path_to_pybind11_include> manually       
+Type below in VS code terminal.  
+```conda activate faiss_env```     
+```python -m pybind11 --includes```    
 
 Go to powershell and check
 ```g++ --version```  then proceed with below
