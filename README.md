@@ -2,7 +2,7 @@
 
 ## Setup and Shortcuts
 
--[Create Python Environment and Compile c++ file on local,and AMAREL](faiss_env.md)      
+-[Create Python Environment and Compile c++ file on local,and AMAREL](faiss_env.md)        
 
 -[Copy the dataset to Amarel HPC](copy_gemsdata_to_amarel)
 
