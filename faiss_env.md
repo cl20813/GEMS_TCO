@@ -4,20 +4,19 @@ Faiss requires python 3.12 so we need a new environment.
 Go to terminal in VSCode.        
 ```conda create -n faiss_env python=3.12```       
 ```conda activate faiss_env```       
-```conda install -c pytorch faiss-cpu```       # order matters, install this first because it's a core dependency.    
-```conda install pybind11```      # comfile c++ file       
+```conda install -c pytorch faiss-cpu```                                              # order matters, install this first because it's a core dependency.    
+```conda install pybind11```                                                          # comfile c++ file       
 ```conda install numpy pandas matplotlib seaborn scikit-learn xarray netCDF4 ```            
-```conda install pytorch::pytorch torchvision torchaudio -c pytorch```     
-``` pip install typer```   conda manages dependencies for a wide range of software, not just Python packages. This can sometimes lead to conflicts or delays in updating packages. pip   
-Also I need to install torch spline library.   
-``` pip install git+https://github.com/patrick-kidger/torchcubicspline.git ```   
-
-### Install gems_tco packge on my macbook. 
+```conda install pytorch::pytorch torchvision torchaudio -c pytorch```       
+``` pip install typer```                                    
+``` pip install git+https://github.com/patrick-kidger/torchcubicspline.git ```        # I need to install torch spline library.    
+        
+### Install gems_tco packge on my macbook.     
 ```cd /Users/joonwonlee/Documents/GEMS_TCO-1/src```    
 ```/opt/anaconda3/envs/gems_tco/bin/python -m pip install -e . --use-pep517```   
 When activate the new environment for the first time, system will ask to install ```ipkernel```.
 
-### Install gems_tco packge on my window laptop. 
+### Install gems_tco packge on my window laptop.   
 ``` cd "C:\Users\joonw\tco\GEMS_TCO-2\src" ```
 ``` C:\Users\joonw\anaconda3\envs\faiss_env\python.exe -m pip install -e . --use-pep517  ```
 ``` C:\Users\joonw\AppData\Local\Programs\Python\Python312\python.exe -m pip install -e . --use-pep517 ```   I have to choose base python interpreter so that change is pulled.
