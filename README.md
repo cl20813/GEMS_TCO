@@ -12,7 +12,7 @@
 
 -[Link to OnDemand HPC](http://ondemand.hpc.rutgers.edu )    
 
-## Research Proposal and Exploratory Data Analysis
+## Research Proposal and Exploratory Data Analysis on GEMS Ozone Data
 -[Research Proposal](GEMS_TCO_EDA/Spatio_temporal_modeling.pdf): The main goal of the project is to develop tools that can help in modeling the spatio-temporal Ozone process.
 
 -[Yearly scale EDA](GEMS_TCO_EDA/will_use/yearly_eda.ipynb): Presented time series of means, variances and semivariograms per hour from January 2023 to December 2024. The plots show not only ```short-term cycles``` but also ```long-term cycles```.
@@ -23,23 +23,9 @@
 
 -[Ozone distribution analysis](GEMS_TCO_EDA/will_use/TCO_VS_Staratoshere.ipynb): I compared ```total column ozone``` with ```stratospheric ozone``` and analyzed the time series of means and variances of ozone values over time to confirm that most of the ozone is located in the stratosphere. 
 
-## Models
--[Full Likelihood V.S. Vecchia Approximation](Exercises/likelihood_exercise/results.md):
+## Reference
 
--[CNN integrated with LSTM](models/fit_deep_learning.ipynb): Still working on it. It seems CNN does not capture high resolution spatial information. Maybe I should replace it with Gaussian Process followed by LSTM. 
-
--[SLURM job order to HPC](models/deep_learning_cnn_lstm_slurm.md)
-
-
-
-
-# Reference
-## Job orders for Amarel Rutgers Cluster
-
--[Relevant Gaussian Process related exercises can be found here. ](https://github.com/cl20813/Gaussian_Process_Exercises)        
-
-[Compare full negative log likelihood vs Vecchia approximation, pure spatial model ](Exercises/likelihood_exercise/slurm_full_vs_vecchia_space):
-
+-[Relevant Gaussian Process related exercises can be found here. ](https://github.com/cl20813/Gaussian_Process_Exercises)      
 
 ## Debugging errors 
 
