@@ -6,7 +6,7 @@
 
 -[Copy the dataset to Amarel HPC](copy_gemsdata_to_amarel)          
       
--[EC2, and VS Code, Environment Setting](aws_ec2_vs_code_environment.md)            
+-[AWS EC2 Instance, and VS Code, Environment Setting](aws_ec2_vs_code_environment.md)            
 
 -[Amrel_guide](Amrel_guide)
 
