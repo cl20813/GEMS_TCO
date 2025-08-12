@@ -25,11 +25,11 @@
 
 -[Yearly scale EDA](GEMS_TCO_EDA/yearly_eda.ipynb): Presented time series of means, variances and semivariograms per hour from January 2023 to December 2024. The plots show not only ```short-term cycles``` but also ```long-term cycles```.
 
--[Monthly scale EDA ](GEMS_TCO_EDA/monthly_eda.ipynb): We present time series of semivariograms, and variances. It shows that the process is ```anisotropic``` and this needs to be reflected in the modeling.
+-[Monthly scale EDA ](GEMS_TCO_EDA/will_use/monthly_eda.ipynb): We present time series of semivariograms, and variances. It shows that the process is ```anisotropic``` and this needs to be reflected in the modeling.
 
--[Hourly scale EDA ](GEMS_TCO_EDA/hourly_eda.ipynb): We explored data on an hourly scale. ```The cyclic pattern``` shown in the ```semivariograms``` indicates that we should fit the data with a model that can explain this cyclic pattern. Secondly, ```asymmetric cross-variograms``` on some days imply that there is ```space and time interaction```, hence we should consider a non-separable model. Lastly, ```latitude-sliced``` data shows ```spatial non-stationarity```. I plan to ```detrend for 5x10 spatial points``` in the N5N10 E110E120 region. 
+-[Hourly scale EDA ](GEMS_TCO_EDA/will_use/hourly_eda.ipynb): We explored data on an hourly scale. ```The cyclic pattern``` shown in the ```semivariograms``` indicates that we should fit the data with a model that can explain this cyclic pattern. Secondly, ```asymmetric cross-variograms``` on some days imply that there is ```space and time interaction```, hence we should consider a non-separable model. Lastly, ```latitude-sliced``` data shows ```spatial non-stationarity```. I plan to ```detrend for 5x10 spatial points``` in the N5N10 E110E120 region. 
 
--[Ozone distribution analysis](GEMS_TCO_EDA/TCO_VS_Staratoshere.ipynb): I compared ```total column ozone``` with ```stratospheric ozone``` and analyzed the time series of means and variances of ozone values over time to confirm that most of the ozone is located in the stratosphere. 
+-[Ozone distribution analysis](GEMS_TCO_EDA/will_use/TCO_VS_Staratoshere.ipynb): I compared ```total column ozone``` with ```stratospheric ozone``` and analyzed the time series of means and variances of ozone values over time to confirm that most of the ozone is located in the stratosphere. 
 
 ## Models
 -[Full Likelihood V.S. Vecchia Approximation](Exercises/likelihood_exercise/results.md):
