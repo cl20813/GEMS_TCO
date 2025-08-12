@@ -4,7 +4,9 @@
 
 -[Create Python Environment and Compile c++ file on local,and AMAREL](faiss_env.md)        
 
--[Copy the dataset to Amarel HPC](copy_gemsdata_to_amarel)
+-[Copy the dataset to Amarel HPC](copy_gemsdata_to_amarel)   
+      
+-[EC2, and VS Code, Environment Setting](aws_ec2_vs_code_environment.md)         
 
 -[Amrel_guide](Amrel_guide)
 
