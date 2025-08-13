@@ -2,6 +2,7 @@
 mac_data_load_path = "/Users/joonwonlee/Documents/GEMS_DATA/"
 amarel_data_load_path = "/home/jl2815/tco/data/"
 window_data_load_path = "C:\\Users\\joonw\\tco\\Extracted_data/"
+aws_data_load_path = "/home/ec2-user/gems_tco/data/"
 
 # load full likelihood based estimates for a day
 mac_estimates_day_path = "/Users/joonwonlee/Documents/GEMS_TCO-1//outputs/day/estimates/save/day"
