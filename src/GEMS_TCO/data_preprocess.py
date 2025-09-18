@@ -200,10 +200,10 @@ class center_matching_hour():
     def __init__(
         self, 
         df:pd.DataFrame=None, 
-        lat_s:float =5,
-        lat_e:float =10, 
-        lon_s:float =110,
-        lon_e:float =120, 
+        lat_s:float =0,
+        lat_e:float =5, 
+        lon_s:float =123,
+        lon_e:float =133, 
         lat_resolution:float=None, 
         lon_resolution:float =None
     ):
