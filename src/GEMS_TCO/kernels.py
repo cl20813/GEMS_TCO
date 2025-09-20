@@ -513,7 +513,7 @@ class spline(spatio_temporal_kernels):
         cov_map = self.cov_structure_saver_using_spline(params)
         nll = self.vecchia_nll_using_spline(params, cov_map)
         return nll
-
+    
     def optimizer_fun(self, params:torch.Tensor, lr:float =0.01, betas: tuple=(0.9, 0.8), eps:float=1e-8, step_size:int=40, gamma:float=0.5):
         optimizer = torch.optim.Adam([params], lr=lr, betas=betas, eps=eps)
         scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)  # Decrease LR by a factor of 0.1 every 10 epochs
