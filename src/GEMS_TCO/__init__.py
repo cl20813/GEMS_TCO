@@ -183,7 +183,8 @@ class load_data:
         coarse_dicts: Dict[str, pd.DataFrame],  
         idx_for_datamap: List[int] = [0, 8]
     ) -> Tuple[Dict[str, torch.Tensor], torch.Tensor]:
-        """
+        
+        """  
         Load and process working data by day.
 
         Parameters:
@@ -202,20 +203,24 @@ class load_data:
         analysis_data_map = {}
         for i in range(idx_for_datamap[0], idx_for_datamap[1]):
             tmp = coarse_dicts[key_idx[i]].copy()
-            tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'] - 477700)
-            tmp = tmp.iloc[:,:4].to_numpy()
-            tmp = torch.from_numpy(tmp).double()
-            analysis_data_map[key_idx[i]] = tmp
+            tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'] - 477700).astype(np.float32)
+            tmp_data = tmp.iloc[:,:4].to_numpy(dtype=np.float32)
+            
+            # Change from .double() to .float()
+            analysis_data_map[key_idx[i]] = torch.from_numpy(tmp_data)
 
-        aggregated_data = pd.DataFrame()
+        # Use a list to store DataFrames for efficient concatenation
+        aggregated_df_list = []
         for i in range(idx_for_datamap[0], idx_for_datamap[1]):
             tmp = coarse_dicts[key_idx[i]].copy()
             tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'] - 477700)
-            tmp = tmp.reset_index(drop=True)  
-            aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
+            aggregated_df_list.append(tmp.iloc[:, :4])
 
-        aggregated_data = aggregated_data.iloc[:, :4].to_numpy()
-        aggregated_data = torch.from_numpy(aggregated_data).double()
+        aggregated_data_df = pd.concat(aggregated_df_list, axis=0, ignore_index=True)
+        aggregated_data_np = aggregated_data_df.to_numpy(dtype=np.float32)
+
+        # Change from .double() to .float()
+        aggregated_data = torch.from_numpy(aggregated_data_np)
         return analysis_data_map, aggregated_data
    
 
