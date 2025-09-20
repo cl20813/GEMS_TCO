@@ -178,6 +178,47 @@ class load_data:
         aggregated_data = torch.from_numpy(aggregated_data).double()
         return analysis_data_map, aggregated_data
 
+    def load_working_data_byday_wo_mm(
+        self, 
+        coarse_dicts: Dict[str, pd.DataFrame],  
+        idx_for_datamap: List[int] = [0, 8]
+    ) -> Tuple[Dict[str, torch.Tensor], torch.Tensor]:
+        """
+        Load and process working data by day.
+
+        Parameters:
+        - coarse_dicts (Dict[str, pd.DataFrame]): Dictionary of processed dataframes.
+        - idx_for_datamap (List[int]): Indices for the data map. Default is [0, 8].
+
+        Returns:
+        - Tuple[Dict[str, torch.Tensor], torch.Tensor]: 
+            - analysis_data_map: Dictionary of tensors for analysis.
+            - aggregated_data: Aggregated tensor data.
+        """
+        key_idx = sorted(coarse_dicts)
+        if not key_idx:
+            raise ValueError("coarse_dicts is empty")
+        
+        analysis_data_map = {}
+        for i in range(idx_for_datamap[0], idx_for_datamap[1]):
+            tmp = coarse_dicts[key_idx[i]].copy()
+            tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'] - 477700)
+            tmp = tmp.iloc[:,:4].to_numpy()
+            tmp = torch.from_numpy(tmp).double()
+            analysis_data_map[key_idx[i]] = tmp
+
+        aggregated_data = pd.DataFrame()
+        for i in range(idx_for_datamap[0], idx_for_datamap[1]):
+            tmp = coarse_dicts[key_idx[i]].copy()
+            tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'] - 477700)
+            tmp = tmp.reset_index(drop=True)  
+            aggregated_data = pd.concat((aggregated_data, tmp), axis=0)
+
+        aggregated_data = aggregated_data.iloc[:, :4].to_numpy()
+        aggregated_data = torch.from_numpy(aggregated_data).double()
+        return analysis_data_map, aggregated_data
+   
+
     ## maybe I should delete reorder_data someday
 
     def reorder_data(self, analysis_data_map, key_order):

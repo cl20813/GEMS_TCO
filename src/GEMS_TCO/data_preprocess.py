@@ -240,7 +240,7 @@ class center_matching_hour():
             orbit_map[orbit_key] = self.df.loc[self.df['Orbit'] == orbit].reset_index(drop=True)
         return orbit_map
     
-    def make_center_points(self, step_lat:float=0.042, step_lon:float=0.062) -> pd.DataFrame:
+    def make_center_points(self, step_lat:float=0.044, step_lon:float=0.063) -> pd.DataFrame:
         lat_coords = np.arange( self.lat_e-step_lat- 0.0002, self.lat_s -step_lat, -step_lat)
         lon_coords = np.arange( self.lon_e-step_lon- 0.0002, self.lon_s-step_lon, -step_lon)
 
@@ -251,6 +251,31 @@ class center_matching_hour():
         
         # Create 2D grid with broadcasting
         decrement = 0.00012
+        lat_grid = final_lat_values[:, None] + np.arange(len(final_lon_values)) * decrement  # shape: (228, 152)
+
+        # Flatten row-wise (C order)
+        center_lats = lat_grid.flatten()
+
+        # Create matching longitude grid
+        center_lons = np.tile(final_lon_values, len(final_lat_values))
+
+        # Now you can build your DataFrame
+        center_points_df = pd.DataFrame({'lat': center_lats, 'lon': center_lons})
+        return center_points_df
+    
+    def make_center_points_wo_calibration(self, step_lat:float=0.044, step_lon:float=0.063) -> pd.DataFrame:
+        lat_coords = np.arange( self.lat_e-step_lat, self.lat_s -step_lat, -step_lat)
+        lon_coords = np.arange( self.lon_e-step_lon, self.lon_s-step_lon, -step_lon)
+
+        # Apply the shift as in the original code
+        # These are the unique lat/lon values for the "center_points" grid
+        final_lat_values = lat_coords + step_lat 
+        final_lon_values = lon_coords + step_lon 
+        
+        # Create 2D grid with broadcasting
+        #decrement = 0.00012
+        decrement = 0 
+        
         lat_grid = final_lat_values[:, None] + np.arange(len(final_lon_values)) * decrement  # shape: (228, 152)
 
         # Flatten row-wise (C order)
