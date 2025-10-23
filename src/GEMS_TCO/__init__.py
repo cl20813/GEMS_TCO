@@ -18,6 +18,10 @@ from GEMS_TCO import orderings as _orderings
 from GEMS_TCO import configuration as config
 
 
+# This line makes the class available directly from the package
+from .data_loader import load_data2
+
+
 
 class load_data:
     def __init__(self, datapath:str):
@@ -223,7 +227,13 @@ class load_data:
         aggregated_data = torch.from_numpy(aggregated_data_np)
         return analysis_data_map, aggregated_data
    
+'''
+=======
 
+>>>>>>> 98fc71c474ddced6792e89e9ab27c07529da5b48
+=======
+
+>>>>>>> 0a418ac421c02a3cd32b6e4c97b2bdc92cdb79b7
     ## maybe I should delete reorder_data someday
 
     def reorder_data(self, analysis_data_map, key_order):
@@ -310,6 +320,9 @@ class load_data:
         entire_data = entire_data[:, [0, 1, 3, 2]]
         return analysis_data_map, entire_data
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+'''
 
 class log_semivariograms:
     def __init__(self, deltas: List[Tuple[float, float]], semivariograms, tolerance: float):
