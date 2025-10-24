@@ -1435,6 +1435,19 @@ class model_fitting(vecchia_experiment):
             
         return optimizer, scheduler
 
+    def optimizer_fun10_23(self, params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, 
+                    scheduler_type:str='step', step_size=40, gamma=0.5, T_max=10): # <-- Added new arguments
+        
+        optimizer = torch.optim.Adam(params, lr=lr, betas=betas, eps=eps)
+        
+        if scheduler_type.lower() == 'cosine':
+            scheduler = CosineAnnealingLR(optimizer, T_max=T_max) # Uses T_max
+        else: # Default to StepLR
+            scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
+            
+        return optimizer, scheduler
+    
+
 
     # use adpating lr
     def run_full(self, params, optimizer, scheduler,  covariance_function, epochs=10 ):
@@ -1525,6 +1538,49 @@ class model_fitting(vecchia_experiment):
         loss = loss.item()
         print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {final_params_list}')
         return final_params_list + [loss], epoch
+    
+
+    def run_vecc_oct23(self, params_list, optimizer, scheduler,  covariance_function, epochs=10):
+        prev_loss= float('inf')
+        tol = 1e-4  # Convergence tolerance
+        
+        for epoch in range(epochs):  
+            params = torch.cat(params_list)
+            # --- FIX: Re-compute cov_map INSIDE the loop ---
+            # The cov_map depends on 'params', so it must be re-computed
+            # every time 'params' is updated.
+            cov_map = self.cov_structure_saver(params, covariance_function)
+            
+            optimizer.zero_grad()  
+            loss = self.compute_vecc_nll_oct22(params, covariance_function, cov_map)
+            
+            # --- FIX: Removed retain_graph=True ---
+            # This was causing a memory leak. Since the graph is
+            # rebuilt from scratch every epoch (including cov_map),
+            # we no longer need to retain it.
+            loss.backward()
+
+            # Print gradients and parameters every 10th epoch
+            if epoch % 50 == 0:
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            optimizer.step()  # Update the parameters
+            scheduler.step()  # Update the learning rate
+
+            # Check for convergence
+            if abs(prev_loss - loss.item()) < tol:
+                print(f"Converged at epoch {epoch}")
+                print(f'Epoch {epoch+1},  \n vecc Parameters: {params.detach().numpy()}')
+                break
+
+            prev_loss = loss.item()
+
+        final_params_list = [p.item() for p in params] # Get final params as a list
+        loss = loss.item()
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {final_params_list}')
+        return final_params_list + [loss], epoch
+    
+
     # --- NEW ADVANCED TRAINING LOOP ---
 
     def run_vecc_advanced(self, params, optimizer, scheduler, covariance_function, epochs=10, log_param_indices:List[int]=None):
