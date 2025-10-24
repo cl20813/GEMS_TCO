@@ -1520,8 +1520,8 @@ class model_fitting(vecchia_experiment):
             loss.backward()
 
             # Print gradients and parameters every 10th epoch
-            # if epoch % 500 == 0:
-            #     print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            if epoch % 50 == 0:
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
             
             optimizer.step()  # Update the parameters
             scheduler.step()  # Update the learning rate
@@ -1562,7 +1562,7 @@ class model_fitting(vecchia_experiment):
 
             # Print gradients and parameters every 10th epoch
             if epoch % 50 == 0:
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params}')
             
             optimizer.step()  # Update the parameters
             scheduler.step()  # Update the learning rate

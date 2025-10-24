@@ -286,6 +286,74 @@ class load_data2:
         aggregated_data = torch.from_numpy(aggregated_data_np)
         
         return analysis_data_map, aggregated_data
+
+    def load_working_data_keep_ori(
+        self, 
+        coarse_dicts: Dict[str, pd.DataFrame],  
+        idx_for_datamap: List[int] = [0, 8],
+        ord_mm: Optional[np.ndarray] = None,
+        dtype: torch.dtype = torch.float
+    ) -> Tuple[Dict[str, torch.Tensor], torch.Tensor]:
+        """
+        Load and process working data by day, with optional MaxMin reordering.
+
+        Parameters:
+        - coarse_dicts (Dict[str, pd.DataFrame]): Dictionary of processed dataframes.
+        - idx_for_datamap (List[int]): Indices for the data map.
+        - ord_mm (Optional[np.ndarray]): If provided, applies this ordering to the data.
+        - dtype (torch.dtype): The target data type (e.g., torch.float or torch.double).
+
+        Returns:
+        - Tuple[Dict[str, torch.Tensor], torch.Tensor]: 
+            - analysis_data_map: Dictionary of tensors for analysis.
+            - aggregated_data: Aggregated tensor data.
+        """
+        key_idx = sorted(coarse_dicts)
+        if not key_idx:
+            raise ValueError("coarse_dicts is empty")
+        
+        analysis_data_map = {}
+        aggregated_df_list = []
+        
+        # Determine the corresponding numpy dtype
+        np_dtype = np.float32 if dtype == torch.float else np.float64
+        
+        selected_keys = key_idx[idx_for_datamap[0]:idx_for_datamap[1]]
+        
+        for key in selected_keys:
+            tmp = coarse_dicts[key].copy()
+            tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'] - 477700).astype(np_dtype)
+            
+            # --- Conditionally apply reordering ---
+            if ord_mm is not None:
+                tmp_processed = tmp.iloc[ord_mm].reset_index(drop=True)
+            else:
+                tmp_processed = tmp
+            
+            # Slice to the first 4 columns
+            # This is more efficient than the original `load_working_data_byday`
+            # which appended the *entire* reordered df to the list.
+            tmp_data_df = tmp_processed.iloc[:, [0,1,2,3,5,6]]
+
+            # 1. Create data for analysis_data_map
+            tmp_np = tmp_data_df.to_numpy(dtype=np_dtype)
+            analysis_data_map[key] = torch.from_numpy(tmp_np) # .to(dtype) is redundant
+
+            # 2. Store the df for aggregation
+            aggregated_df_list.append(tmp_data_df)
+
+        if not aggregated_df_list:
+            return analysis_data_map, torch.empty(0, 4, dtype=dtype)
+
+        # Concat once
+        aggregated_data_df = pd.concat(aggregated_df_list, axis=0, ignore_index=True)
+        aggregated_data_np = aggregated_data_df.to_numpy(dtype=np_dtype)
+        
+        # Create final tensor
+        aggregated_data = torch.from_numpy(aggregated_data_np)
+        
+        return analysis_data_map, aggregated_data
+    
     ''' 
     # To replace load_working_data_byday (with reordering, as double):
     analysis_map_mm, agg_data_mm = self.load_working_data(
