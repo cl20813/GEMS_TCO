@@ -30,13 +30,14 @@ from torchcubicspline import natural_cubic_spline_coeffs, NaturalCubicSpline
 
 from typing import Dict, Any, Callable, List, Tuple
 
-
+import time
 import copy    
 import logging     # for logging
 # Add your custom path
 
 import warnings
-
+import torch
+from functools import partial
 # --- MODIFIED 'optimizer_fun' IN 'model_fitting' CLASS ---
 from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR # Need to import this
 # ... (other imports) ...
@@ -107,24 +108,6 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         distance = self.custom_distance_matrix(U,V)
         return distance # This is the optimized version, fixing the redundancy
     
-
-
-        if y is None or x is None:
-            raise ValueError("Both y and x_df must be provided.")
-
-        x1, y1, t1 = x[:, 0], x[:, 1], x[:, 3]
-        x2, y2, t2 = y[:, 0], y[:, 1], y[:, 3]
-
-        # spat_coord1 = torch.stack((self.x1 , self.y1 - advec * self.t1), dim=-1)
-        spat_coord1 = torch.stack(( (x1 - advec_lat * t1)/range_lat, (y1 - advec_lon * t1)/range_lon ), dim=-1)
-        spat_coord2 = torch.stack(( (x2 - advec_lat * t2)/range_lat, (y2 - advec_lon * t2)/range_lon ), dim=-1)
-
-        U = torch.cat((spat_coord1, (beta * t1).reshape(-1, 1)), dim=1)
-        V = torch.cat((spat_coord2, (beta * t2).reshape(-1, 1)), dim=1)
-
-        distance = self.custom_distance_matrix(U,V)
-        non_zero_indices = distance != 0
-        return distance, non_zero_indices
 
  
     def matern_cov_anisotropy_v05(self,params: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
@@ -265,6 +248,14 @@ class likelihood_function(spatio_temporal_kernels):
         """
         Optimized likelihood function using Cholesky decomposition.
         """
+
+        # --- FIX: Cast all input data to float64 ONCE at the beginning ---
+        # This ensures 'input_data' and 'y' match the 'params' dtype (float64).
+        input_data = input_data.to(torch.float64)
+        y= y.to(torch.float64)
+        # --- End Fix ---
+        # 
+        #         
         cov_matrix = covariance_function(params=params, y= input_data, x= input_data)
         
         # --- OPTIMIZATION ---
@@ -278,13 +269,24 @@ class likelihood_function(spatio_temporal_kernels):
 
         # 2. Get log-determinant from Cholesky factor (fast and stable)
         log_det = 2 * torch.sum(torch.log(torch.diag(L)))
-        locs = input_data[:,:2] # (N, 2)
         
-        # Ensure y is a column vector (N, 1) for matrix operations
+        #locs = input_data[:,:2] # (N, 2)
+        ## Ensure y is a column vector (N, 1) for matrix operations
+        #if y.dim() == 1:
+        #    y_col = y.unsqueeze(-1)
+        #else:
+        #    y_col = y
+
+        # --- FIX: Cast locs and y to float64 to match L ---
+        # input_data is float32, so locs is float32. We must cast it.
+        locs = input_data[:,:2].to(torch.float64) 
+        
+        # Ensure y is a column vector (N, 1) and also float64
         if y.dim() == 1:
-            y_col = y.unsqueeze(-1)
+            y_col = y.unsqueeze(-1).to(torch.float64)
         else:
-            y_col = y
+            y_col = y.to(torch.float64)
+        # --- End Fix ---
 
         # 3. Solve for C_inv_X and C_inv_y using efficient O(N^2) triangular solves
         C_inv_X = torch.cholesky_solve(locs, L, upper=False)  # Solves C*z = X
@@ -1261,6 +1263,61 @@ class vecchia_experiment(likelihood_function):
                 neg_log_lik += 0.5 * (log_det + quad_form)
                 
         return neg_log_lik
+    
+
+    # --- STEP 2: The NEW Matrix-Builder for the Y field ---
+    def build_cov_matrix_spatial_difference_anisotropy(self, 
+                                                    params: torch.Tensor, 
+                                                    y: torch.Tensor, 
+                                                    x: torch.Tensor, 
+                                                    delta1: float, 
+                                                    delta2: float) -> torch.Tensor:
+        """
+        Builds the full covariance matrix Cov(Y(s_i), Y(s_j)) for the 
+        spatially differenced data, using the NON-STATIONARY anisotropic base kernel.
+        
+        This is the function that will be passed to your Vecchia methods.
+        
+        y: (N, 4) tensor of [lat, lon, val, time]
+        x: (M, 4) tensor of [lat, lon, val, time]
+        """
+        # Y(s) = -2*X(s) + 1*X(s+d1) + 1*X(s+d2)
+        weights = {(0, 0): -2.0, (1, 0): 1.0, (0, 1): 1.0}
+        device = params.device
+        dtype = torch.float64
+        
+        final_cov_matrix = torch.zeros(y.shape[0], x.shape[0], device=device, dtype=dtype)
+        
+        delta1_dev = torch.tensor(delta1, device=device, dtype=dtype)
+        delta2_dev = torch.tensor(delta2, device=device, dtype=dtype)
+
+        for (a_idx, b_idx), w_ab in weights.items():
+            offset_a1 = a_idx * delta1_dev # Lat offset for y
+            offset_a2 = b_idx * delta2_dev # Lon offset for y
+            
+            # Create a shifted version of the 'y' coordinates
+            # We only need to shift lat (col 0) and lon (col 1).
+            y_shifted = y.clone()
+            y_shifted[:, 0] += offset_a1
+            y_shifted[:, 1] += offset_a2
+            
+            for (c_idx, d_idx), w_cd in weights.items():
+                offset_c1 = c_idx * delta1_dev # Lat offset for x
+                offset_c2 = d_idx * delta2_dev # Lon offset for x
+
+                # Create a shifted version of the 'x' coordinates
+                x_shifted = x.clone()
+                x_shifted[:, 0] += offset_c1
+                x_shifted[:, 1] += offset_c2
+                
+                # --- Call the BASE X kernel (your old function) ---
+                term_cov = self.matern_cov_anisotropy_v05(params, x_shifted, y_shifted)
+                
+                final_cov_matrix += w_ab * w_cd * term_cov
+        
+        return final_cov_matrix
+    
+
 '''
 =======
 
@@ -1416,38 +1473,61 @@ class model_fitting(vecchia_experiment):
     def compute_full_nll(self,params, covariance_function):
         full_nll = self.full_likelihood(params=params, input_data=self.aggregated_data, y=self.aggregated_response, covariance_function= covariance_function) 
         return full_nll
-    
+    '''  
     def optimizer_fun(self, params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, step_size=40, gamma=0.5):
         optimizer = torch.optim.Adam([params], lr=lr, betas=betas, eps=eps)
         scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)  # Decrease LR by a factor of 0.1 every 10 epochs
         return optimizer, scheduler
+    '''
 
-
-    def optimizer_fun(self, params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, 
-                    scheduler_type:str='step', step_size=40, gamma=0.5, T_max=10): # <-- Added new arguments
-        
-        optimizer = torch.optim.Adam([params], lr=lr, betas=betas, eps=eps)
-        
-        if scheduler_type.lower() == 'cosine':
-            scheduler = CosineAnnealingLR(optimizer, T_max=T_max) # Uses T_max
-        else: # Default to StepLR
-            scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
+    def optimizer_fun(self, 
+                        param_groups_or_params, # <--- Renamed argument to be flexible
+                        lr=0.01, 
+                        betas=(0.9, 0.8), 
+                        eps=1e-8, 
+                        scheduler_type:str='step', 
+                        step_size=40, 
+                        gamma=0.5, 
+                        T_max=10):
             
-        return optimizer, scheduler
-
-    def optimizer_fun10_23(self, params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, 
-                    scheduler_type:str='step', step_size=40, gamma=0.5, T_max=10): # <-- Added new arguments
-        
-        optimizer = torch.optim.Adam(params, lr=lr, betas=betas, eps=eps)
-        
-        if scheduler_type.lower() == 'cosine':
-            scheduler = CosineAnnealingLR(optimizer, T_max=T_max) # Uses T_max
-        else: # Default to StepLR
-            scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
+            # 1. Determine if the input is a list of groups or a single parameter/list of parameters
+            # We check the type of the first element (if it's a list) or the input itself.
+            # If it's a list of dicts (parameter groups), we pass it directly.
+            # Otherwise, we wrap the input in a list for the optimizer.
             
-        return optimizer, scheduler
+            if isinstance(param_groups_or_params, list) and len(param_groups_or_params) > 0 and isinstance(param_groups_or_params[0], dict):
+                # Input is a list of parameter groups (dictionaries)
+                # The 'lr', 'betas', and 'eps' arguments passed to this function 
+                # will act as defaults IF they are not specified in the groups.
+                # However, since your example *explicitly* sets 'lr' in the groups, 
+                # those will take precedence.
+                optimizer = torch.optim.Adam(
+                    param_groups_or_params, 
+                    lr=lr, # Used as a global default if no lr in groups
+                    betas=betas, 
+                    eps=eps
+                )
+            else:
+                # Input is a single parameter, a list/tuple of parameters, or a tensor.
+                # Use the original logic, wrapping it in a list of parameters.
+                # Note: Your example passes a list of groups, so this block won't run.
+                optimizer = torch.optim.Adam(
+                    [param_groups_or_params], # Wrap the single parameter/list for Adam
+                    lr=lr, 
+                    betas=betas, 
+                    eps=eps
+                )
+
+            # 2. Scheduler logic remains the same (it needs the optimizer object)
+            if scheduler_type.lower() == 'cosine':
+                # Cosine Annealing uses T_max
+                scheduler = CosineAnnealingLR(optimizer, T_max=T_max) 
+            else: 
+                # Default to StepLR, using step_size and gamma
+                scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
+                
+            return optimizer, scheduler
     
-
 
     # use adpating lr
     def run_full(self, params, optimizer, scheduler,  covariance_function, epochs=10 ):
@@ -1498,7 +1578,7 @@ class model_fitting(vecchia_experiment):
         return final_params_list + [loss], epoch
 
 
-    
+    ''' 
     def run_vecc_oct22(self, params, optimizer, scheduler,  covariance_function, epochs=10):
         prev_loss= float('inf')
         tol = 1e-4  # Convergence tolerance
@@ -1538,9 +1618,10 @@ class model_fitting(vecchia_experiment):
         loss = loss.item()
         print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {final_params_list}')
         return final_params_list + [loss], epoch
-    
+    '''
 
-    def run_vecc_oct23(self, params_list, optimizer, scheduler,  covariance_function, epochs=10):
+    # using scheduler and optimizer for list of params
+    def run_vecc_scheduler_oct23(self, params_list, optimizer, scheduler,  covariance_function, epochs=10):
         prev_loss= float('inf')
         tol = 1e-4  # Convergence tolerance
         
@@ -1560,9 +1641,24 @@ class model_fitting(vecchia_experiment):
             # we no longer need to retain it.
             loss.backward()
 
-            # Print gradients and parameters every 10th epoch
-            if epoch % 50 == 0:
-                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params}')
+            # Print gradients and parameters every 50th epoch (Adjusted logic)
+            if epoch % 10 == 0:
+                print(f'--- Epoch {epoch+1} / Loss: {loss.item():.6f} ---')
+                
+                # Iterate through the list of parameter tensors to print their individual grads and values
+                # The params_list is the argument passed to the function
+                for i, param_tensor in enumerate(params_list):
+                    
+                    # **Crucial Check:** Check if the gradient exists (i.e., is not None)
+                    if param_tensor.grad is not None:
+                        grad_value = param_tensor.grad.item()
+                    else:
+                        # This happens if a tensor's gradient was not computed in this step
+                        grad_value = 'N/A' 
+                        
+                    print(f'  Param {i}: Value={param_tensor.item():.4f}, Grad={grad_value}')
+                    
+                print("-" * 30) # Separator for clarity
             
             optimizer.step()  # Update the parameters
             scheduler.step()  # Update the learning rate
@@ -1581,125 +1677,169 @@ class model_fitting(vecchia_experiment):
         return final_params_list + [loss], epoch
     
 
-    # --- NEW ADVANCED TRAINING LOOP ---
 
-    def run_vecc_advanced(self, params, optimizer, scheduler, covariance_function, epochs=10, log_param_indices:List[int]=None):
-        """
-        Advanced training loop based on the user's reference.
-        - Tracks best loss and best params.
-        - Handles NaN/Inf loss.
-        - Clips gradients.
-        - Prints parameters in "natural scale" (by exponentiating log-params).
-        """
-        best_loss = float('inf')
-        # We only have one tensor, but we'll use a list for compatibility
-        best_params_state = params.detach().clone()
-        epochs_completed = 0
+    # The final, robust version using List Input and Early Stopping
+    def run_vecc_early_stp_1028(self, 
+                            params_list: list[torch.Tensor], # Input is now a list
+                            optimizer: torch.optim.Optimizer,
+                            covariance_function: Callable, 
+                            epochs: int,
+                            patience: int = 10,
+                            min_delta: float = 1e-5
+                            ) -> tuple[torch.Tensor, int]:
         
-        if log_param_indices is None:
-            log_param_indices = []
+        best_loss = float('inf')
+        epochs_no_improve = 0
+        
+        # Initialization of best_params requires concatenating the list once
+        best_params = torch.cat(params_list).detach().clone() 
 
-        def get_printable_params(p_tensor):
-            """Helper to convert log-params to natural scale for printing."""
-            p_cat = p_tensor.detach().clone().cpu()
-            try:
-                if log_param_indices:
-                    log_vals = p_cat[log_param_indices]
-                    if not (torch.isnan(log_vals).any() or torch.isinf(log_vals).any()):
-                        p_cat[log_param_indices] = torch.exp(log_vals)
-                    else:
-                        p_cat[log_param_indices] = float('nan')
-            except IndexError:
-                print("Warning: log_param_indices out of bounds.")
-                pass # Fail gracefully
-            return p_cat.numpy().round(4)
+        for epoch in range(epochs):  
+            # CRITICAL CHANGE: Reconstruct the full parameter tensor for the model/likelihood call
+            params = torch.cat(params_list) 
 
-        for epoch in range(epochs):
-            epochs_completed = epoch
-            
-            # --- This is the key logic from run_vecc_may9 ---
+            # 1. Pre-calculate the Covariance Map 
             cov_map = self.cov_structure_saver(params, covariance_function)
             
             optimizer.zero_grad()
             
+            # 2. Calculate the Negative Log-Likelihood
             loss = self.compute_vecc_nll_oct22(params, covariance_function, cov_map)
-            # --- End key logic ---
+            
+            loss.backward()
+            optimizer.step()
+            
+            current_loss = loss.item()
+            
+            # We update the print statement to show the full parameters
+            if epoch % 10 == 0:
+                print(f'Epoch {epoch+1}/{epochs} | NLL: {current_loss:.6f} | Params: {params.detach().numpy()}')
+                
+            # --- Early Stopping Check (uses current loss, saves concatenated parameters) ---
+            if current_loss < best_loss - min_delta:
+                best_loss = current_loss
+                epochs_no_improve = 0
+                # Save the currently concatenated parameters
+                best_params = params.detach().clone() 
+            else:
+                epochs_no_improve += 1
+                
+            if epochs_no_improve >= patience:
+                print(f'*** Early stopping triggered after {epoch+1} epochs (Patience: {patience}, Best NLL: {best_loss:.6f}) ***')
+                return best_params, epoch 
 
-            if torch.isnan(loss) or torch.isinf(loss):
-                print(f"Loss became NaN or Inf at epoch {epoch+1}. Stopping.")
-                if epoch == 0: 
-                    best_params_state = None # Mark as failed from start
-                break 
+        return best_params, epochs - 1
 
+
+    def optimizer_fun_scheduler_same_lr(self, params, lr=0.01, betas=(0.9, 0.8), eps=1e-8, 
+                    scheduler_type:str='step', step_size=40, gamma=0.5, T_max=10): # <-- Added new arguments
+        
+        optimizer = torch.optim.Adam([params], lr=lr, betas=betas, eps=eps)
+        
+        if scheduler_type.lower() == 'cosine':
+            scheduler = CosineAnnealingLR(optimizer, T_max=T_max) # Uses T_max
+        else: # Default to StepLR
+            scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
+            
+        return optimizer, scheduler
+    
+    def run_vecc_scheduler_same_lr(self, params, optimizer, scheduler,  covariance_function, epochs=10):
+        prev_loss= float('inf')
+        tol = 1e-4  # Convergence tolerance
+        
+        for epoch in range(epochs):  
+            
+            # --- FIX: Re-compute cov_map INSIDE the loop ---
+            # The cov_map depends on 'params', so it must be re-computed
+            # every time 'params' is updated.
+            cov_map = self.cov_structure_saver(params, covariance_function)
+            
+            optimizer.zero_grad()  
+            loss = self.compute_vecc_nll_oct22(params, covariance_function, cov_map)
+            
+            # --- FIX: Removed retain_graph=True ---
+            # This was causing a memory leak. Since the graph is
+            # rebuilt from scratch every epoch (including cov_map),
+            # we no longer need to retain it.
             loss.backward()
 
-            # Check for NaN gradients
-            if params.grad is not None and (torch.isnan(params.grad).any() or torch.isinf(params.grad).any()):
-                 warnings.warn(f"NaN or Inf gradient at epoch {epoch+1}. Skipping step.")
-                 optimizer.zero_grad() 
-                 continue 
+            # Print gradients and parameters every 10th epoch
+            if epoch % 10 == 0:
+                print(f'Epoch {epoch+1}, Gradients: {params.grad.numpy()}\n Loss: {loss.item()}, Parameters: {params.detach().numpy()}')
+            
+            optimizer.step()  # Update the parameters
+            scheduler.step()  # Update the learning rate
 
-            # Clip gradients
-            torch.nn.utils.clip_grad_norm_([params], max_norm=1.0)
+            # Check for convergence
+            if abs(prev_loss - loss.item()) < tol:
+                print(f"Converged at epoch {epoch}")
+                print(f'Epoch {epoch+1},  \n vecc Parameters: {params.detach().numpy()}')
+                break
 
-            optimizer.step()
-            if scheduler:
-                scheduler.step() 
+            prev_loss = loss.item()
 
-            current_loss_item = loss.item()
-            if current_loss_item < best_loss:
-                # Check if params are valid before saving
-                params_valid = not (torch.isnan(params.data).any() or torch.isinf(params.data).any())
-                if params_valid:
-                    best_loss = current_loss_item
-                    best_params_state = params.detach().clone()
-
-            if epoch % 10 == 0 or epoch == epochs - 1: # Print more often
-                current_lr = optimizer.param_groups[0]['lr'] if optimizer.param_groups else 0.0
-                print(f'--- Epoch {epoch+1}/{epochs} (LR: {current_lr:.6f}) ---')
-                print(f' Loss: {current_loss_item:.4f} (Best: {best_loss:.4f})')
-                print(f' Parameters (Natural Scale): {get_printable_params(params)}')
-
-        if best_params_state is None:
-            print("\n--- Training Failed (NaN/Inf from start) ---")
-            return None, epochs_completed
-
-        # --- Prepare final output ---
-        final_params_log_scale = best_params_state.cpu()
-        final_params_natural_scale = get_printable_params(final_params_log_scale)
-
-        final_params_rounded = [round(p.item(), 4) if not np.isnan(p.item()) else float('nan') for p in final_params_natural_scale]
-        final_loss_rounded = round(best_loss, 3) if best_loss != float('inf') else float('inf')
-
-        print("\n--- Training Complete ---")
-        print(f'\nFINAL BEST STATE ACHIEVED (during training):')
-        print(f'Best Loss: {final_loss_rounded}')
-        print(f'Parameters Corresponding to Best Loss (Natural Scale): {final_params_rounded}')
-
-        return final_params_rounded + [final_loss_rounded], epochs_completed
+        final_params_list = [p.item() for p in params] # Get final params as a list
+        loss = loss.item()
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {final_params_list}')
+        return final_params_list + [loss], epoch
     
-class EarlyStopping:
-    def __init__(self, patience=10, delta=0):
-        """
-        Args:
-            patience (int): Number of epochs with no improvement after which training will be stopped.
-            delta (float): Minimum change in the validation loss to qualify as an improvement.
-        """
-        self.patience = patience
-        self.delta = delta
-        self.counter = 0
-        self.best_loss = float('inf')
-        self.early_stop = False
 
-    def __call__(self, val_loss):
-        if val_loss < self.best_loss - self.delta:
-            self.best_loss = val_loss
-            self.counter = 0  # Reset counter when we have improvement
-        else:
-            self.counter += 1
+
+
+    def run_vecc_scheduler_same_lr_fit_hour(self, params, optimizer, scheduler,  covariance_function, epochs=10):
+        prev_loss= float('inf')
+        tol = 1e-4  # Convergence tolerance
         
-        if self.counter >= self.patience:
-            self.early_stop = True
-        return self.early_stop
+        # Indices to be kept FIXED (advection and beta): 3, 4, 5
+        FIXED_INDICES = [3, 4, 5] 
+        
+        # Store the initial values of the fixed parameters for later comparison/verification
+        initial_fixed_values = params.detach()[FIXED_INDICES].numpy().copy()
+
+        for epoch in range(epochs):  
+            
+            cov_map = self.cov_structure_saver(params, covariance_function)
+            
+            optimizer.zero_grad()  
+            loss = self.compute_vecc_nll_oct22(params, covariance_function, cov_map)
+            
+            loss.backward()
+
+            # --- CRITICAL CHANGE: GRADIENT MASKING ---
+            # Set the gradients of the fixed parameters to zero.
+            # This prevents the optimizer from updating these specific elements.
+            if params.grad is not None:
+                # params.grad is a tensor, we use indexing to set specific gradients to 0
+                params.grad[FIXED_INDICES] = 0.0
+            # ----------------------------------------
+
+            # Print gradients and parameters every 50th epoch
+            if epoch % 10 == 0:
+                print(f'Epoch {epoch+1}, Gradients (Full): {params.grad.numpy()}\n Loss: {loss.item()}, Parameters (Full): {params.detach().numpy()}')
+                # Verify the fixed parameters haven't changed (optional but helpful)
+                current_fixed_values = params.detach()[FIXED_INDICES].numpy()
+                if not np.allclose(initial_fixed_values, current_fixed_values):
+                    print("WARNING: Fixed parameters seem to have moved!")
+
+            optimizer.step()  # Only params 0, 1, 2, 6 will move
+            scheduler.step()  # Update the learning rate
+
+            # Check for convergence
+            if abs(prev_loss - loss.item()) < tol:
+                print(f"Converged at epoch {epoch}")
+                print(f'Epoch {epoch+1},  \n vecc Parameters: {params.detach().numpy()}')
+                break
+
+            prev_loss = loss.item()
+
+        final_params_list = params.detach().tolist() # Get final params as a list
+        loss = loss.item()
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss:.6f}, \n vecc Parameters: {final_params_list}')
+        return final_params_list + [loss], epoch
+
+    
+
+
+
     
 ####################
