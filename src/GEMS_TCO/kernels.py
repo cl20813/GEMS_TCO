@@ -109,7 +109,6 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         return distance # This is the optimized version, fixing the redundancy
     
 
- 
     def matern_cov_anisotropy_v05(self,params: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
         
@@ -125,6 +124,112 @@ class spatio_temporal_kernels:               #sigmasq range advec beta  nugget
         # Add a small jitter term to the diagonal for numerical stability
         out += torch.eye(out.shape[0], dtype=torch.float64) * nugget 
         return out
+
+
+
+
+    def precompute_coords_aniso_STABLE(self, dist_params: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+            """
+            Calculates the reparameterized distance 'd' for the new model.
+            d = sqrt( d_spat^2 + d_temp^2 )
+            
+            dist_params index map:
+            [0] phi3 (theta_3^2)
+            [1] phi4 (beta^2)
+            [2] advec_lat (v_lat)
+            [3] advec_lon (v_lon)
+            """
+            
+            # 1. Unpack distance parameters
+            phi3, phi4, advec_lat, advec_lon = dist_params
+            
+            # 2. Get coordinates for the two sets of points
+            # x are the "U" points, y are the "V" points
+            x_lat, x_lon, x_t = x[:, 0], x[:, 1], x[:, 3]
+            y_lat, y_lon, y_t = y[:, 0], y[:, 1], y[:, 3]
+
+            # 3. Calculate advection-adjusted coordinate differences
+            # We need the difference between all pairs, so we use broadcasting
+            # (x1 - v1*t1) - (x2 - v1*t2) is not right.
+            # We need (x1_adv) - (x2_adv)
+            
+            # Advected coordinates for set U (N, 1)
+            u_lat_adv = x_lat - advec_lat * x_t
+            u_lon_adv = x_lon - advec_lon * x_t
+            u_t = x_t
+            
+            # Advected coordinates for set V (M, 1)
+            v_lat_adv = y_lat - advec_lat * y_t
+            v_lon_adv = y_lon - advec_lon * y_t
+            v_t = y_t
+
+            # 4. Calculate matrix of differences (N, M)
+            delta_lat_adv = u_lat_adv.unsqueeze(1) - v_lat_adv.unsqueeze(0)
+            delta_lon_adv = u_lon_adv.unsqueeze(1) - v_lon_adv.unsqueeze(0)
+            delta_t       = u_t.unsqueeze(1)       - v_t.unsqueeze(0)
+
+            # 5. Calculate squared distance terms based on your formula
+            # d_spat^2 = (delta_lat_adv^2 * phi3) + (delta_lon_adv^2 * 1)
+            # d_temp^2 = delta_t^2 * phi4
+            dist_sq = (delta_lat_adv.pow(2) * phi3) + delta_lon_adv.pow(2) + (delta_t.pow(2) * phi4)
+            
+            # 6. Return the final distance 'd'
+            # We add a small jitter *inside* the sqrt to prevent nan gradients at 0
+            distance = torch.sqrt(dist_sq + 1e-8)
+            
+            return distance
+    
+    def matern_cov_aniso_STABLE_log_reparam(self, raw_params: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+            """
+            Applies log-exp reparameterization to your new phi-based model.
+            
+            raw_params index map:
+            [0] log_phi1
+            [1] log_phi2
+            [2] log_phi3
+            [3] log_phi4
+            [4] advec_lat (unconstrained)
+            [5] advec_lon (unconstrained)
+            [6] log_nugget
+            """
+            
+            # --- A. Recover all parameters ---
+            
+            # 1. Recover constrained parameters using torch.exp()
+            phi1   = torch.exp(raw_params[0])
+            phi2   = torch.exp(raw_params[1]) # This is range_inv
+            phi3   = torch.exp(raw_params[2]) # This is theta_3^2
+            phi4   = torch.exp(raw_params[3]) # This is beta^2
+            nugget = torch.exp(raw_params[6])
+            
+            # 2. Recover unconstrained parameters directly
+            advec_lat = raw_params[4]
+            advec_lon = raw_params[5]
+            
+            # 3. Derive sigmasq
+            sigmasq = phi1 / phi2  # (sigma^2/range) / (1/range) = sigma^2
+
+            # --- B. Call internal functions ---
+            
+            # 1. Assemble the parameters for the distance function
+            dist_params = torch.stack([phi3, phi4, advec_lat, advec_lon])
+            
+            # 2. Call the new distance function
+            distance = self.precompute_coords_aniso_STABLE(dist_params, x, y)
+            
+            # 3. Calculate covariance: C = sigma^2 * exp(-d / range) = sigmasq * exp(-d * range_inv)
+            cov = sigmasq * torch.exp(-distance * phi2)
+
+            # 4. Add nugget to the diagonal
+            cov.diagonal().add_(nugget + 1e-8) 
+            
+            return cov
+
+
+
+
+
+    
 
     def matern_cov_anisotropy_v15(self,params: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
@@ -1485,7 +1590,7 @@ class model_fitting(vecchia_experiment):
                         lr=0.01, 
                         betas=(0.9, 0.8), 
                         eps=1e-8, 
-                        scheduler_type:str='step', 
+                        scheduler_type:str='step',  # 'step' or 'cosine'
                         step_size=40, 
                         gamma=0.5, 
                         T_max=10):
@@ -1675,6 +1780,81 @@ class model_fitting(vecchia_experiment):
         loss = loss.item()
         print(f'FINAL STATE: Epoch {epoch+1}, Loss: {loss}, \n vecc Parameters: {final_params_list}')
         return final_params_list + [loss], epoch
+
+# using scheduler and optimizer for list of params
+    def run_vecc_scheduler_oct23(self, params_list, optimizer, scheduler,  covariance_function, epochs=10):
+        # --- REVISED: We now use a gradient tolerance ---
+        grad_tol = 1e-5  # Convergence tolerance for the max absolute gradient
+        
+        for epoch in range(epochs):  
+            params = torch.cat(params_list)
+            # --- FIX: Re-compute cov_map INSIDE the loop ---
+            # The cov_map depends on 'params', so it must be re-computed
+            # every time 'params' is updated.
+            cov_map = self.cov_structure_saver(params, covariance_function)
+            
+            optimizer.zero_grad()  
+            loss = self.compute_vecc_nll_oct22(params, covariance_function, cov_map)
+            
+            # --- FIX: Removed retain_graph=True ---
+            loss.backward()
+
+            # --- NEW: Calculate max absolute gradient (L-infinity norm) ---
+            # We calculate this every epoch to check for convergence.
+            max_abs_grad = 0.0
+            grad_values = []
+            for p in params_list:
+                if p.grad is not None:
+                    # .item() is correct since params are 1-element tensors
+                    grad_values.append(abs(p.grad.item())) 
+            
+            if grad_values: # Avoid error on empty list
+                max_abs_grad = max(grad_values)
+
+            # Print gradients and parameters every 10th epoch
+            if epoch % 10 == 0:
+                print(f'--- Epoch {epoch+1} / Loss: {loss.item():.6f} ---')
+                
+                # Iterate through the list of parameter tensors to print
+                for i, param_tensor in enumerate(params_list):
+                    
+                    if param_tensor.grad is not None:
+                        grad_value = param_tensor.grad.item()
+                    else:
+                        grad_value = 'N/A' 
+                        
+                    print(f'  Param {i}: Value={param_tensor.item():.4f}, Grad={grad_value}')
+                
+                # --- NEW: Print the max grad ---
+                print(f'  Max Abs Grad: {max_abs_grad:.6e}') 
+                print("-" * 30) # Separator for clarity
+            
+            optimizer.step()  # Update the parameters
+            scheduler.step()  # Update the learning rate
+
+            # --- REVISED: Convergence Check ---
+            # Check if the largest absolute gradient is below our tolerance.
+            # We add 'epoch > 5' to let the optimizer settle down first.
+            if epoch > 5 and max_abs_grad < grad_tol:
+                print(f"\nConverged on gradient norm (max|grad| < {grad_tol}) at epoch {epoch}")
+                
+                # Get final params *after* the step
+                final_params_tensor = torch.cat(params_list) 
+                print(f'Epoch {epoch+1},  \n vecc Parameters: {final_params_tensor.detach().numpy()}')
+                break
+
+            # --- REMOVED: Old loss-based check ---
+            # if abs(prev_loss - loss.item()) < tol:
+            #     ...
+            # prev_loss = loss.item()
+
+        # --- Cleaned up final reporting ---
+        final_params_tensor = torch.cat(params_list)
+        final_params_list = [p.item() for p in final_params_tensor] # Get final params as a list
+        final_loss = loss.item()
+        
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {final_loss}, \n vecc Parameters: {final_params_list}')
+        return final_params_list + [final_loss], epoch
     
 
 

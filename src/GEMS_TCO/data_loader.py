@@ -90,6 +90,36 @@ class load_data2:
                         print(f"Error reading file {filepath}: {e}")
             
             return coarse_dicts
+    
+    def subset_df_map(
+            self, 
+            df_map: Dict[str, pd.DataFrame],
+            lat_range: List[float] = [0.0, 5.0],
+            lon_range: List[float] = [123.0, 133.0]
+        ) -> Dict[str, pd.DataFrame]:
+            """
+            Subsets each DataFrame in a dictionary to a specific lat/lon range.
+            
+            Assumes DataFrames have 'Latitude' and 'Longitude' columns.
+            Returns a *new* dictionary with the subsetted DataFrames.
+            """
+            subsetted_map = {}
+            for key, df in df_map.items():
+                # Create boolean masks for latitude and longitude
+                lat_mask = (df['Latitude'] >= lat_range[0]) & (df['Latitude'] <= lat_range[1])
+                lon_mask = (df['Longitude'] >= lon_range[0]) & (df['Longitude'] <= lon_range[1])
+                
+                # Apply the combined mask and store a copy to avoid SettingWithCopyWarning
+                subsetted_map[key] = df[lat_mask & lon_mask].reset_index(drop=True).copy()
+                
+            return subsetted_map
+    ''' 
+    df_map_subsetted = data_load_instance.subset_df_map(
+    df_map, 
+    lat_range=[0.0, 5.0], 
+    lon_range=[123.0, 133.0]
+    )
+    '''
 
     def get_spatial_ordering(
             self, 
@@ -184,41 +214,13 @@ class load_data2:
     mm_cond_number=mm_cond_number,
     years_=years, 
     months_=month_range,
-    lat_range=[0.0, 5.0],      # <-- Add this
-    lon_range=[123.0, 133.0]   # <-- Add this
+    lat_range=[0.0, 5.0],    
+    lon_range=[123.0, 133.0]   
     )
     
     '''
 
-    def subset_df_map(
-            self, 
-            df_map: Dict[str, pd.DataFrame],
-            lat_range: List[float] = [0.0, 5.0],
-            lon_range: List[float] = [123.0, 133.0]
-        ) -> Dict[str, pd.DataFrame]:
-            """
-            Subsets each DataFrame in a dictionary to a specific lat/lon range.
-            
-            Assumes DataFrames have 'Latitude' and 'Longitude' columns.
-            Returns a *new* dictionary with the subsetted DataFrames.
-            """
-            subsetted_map = {}
-            for key, df in df_map.items():
-                # Create boolean masks for latitude and longitude
-                lat_mask = (df['Latitude'] >= lat_range[0]) & (df['Latitude'] <= lat_range[1])
-                lon_mask = (df['Longitude'] >= lon_range[0]) & (df['Longitude'] <= lon_range[1])
-                
-                # Apply the combined mask and store a copy to avoid SettingWithCopyWarning
-                subsetted_map[key] = df[lat_mask & lon_mask].copy()
-                
-            return subsetted_map
-    ''' 
-    df_map_subsetted = data_load_instance.subset_df_map(
-    df_map, 
-    lat_range=[0.0, 5.0], 
-    lon_range=[123.0, 133.0]
-    )
-    '''
+
 
     def load_working_data(
         self, 
