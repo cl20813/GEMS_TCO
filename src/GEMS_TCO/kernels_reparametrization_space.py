@@ -21,7 +21,9 @@ import numpy as np
 
 import torch
 from torch.func import grad, hessian, jacfwd, jacrev
-from torch.optim.lr_scheduler import StepLR
+
+from torch.optim.lr_scheduler import ReduceLROnPlateau, StepLR, CosineAnnealingLR
+import torch.optim as optim
 import torch.optim as optim
 import torch.nn as nn
 from scipy.interpolate import splrep, splev
@@ -169,13 +171,18 @@ class SpatialModel:
     # --- END NEW COVARIANCE FUNCTION ---
     
     
-    def full_likelihood(self,params: torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
+    def full_likelihood_avg(self, params: torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
             """
-            Optimized likelihood function using Cholesky decomposition.
+            Calculates the AVERAGE Negative Log-Likelihood (NLL) per data point.
             Includes an intercept (spatial trend).
             """
             input_data = input_data.to(torch.float64)
             y = y.to(torch.float64)
+            
+            # Get N (number of observations)
+            N = input_data.shape[0]
+            if N == 0:
+                return torch.tensor(0.0, device=self.device, dtype=torch.float64)
                     
             # The covariance function is now the new spatial-only one
             cov_matrix = covariance_function(params=params, y= input_data, x= input_data)
@@ -221,8 +228,22 @@ class SpatialModel:
             C_inv_y_mu = torch.cholesky_solve(y_mu, L, upper=False)
             quad_form = torch.matmul(y_mu.T, C_inv_y_mu) 
 
-            neg_log_lik = 0.5 * (log_det + quad_form.squeeze())
-            return  neg_log_lik
+            # --- NLL Calculation ---
+            
+            # 1. Core NLL (Log-det + Quad-form)
+            neg_log_lik_sum = 0.5 * (log_det + quad_form.squeeze())
+            
+            # 2. (Optional) Add constant term for the "true" NLL
+            # If you want the true average NLL, uncomment the next two lines.
+            # If you only want the average core NLL (for optimization comparison), leave them commented.
+            
+            # log_2pi = torch.log(torch.tensor(2 * np.pi, dtype=torch.float64, device=self.device))
+            # neg_log_lik_sum += 0.5 * N * log_2pi
+            
+            # 3. 💥 REVISED: Return the average NLL
+            neg_log_lik_avg = neg_log_lik_sum / N
+            
+            return  neg_log_lik_avg
 
 
 # 💥 Fixed inheritance to point to the renamed 'SpatialModel'
@@ -329,20 +350,33 @@ class VecchiaLikelihood(SpatialModel):
         Optimized version.
         💥 NOW SPATIAL-ONLY: Treats each time step as an independent
         realization of the spatial process.
+        
+        💥 REVISED: Returns the AVERAGE NLL per observation for the full dataset (all time steps).
         """
         cut_line= self.nheads
         key_list = list(self.input_map.keys())
-        if not key_list:
-             return torch.tensor(0.0, device=self.device, dtype=torch.float64)
+        T_temporal = len(key_list)
+        if T_temporal == 0:
+            return torch.tensor(0.0, device=self.device, dtype=torch.float64)
 
-        neg_log_lik = 0.0
+        # This will accumulate the total SUM of the core NLL
+        neg_log_lik_SUM = torch.tensor(0.0, device=self.device, dtype=torch.float64)
         
         # 💥 Loop over all time steps
-        for time_idx in range(0,len(self.input_map)):
-       
+        for time_idx in range(T_temporal):
+    
             # --- Head Calculation (for this time step) ---
             head_data = self.input_map[key_list[time_idx]][:cut_line,:]
-            neg_log_lik += self.full_likelihood(params, head_data, head_data[:, 2], covariance_function)          
+            N_head = head_data.shape[0]
+
+            if N_head > 0:
+                # 1. 💥 Call the AVG function (from full_likelihood_avg.py)
+                # We assume self.full_likelihood is now self.full_likelihood_avg
+                avg_head_nll = self.full_likelihood_avg(params, head_data, head_data[:, 2], covariance_function) 
+                
+                # 2. 💥 Convert AVG back to SUM for accumulation
+                # (avg_nll * N_head) = sum_nll
+                neg_log_lik_SUM += avg_head_nll * N_head
             # --- End Head Calculation ---
 
             # --- Conditional Calculation (for this time step) ---
@@ -384,91 +418,20 @@ class VecchiaLikelihood(SpatialModel):
                 alpha = current_y - cond_mean
                 quad_form = alpha**2 * (1 / cov_ygivenx)
             
-                neg_log_lik += 0.5 * (log_det + quad_form)
-        return neg_log_lik
+                # 3. 💥 Add the conditional sum
+                neg_log_lik_SUM += 0.5 * (log_det + quad_form)
 
-    def compute_vecc_nll_fullbatch(self, params , covariance_function, cov_map):
-        vecc_nll = self.vecchia_space_fullbatch(params, covariance_function, cov_map)
-        return vecc_nll
-    
-#############
-
-    # Place this inside fit_vecchia_adams_mini or VecchiaLikelihood
-    def vecchia_minibatch_total_heads_nll(self, params: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
-        """
-        Calculates the sum of Head NLLs over ALL time steps (once per epoch).
-        """
-        key_list = self.key_list
-        cut_line = self.nheads
-        total_heads_nll = torch.tensor(0.0, device=self.device, dtype=torch.float64)
+        # --- Final Averaging ---
+        N_spatial = self.size_per_hour
+        N_total = N_spatial * T_temporal
         
-        for time_idx in range(len(self.input_map)):
-            head_data = self.input_map[key_list[time_idx]][:cut_line,:]
-            # full_likelihood returns the Core NLL Term (without constant)
-            total_heads_nll += self.full_likelihood(params, head_data, head_data[:, 2], covariance_function)
+        if N_total == 0:
+            return torch.tensor(0.0, device=self.device, dtype=torch.float64)
             
-        return total_heads_nll
-    # Place this inside fit_vecchia_adams_mini or VecchiaLikelihood
-    def vecchia_minibatch_conditional_nll(
-        self, 
-        params: torch.Tensor, 
-        covariance_function: Callable, 
-        cov_map: Dict[str, Any],
-        batch_time_indices: List[int] # Accepts a list of time indices for the batch
-    ) -> torch.Tensor:
-        """
-        Calculates the SUM of Conditional NLL terms ONLY for the mini-batch time steps.
-        """
-        cut_line = self.nheads
-        key_list = self.key_list
-        neg_log_lik_conditional_sum = torch.tensor(0.0, device=self.device, dtype=torch.float64)
+        # 4. 💥 Return the average NLL per observation
+        neg_log_lik_AVG = neg_log_lik_SUM / N_total
         
-        # 💥 Loop ONLY over the mini-batch time indices
-        for time_idx in batch_time_indices:
-            
-            # --- Head Calculation REMOVED --- 
-            
-            # --- Conditional Calculation (for this time step) ---
-            for index in range(cut_line, self.size_per_hour):
-                
-                # ... (all conditional calculation steps remain the same) ...
-                # ... (e.g., loading components from cov_map, solving for beta, calculating quad_form, etc.)
-                
-                # --- Assuming the conditional calculation ends here ---
-                # You must ensure the conditional calculation logic is copied here.
-                
-                # PLACEHOLDER for full conditional calculation from your original code:
-                
-                if index not in cov_map: continue 
-                tmp1 = cov_map[index]['tmp1']
-                L_full = cov_map[index]['L_full']
-                locs = cov_map[index]['locs']
-                cov_ygivenx = cov_map[index]['cov_ygivenx']
-                cond_mean_tmp = cov_map[index]['cond_mean_tmp']
-                log_det = cov_map[index]['log_det']
-                aggregated_arr = self._build_conditioning_set(time_idx, index)
-                aggregated_y = aggregated_arr[:, 2]
-                current_y = aggregated_y[0]
-                mu_neighbors_y = aggregated_y[1:]
-                C_inv_y = torch.cholesky_solve(aggregated_y.unsqueeze(-1), L_full, upper=False)
-                tmp2 = torch.matmul(locs.T, C_inv_y)
-                try:
-                    jitter_beta = torch.eye(tmp1.shape[0], device=self.device, dtype=torch.float64) * 1e-8
-                    beta = torch.linalg.solve(tmp1 + jitter_beta, tmp2)
-                except torch.linalg.LinAlgError:
-                    continue 
-                mu = torch.matmul(locs, beta).squeeze()
-                mu_current = mu[0]
-                mu_neighbors = mu[1:]
-                cond_mean = mu_current + torch.matmul(cond_mean_tmp, (mu_neighbors_y - mu_neighbors).unsqueeze(-1)).squeeze()
-                alpha = current_y - cond_mean
-                quad_form = alpha**2 * (1 / cov_ygivenx)
-                
-                neg_log_lik_conditional_sum += 0.5 * (log_det + quad_form)
-                
-        # Return the SUM of conditional NLL for this batch
-        return neg_log_lik_conditional_sum
-
+        return neg_log_lik_AVG
 
 
 class fit_vecchia_adams_fullbatch(VecchiaLikelihood): 
@@ -476,27 +439,42 @@ class fit_vecchia_adams_fullbatch(VecchiaLikelihood):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number, nheads)
      
     
+    # ... inside your class (e.g., fit_vecchia_adams_minibatch) ...
+
     def set_optimizer(self, 
                         param_groups, 
                         lr=0.01, 
                         betas=(0.9, 0.99), 
                         eps=1e-8, 
-                        scheduler_type:str='step', 
+                        scheduler_type:str='plateau', # <-- Changed default
                         step_size=40, 
                         gamma=0.5, 
-                        T_max=10):
+                        T_max=10,
+                        patience=5,      # <-- New param for Plateau
+                        factor=0.5):     # <-- New param for Plateau
 
-            optimizer = torch.optim.Adam(
+            optimizer = optim.Adam(
                 param_groups, 
                 lr=lr,
                 betas=betas, 
                 eps=eps
             )
-   
-            if scheduler_type.lower() == 'cosine':
+
+            if scheduler_type.lower() == 'plateau':
+                # 💡 Monitors the loss and reduces LR if it stops improving
+                scheduler = ReduceLROnPlateau(
+                    optimizer,
+                    mode='min',      # We want to minimize the NLL
+                    factor=factor,   # Amount to reduce LR by (e.g., 0.5 = 50% cut)
+                    patience=patience, # How many epochs to wait for improvement
+                    verbose=True     # Prints a message when LR is reduced
+                )
+            elif scheduler_type.lower() == 'cosine':
                 scheduler = CosineAnnealingLR(optimizer, T_max=T_max) 
             else: 
+                # Default to StepLR if 'step' or anything else is passed
                 scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
+                
             return optimizer, scheduler
 
     
@@ -543,7 +521,7 @@ class fit_vecchia_adams_fullbatch(VecchiaLikelihood):
                 print("-" * 30)
             
             optimizer.step()
-            scheduler.step()
+            scheduler.step(loss)
 
             if epoch > 5 and max_abs_grad < grad_tol:
                 print(f"\nConverged on gradient norm (max|grad| < {grad_tol}) at epoch {epoch}")
@@ -598,210 +576,6 @@ class fit_vecchia_adams_fullbatch(VecchiaLikelihood):
             print(f"\nWarning: Could not convert raw params. Error: {e}")
             return {}
 
-class fit_vecchia_adams_minibatch(VecchiaLikelihood): 
-    # The __init__ and set_optimizer methods are assumed to be correctly defined 
-    # and inherited/contained within the class as presented.
-
-    def set_optimizer(self, 
-                        param_groups, 
-                        lr=0.01, 
-                        betas=(0.9, 0.99), 
-                        eps=1e-8, 
-                        scheduler_type:str='step', 
-                        step_size=40, 
-                        gamma=0.5, 
-                        T_max=10):
-
-            # Assuming necessary imports (StepLR, CosineAnnealingLR) are available
-            optimizer = torch.optim.Adam(
-                param_groups, 
-                lr=lr,
-                betas=betas, 
-                eps=eps
-            )
-   
-            if scheduler_type.lower() == 'cosine':
-                scheduler = CosineAnnealingLR(optimizer, T_max=T_max) 
-            else: 
-                scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
-            return optimizer, scheduler
-
-    def fit_vecc_scheduler_minibatch(
-            self, 
-            params_list: List[torch.Tensor], 
-            optimizer, 
-            scheduler,  
-            covariance_function: Callable, 
-            epochs: int = 10, 
-            batch_size: Optional[int] = None 
-        ):
-        """
-        Fits the spatial-only Vecchia model using SML (Stochastic Maximum Likelihood).
-        The Heads NLL (deterministic) is computed once per epoch, and the
-        Conditional NLL (stochastic) is computed per mini-batch.
-        """
-        grad_tol = 1e-5
-        
-        # --- 1. Setup Data Sizes and DataLoader ---
-        N_spatial = self.size_per_hour
-        T_temporal = len(self.input_map)
-        N_total = N_spatial * T_temporal
-        N_total_heads = self.nheads * T_temporal
-        N_total_conditionals = N_total - N_total_heads
-        
-        all_time_indices = list(range(T_temporal))
-        
-        if batch_size is None or batch_size >= T_temporal:
-            batch_size = T_temporal # Full-batch equivalent
-            
-        time_dataset = data.TensorDataset(torch.arange(T_temporal))
-        time_loader = data.DataLoader(time_dataset, batch_size=batch_size, shuffle=True) 
-
-        # --- 2. Main Optimization Loop ---
-        for epoch in range(epochs):
-            total_epoch_loss_sum = 0.0 # Accumulates the total NLL sum for reporting
-            max_abs_grad_epoch = 0.0
-            
-            # --- 3. Epoch-Level Calculations (Deterministic Part) ---
-            
-            # Get the parameters *once* at the start of the epoch
-            params_epoch = torch.cat(params_list)
-            
-            # 🔑 CRITICAL FIX: Calculate cov_map *with* gradients.
-            # This graph is necessary for the conditional terms.
-            cov_map = self.cov_structure_saver(params_epoch, covariance_function)
-            
-            # --- Mini-Batch Loop (Stochastic Part) ---
-            for i, (batch_indices_tensor,) in enumerate(time_loader):
-                
-                # We must re-use the params tensor from the start of the epoch
-                # (params_epoch) for both loss calculations to ensure the
-                # gradients are combined correctly on the same graph.
-                
-                # If we call torch.cat(params_list) here, the gradients 
-                # from previous steps (if optimizer.step() was inside batch loop)
-                # would be lost.
-                
-                # 💥 If optimizer.step() is *inside* the batch loop (SML):
-                params = torch.cat(params_list)
-
-                optimizer.zero_grad()
-                
-                # 4a. Calculate Heads NLL (Deterministic)
-                # We must recalculate this every batch using the *current* params
-                # to ensure the gradient is fresh.
-                heads_nll_sum = self.vecchia_minibatch_total_heads_nll(params, covariance_function) 
-
-                # 4b. Calculate Conditional NLL (Stochastic)
-                batch_time_indices = batch_indices_tensor.tolist()
-                conditional_nll_sum = self.vecchia_minibatch_conditional_nll( 
-                    params=params, 
-                    covariance_function=covariance_function, 
-                    cov_map=cov_map, # cov_map must be rebuilt if params change
-                    batch_time_indices=batch_time_indices
-                )
-                
-                # 4c. Scale Loss and Combine (SML Estimator)
-                N_batch_time = len(batch_time_indices)
-                N_batch_conditional = N_spatial * N_batch_time - (self.nheads * N_batch_time)
-
-                # Scale the batch conditional sum up to estimate the TOTAL sum
-                conditional_nll_estimated_total = conditional_nll_sum * (N_total_conditionals / N_batch_conditional)
-                
-                # Total Loss = (Heads NLL + Scaled Conditional NLL) / N_total
-                loss_avg = (heads_nll_sum + conditional_nll_estimated_total) / N_total 
-                
-                # 4d. Backward Pass
-                loss_avg.backward() 
-
-                # --- Gradient Calculation and Accumulation ---
-                max_abs_grad_batch = 0.0
-                for p in params_list:
-                    if p.grad is not None:
-                        max_abs_grad_batch = max(max_abs_grad_batch, abs(p.grad.item())) 
-                
-                max_abs_grad_epoch = max(max_abs_grad_epoch, max_abs_grad_batch)
-
-                # 5. Step the optimizer
-                optimizer.step()
-                
-                # Accumulate the total NLL for monitoring
-                total_epoch_loss_sum += loss_avg.item() * N_total 
-                
-            # --- End of Epoch/Scheduler Step ---
-            scheduler.step()
-            
-            # --- Monitoring and Convergence Checks ---
-            avg_epoch_loss_per_observation = total_epoch_loss_sum / (N_total * len(time_loader)) # Avg loss over all batches
-
-            print(f'--- Epoch {epoch+1:03d} / Avg NLL per Obs: {avg_epoch_loss_per_observation:.6f} ---')
-            
-            # Print Raw Parameters (log-transformed)
-            for i, param_tensor in enumerate(params_list):
-                if param_tensor.grad is not None:
-                    grad_value = param_tensor.grad.item()
-                else:
-                    grad_value = 'N/A' 
-                print(f'  Param {i}: Value={param_tensor.item():.6f}, Grad={grad_value:.4e}') 
-            
-            print(f'  Max Abs Grad: {max_abs_grad_epoch:.6e}') 
-            print("-" * 30)
-            
-            if epoch > 5 and max_abs_grad_epoch < grad_tol:
-                print(f"\nConverged on gradient norm (max|grad| < {grad_tol}) at epoch {epoch}")
-                break
-
-        # --- Final Output ---
-        final_params_tensor = torch.cat(params_list)
-        final_params_list = [p.item() for p in final_params_tensor]
-        final_loss = avg_epoch_loss_per_observation
-        
-        print(f'FINAL STATE: Epoch {epoch+1}, Avg NLL per Obs: {final_loss:.6f}, \n RAW vecc Parameters: {final_params_list}')
-        return final_params_list + [final_loss], epoch
-    
-
-
-    # --- 💥 NEW HELPER METHOD (SPATIAL-ONLY) 💥 ---
-    def _convert_raw_params_to_interpretable(self, raw_params_list: List[float]) -> Dict[str, float]:
-        """Converts the 4 raw optimized parameters back to interpretable model parameters."""
-        try:
-            # Unpack the 4 raw (log-space) parameters
-            log_phi1 = raw_params_list[0]
-            log_phi2 = raw_params_list[1]
-            log_phi3 = raw_params_list[2]
-            log_nugget = raw_params_list[3]
-
-            # Exponentiate to get 'phi' values
-            phi1 = np.exp(log_phi1)
-            phi2 = np.exp(log_phi2)
-            phi3 = np.exp(log_phi3)
-            nugget = np.exp(log_nugget)
-            
-            # Convert to interpretable parameters
-            
-            # phi2 = 1 / range_lon  =>  range_lon = 1 / phi2
-            range_lon = 1.0 / phi2
-            
-            # phi1 = sigmasq * phi2 (or sigmasq / range_lon) =>  sigmasq = phi1 / phi2
-            sigmasq = phi1 / phi2 
-            
-            # phi3 = (range_lon / range_lat)^2 => sqrt(phi3) = range_lon / range_lat
-            # => range_lat = range_lon / sqrt(phi3)
-            range_lat = range_lon / np.sqrt(phi3)
-            
-            # beta and advection are gone
-
-            return {
-                "sigma_sq": sigmasq,
-                "range_lon": range_lon,
-                "range_lat": range_lat,
-                "nugget": nugget
-            }
-        except Exception as e:
-            print(f"\nWarning: Could not convert raw params. Error: {e}")
-            return {}
-          
-    
 
 class fit_vecchia_lbfgs(VecchiaLikelihood): 
     """
