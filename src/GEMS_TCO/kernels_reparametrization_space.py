@@ -432,7 +432,9 @@ class VecchiaLikelihood(SpatialModel):
         neg_log_lik_AVG = neg_log_lik_SUM / N_total
         
         return neg_log_lik_AVG
-
+    def compute_vecc_nll_fullbatch(self, params , covariance_function, cov_map):
+        vecc_nll = self.vecchia_space_fullbatch(params, covariance_function, cov_map)
+        return vecc_nll
 
 class fit_vecchia_adams_fullbatch(VecchiaLikelihood): 
     def __init__(self, smooth:float, input_map:Dict[str,Any], aggregated_data:torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int):
