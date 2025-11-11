@@ -586,13 +586,13 @@ class fit_vecchia_adams(VecchiaLikelihood):
             range_lon = 1.0 / phi2
             sigmasq = phi1 / phi2 
             range_lat = range_lon / np.sqrt(phi3)
-            beta = np.sqrt(phi4) # time range
+            range_time = 1/(np.sqrt(phi4) * phi2) # time range
 
             return {
                 "sigma_sq": sigmasq,
                 "range_lon": range_lon,
                 "range_lat": range_lat,
-                "beta": beta,
+                "range_time": range_time,
                 "advec_lat": advec_lat,
                 "advec_lon": advec_lon,
                 "nugget": nugget
@@ -660,13 +660,13 @@ class fit_vecchia_lbfgs(VecchiaLikelihood):
             range_lon = 1.0 / phi2
             sigmasq = phi1 / phi2 
             range_lat = range_lon / np.sqrt(phi3)
-            beta = np.sqrt(phi4) # time range
+            range_time = 1/(np.sqrt(phi4) * phi2) # time range
 
             return {
                 "sigma_sq": sigmasq,
                 "range_lon": range_lon,
                 "range_lat": range_lat,
-                "beta": beta,
+                "range_time": range_time,
                 "advec_lat": advec_lat,
                 "advec_lon": advec_lon,
                 "nugget": nugget
