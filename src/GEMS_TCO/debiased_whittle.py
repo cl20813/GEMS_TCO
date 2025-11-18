@@ -47,9 +47,11 @@ from GEMS_TCO.data_loader import load_data2
 
 
 
-class full_vecc_dw_likeihloods:
-    def __init__(self, daily_aggregated_tensors, daily_hourly_maps, day_idx, params_list):
+class full_vecc_dw_likelihoods:
+    def __init__(self, daily_aggregated_tensors, daily_hourly_maps, day_idx, params_list, lat_range, lon_range):
         self.day_idx = day_idx
+        self.lat_range = lat_range
+        self.lon_range = lon_range
         self.daily_aggregated_tensors = daily_aggregated_tensors
         self.daily_hourly_maps = daily_hourly_maps
         self.daily_aggregated_tensor = daily_aggregated_tensors[day_idx]
@@ -90,33 +92,34 @@ class full_vecc_dw_likeihloods:
         full_nll = self.compute_full_likelihoods()
         vecc_nll = self.compute_vecchia_nll()
 
-        db = debiased_whittle_preprocess(self.daily_aggregated_tensors, self.daily_hourly_maps, day_idx=0, params_list=self.params_list)
-
-        subsetted_aggregated_day = db.generate_spatially_filtered_days(0,5,123,133)
-        subsetted_aggregated_day 
-
+        # --- Debiased Whittle Configuration ---
         dwl = debiased_whittle_likelihood()
-        # --- Configuration ---
-        DAY_TO_RUN = 1
+
         TAPERING_FUNC = dwl.cgn_hamming # Use Hamming taper
-        NUM_RUNS = 1
-        EPOCHS = 2000
         DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {DEVICE}")
-
         DELTA_LAT, DELTA_LON = 0.044, 0.063 
 
         LAT_COL, LON_COL = 0, 1
         VAL_COL = 2 # Spatially differenced value
         TIME_COL = 3
-        lr = 0.01 
+
+
+        db = debiased_whittle_preprocess(self.daily_aggregated_tensors, self.daily_hourly_maps, day_idx=0, params_list=self.params_list, lat_range=self.lat_range, lon_range=self.lon_range)
+        subsetted_aggregated_day = db.generate_spatially_filtered_days(self.lat_range[0],self.lat_range[1],self.lon_range[0],self.lon_range[1])
+        
+        #(N-1)*(M-1) grid after differencing
+
+        print(subsetted_aggregated_day.shape)
+        
+        ####
 
         cur_df = subsetted_aggregated_day
         unique_times = torch.unique(cur_df[:, TIME_COL])
         time_slices_list = [cur_df[cur_df[:, TIME_COL] == t_val] for t_val in unique_times]
 
         # --- 1. Pre-compute J-vector, Taper Grid, and Taper Autocorrelation ---
-        print("Pre-computing J-vector (Hamming taper)...")
+        #print("Pre-computing J-vector (Hamming taper)...")
         J_vec, n1, n2, p, taper_grid = dwl.generate_Jvector_tapered( 
             time_slices_list,
             tapering_func=TAPERING_FUNC, 
@@ -128,39 +131,12 @@ class full_vecc_dw_likeihloods:
         taper_autocorr_grid = dwl.calculate_taper_autocorrelation_fft(taper_grid, n1, n2, DEVICE)
 
 
-        init_sigmasq   = 13.059
-        init_range_lat = 0.154 
-        init_range_lon = 0.195 
-        init_nugget    = 0.247
-        init_range_time = 1.28
-        init_advec_lat = 0.0218
-        init_advec_lon = -0.1689
-
-
-        init_phi2 = 1.0 / init_range_lon
-        init_phi1 = init_sigmasq * init_phi2
-        init_phi3 = (init_range_lon / init_range_lat)**2
-        init_phi4 = (init_range_lon / init_range_time)**2      # (range_lon / range_time)^2
-
-        initial_params_values = [
-            np.log(init_phi1),    # [0] log_phi1
-            np.log(init_phi2),    # [1] log_phi2
-            np.log(init_phi3),    # [2] log_phi3
-            np.log(init_phi4),    # [3] log_phi4
-            init_advec_lat,       # [4] advec_lat (NOT log)
-            init_advec_lon,       # [5] advec_lon (NOT log)
-            np.log(init_nugget)   # [6] log_nugget
-        ]
-
-        print(f"Starting with FIXED params (raw log-scale): {[round(p, 4) for p in initial_params_values]}")
-
         params_list = [
-            Parameter(torch.tensor([val], dtype=torch.float32))
-            for val in initial_params_values
+            Parameter(torch.tensor([val], dtype=torch.float32, device=DEVICE), requires_grad=True)
+            for val in self.params_list
         ]
 
-
-        dwnll = dwl.whittle_likelihood_loss_tapered(
+        dwnll,n1,n2 = dwl.whittle_likelihood_loss_tapered_sum(
             params=torch.cat(params_list),
             I_sample=I_sample,
             n1=n1,
@@ -170,13 +146,12 @@ class full_vecc_dw_likeihloods:
             delta1=DELTA_LAT,
             delta2=DELTA_LON
         )
-        outputs = [full_nll, vecc_nll, dwnll]
+        outputs = [full_nll, vecc_nll, dwnll, n1, n2]
         return outputs
-    
 
-class debiased_whittle_preprocess(full_vecc_dw_likeihloods):
-    def __init__(self, daily_aggregated_tensors, daily_hourly_maps, day_idx, params_list):
-        super().__init__(daily_aggregated_tensors, daily_hourly_maps, day_idx, params_list)
+class debiased_whittle_preprocess(full_vecc_dw_likelihoods):
+    def __init__(self, daily_aggregated_tensors, daily_hourly_maps, day_idx, params_list, lat_range, lon_range):
+        super().__init__(daily_aggregated_tensors, daily_hourly_maps, day_idx, params_list, lat_range, lon_range)
 
     def subset_tensor(self,df_tensor: torch.Tensor, lat_s: float, lat_e: float, lon_s: float,lon_e: float) -> torch.Tensor:
         """Subsets a tensor to a specific lat/lon range."""
@@ -272,7 +247,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 #     def __init__(self, *args, **kwargs):
 #         pass
 
-class debiased_whittle_likelihood: # (full_vecc_dw_likeihloods):
+class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
     
     # NOTE: The __init__ was empty. If it needs to call super(), 
     # it should be added back. I'm keeping it as you provided.
@@ -675,6 +650,77 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likeihloods):
             return torch.tensor(float('inf'), device=device)
 
         return avg_loss
+
+    @staticmethod
+    def whittle_likelihood_loss_tapered_sum(params, I_sample, n1, n2, p_time, taper_autocorr_grid, delta1, delta2):
+        """
+        ✅ Whittle Likelihood Loss (AVERAGED) using data tapering.
+        """
+        device = I_sample.device
+        params_tensor = params.to(device)
+
+        if torch.isnan(params_tensor).any() or torch.isinf(params_tensor).any():
+            print("Warning: NaN/Inf detected in input parameters to likelihood.")
+            return torch.tensor(float('nan'), device=device)
+
+        I_expected = debiased_whittle_likelihood.expected_periodogram_fft_tapered(
+            params_tensor, n1, n2, p_time, taper_autocorr_grid, 
+            delta1, delta2
+        )
+
+        if torch.isnan(I_expected).any() or torch.isinf(I_expected).any():
+            print("Warning: NaN/Inf returned from expected_periodogram calculation.")
+            return torch.tensor(float('nan'), device=device)
+
+        eye_matrix = torch.eye(p_time, dtype=torch.complex64, device=device)
+        diag_vals = torch.abs(I_expected.diagonal(dim1=-2, dim2=-1))
+        mean_diag_abs = diag_vals.mean().item() if diag_vals.numel() > 0 and not torch.isnan(diag_vals).all() else 1.0
+        diag_load = max(mean_diag_abs * 1e-8, 1e-9)
+        I_expected_stable = I_expected + eye_matrix * diag_load
+
+        sign, logabsdet = torch.linalg.slogdet(I_expected_stable)
+        if torch.any(sign.real <= 1e-9):
+            print("Warning: Non-positive determinant encountered. Applying penalty.")
+            log_det_term = torch.where(sign.real > 1e-9, logabsdet, torch.tensor(1e10, device=device))
+        else:
+            log_det_term = logabsdet
+
+        if torch.isnan(I_sample).any() or torch.isinf(I_sample).any():
+            print("Warning: NaN/Inf detected in I_sample input to likelihood.")
+            return torch.tensor(float('nan'), device=device)
+
+        try:
+            solved_term = torch.linalg.solve(I_expected_stable, I_sample)
+            trace_term = torch.einsum('...ii->...', solved_term).real
+        except torch.linalg.LinAlgError as e:
+            print(f"Warning: LinAlgError during solve: {e}. Applying high loss penalty.")
+            return torch.tensor(float('inf'), device=device)
+
+        if torch.isnan(trace_term).any() or torch.isinf(trace_term).any():
+            print("Warning: NaN/Inf detected in trace_term. Returning NaN loss.")
+            return torch.tensor(float('nan'), device=device)
+
+        likelihood_terms = log_det_term + trace_term
+
+        if torch.isnan(likelihood_terms).any():
+            print("Warning: NaN detected in likelihood_terms before summation. Returning NaN loss.")
+            return torch.tensor(float('nan'), device=device)
+
+        total_sum = torch.sum(likelihood_terms)
+        dc_term = likelihood_terms[0, 0] if n1 > 0 and n2 > 0 else torch.tensor(0.0, device=device)
+        if torch.isnan(dc_term).any() or torch.isinf(dc_term).any():
+            print("Warning: NaN/Inf detected in DC term. Setting to 0.")
+            dc_term = torch.tensor(0.0, device=device)
+
+        # This is the sum of non-zero frequency likelihood terms
+        sum_loss = total_sum - dc_term if (n1 > 1 or n2 > 1) else total_sum
+
+        if torch.isnan(sum_loss) or torch.isinf(sum_loss):
+            print("Warning: NaN/Inf detected in final loss. Returning Inf penalty.")
+            return torch.tensor(float('inf'), device=device)
+
+        return total_sum, n1, n2
+    
 
     # =========================================================================
     # 5. Training Loop & Helpers (💥 NEWLY ADDED 💥)
