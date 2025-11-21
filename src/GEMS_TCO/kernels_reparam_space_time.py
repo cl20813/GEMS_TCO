@@ -48,7 +48,6 @@ log_file_path = '/home/jl2815/tco/exercise_25/st_models/log/fit_st_by_latitude_1
 
 
 
-
 # (Your other imports like torch.optim go here)
 
 class SpatioTemporalModel:

@@ -12,9 +12,7 @@ mac_full_day_v05_csv = "df_cv_smooth_05/full_day_v05_r2s10_1127.csv"
 amarel_estimates_day_path = "/home/jl2815/tco/exercise_output/estimates/day/"
 amarel_estimates_day_saved_path = "/home/jl2815/tco/exercise_output/estimates/day/saved/"
 amarel_full_day_v05_pickle = "full_day_v(0.5)_1250_july24.pkl"
-amarel_full_day_v05_range_plus2_csv = "full_day_v05_1250_range_plus2.csv"
-amarel_full_day_v05_range_plus2_sigma_n10_csv = "full_day_v05_1250_range_plus2_sigma_n10.csv"
-# Sigma was replcaed with overall variance per day for above plus2_sigma_n10.csv file
+
 
 window_estimates_day_path = "C:\\Users\\joonw\\tco\\GEMS_TCO-2\\Exercises\\st_model\\estimates\\"   
 window_full_day_v05_pickle  = "full_estimates_1250_july24.pkl"

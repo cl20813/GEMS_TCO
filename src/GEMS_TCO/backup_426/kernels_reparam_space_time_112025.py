@@ -19,7 +19,8 @@ import numpy as np
 
 import torch
 from torch.func import grad, hessian, jacfwd, jacrev
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR, ReduceLROnPlateau
+
 import torch.optim as optim
 import torch.nn as nn
 from scipy.interpolate import splrep, splev
@@ -36,23 +37,16 @@ import logging     # for logging
 # Add your custom path
 
 import warnings
-import torch
 from functools import partial
-# --- MODIFIED 'optimizer_fun' IN 'model_fitting' CLASS ---
-from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR # Need to import this
-# ... (other imports) ...
+
+import torch.optim as optim
 
 sys.path.append("/cache/home/jl2815/tco")
 
 # Configure logging to a specific file path
 log_file_path = '/home/jl2815/tco/exercise_25/st_models/log/fit_st_by_latitude_11_14.log'
 
-import torch
-import numpy as np
-from collections import defaultdict
-from typing import Dict, Any, Callable, List
-from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
-from scipy.special import gamma # Make sure to import gamma
+
 
 # (Your other imports like torch.optim go here)
 
@@ -176,75 +170,98 @@ class SpatioTemporalModel:
             
             return cov
     
-    # --- 💥 END REPLACEMENT ---
-    # The old matern_cov_anisotropy_v05, precompute_coords_anisotropy,
-    # and custom_distance_matrix functions are now gone.
-    
-    def full_likelihood(self,params: torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
-            """
-            Optimized likelihood function using Cholesky decomposition.
-            NOW INCLUDES AN INTERCEPT (BETA_0).
-            """
-            input_data = input_data.to(torch.float64)
-            y = y.to(torch.float64)
-                    
-            cov_matrix = covariance_function(params=params, y= input_data, x= input_data)
-            
-            try:
-                # 💥 Add jitter *before* Cholesky for stability
-                jitter = torch.eye(cov_matrix.shape[0], device=self.device, dtype=torch.float64) * 1e-6
-                L = torch.linalg.cholesky(cov_matrix + jitter)
-            except torch.linalg.LinAlgError:
-                print("Warning: Cholesky decomposition failed.")
-                return torch.tensor(torch.inf, device=params.device, dtype=params.dtype)
-            
-            log_det = 2 * torch.sum(torch.log(torch.diag(L)))
-            
-            # --- START FIX: ADD INTERCEPT ---
-            locs_original = input_data[:,:2].to(torch.float64) 
-            intercept = torch.ones(locs_original.shape[0], 1, 
-                                device=locs_original.device, 
-                                dtype=torch.float64)
-            locs = torch.cat((intercept, locs_original), dim=1)
-            # --- END FIX ---
-            
-            if y.dim() == 1:
-                y_col = y.unsqueeze(-1).to(torch.float64)
-            else:
-                y_col = y.to(torch.float64)
+        # --- 💥 END REPLACEMENT ---
+        # The old matern_cov_anisotropy_v05, precompute_coords_anisotropy,
+        # and custom_distance_matrix functions are now gone.
+        
+    def full_likelihood_avg(self, params: torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
+                """
+                Calculates the AVERAGE Negative Log-Likelihood (NLL) per data point.
+                Includes an intercept (spatial trend).
+                """
+                input_data = input_data.to(torch.float64)
+                y = y.to(torch.float64)
+                
+                # Get N (number of observations)
+                N = input_data.shape[0]
+                if N == 0:
+                    return torch.tensor(0.0, device=self.device, dtype=torch.float64)
+                        
+                # The covariance function is the spatio-temporal one
+                cov_matrix = covariance_function(params=params, y= input_data, x= input_data)
+                
+                try:
+                    jitter = torch.eye(cov_matrix.shape[0], device=self.device, dtype=torch.float64) * 1e-6
+                    L = torch.linalg.cholesky(cov_matrix + jitter)
+                except torch.linalg.LinAlgError:
+                    print("Warning: Cholesky decomposition failed.")
+                    return torch.tensor(torch.inf, device=params.device, dtype=params.dtype)
+                
+                log_det = 2 * torch.sum(torch.log(torch.diag(L)))
+                
+                # --- Spatial Trend (Intercept + Lat + Lon) ---
+                locs_original = input_data[:,:2].to(torch.float64) # [lat, lon]
+                intercept = torch.ones(locs_original.shape[0], 1, 
+                                    device=locs_original.device, 
+                                    dtype=torch.float64)
+                locs = torch.cat((intercept, locs_original), dim=1) # [1, lat, lon]
+                # --- End Trend ---
+                
+                if y.dim() == 1:
+                    y_col = y.unsqueeze(-1).to(torch.float64)
+                else:
+                    y_col = y.to(torch.float64)
 
-            C_inv_X = torch.cholesky_solve(locs, L, upper=False)  # (N, 3)
-            C_inv_y = torch.cholesky_solve(y_col, L, upper=False) # (N, 1)
+                C_inv_X = torch.cholesky_solve(locs, L, upper=False)  # (N, 3)
+                C_inv_y = torch.cholesky_solve(y_col, L, upper=False) # (N, 1)
 
-            tmp1 = torch.matmul(locs.T, C_inv_X)       # (3, 3)
-            tmp2 = torch.matmul(locs.T, C_inv_y)       # (3, 1)
-            
-            try:
-                # 💥 Add jitter to the small (3,3) system
-                jitter_beta = torch.eye(tmp1.shape[0], device=self.device, dtype=torch.float64) * 1e-8
-                beta = torch.linalg.solve(tmp1 + jitter_beta, tmp2)
-            except torch.linalg.LinAlgError:
-                print("Warning: Could not solve for beta. X^T C_inv X may be singular.")
-                return torch.tensor(torch.inf, device=locs.device, dtype=locs.dtype)
+                tmp1 = torch.matmul(locs.T, C_inv_X)       # (3, 3)
+                tmp2 = torch.matmul(locs.T, C_inv_y)       # (3, 1)
+                
+                try:
+                    jitter_beta = torch.eye(tmp1.shape[0], device=self.device, dtype=torch.float64) * 1e-8
+                    beta = torch.linalg.solve(tmp1 + jitter_beta, tmp2) # Solves for [b0, b1, b2]
+                except torch.linalg.LinAlgError:
+                    print("Warning: Could not solve for beta. X^T C_inv X may be singular.")
+                    return torch.tensor(torch.inf, device=locs.device, dtype=locs.dtype)
 
-            mu = torch.matmul(locs, beta) # (N, 1)
-            y_mu = y_col - mu
-            
-            C_inv_y_mu = torch.cholesky_solve(y_mu, L, upper=False)
-            quad_form = torch.matmul(y_mu.T, C_inv_y_mu) 
+                mu = torch.matmul(locs, beta) # (N, 1)
+                y_mu = y_col - mu
+                
+                C_inv_y_mu = torch.cholesky_solve(y_mu, L, upper=False)
+                quad_form = torch.matmul(y_mu.T, C_inv_y_mu) 
 
-            neg_log_lik = 0.5 * (log_det + quad_form.squeeze())
-            return  neg_log_lik
+                # --- NLL Calculation ---
+                
+                # 1. Core NLL (Log-det + Quad-form)
+                neg_log_lik_sum = 0.5 * (log_det + quad_form.squeeze())
+                
+                # 2. (Optional) Add constant term for the "true" NLL
+                # log_2pi = torch.log(torch.tensor(2 * np.pi, dtype=torch.float64, device=self.device))
+                # neg_log_lik_sum += 0.5 * N * log_2pi
+                
+                # 3. 💥 REVISED: Return the average NLL
+                neg_log_lik_avg = neg_log_lik_sum / N
+                
+                return  neg_log_lik_avg
 
 
-# 💥 DELETED the duplicate, empty VecchiaLikelihood definition
+
+
+# Assuming SpatioTemporalModel is defined above with 
+# the corrected 'full_likelihood_avg' method from our
+# previous discussion.
+
 class VecchiaLikelihood(SpatioTemporalModel):
     def __init__(self, smooth:float, input_map :Dict[str,Any], aggregated_data: torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
         self.nheads = nheads
 
     def _build_conditioning_set(self, time_idx: int, index: int):
-        """Helper function to build the conditioning set data."""
+        """
+        Helper function to build the conditioning set data.
+        (This function is unchanged, as its logic is correct)
+        """
         current_np = self.input_map[self.key_list[time_idx]]
         current_row = current_np[index].reshape(1, -1)
         
@@ -280,7 +297,10 @@ class VecchiaLikelihood(SpatioTemporalModel):
             cut_line= self.nheads
             key_list = list(self.input_map.keys())
 
-            for time_idx in range(0,3):
+            # --- 💥 CHANGE 1: Loop over ALL time indices ---
+            # Was: for time_idx in range(0,3):
+            for time_idx in range(0, len(key_list)):
+            # --- END CHANGE 1 ---
                 if time_idx >= len(key_list):
                     break
                 current_np = self.input_map[key_list[time_idx]]
@@ -289,13 +309,11 @@ class VecchiaLikelihood(SpatioTemporalModel):
                     
                     aggregated_arr = self._build_conditioning_set(time_idx, index)
                     
-                    # --- 💥 START FIX: ADD INTERCEPT ---
                     locs_original = aggregated_arr[:, :2]
                     intercept = torch.ones(locs_original.shape[0], 1, 
                                         device=locs_original.device, 
                                         dtype=torch.float64)
                     locs = torch.cat((intercept, locs_original), dim=1)
-                    # --- 💥 END FIX ---
                     
                     aggregated_y = aggregated_arr[:, 2] 
 
@@ -311,7 +329,6 @@ class VecchiaLikelihood(SpatioTemporalModel):
                     C_inv_locs = torch.cholesky_solve(locs, L_full, upper=False)
                     tmp1 = torch.matmul(locs.T, C_inv_locs) # tmp1 is now (3, 3)
                 
-                    # --- OPTIMIZATION 2 (Unchanged) ---
                     sigma = cov_matrix[0, 0]
                     cov_yx = cov_matrix[0, 1:]
                     cov_xx = cov_matrix[1:, 1:]
@@ -329,202 +346,226 @@ class VecchiaLikelihood(SpatioTemporalModel):
                     log_det = torch.log(cov_ygivenx)
                 
                     cov_map[(time_idx,index)] = {
-                        'tmp1': tmp1,                     # Saves the (3, 3) matrix
+                        'tmp1': tmp1,
                         'L_full': L_full, 
                         'cov_ygivenx': cov_ygivenx, 
                         'cond_mean_tmp': cond_mean_tmp, 
                         'log_det': log_det, 
-                        'locs': locs.clone(),             # Saves the (N+1, 3) matrix
+                        'locs': locs.clone(),
                     }
             return cov_map
 
-    def vecchia_oct22(self, params: torch.Tensor, covariance_function: Callable, cov_map:Dict[str,Any]) -> torch.Tensor:
-        """
-        Optimized version.
-        Uses pre-computed Cholesky factors for fast O(N^2) solves.
-        This function is now correct because it uses the (3,3) tmp1
-        and (N+1, 3) locs loaded from cov_map.
-        """
-        cut_line= self.nheads
-        key_list = list(self.input_map.keys())
-        if not key_list:
-             return torch.tensor(0.0, device=self.device, dtype=torch.float64)
+    def vecchia_space_time_fullbatch(self, params: torch.Tensor, covariance_function: Callable, cov_map:Dict[str,Any]) -> torch.Tensor:
+            """
+            Calculates the TOTAL AVERAGE NLL.
+            (This function now correctly uses the specific cov_map 
+             for every time_idx).
+            """
+            cut_line= self.nheads
+            key_list = list(self.input_map.keys())
+            if not key_list:
+                return torch.tensor(0.0, device=self.device, dtype=torch.float64)
 
-        neg_log_lik = 0.0
-        
-        # --- Head Calculation ---
-        heads_data = [self.input_map[key_list[0]][:cut_line,:]]
-        for time_idx in range(1, len(self.input_map)):
-            tmp = self.input_map[key_list[time_idx]][:cut_line,:]
-            heads_data.append(tmp)
-        heads = torch.cat(heads_data, dim=0).to(self.device)
+            # --- Head Calculation (Unchanged) ---
+            heads_data = [self.input_map[key_list[0]][:cut_line,:]]
+            for time_idx in range(1, len(self.input_map)):
+                tmp = self.input_map[key_list[time_idx]][:cut_line,:]
+                heads_data.append(tmp)
+            heads = torch.cat(heads_data, dim=0).to(self.device)
 
-        neg_log_lik += self.full_likelihood(params, heads, heads[:, 2], covariance_function)          
-        # --- End Head Calculation ---
-        
-        for time_idx in range(0,len(self.input_map)):
-       
-            for index in range(cut_line, self.size_per_hour):
-                
-                map_key = (time_idx, index) if time_idx < 2 else (2, index)
-                
-                if map_key not in cov_map:
-                    continue 
-                    
-                # Load all pre-computed structural components
-                # tmp1 is (3, 3), locs is (N+1, 3)
-                tmp1 = cov_map[map_key]['tmp1']
-                L_full = cov_map[map_key]['L_full']
-                locs = cov_map[map_key]['locs']
-                cov_ygivenx = cov_map[map_key]['cov_ygivenx']
-                cond_mean_tmp = cov_map[map_key]['cond_mean_tmp']
-                log_det = cov_map[map_key]['log_det']
+            N_head = heads.shape[0]
+            if N_head > 0:
+                head_nll_avg = self.full_likelihood_avg(params, heads, heads[:, 2], covariance_function)
+                head_nll_sum = head_nll_avg * N_head
+            else:
+                head_nll_sum = torch.tensor(0.0, device=self.device, dtype=torch.float64)
+            # --- End Head Calculation ---
 
-                aggregated_arr = self._build_conditioning_set(time_idx, index)
-                aggregated_y = aggregated_arr[:, 2]
-                current_y = aggregated_y[0]
-                mu_neighbors_y = aggregated_y[1:]
-
-                C_inv_y = torch.cholesky_solve(aggregated_y.unsqueeze(-1), L_full, upper=False)
-                tmp2 = torch.matmul(locs.T, C_inv_y) # (3, N+1) @ (N+1, 1) = (3, 1)
-                
-                try:
-                    # tmp1.shape[0] is now 3, so this is correct
-                    jitter_beta = torch.eye(tmp1.shape[0], device=self.device, dtype=torch.float64) * 1e-8
-                    beta = torch.linalg.solve(tmp1 + jitter_beta, tmp2) # Solves (3, 3) system
-                except torch.linalg.LinAlgError:
-                    print(f"Warning: Could not solve for beta (Vecchia) at {(time_idx, index)}")
-                    continue 
-                    
-                mu = torch.matmul(locs, beta).squeeze() # (N+1, 3) @ (3, 1) = (N+1,)
-                mu_current = mu[0]
-                mu_neighbors = mu[1:]
-                
-                cond_mean = mu_current + torch.matmul(cond_mean_tmp, (mu_neighbors_y - mu_neighbors).unsqueeze(-1)).squeeze()
-                alpha = current_y - cond_mean
-                quad_form = alpha**2 * (1 / cov_ygivenx)
             
-                neg_log_lik += 0.5 * (log_det + quad_form)
+            # --- Vecchia (Conditional) Calculation ---
+            vecchia_nll_sum = torch.tensor(0.0, device=self.device, dtype=torch.float64)
+            N_tail = 0
+            
+            for time_idx in range(0,len(self.input_map)):
+        
+                for index in range(cut_line, self.size_per_hour):
+                    
+                    # --- 💥 CHANGE 2: Use the specific map_key for ALL t ---
+                    # Was: map_key = (time_idx, index) if time_idx < 2 else (2, index)
+                    map_key = (time_idx, index)
+                    # --- END CHANGE 2 ---
+                    
+                    if map_key not in cov_map:
+                        continue 
+                        
+                    # Load all pre-computed structural components
+                    tmp1 = cov_map[map_key]['tmp1']
+                    L_full = cov_map[map_key]['L_full']
+                    locs = cov_map[map_key]['locs']
+                    cov_ygivenx = cov_map[map_key]['cov_ygivenx']
+                    cond_mean_tmp = cov_map[map_key]['cond_mean_tmp']
+                    log_det = cov_map[map_key]['log_det']
+
+                    # Note: We re-build this small array, which is fast.
+                    # We don't save it in cov_map because it contains 'y' values.
+                    aggregated_arr = self._build_conditioning_set(time_idx, index)
+                    aggregated_y = aggregated_arr[:, 2]
+                    current_y = aggregated_y[0]
+                    mu_neighbors_y = aggregated_y[1:]
+
+                    C_inv_y = torch.cholesky_solve(aggregated_y.unsqueeze(-1), L_full, upper=False)
+                    tmp2 = torch.matmul(locs.T, C_inv_y) # (3, 1)
+                    
+                    try:
+                        jitter_beta = torch.eye(tmp1.shape[0], device=self.device, dtype=torch.float64) * 1e-8
+                        beta = torch.linalg.solve(tmp1 + jitter_beta, tmp2) 
+                    except torch.linalg.LinAlgError:
+                        print(f"Warning: Could not solve for beta (Vecchia) at {(time_idx, index)}")
+                        continue 
+                        
+                    mu = torch.matmul(locs, beta).squeeze() # (N+1,)
+                    mu_current = mu[0]
+                    mu_neighbors = mu[1:]
+                    
+                    cond_mean = mu_current + torch.matmul(cond_mean_tmp, (mu_neighbors_y - mu_neighbors).unsqueeze(-1)).squeeze()
+                    alpha = current_y - cond_mean
+                    quad_form = alpha**2 * (1 / cov_ygivenx)
                 
-        return neg_log_lik
+                    vecchia_nll_sum += 0.5 * (log_det + quad_form)
+                    N_tail += 1
+            # --- End Vecchia Calculation ---
+
+            
+            # --- Final Calculation (Unchanged) ---
+            total_nll_sum = head_nll_sum + vecchia_nll_sum
+            total_points = N_head + N_tail
+            
+            if total_points == 0:
+                return torch.tensor(0.0, device=self.device, dtype=torch.float64)
+
+            return total_nll_sum / total_points
 
     def compute_vecc_nll(self, params , covariance_function, cov_map):
-        vecc_nll = self.vecchia_oct22(params, covariance_function, cov_map)
+        vecc_nll = self.vecchia_space_time_fullbatch(params, covariance_function, cov_map)
         return vecc_nll
 
-# This class should also be in your file, along with the L-BFGS one
 class fit_vecchia_adams(VecchiaLikelihood): 
     def __init__(self, smooth:float, input_map:Dict[str,Any], aggregated_data:torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number, nheads)
      
     
     def set_optimizer(self, 
-                        param_groups, # <--- Renamed argument to be flexible
+                        param_groups, 
                         lr=0.01, 
                         betas=(0.9, 0.99), 
                         eps=1e-8, 
-                        scheduler_type:str='step', 
+                        scheduler_type:str='plateau', # <-- Updated default
                         step_size=40, 
                         gamma=0.5, 
-                        T_max=10):
+                        T_max=10,
+                        patience=5,      # <-- New param for Plateau
+                        factor=0.5):     # <-- New param for Plateau
 
-            # Input is a list of parameter groups (dictionaries)
-            optimizer = torch.optim.Adam(
+            optimizer = optim.Adam(
                 param_groups, 
-                lr=lr, # Used as a global default if no lr in groups
+                lr=lr,
                 betas=betas, 
                 eps=eps
             )
-   
-            # 2. Scheduler logic remains the same (it needs the optimizer object)
-            if scheduler_type.lower() == 'cosine':
-                # Cosine Annealing uses T_max
+
+            if scheduler_type.lower() == 'plateau':
+                # 💡 Monitors the loss and reduces LR if it stops improving
+                scheduler = ReduceLROnPlateau(
+                    optimizer,
+                    mode='min',      # We want to minimize the NLL
+                    factor=factor,   # Amount to reduce LR by (e.g., 0.5 = 50% cut)
+                    patience=patience, # How many epochs to wait for improvement
+                    verbose=True     # Prints a message when LR is reduced
+                )
+            elif scheduler_type.lower() == 'cosine':
                 scheduler = CosineAnnealingLR(optimizer, T_max=T_max) 
             else: 
-                # Default to StepLR, using step_size and gamma
+                # Default to StepLR if 'step' or anything else is passed
                 scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
+                
             return optimizer, scheduler
 
-    # (You would also add your fit_vecc_scheduler_oct23 method here)
-    # (And your fit_vecchia_lbfgs class)
-    def fit_vecc_scheduler_oct23(self, params_list, optimizer, scheduler,  covariance_function, epochs=10):
-
-        grad_tol = 1e-5  # Convergence tolerance for the max absolute gradient
+    
+    def fit_model(self, params_list, optimizer, scheduler,  covariance_function, epochs=100):
+        """
+        Fits the model using Adam and a scheduler.
+        Handles schedulers that do and do not require the loss.
+        """
+        grad_tol = 1e-5  # Convergence tolerance
+        
         for epoch in range(epochs):  
             params = torch.cat(params_list)
-            # --- FIX: Re-compute cov_map INSIDE the loop ---
-            # The cov_map depends on 'params', so it must be re-computed
-            # every time 'params' is updated.
+            
+            # Must be re-computed every epoch
             cov_map = self.cov_structure_saver(params, covariance_function)
             
             optimizer.zero_grad()  
+            # Uses the wrapper from the base class
             loss = self.compute_vecc_nll(params, covariance_function, cov_map)
             
-            # --- FIX: Removed retain_graph=True ---
             loss.backward()
 
-            # --- NEW: Calculate max absolute gradient (L-infinity norm) ---
-            # We calculate this every epoch to check for convergence.
             max_abs_grad = 0.0
             grad_values = []
             for p in params_list:
                 if p.grad is not None:
-                    # .item() is correct since params are 1-element tensors
                     grad_values.append(abs(p.grad.item())) 
             
-            if grad_values: # Avoid error on empty list
+            if grad_values:
                 max_abs_grad = max(grad_values)
 
-            # Print gradients and parameters every 10th epoch
             if epoch % 10 == 0:
                 print(f'--- Epoch {epoch+1} / Loss: {loss.item():.6f} ---')
-                
-                # Iterate through the list of parameter tensors to print
+                # 💥 This will now print 7 parameters
                 for i, param_tensor in enumerate(params_list):
-                    
-                    if param_tensor.grad is not None:
-                        grad_value = param_tensor.grad.item()
-                    else:
-                        grad_value = 'N/A' 
-                        
+                    grad_value = param_tensor.grad.item() if param_tensor.grad is not None else 'N/A' 
                     print(f'  Param {i}: Value={param_tensor.item():.4f}, Grad={grad_value}')
                 
-                # --- NEW: Print the max grad ---
                 print(f'  Max Abs Grad: {max_abs_grad:.6e}') 
-                print("-" * 30) # Separator for clarity
+                print("-" * 30)
             
-            optimizer.step()  # Update the parameters
-            scheduler.step()  # Update the learning rate
+            optimizer.step()
+            
+            # --- 💥 CRITICAL SCHEDULER CHANGE ---
+            # Plateau needs the loss, others don't.
+            if isinstance(scheduler, ReduceLROnPlateau):
+                scheduler.step(loss)
+            else:
+                scheduler.step()
+            # --- END CHANGE ---
 
-            # --- REVISED: Convergence Check ---
-            # Check if the largest absolute gradient is below our tolerance.
-            # We add 'epoch > 5' to let the optimizer settle down first.
             if epoch > 5 and max_abs_grad < grad_tol:
                 print(f"\nConverged on gradient norm (max|grad| < {grad_tol}) at epoch {epoch}")
-                
-                # Get final params *after* the step
-                final_params_tensor = torch.cat(params_list) 
-                print(f'Epoch {epoch+1},  \n vecc Parameters: {final_params_tensor.detach().numpy()}')
                 break
 
-            # --- REMOVED: Old loss-based check ---
-            # if abs(prev_loss - loss.item()) < tol:
-            #     ...
-            # prev_loss = loss.item()
-
-        # --- Cleaned up final reporting ---
-        final_params_tensor = torch.cat(params_list)
-        final_params_list = [p.item() for p in final_params_tensor] # Get final params as a list
+        # --- Final Reporting ---
+        final_params_tensor = torch.cat(params_list).detach()
+        final_raw_params_list = [p.item() for p in final_params_tensor]
         final_loss = loss.item()
-        
-        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {final_loss}, \n vecc Parameters: {final_params_list}')
-        return final_params_list + [final_loss], epoch
 
-    # --- 💥 NEW HELPER METHOD 💥 ---
+        # Convert to Interpretable Parameters
+        interpretable_params = self._convert_raw_params_to_interpretable(final_raw_params_list)
+        
+        print(f'FINAL STATE: Epoch {epoch+1}, Loss: {final_loss}')
+        print(f'  Raw (vecc) Parameters: {final_raw_params_list}')
+        print(f'  Interpretable Parameters:')
+        
+        if interpretable_params:
+            for key, val in interpretable_params.items():
+                print(f'    {key:10s}: {val:.6f}')
+        
+        return final_raw_params_list + [final_loss], epoch
+
+
     def _convert_raw_params_to_interpretable(self, raw_params_list: List[float]) -> Dict[str, float]:
-        """Converts the raw optimized parameters back to interpretable model parameters."""
+        """Converts the 7 raw optimized parameters back to interpretable model parameters."""
         try:
-            # Unpack the raw (log-space) parameters
+            # Unpack the 7 raw parameters
             log_phi1 = raw_params_list[0]
             log_phi2 = raw_params_list[1]
             log_phi3 = raw_params_list[2]
@@ -538,30 +579,19 @@ class fit_vecchia_adams(VecchiaLikelihood):
             phi2 = np.exp(log_phi2)
             phi3 = np.exp(log_phi3)
             phi4 = np.exp(log_phi4)
-            
-            # Convert to interpretable parameters
-            
-            # nugget = exp(log_nugget)
             nugget = np.exp(log_nugget)
             
-            # phi2 = 1 / range_lon  =>  range_lon = 1 / phi2
+            # Convert to interpretable parameters
             range_lon = 1.0 / phi2
-            
-            # phi1 = sigmasq * phi2  =>  sigmasq = phi1 / phi2
             sigmasq = phi1 / phi2 
-            
-            # phi3 = (range_lon / range_lat)^2 => sqrt(phi3) = range_lon / range_lat
-            # => range_lat = range_lon / sqrt(phi3)
             range_lat = range_lon / np.sqrt(phi3)
-            
-            # phi4 = beta^2  => beta = sqrt(phi4)
-            beta = np.sqrt(phi4)
+            range_time = 1/(np.sqrt(phi4) * phi2) # time range
 
             return {
                 "sigma_sq": sigmasq,
                 "range_lon": range_lon,
                 "range_lat": range_lat,
-                "beta": beta,
+                "range_time": range_time,
                 "advec_lat": advec_lat,
                 "advec_lon": advec_lon,
                 "nugget": nugget
@@ -571,22 +601,9 @@ class fit_vecchia_adams(VecchiaLikelihood):
             return {}
     
 
-
-
-import torch
-from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
-from collections import defaultdict
-from typing import Dict, Any, Callable, List
-import numpy as np
-# (Make sure all other necessary imports like VecchiaLikelihood are present)
-
 class fit_vecchia_lbfgs(VecchiaLikelihood): 
     """
     Alternative fitting class that uses the L-BFGS optimizer.
-    
-    L-BFGS is a quasi-Newton method that often converges in fewer
-    iterations (steps) than Adam, but each step is more computationally
-    expensive as it involves a line search.
     """
     
     def __init__(self, smooth:float, input_map:Dict[str,Any], aggregated_data:torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int):
@@ -603,29 +620,26 @@ class fit_vecchia_lbfgs(VecchiaLikelihood):
                         history_size=100):
         """
         Sets up the L-BFGS optimizer.
-        
-        Note: Schedulers are generally not used with L-BFGS.
-        The 'lr' parameter acts as an initial step length for the line search.
         """
 
         optimizer = torch.optim.LBFGS(
             param_groups, 
             lr=lr, 
-            max_iter=max_iter,       # Max iterations per optimizer step
-            max_eval=max_eval,     # Max function evaluations per step
-            tolerance_grad=tolerance_grad,   # Internal grad norm tolerance
-            tolerance_change=tolerance_change, # Internal param/loss change tolerance
+            max_iter=max_iter,
+            max_eval=max_eval,
+            tolerance_grad=tolerance_grad,
+            tolerance_change=tolerance_change,
             history_size=history_size
         )
         
         # L-BFGS manages its own step size, so no scheduler is returned
         return optimizer
 
-    # --- 💥 NEW HELPER METHOD 💥 ---
+
     def _convert_raw_params_to_interpretable(self, raw_params_list: List[float]) -> Dict[str, float]:
-        """Converts the raw optimized parameters back to interpretable model parameters."""
+        """Converts the 7 raw optimized parameters back to interpretable model parameters."""
         try:
-            # Unpack the raw (log-space) parameters
+            # Unpack the 7 raw parameters
             log_phi1 = raw_params_list[0]
             log_phi2 = raw_params_list[1]
             log_phi3 = raw_params_list[2]
@@ -639,30 +653,19 @@ class fit_vecchia_lbfgs(VecchiaLikelihood):
             phi2 = np.exp(log_phi2)
             phi3 = np.exp(log_phi3)
             phi4 = np.exp(log_phi4)
-            
-            # Convert to interpretable parameters
-            
-            # nugget = exp(log_nugget)
             nugget = np.exp(log_nugget)
             
-            # phi2 = 1 / range_lon  =>  range_lon = 1 / phi2
+            # Convert to interpretable parameters
             range_lon = 1.0 / phi2
-            
-            # phi1 = sigmasq * phi2  =>  sigmasq = phi1 / phi2
             sigmasq = phi1 / phi2 
-            
-            # phi3 = (range_lon / range_lat)^2 => sqrt(phi3) = range_lon / range_lat
-            # => range_lat = range_lon / sqrt(phi3)
             range_lat = range_lon / np.sqrt(phi3)
-            
-            # phi4 = beta^2  => beta = sqrt(phi4)
-            beta = np.sqrt(phi4)
+            range_time = 1/(np.sqrt(phi4) * phi2) # time range
 
             return {
                 "sigma_sq": sigmasq,
                 "range_lon": range_lon,
                 "range_lat": range_lat,
-                "beta": beta,
+                "range_time": range_time,
                 "advec_lat": advec_lat,
                 "advec_lon": advec_lon,
                 "nugget": nugget
@@ -678,21 +681,17 @@ class fit_vecchia_lbfgs(VecchiaLikelihood):
                          max_steps: int = 50):
         """
         Fits the model using L-BFGS.
-        
-        'max_steps' is the number of L-BFGS optimization steps (not epochs).
         """
 
         grad_tol = 1e-5  # Outer convergence tolerance
         print("--- Starting L-BFGS Optimization ---")
 
-        # Define the closure function required by L-BFGS
         def closure():
             optimizer.zero_grad()
             params = torch.cat(params_list)
             
             # --- CRITICAL ---
-            # The entire computation graph, including the expensive
-            # cov_map, MUST be rebuilt inside the closure.
+            # cov_map MUST be rebuilt inside the closure.
             cov_map = self.cov_structure_saver(params, covariance_function)
             loss = self.compute_vecc_nll(params, covariance_function, cov_map)
             
@@ -701,10 +700,8 @@ class fit_vecchia_lbfgs(VecchiaLikelihood):
 
         for i in range(max_steps):
             
-            # --- Optimizer Step ---
             loss = optimizer.step(closure)
             
-            # --- Reporting (inside no_grad to save memory) ---
             max_abs_grad = 0.0
             grad_values = []
             with torch.no_grad():
@@ -716,33 +713,30 @@ class fit_vecchia_lbfgs(VecchiaLikelihood):
                     max_abs_grad = max(grad_values)
 
                 print(f'--- Step {i+1}/{max_steps} / Loss: {loss.item():.6f} ---')
+                # 💥 This will now print 7 parameters
                 for j, param_tensor in enumerate(params_list):
                     grad_value = param_tensor.grad.item() if param_tensor.grad is not None else 'N/A'
                     print(f'  Param {j}: Value={param_tensor.item():.4f}, Grad={grad_value}')
                 print(f'  Max Abs Grad: {max_abs_grad:.6e}') 
                 print("-" * 30)
 
-            # --- Outer Convergence Check ---
             if max_abs_grad < grad_tol:
                 print(f"\nConverged on gradient norm (max|grad| < {grad_tol}) at step {i+1}")
                 break
 
-        # --- 💥 UPDATED FINAL REPORTING 💥 ---
+        # --- Final Reporting ---
         final_params_tensor = torch.cat(params_list).detach()
-        final_raw_params_list = [p.item() for p in final_params_tensor] # Get final params as a list
+        final_raw_params_list = [p.item() for p in final_params_tensor]
         final_loss = loss.item()
         
-        # Convert to Interpretable Parameters
         interpretable_params = self._convert_raw_params_to_interpretable(final_raw_params_list)
         
         print(f'FINAL STATE: Step {i+1}, Loss: {final_loss}')
         print(f'  Raw (vecc) Parameters: {final_raw_params_list}')
         print(f'  Interpretable Parameters:')
         
-        # Pretty-print the dictionary
         if interpretable_params:
             for key, val in interpretable_params.items():
                 print(f'    {key:10s}: {val:.6f}')
         
-        # Return the raw params + loss, as the calling script expects this
         return final_raw_params_list + [final_loss], i
