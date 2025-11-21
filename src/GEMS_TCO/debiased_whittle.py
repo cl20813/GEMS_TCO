@@ -130,7 +130,7 @@ class full_vecc_dw_likelihoods:
 
 
         params_list = [
-            Parameter(torch.tensor([val], dtype=torch.float32, device=DEVICE), requires_grad=True)
+            Parameter(torch.tensor([val], dtype=torch.float64, device=DEVICE), requires_grad=True)
             for val in self.params_list
         ]
 
@@ -144,7 +144,7 @@ class full_vecc_dw_likelihoods:
             delta1=DELTA_LAT,
             delta2=DELTA_LON
         )
-        outputs = [full_nll, vecc_nll, dwnll, n1, n2]
+        outputs = [full_nll, vecc_nll, dwnll*8, n1, n2]
         return outputs
 
 class debiased_whittle_preprocess(full_vecc_dw_likelihoods):
@@ -167,7 +167,11 @@ class debiased_whittle_preprocess(full_vecc_dw_likelihoods):
         This approximates Z(s) = [X(s+d_lat) - X(s)] + [X(s+d_lon) - X(s)].
         """
         if df_tensor.size(0) == 0:
-            return torch.empty(0, 4)
+            return torch.empty(0, 4, dtype=torch.float64)
+        
+        # ✅ FIX: Force input to float64 immediately
+        if df_tensor.dtype != torch.float64:
+            df_tensor = df_tensor.to(torch.float64)
 
         # 1. Get grid dimensions and validate
         unique_lats = torch.unique(df_tensor[:, 0])
@@ -189,7 +193,7 @@ class debiased_whittle_preprocess(full_vecc_dw_likelihoods):
         # forward difference operator, defining the kernel for cross-correlation is more direct.
         # The kernel below is designed for cross-correlation to achieve the desired differencing.
         diff_kernel = torch.tensor([[[[-2., 1.],
-                                    [ 1., 0.]]]], dtype=torch.float32)
+                                    [ 1., 0.]]]], dtype=torch.float64)
 
         # 3. Apply convolution (which acts as cross-correlation)
         filtered_grid = F.conv2d(ozone_data, diff_kernel, padding='valid').squeeze()
@@ -260,8 +264,8 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         """Computes a 2D Hamming window."""
         u1, u2 = u
         device = u1.device if isinstance(u1, torch.Tensor) else (u2.device if isinstance(u2, torch.Tensor) else torch.device('cpu'))
-        u1_tensor = u1.to(device) if isinstance(u1, torch.Tensor) else torch.tensor(u1, device=device, dtype=torch.float32)
-        u2_tensor = u2.to(device) if isinstance(u2, torch.Tensor) else torch.tensor(u2, device=device, dtype=torch.float32)
+        u1_tensor = u1.to(device) if isinstance(u1, torch.Tensor) else torch.tensor(u1, device=device, dtype=torch.float64)
+        u2_tensor = u2.to(device) if isinstance(u2, torch.Tensor) else torch.tensor(u2, device=device, dtype=torch.float64)
         n1_eff = float(n1) if n1 > 0 else 1.0
         n2_eff = float(n2) if n2 > 0 else 1.0
         hamming1 = 0.54 + 0.46 * torch.cos(2.0 * torch.pi * u1_tensor / n1_eff)
@@ -294,45 +298,45 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         """
         # --- 💥 REVISED: p_time is the number of time points 💥 ---
         p_time = len(tensor_list)
-        if p_time == 0: return torch.empty(0, 0, 0, device=device), 0, 0, 0, None 
+        if p_time == 0: return torch.empty(0, 0, 0, device=device, dtype=torch.complex128), 0, 0, 0, None
 
         valid_tensors = [t for t in tensor_list if t.numel() > 0 and t.shape[1] > max(lat_col, lon_col, val_col)]
         if not valid_tensors:
             print("Warning: No valid tensors found in tensor_list.")
-            return torch.empty(0, 0, 0, device=device), 0, 0, 0, None
+            return torch.empty(0, 0, 0, device=device, dtype=torch.complex128), 0, 0, 0, None
 
         try:
             all_lats_cpu = torch.cat([t[:, lat_col] for t in valid_tensors])
             all_lons_cpu = torch.cat([t[:, lon_col] for t in valid_tensors])
         except IndexError:
             print(f"Error: Invalid column index. Check tensor shapes.")
-            return torch.empty(0, 0, 0, device=device), 0, 0, 0, None
+            return torch.empty(0, 0, 0, device=device, dtype=torch.complex128), 0, 0, 0, None
 
         all_lats_cpu = all_lats_cpu[~torch.isnan(all_lats_cpu) & ~torch.isinf(all_lats_cpu)]
         all_lons_cpu = all_lons_cpu[~torch.isnan(all_lons_cpu) & ~torch.isinf(all_lons_cpu)]
         if all_lats_cpu.numel() == 0 or all_lons_cpu.numel() == 0:
             print("Warning: No valid coordinates after NaN/Inf filtering.")
-            return torch.empty(0, 0, 0, device=device), 0, 0, 0, None
+            return torch.empty(0, 0, 0, device=device, dtype=torch.complex128), 0, 0, 0, None
 
         unique_lats_cpu, unique_lons_cpu = torch.unique(all_lats_cpu), torch.unique(all_lons_cpu)
         n1, n2 = len(unique_lats_cpu), len(unique_lons_cpu)
         if n1 == 0 or n2 == 0:
             print("Warning: Grid dimensions are zero.")
-            return torch.empty(0, 0, 0, device=device), 0, 0, 0, None
+            return torch.empty(0, 0, 0, device=device, dtype=torch.complex128), 0, 0, 0, None
 
         lat_map = {lat.item(): i for i, lat in enumerate(unique_lats_cpu)}
         lon_map = {lon.item(): i for i, lon in enumerate(unique_lons_cpu)}
 
         u1_mesh_cpu, u2_mesh_cpu = torch.meshgrid(
-            torch.arange(n1, dtype=torch.float32),
-            torch.arange(n2, dtype=torch.float32),
+            torch.arange(n1, dtype=torch.float64),
+            torch.arange(n2, dtype=torch.float64),
             indexing='ij'
         )
         taper_grid = tapering_func((u1_mesh_cpu, u2_mesh_cpu), n1, n2).to(device) # Taper on device
 
         fft_results = []
         for tensor in tensor_list:
-            data_grid = torch.zeros((n1, n2), dtype=torch.float32, device=device)
+            data_grid = torch.zeros((n1, n2), dtype=torch.float64, device=device)
             if tensor.numel() > 0 and tensor.shape[1] > max(lat_col, lon_col, val_col):
                 for row in tensor:
                     lat_item, lon_item = row[lat_col].item(), row[lon_col].item()
@@ -355,14 +359,14 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
 
         if not fft_results:
             print("Warning: No FFT results generated.")
-            return torch.empty(0, 0, 0, device=device), n1, n2, 0, taper_grid
+            return torch.empty(0, 0, 0, device=device, dtype=torch.complex128), n1, n2, 0, taper_grid
 
         J_vector_tensor = torch.stack(fft_results, dim=2).to(device)
 
         H = torch.sum(taper_grid**2)
         if H < 1e-12:
             print("Warning: Normalization factor H is near zero.")
-            norm_factor = torch.tensor(0.0, device=device)
+            norm_factor = torch.tensor(0.0, device=device, dtype=torch.float64)
         else:
             norm_factor = (torch.sqrt(1.0 / H) / (2.0 * cmath.pi)).to(device)
 
@@ -376,7 +380,7 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         if torch.isnan(J_vector_tensor).any() or torch.isinf(J_vector_tensor).any():
             print("Warning: NaN/Inf detected in J_vector_tensor input.")
             n1, n2, p = J_vector_tensor.shape
-            return torch.full((n1, n2, p, p), float('nan'), dtype=torch.complex64, device=J_vector_tensor.device)
+            return torch.full((n1, n2, p, p), float('nan'), dtype=torch.complex128, device=J_vector_tensor.device)
 
         J_col = J_vector_tensor.unsqueeze(-1)
         J_row_conj = J_vector_tensor.unsqueeze(-2).conj()
@@ -396,13 +400,13 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         t is the PHYSICAL time lag.
         """
         device = params.device
-        u1_dev = u1.to(device) if isinstance(u1, torch.Tensor) else torch.tensor(u1, device=device, dtype=torch.float32)
-        u2_dev = u2.to(device) if isinstance(u2, torch.Tensor) else torch.tensor(u2, device=device, dtype=torch.float32)
-        t_dev = t.to(device) if isinstance(t, torch.Tensor) else torch.tensor(t, device=device, dtype=torch.float32)
+        u1_dev = u1.to(device) if isinstance(u1, torch.Tensor) else torch.tensor(u1, device=device, dtype=torch.float64)
+        u2_dev = u2.to(device) if isinstance(u2, torch.Tensor) else torch.tensor(u2, device=device, dtype=torch.float64)
+        t_dev = t.to(device) if isinstance(t, torch.Tensor) else torch.tensor(t, device=device, dtype=torch.float64)
 
         if torch.isnan(params).any() or torch.isinf(params).any():
             out_shape = torch.broadcast_shapes(u1_dev.shape, u2_dev.shape, t_dev.shape)
-            return torch.full(out_shape, float('nan'), device=device, dtype=torch.float32)
+            return torch.full(out_shape, float('nan'), device=device, dtype=torch.float64)
 
         # --- A. Unpack and Recover Parameters ---
         phi1   = torch.exp(params[0])
@@ -451,10 +455,10 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         out_shape = torch.broadcast_shapes(u1.shape if isinstance(u1, torch.Tensor) else (),
                                         u2.shape if isinstance(u2, torch.Tensor) else (),
                                         t.shape if isinstance(t, torch.Tensor) else ())
-        cov = torch.zeros(out_shape, device=device, dtype=torch.float32)
-        u1_dev = u1.to(device) if isinstance(u1, torch.Tensor) else torch.tensor(u1, device=device, dtype=torch.float32)
-        u2_dev = u2.to(device) if isinstance(u2, torch.Tensor) else torch.tensor(u2, device=device, dtype=torch.float32)
-        t_dev = t.to(device) if isinstance(t, torch.Tensor) else torch.tensor(t, device=device, dtype=torch.float32)
+        cov = torch.zeros(out_shape, device=device, dtype=torch.float64)
+        u1_dev = u1.to(device) if isinstance(u1, torch.Tensor) else torch.tensor(u1, device=device, dtype=torch.float64)
+        u2_dev = u2.to(device) if isinstance(u2, torch.Tensor) else torch.tensor(u2, device=device, dtype=torch.float64)
+        t_dev = t.to(device) if isinstance(t, torch.Tensor) else torch.tensor(t, device=device, dtype=torch.float64)
 
         for (a_idx, b_idx), w_ab in weights.items():
             offset_a1 = a_idx * delta1
@@ -484,9 +488,9 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         t is the PHYSICAL time lag.
         """
         device = params.device
-        u1_dev = u1.to(device) if isinstance(u1, torch.Tensor) else torch.tensor(u1, device=device, dtype=torch.float32)
-        u2_dev = u2.to(device) if isinstance(u2, torch.Tensor) else torch.tensor(u2, device=device, dtype=torch.float32)
-        t_dev = t.to(device) if isinstance(t, torch.Tensor) else torch.tensor(t, device=device, dtype=torch.float32)
+        u1_dev = u1.to(device) if isinstance(u1, torch.Tensor) else torch.tensor(u1, device=device, dtype=torch.float64)
+        u2_dev = u2.to(device) if isinstance(u2, torch.Tensor) else torch.tensor(u2, device=device, dtype=torch.float64)
+        t_dev = t.to(device) if isinstance(t, torch.Tensor) else torch.tensor(t, device=device, dtype=torch.float64)
 
         # --- Convert GRID lags to PHYSICAL lags ---
         lag_u1 = u1_dev * delta1
@@ -508,7 +512,7 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
 
         if torch.isnan(cov_X_value).any() or torch.isnan(taper_autocorr_value).any():
             out_shape = torch.broadcast_shapes(cov_X_value.shape, taper_autocorr_value.shape)
-            return torch.full(out_shape, float('nan'), device=device, dtype=torch.float32)
+            return torch.full(out_shape, float('nan'), device=device, dtype=torch.float64)
 
         result = cov_X_value * taper_autocorr_value
         if torch.isnan(result).any(): print("Warning: NaN in cn_bar_tapered output.")
@@ -527,12 +531,12 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         else:
             params_tensor = params.to(device)
 
-        u1_lags = torch.arange(n1, dtype=torch.float32, device=device)
-        u2_lags = torch.arange(n2, dtype=torch.float32, device=device)
+        u1_lags = torch.arange(n1, dtype=torch.float64, device=device)
+        u2_lags = torch.arange(n2, dtype=torch.float64, device=device)
         u1_mesh, u2_mesh = torch.meshgrid(u1_lags, u2_lags, indexing='ij')
 
-        t_lags = torch.arange(p_time, dtype=torch.float32, device=device)
-        tilde_cn_tensor = torch.zeros((n1, n2, p_time, p_time), dtype=torch.complex64, device=device)
+        t_lags = torch.arange(p_time, dtype=torch.float64, device=device)
+        tilde_cn_tensor = torch.zeros((n1, n2, p_time, p_time), dtype=torch.complex128, device=device)
 
         for q in range(p_time):
             for r in range(p_time):
@@ -552,12 +556,12 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
                 if torch.isnan(tilde_cn_grid_qr).any():
                     tilde_cn_tensor[:, :, q, r] = float('nan')
                 else:
-                    tilde_cn_tensor[:, :, q, r] = tilde_cn_grid_qr.to(torch.complex64)
+                    tilde_cn_tensor[:, :, q, r] = tilde_cn_grid_qr.to(torch.complex128)
 
         if torch.isnan(tilde_cn_tensor).any():
             print("Warning: NaN detected in tilde_cn_tensor before FFT.")
             nan_shape = (n1, n2, p_time, p_time)
-            return torch.full(nan_shape, float('nan'), dtype=torch.complex64, device=device)
+            return torch.full(nan_shape, float('nan'), dtype=torch.complex128, device=device)
 
         fft_result = torch.fft.fft2(tilde_cn_tensor, dim=(0, 1))
         fft_result_real = fft_result.real 
@@ -581,7 +585,7 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
 
         if torch.isnan(params_tensor).any() or torch.isinf(params_tensor).any():
             print("Warning: NaN/Inf detected in input parameters to likelihood.")
-            return torch.tensor(float('nan'), device=device)
+            return torch.tensor(float('nan'), device=device, dtype=torch.float64)
 
         I_expected = debiased_whittle_likelihood.expected_periodogram_fft_tapered(
             params_tensor, n1, n2, p_time, taper_autocorr_grid, 
@@ -590,9 +594,9 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
 
         if torch.isnan(I_expected).any() or torch.isinf(I_expected).any():
             print("Warning: NaN/Inf returned from expected_periodogram calculation.")
-            return torch.tensor(float('nan'), device=device)
+            return torch.tensor(float('nan'), device=device, dtype=torch.float64)
 
-        eye_matrix = torch.eye(p_time, dtype=torch.complex64, device=device)
+        eye_matrix = torch.eye(p_time, dtype=torch.complex128, device=device)
         diag_vals = torch.abs(I_expected.diagonal(dim1=-2, dim2=-1))
         mean_diag_abs = diag_vals.mean().item() if diag_vals.numel() > 0 and not torch.isnan(diag_vals).all() else 1.0
         diag_load = max(mean_diag_abs * 1e-8, 1e-9)
@@ -601,7 +605,7 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         sign, logabsdet = torch.linalg.slogdet(I_expected_stable)
         if torch.any(sign.real <= 1e-9):
             print("Warning: Non-positive determinant encountered. Applying penalty.")
-            log_det_term = torch.where(sign.real > 1e-9, logabsdet, torch.tensor(1e10, device=device))
+            log_det_term = torch.where(sign.real > 1e-9, logabsdet, torch.tensor(1e10, device=device, dtype=torch.float64))
         else:
             log_det_term = logabsdet
 
@@ -614,23 +618,23 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
             trace_term = torch.einsum('...ii->...', solved_term).real
         except torch.linalg.LinAlgError as e:
             print(f"Warning: LinAlgError during solve: {e}. Applying high loss penalty.")
-            return torch.tensor(float('inf'), device=device)
+            return torch.tensor(float('inf'), device=device, dtype=torch.float64)
 
         if torch.isnan(trace_term).any() or torch.isinf(trace_term).any():
             print("Warning: NaN/Inf detected in trace_term. Returning NaN loss.")
-            return torch.tensor(float('nan'), device=device)
+            return torch.tensor(float('nan'), device=device, dtype=torch.float64)
 
         likelihood_terms = log_det_term + trace_term
 
         if torch.isnan(likelihood_terms).any():
             print("Warning: NaN detected in likelihood_terms before summation. Returning NaN loss.")
-            return torch.tensor(float('nan'), device=device)
+            return torch.tensor(float('nan'), device=device, dtype=torch.float64)
 
         total_sum = torch.sum(likelihood_terms)
-        dc_term = likelihood_terms[0, 0] if n1 > 0 and n2 > 0 else torch.tensor(0.0, device=device)
+        dc_term = likelihood_terms[0, 0] if n1 > 0 and n2 > 0 else torch.tensor(0.0, device=device, dtype=torch.float64)
         if torch.isnan(dc_term).any() or torch.isinf(dc_term).any():
             print("Warning: NaN/Inf detected in DC term. Setting to 0.")
-            dc_term = torch.tensor(0.0, device=device)
+            dc_term = torch.tensor(0.0, device=device, dtype=torch.float64)
 
         # This is the sum of non-zero frequency likelihood terms
         sum_loss = total_sum - dc_term if (n1 > 1 or n2 > 1) else total_sum
@@ -645,7 +649,7 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
 
         if torch.isnan(avg_loss) or torch.isinf(avg_loss):
             print("Warning: NaN/Inf detected in final loss. Returning Inf penalty.")
-            return torch.tensor(float('inf'), device=device)
+            return torch.tensor(float('inf'), device=device, dtype=torch.float64)
 
         return avg_loss
 
@@ -659,7 +663,7 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
 
         if torch.isnan(params_tensor).any() or torch.isinf(params_tensor).any():
             print("Warning: NaN/Inf detected in input parameters to likelihood.")
-            return torch.tensor(float('nan'), device=device)
+            return torch.tensor(float('nan'), device=device, dtype=torch.float64)
 
         I_expected = debiased_whittle_likelihood.expected_periodogram_fft_tapered(
             params_tensor, n1, n2, p_time, taper_autocorr_grid, 
@@ -670,7 +674,7 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
             print("Warning: NaN/Inf returned from expected_periodogram calculation.")
             return torch.tensor(float('nan'), device=device)
 
-        eye_matrix = torch.eye(p_time, dtype=torch.complex64, device=device)
+        eye_matrix = torch.eye(p_time, dtype=torch.complex128, device=device)
         diag_vals = torch.abs(I_expected.diagonal(dim1=-2, dim2=-1))
         mean_diag_abs = diag_vals.mean().item() if diag_vals.numel() > 0 and not torch.isnan(diag_vals).all() else 1.0
         diag_load = max(mean_diag_abs * 1e-8, 1e-9)
@@ -679,43 +683,42 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         sign, logabsdet = torch.linalg.slogdet(I_expected_stable)
         if torch.any(sign.real <= 1e-9):
             print("Warning: Non-positive determinant encountered. Applying penalty.")
-            log_det_term = torch.where(sign.real > 1e-9, logabsdet, torch.tensor(1e10, device=device))
+            log_det_term = torch.where(sign.real > 1e-9, logabsdet, torch.tensor(1e10, device=device, dtype=torch.float64))
         else:
             log_det_term = logabsdet
 
         if torch.isnan(I_sample).any() or torch.isinf(I_sample).any():
             print("Warning: NaN/Inf detected in I_sample input to likelihood.")
-            return torch.tensor(float('nan'), device=device)
+            return torch.tensor(float('nan'), device=device, dtype=torch.float64)
 
         try:
             solved_term = torch.linalg.solve(I_expected_stable, I_sample)
             trace_term = torch.einsum('...ii->...', solved_term).real
         except torch.linalg.LinAlgError as e:
             print(f"Warning: LinAlgError during solve: {e}. Applying high loss penalty.")
-            return torch.tensor(float('inf'), device=device)
+            return torch.tensor(float('inf'), device=device, dtype=torch.float64)
 
         if torch.isnan(trace_term).any() or torch.isinf(trace_term).any():
             print("Warning: NaN/Inf detected in trace_term. Returning NaN loss.")
-            return torch.tensor(float('nan'), device=device)
-
+            return torch.tensor(float('nan'), device=device, dtype=torch.float64)
         likelihood_terms = log_det_term + trace_term
 
         if torch.isnan(likelihood_terms).any():
             print("Warning: NaN detected in likelihood_terms before summation. Returning NaN loss.")
-            return torch.tensor(float('nan'), device=device)
+            return torch.tensor(float('nan'), device=device, dtype=torch.float64)
 
         total_sum = torch.sum(likelihood_terms)
         dc_term = likelihood_terms[0, 0] if n1 > 0 and n2 > 0 else torch.tensor(0.0, device=device)
         if torch.isnan(dc_term).any() or torch.isinf(dc_term).any():
             print("Warning: NaN/Inf detected in DC term. Setting to 0.")
-            dc_term = torch.tensor(0.0, device=device)
+            dc_term = torch.tensor(0.0, device=device, dtype=torch.float64)
 
         # This is the sum of non-zero frequency likelihood terms
         sum_loss = total_sum - dc_term if (n1 > 1 or n2 > 1) else total_sum
 
         if torch.isnan(sum_loss) or torch.isinf(sum_loss):
             print("Warning: NaN/Inf detected in final loss. Returning Inf penalty.")
-            return torch.tensor(float('inf'), device=device)
+            return torch.tensor(float('inf'), device=device, dtype=torch.float64)
 
         return total_sum, n1, n2
     

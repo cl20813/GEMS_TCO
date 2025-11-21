@@ -29,7 +29,8 @@ import json
 from json import JSONEncoder
 from GEMS_TCO import configuration as config
 from GEMS_TCO.data_loader import load_data2, exact_location_filter
-
+from GEMS_TCO import debiased_whittle
+from torch.nn import Parameter
 
 app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
 @app.command()
@@ -107,19 +108,44 @@ def cli(
     # lat_lon_resolution, v, mm_cond_number, nheads
     # lr, patience, factor, epochs
 
-    # --- L-BFGS SPECIFIC GLOBAL PARAMETERS ---
+# --- 1. Global Configuration & Constants ---
+    dwl = debiased_whittle.debiased_whittle_likelihood()
+    TAPERING_FUNC = dwl.cgn_hamming 
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {DEVICE}")
+
+    # Global L-BFGS Settings
     LBFGS_LR = 1.0
-    LBFGS_MAX_STEPS = 10       # Number of outer optimization steps
-    LBFGS_HISTORY_SIZE = 100   # Memory for Hessian approximation
-    LBFGS_MAX_EVAL = 50        # Max evaluations (line search) per step
+    LBFGS_MAX_STEPS = 10       
+    LBFGS_HISTORY_SIZE = 100   
+    LBFGS_MAX_EVAL = 50        
+    DWL_MAX_STEPS = 20         
+
+    DELTA_LAT, DELTA_LON = 0.044, 0.063 
+    LAT_COL, LON_COL, VAL_COL, TIME_COL = 0, 1, 2, 3
+
+    TAPERING_FUNC = dwl.cgn_hamming # Use Hamming taper
+    MAX_STEPS = 20 # L-BFGS usually converges in far fewer steps
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {DEVICE}")
+
+
 
     # --- 2. Run optimization loop over pre-loaded data ---
 
     for day_idx in days_list:  # 0-based
 
+        print(f'\n{"="*40}')
+        print(f'--- Starting Processing for Day {day_idx+1} (2024-07-{day_idx+1}) ---')
+        print(f'{"="*40}')
+
         # Assuming data access is correct
         daily_hourly_map = daily_hourly_maps[day_idx]
         daily_aggregated_tensor = daily_aggregated_tensors[day_idx]
+        # Create 1-item lists to satisfy class interfaces designed for lists
+        # This prevents loading 30 days of unused data
+        daily_hourly_maps_wrapper = [day_hourly_map] 
+        daily_aggregated_tensors_wrapper = [day_aggregated_tensor]
 
         # --- Parameter Initialization (SPATIO-TEMPORAL) ---
         '''  
@@ -131,14 +157,14 @@ def cli(
         init_advec_lat = 0.02
         init_advec_lon = -0.08
         '''
+        
         init_sigmasq   = 13.059
         init_range_lat = 0.154 
-        init_range_lon = 0.195 
-        init_nugget    = 0.247
-        init_range_time = 0.7
+        init_range_lon = 0.195
         init_advec_lat = 0.0218
+        init_range_time = 0.7
         init_advec_lon = -0.1689
-
+        init_nugget    = 0.247
         
         # Map model parameters to the 'phi' reparameterization
         init_phi2 = 1.0 / init_range_lon                # 1/range_lon
@@ -148,33 +174,111 @@ def cli(
 
         device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-        # 7-parameter spatio-temporal list (Log/Linear)
+        # Create Initial Parameters (Float64, Requires Grad)
+        initial_vals = [np.log(init_phi1), np.log(init_phi2), np.log(init_phi3), 
+                        np.log(init_phi4), init_advec_lat, init_advec_lon, np.log(init_nugget)]
+
         params_list = [
-            torch.tensor([np.log(init_phi1)],      requires_grad=True, dtype=torch.float64, device=device_str ), # [0] log(phi1)
-            torch.tensor([np.log(init_phi2)],      requires_grad=True, dtype=torch.float64, device=device_str ), # [1] log(phi2)
-            torch.tensor([np.log(init_phi3)],      requires_grad=True, dtype=torch.float64, device=device_str ), # [2] log(phi3)
-            torch.tensor([np.log(init_phi4)],      requires_grad=True, dtype=torch.float64, device=device_str ), # [3] log(phi4)
-            torch.tensor([init_advec_lat],         requires_grad=True, dtype=torch.float64, device=device_str ), # [4] advec_lat (linear)
-            torch.tensor([init_advec_lon],         requires_grad=True, dtype=torch.float64, device=device_str ), # [5] advec_lon (linear)
-            torch.tensor([np.log(init_nugget)],    requires_grad=True, dtype=torch.float64, device=device_str )  # [6] log(nugget)
+            torch.tensor([val], requires_grad=True, dtype=torch.float64, device=DEVICE)
+            for val in initial_vals
         ]
 
+        # Helper to define the boundary globally for clarity
+        NUGGET_LOWER_BOUND = 0.05
+        LOG_NUGGET_LOWER_BOUND = np.log(NUGGET_LOWER_BOUND) # Approx -2.9957
+        all_final_results = []
+        all_final_losses = []
+
+# -------------------------------------------------------
+        # STEP C: Phase 1 - Debiased Whittle Optimization
+        # -------------------------------------------------------
+        print("\n--- Phase 1: Debiased Whittle Initialization ---")
+        
+        # Helper list for preprocess (can use raw values or params_list)
+        # We use the raw floats for the preprocessor init
+        raw_init_floats = [init_sigmasq, init_range_lat, init_range_lon, init_range_time, 
+                           init_advec_lat, init_advec_lon, init_nugget]
+
+        # Initialize Preprocessor with the wrapper lists (0-index because list has length 1)
+        db = debiased_whittle.debiased_whittle_preprocess(
+            daily_aggregated_tensors_wrapper, 
+            daily_hourly_maps_wrapper, 
+            day_idx= 0, # It is index 0 in our wrapper list # this automatically lead to day_idx
+            params_list=raw_init_floats, 
+            lat_range=[0,5], 
+            lon_range=[123.0, 133.0]
+        )
+
+        cur_df = db.generate_spatially_filtered_days(0, 5, 123, 133)
+        
+        if cur_df.numel() == 0 or cur_df.shape[1] <= max(LAT_COL, LON_COL, VAL_COL, TIME_COL):
+            print(f"Error: Data for Day {day_idx+1} is empty or invalid.")
+            exit()
+
+        unique_times = torch.unique(cur_df[:, TIME_COL])
+        time_slices_list = [cur_df[cur_df[:, TIME_COL] == t_val] for t_val in unique_times]
+
+        # --- 1. Pre-compute J-vector, Taper Grid, and Taper Autocorrelation ---
+        print("Pre-computing J-vector (Hamming taper)...")
+        
+        # --- 💥 REVISED: Renamed 'p' to 'p_time' 💥 ---
+        J_vec, n1, n2, p_time, taper_grid = dwl.generate_Jvector_tapered( 
+            time_slices_list,
+            tapering_func=TAPERING_FUNC, 
+            lat_col=LAT_COL, lon_col=LON_COL, val_col=VAL_COL,
+            device=DEVICE
+        )
+
+        if J_vec is None or J_vec.numel() == 0 or n1 == 0 or n2 == 0 or p_time == 0:
+            print(f"Error: J-vector generation failed for Day {day_idx+1}.")
+            exit()
+        
+
+        I_sample = dwl.calculate_sample_periodogram_vectorized(J_vec)
+        taper_autocorr_grid = dwl.calculate_taper_autocorrelation_fft(taper_grid, n1, n2, DEVICE)
+
+        # Set up Optimizer for Whittle
+        optimizer_dw = torch.optim.LBFGS(
+            params_list, lr=1.0, max_iter=20, history_size=100, 
+            line_search_fn="strong_wolfe", tolerance_grad=1e-5
+        )
+
+        print(f"Running Whittle L-BFGS on {DEVICE}...")
+        # --- END REVISION ---
+
+
+        print(f"Starting optimization run {i+1} on device {DEVICE} (Hamming, 7-param ST kernel, L-BFGS)...")
+        
+        # Run Whittle Optimization      
+        nat_str, phi_str, raw_str, loss, steps = dwl.run_lbfgs_tapered(
+            params_list=params_list,
+            optimizer=optimizer_dw,
+            I_sample=I_sample,
+            n1=n1, n2=n2, p_time=p_time,
+            taper_autocorr_grid=taper_autocorr_grid, 
+            max_steps=DWL_MAX_STEPS,
+            device=DEVICE
+        )
+
+# -------------------------------------------------------
+        # STEP D: Handoff - Create 'new_params_list'
+        new_params_list = [
+                    Parameter(p.detach().clone().to(DEVICE).requires_grad_(True)) 
+                    for p in params_list
+                ]
+        # detach otherwise vecc will try to backprop through dwl graph
+
+ 
         # --- Define parameter groups ---
         lr_all = LBFGS_LR
         all_indices = [0, 1, 2, 3, 4, 5, 6] 
-        
+
         # L-BFGS requires the parameters to be iterable in a single list or group
         param_groups = [
-            {'params': [params_list[idx] for idx in all_indices], 'lr': lr_all, 'name': 'all_params'}
+            {'params': [new_params_list[idx] for idx in all_indices], 'lr': lr_all, 'name': 'all_params'}
         ]
 
-        # --- Print Job Info (using placeholder print variables) ---
-
-        print(f'\n--- Starting Day {day_idx+1} (2024-07-{day_idx+1}) ---')
-        print(f'Data size per day: { daily_aggregated_tensor.shape[0]/8}, smooth: {v}')
-        print(f'mm_cond_number: {mm_cond_number},\ninitial parameters: \n')
-        for i, p in enumerate(params_list):
-            print(f"  Param {i}: {p.item():.4f}")
+        
                 
         # --- 💥 Instantiate the L-BFGS Class ---
         # NOTE: Assuming fit_vecchia_lbfgs is available via kernels_reparam_space_time
@@ -187,31 +291,29 @@ def cli(
                 nheads = nheads
             )
 
-        start_time = time.time()
-        
         # --- 💥 Set L-BFGS Optimizer ---
         # L-BFGS specific arguments are passed here
-        optimizer = model_instance.set_optimizer(
-                param_groups,     
-                lr=LBFGS_LR,            
-                max_iter=LBFGS_MAX_EVAL,        # max_iter in LBFGS is the line search limit
-                history_size=LBFGS_HISTORY_SIZE 
-            )
+        optimizer_vecc = model_instance.set_optimizer(
+                    new_params_list,     
+                    lr=LBFGS_LR,            
+                    max_iter=LBFGS_MAX_EVAL,        
+                    history_size=LBFGS_HISTORY_SIZE 
+                )
 
+        start_time = time.time()
         # --- 💥 Call the L-BFGS Fit Method ---
         out, steps_ran = model_instance.fit_vecc_lbfgs(
-                params_list,
-                optimizer,
+                new_params_list,
+                optimizer_vecc,
                 model_instance.matern_cov_aniso_STABLE_log_reparam, 
                 max_steps=LBFGS_MAX_STEPS # Outer loop steps
             )
 
+
         end_time = time.time()
         epoch_time = end_time - start_time
         
-        print(f"Day {day_idx+1} optimization finished in {epoch_time:.2f}s over {steps_ran+1} L-BFGS steps.")
-        print(f"Day {day_idx+1} final results (raw params + loss): {out}")
-
+        print(f"Vecchia Optimization finished in {epoch_time:.2f}s. Results: {out}")
 
         input_filepath = output_path / f"vecchia_day_v05_LBFGS_NOV25_{ ( daily_aggregated_tensors[0].shape[0]/8 ) }.json"
         

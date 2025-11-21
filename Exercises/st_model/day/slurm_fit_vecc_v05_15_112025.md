@@ -14,6 +14,9 @@ scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/coarse_cen_map_without_de
 # mac
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_vecc_day_v05_112025.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_veccDW_day_v05_112125.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+
+
 
 # window
 scp "C:\Users\joonw\tco\GEMS_TCO-2\Exercises\st_model\day\fit_vecc_day_v05_416.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
@@ -61,9 +64,9 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vec
 #SBATCH --error=/home/jl2815/tco/exercise_output/vec_nov20_18126_%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
-#SBATCH --cpus-per-task=16                                        # Number of CPU cores per task
-#SBATCH --mem=350G                                                 # Memory per node
-#SBATCH --partition=mem                                            # Partition name
+#SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
+#SBATCH --mem=248G                                                 # Memory per node
+#SBATCH --partition=main                                           # Partition name
 
 #### Load the Anaconda module to use srun 
 module purge                                              
@@ -77,7 +80,7 @@ conda activate faiss_env
 echo "Current date and time: $(date)"
 echo "fit_vecc_v05_nov_18126_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_112025.py --v 0.5 --lr 0.03 --step 80 --epochs 100 --space "1, 1" --days "0,28" --mm-cond-number 8 --nheads 400 --no-keep-exact-loc 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_112025.py --v 0.5 --lr 0.03 --step 80 --epochs 100 --space "1, 1" --days "5,28" --mm-cond-number 8 --nheads 400 --no-keep-exact-loc 
 
 ```
 
