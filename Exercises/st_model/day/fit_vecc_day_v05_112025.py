@@ -48,10 +48,10 @@ def cli(
     ## mm-cond-number should be called in command line not mm_cond_number
     ## negative number can be a problem when parsing with typer
     epochs: int = typer.Option(1500, help="Number of iterations in optimization"),
-    nheads: int = typer.Option(200, help="Number of iterations in optimization")
-
+    nheads: int = typer.Option(200, help="Number of iterations in optimization"),
+    keep_exact_loc: bool = typer.Option(True, help="whether to keep exact location data or not")
 ) -> None:
-      
+
     lat_lon_resolution = [int(s) for s in space[0].split(',')]
     days_s_e = list(map(int, days[0].split(',')))
     days_list = list(range(days_s_e[0], days_s_e[1]))
@@ -62,9 +62,6 @@ def cli(
 
     ############################## 
     ## initialize setting
-    lat_lon_resolution = [int(s) for s in space[0].split(',')]
-    days_s_e = list(map(int, days[0].split(',')))
-    days_list = list(range(days_s_e[0], days_s_e[1]))
     years = ['2024']
     month_range =[7,8]
 
@@ -96,7 +93,7 @@ def cli(
         hour_indices, 
         ord_mm= ord_mm,  # or just omit it
         dtype=torch.float, # or just omit it 
-        keep_ori=False
+        keep_ori=keep_exact_loc
         )
 
         daily_aggregated_tensors.append( day_aggregated_tensor )

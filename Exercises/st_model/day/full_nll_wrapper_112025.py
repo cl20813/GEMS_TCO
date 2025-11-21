@@ -98,11 +98,11 @@ def cli(
     for day_idx in days_list:  # 0-based
 
         # Assuming data access is correct
-        daily_hourly_map = daily_hourly_maps[day_idx]
-        daily_aggregated_tensor = daily_aggregated_tensors[day_idx]
+        #daily_hourly_map = daily_hourly_maps[day_idx]
+        #daily_aggregated_tensor = daily_aggregated_tensors[day_idx]
 
-        lat_range= [0,5]
-        lon_range= [123.0, 133.0]
+        lat_range= [1,3]
+        lon_range= [125, 130]
         nn = daily_aggregated_tensors[0].shape[0]
 
         param1 = [3.36336504695141, 1.4000489357246877, -1.5226391671330102, -3.122542129387705, 0.10834442729589913, -0.22068132726903175, 1.1186604833527585]
