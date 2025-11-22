@@ -44,7 +44,6 @@ from GEMS_TCO import configuration as config
 from GEMS_TCO.data_loader import load_data2
 
 
-
 class full_vecc_dw_likelihoods:
     def __init__(self, daily_aggregated_tensors, daily_hourly_maps, day_idx, params_list, lat_range, lon_range):
         self.day_idx = day_idx
@@ -76,6 +75,7 @@ class full_vecc_dw_likelihoods:
             covariance_function = self.model_instance.matern_cov_aniso_STABLE_log_reparam
         )
         return full_likelihood
+    
     def compute_vecchia_nll(self):
         cov_map = self.model_instance.cov_structure_saver(self.params_tensor, self.model_instance.matern_cov_aniso_STABLE_log_reparam)
         vecchia_nll = self.model_instance.vecchia_space_time_fullbatch( # Change this to your chosen Vecchia implementation
@@ -86,7 +86,7 @@ class full_vecc_dw_likelihoods:
         return vecchia_nll
     
 
-    def likelihood_wrapper(self):
+    def likelihood_wrapper(self,daily_aggregated_tensors_dw, daily_hourly_maps_dw):
         full_nll = self.compute_full_likelihoods()
         vecc_nll = self.compute_vecchia_nll()
 
@@ -96,7 +96,7 @@ class full_vecc_dw_likelihoods:
         TAPERING_FUNC = dwl.cgn_hamming # Use Hamming taper
         DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {DEVICE}")
-        
+
         DELTA_LAT, DELTA_LON = 0.044, 0.063 
 
         LAT_COL, LON_COL = 0, 1
@@ -104,7 +104,7 @@ class full_vecc_dw_likelihoods:
         TIME_COL = 3
 
 
-        db = debiased_whittle_preprocess(self.daily_aggregated_tensors, self.daily_hourly_maps, day_idx=0, params_list=self.params_list, lat_range=self.lat_range, lon_range=self.lon_range)
+        db = debiased_whittle_preprocess(daily_aggregated_tensors_dw, daily_hourly_maps_dw, day_idx=0, params_list=self.params_list, lat_range=self.lat_range, lon_range=self.lon_range)
         subsetted_aggregated_day = db.generate_spatially_filtered_days(self.lat_range[0],self.lat_range[1],self.lon_range[0],self.lon_range[1])
         
         #(N-1)*(M-1) grid after differencing
@@ -145,7 +145,9 @@ class full_vecc_dw_likelihoods:
             delta1=DELTA_LAT,
             delta2=DELTA_LON
         )
-        outputs = [full_nll, vecc_nll, dwnll*8, n1, n2]
+
+        outputs = [full_nll, vecc_nll, dwnll, n1, n2]
+        #outputs = [full_nll, vecc_nll, dwnll*8, n1, n2]
         return outputs
 
 class debiased_whittle_preprocess(full_vecc_dw_likelihoods):
@@ -237,18 +239,6 @@ class debiased_whittle_preprocess(full_vecc_dw_likelihoods):
         return subsetted_aggregated_day
     
 
-import torch
-import torch.nn.functional as F
-from torch.nn import Parameter
-import torch.fft 
-import cmath
-import numpy as np
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-
-# Assuming 'full_vecc_dw_likeihloods' is defined elsewhere
-# class full_vecc_dw_likeihloods:
-#     def __init__(self, *args, **kwargs):
-#         pass
 
 class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
     

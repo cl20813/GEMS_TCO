@@ -53,12 +53,11 @@ def cli(
     days_s_e = list(map(int, days[0].split(',')))
     days_list = list(range(days_s_e[0], days_s_e[1]))
     years = ['2024']
-    month_range =[7,8]
+    month_range =[7]
 
     lat_range= [1,3]
     lon_range= [125, 130]
 
-    output_path = input_path = Path(config.amarel_estimates_day_path)
     data_load_instance = load_data2(config.amarel_data_load_path)
 
     df_map, ord_mm, nns_map = data_load_instance.load_maxmin_ordered_data_bymonthyear(
@@ -70,10 +69,14 @@ def cli(
     lon_range= lon_range
     )
 
-    daily_aggregated_tensors = [] 
-    daily_hourly_maps = []      
+    daily_aggregated_tensors_dw = [] 
+    daily_hourly_maps_dw = []      
 
-    for day_index in days_list:
+    daily_aggregated_tensors_vecc = [] 
+    daily_hourly_maps_vecc = []   
+
+
+    for day_index in range(31):
         hour_start_index = day_index * 8
         hour_end_index = (day_index + 1) * 8
         #hour_end_index = day_index*8 + 1
@@ -82,13 +85,24 @@ def cli(
         day_hourly_map, day_aggregated_tensor = data_load_instance.load_working_data(
         df_map, 
         hour_indices, 
+        ord_mm= None,  # or just omit it
+        dtype=torch.float64, # or just omit it 
+        keep_ori=keep_exact_loc
+        )
+
+        daily_aggregated_tensors_dw.append( day_aggregated_tensor )
+        daily_hourly_maps_dw.append( day_hourly_map )
+    
+        day_hourly_map, day_aggregated_tensor = data_load_instance.load_working_data(
+        df_map, 
+        hour_indices, 
         ord_mm= ord_mm,  # or just omit it
         dtype=torch.float64, # or just omit it 
         keep_ori=keep_exact_loc
         )
 
-        daily_aggregated_tensors.append( day_aggregated_tensor )
-        daily_hourly_maps.append( day_hourly_map )
+        daily_aggregated_tensors_vecc.append( day_aggregated_tensor )
+        daily_hourly_maps_vecc.append( day_hourly_map )
 
 
     day1_va = [4.22817, 1.664023, 0.481917, -3.77204, 0.02213, -0.16318, -1.737487]
@@ -115,20 +129,20 @@ def cli(
 
     whole_params = [day1, day2, day3, day4]
 
-    nn = daily_aggregated_tensors[0].shape[0]
+    nn = daily_aggregated_tensors_vecc[0].shape[0]
 
-    print(daily_aggregated_tensors[0], daily_hourly_maps[0])
+    print(f'nn: {nn}')
     for day_idx in days_list:  # 0-based
         for i, model_params in enumerate(whole_params[day_idx]):
             print(f"Day {day_idx+1}, Model {i+1} params: {[round(p,4) for p in model_params]}")
 
-            instance = debiased_whittle.full_vecc_dw_likelihoods(daily_aggregated_tensors, daily_hourly_maps, day_idx= day_idx, params_list=model_params, lat_range=lat_range, lon_range=lon_range)
+            instance = debiased_whittle.full_vecc_dw_likelihoods(daily_aggregated_tensors_vecc, daily_hourly_maps_vecc, day_idx= day_idx, params_list=model_params, lat_range=lat_range, lon_range=lon_range)
      
             instance.initiate_model_instance_vecchia(v, nns_map, mm_cond_number, nheads)
     
-            res = instance.likelihood_wrapper()
+            res = instance.likelihood_wrapper(daily_aggregated_tensors_dw, daily_hourly_maps_dw)
             print(f' full likelihood: {torch.round(res[0]*nn, decimals=2)},\n vecchia: {torch.round(res[1]*nn, decimals=2)}, \n whittle de-biased: {torch.round(res[2], decimals = 2)}')
-
+            print(res[3:])
 if __name__ == "__main__":
     app()
 

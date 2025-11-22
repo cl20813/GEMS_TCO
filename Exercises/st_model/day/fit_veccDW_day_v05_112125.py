@@ -64,7 +64,7 @@ def cli(
     ############################## 
     ## initialize setting
     years = ['2024']
-    month_range =[7,8]
+    month_range =[7]
 
     output_path = input_path = Path(config.amarel_estimates_day_path)
     data_load_instance = load_data2(config.amarel_data_load_path)
