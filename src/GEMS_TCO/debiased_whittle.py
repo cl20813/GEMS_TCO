@@ -96,6 +96,7 @@ class full_vecc_dw_likelihoods:
         TAPERING_FUNC = dwl.cgn_hamming # Use Hamming taper
         DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {DEVICE}")
+        
         DELTA_LAT, DELTA_LON = 0.044, 0.063 
 
         LAT_COL, LON_COL = 0, 1
