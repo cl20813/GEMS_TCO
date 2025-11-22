@@ -78,8 +78,12 @@ def cli(
     lon_range=[123.0, 133.0] 
     )
 
-    daily_aggregated_tensors = [] 
-    daily_hourly_maps = []      
+    daily_aggregated_tensors_dw = [] 
+    daily_hourly_maps_dw = []      
+
+    daily_aggregated_tensors_vecc = [] 
+    daily_hourly_maps_vecc = []   
+
 
     for day_index in range(31):
         hour_start_index = day_index * 8
@@ -90,13 +94,27 @@ def cli(
         day_hourly_map, day_aggregated_tensor = data_load_instance.load_working_data(
         df_map, 
         hour_indices, 
-        ord_mm= ord_mm,  # or just omit it
-        dtype=torch.float, # or just omit it 
+        ord_mm= None,  # or just omit it
+        dtype=torch.float64, # or just omit it 
         keep_ori=keep_exact_loc
         )
 
-        daily_aggregated_tensors.append( day_aggregated_tensor )
-        daily_hourly_maps.append( day_hourly_map )
+        daily_aggregated_tensors_dw.append( day_aggregated_tensor )
+        daily_hourly_maps_dw.append( day_hourly_map )
+    
+        day_hourly_map, day_aggregated_tensor = data_load_instance.load_working_data(
+        df_map, 
+        hour_indices, 
+        ord_mm= ord_mm,  # or just omit it
+        dtype=torch.float64, # or just omit it 
+        keep_ori=keep_exact_loc
+        )
+
+        daily_aggregated_tensors_vecc.append( day_aggregated_tensor )
+        daily_hourly_maps_vecc.append( day_hourly_map )
+
+
+
 
 
     # 5/09/24 try larger range parameters
@@ -124,8 +142,6 @@ def cli(
     DELTA_LAT, DELTA_LON = 0.044, 0.063 
     LAT_COL, LON_COL, VAL_COL, TIME_COL = 0, 1, 2, 3
 
-    TAPERING_FUNC = dwl.cgn_hamming # Use Hamming taper
-    MAX_STEPS = 20 # L-BFGS usually converges in far fewer steps
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {DEVICE}")
 
@@ -140,12 +156,14 @@ def cli(
         print(f'{"="*40}')
 
         # Assuming data access is correct
-        daily_hourly_map = daily_hourly_maps[day_idx]
-        daily_aggregated_tensor = daily_aggregated_tensors[day_idx]
+        daily_hourly_map_dw = daily_hourly_maps_dw[day_idx]
+        daily_aggregated_tensor_dw = daily_aggregated_tensors_dw[day_idx]
+
+        daily_hourly_map_vecc = daily_hourly_maps_vecc[day_idx]
+        daily_aggregated_tensor_vecc = daily_aggregated_tensors_vecc[day_idx]
+
         # Create 1-item lists to satisfy class interfaces designed for lists
         # This prevents loading 30 days of unused data
-        daily_hourly_maps_wrapper = [day_hourly_map] 
-        daily_aggregated_tensors_wrapper = [day_aggregated_tensor]
 
         # --- Parameter Initialization (SPATIO-TEMPORAL) ---
         '''  
@@ -153,7 +171,7 @@ def cli(
         init_range_lat = 0.66 
         init_range_lon = 0.7 
         init_nugget    = 1.5
-        init_range_time = 0.1
+        init_range_time = 1.0
         init_advec_lat = 0.02
         init_advec_lon = -0.08
         '''
@@ -162,7 +180,7 @@ def cli(
         init_range_lat = 0.154 
         init_range_lon = 0.195
         init_advec_lat = 0.0218
-        init_range_time = 0.7
+        init_range_time = 1.0
         init_advec_lon = -0.1689
         init_nugget    = 0.247
         
@@ -183,11 +201,6 @@ def cli(
             for val in initial_vals
         ]
 
-        # Helper to define the boundary globally for clarity
-        NUGGET_LOWER_BOUND = 0.05
-        LOG_NUGGET_LOWER_BOUND = np.log(NUGGET_LOWER_BOUND) # Approx -2.9957
-        all_final_results = []
-        all_final_losses = []
 
 # -------------------------------------------------------
         # STEP C: Phase 1 - Debiased Whittle Optimization
@@ -201,9 +214,9 @@ def cli(
 
         # Initialize Preprocessor with the wrapper lists (0-index because list has length 1)
         db = debiased_whittle.debiased_whittle_preprocess(
-            daily_aggregated_tensors_wrapper, 
-            daily_hourly_maps_wrapper, 
-            day_idx= 0, # It is index 0 in our wrapper list # this automatically lead to day_idx
+            daily_aggregated_tensors_dw, 
+            daily_hourly_maps_dw, 
+            day_idx= day_idx, # It is index 0 in our wrapper list # this automatically lead to day_idx
             params_list=raw_init_floats, 
             lat_range=[0,5], 
             lon_range=[123.0, 133.0]
@@ -246,9 +259,6 @@ def cli(
         print(f"Running Whittle L-BFGS on {DEVICE}...")
         # --- END REVISION ---
 
-
-        print(f"Starting optimization run {i+1} on device {DEVICE} (Hamming, 7-param ST kernel, L-BFGS)...")
-        
         # Run Whittle Optimization      
         nat_str, phi_str, raw_str, loss, steps = dwl.run_lbfgs_tapered(
             params_list=params_list,
@@ -262,30 +272,31 @@ def cli(
 
 # -------------------------------------------------------
         # STEP D: Handoff - Create 'new_params_list'
+        loss = loss*n1*n2*8  # scale the loss to match de-biased whittle definition
         new_params_list = [
                     Parameter(p.detach().clone().to(DEVICE).requires_grad_(True)) 
                     for p in params_list
-                ]
+                ] 
+        
         # detach otherwise vecc will try to backprop through dwl graph
+  
+        dw_estimates_loss = [x.item() for x in new_params_list] + [loss]
 
- 
-        # --- Define parameter groups ---
-        lr_all = LBFGS_LR
-        all_indices = [0, 1, 2, 3, 4, 5, 6] 
-
-        # L-BFGS requires the parameters to be iterable in a single list or group
-        param_groups = [
-            {'params': [new_params_list[idx] for idx in all_indices], 'lr': lr_all, 'name': 'all_params'}
-        ]
+        input_filepath = output_path / f"debiased_whittle_day_v05_LBFGS_NOV25_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
+        res = alg_optimization( f"2024-07-{day_idx+1}", "DW_Nov25", ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) , lr,  step , dw_estimates_loss, 0 , 0)
+        loaded_data = res.load(input_filepath)
+        loaded_data.append( res.toJSON() )
+        fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'epoch'] # 0 for epoch
+        csv_filepath = input_path/f"DW_v{int(v*100):03d}_LBFGS_NOV25_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
+        res.tocsv( loaded_data, fieldnames,csv_filepath )
 
         
-                
         # --- 💥 Instantiate the L-BFGS Class ---
         # NOTE: Assuming fit_vecchia_lbfgs is available via kernels_reparam_space_time
         model_instance = kernels_reparam_space_time.fit_vecchia_lbfgs(
                 smooth = v,
-                input_map = daily_hourly_map,
-                aggregated_data = daily_aggregated_tensor,
+                input_map = daily_hourly_map_vecc,
+                aggregated_data = daily_aggregated_tensor_vecc,
                 nns_map = nns_map,
                 mm_cond_number = mm_cond_number,
                 nheads = nheads
@@ -309,21 +320,20 @@ def cli(
                 max_steps=LBFGS_MAX_STEPS # Outer loop steps
             )
 
-
         end_time = time.time()
         epoch_time = end_time - start_time
         
         print(f"Vecchia Optimization finished in {epoch_time:.2f}s. Results: {out}")
 
-        input_filepath = output_path / f"vecchia_day_v05_LBFGS_NOV25_{ ( daily_aggregated_tensors[0].shape[0]/8 ) }.json"
+        input_filepath = output_path / f"vecchiaDW_day_v05_LBFGS_NOV25_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
         
-        res = alg_optimization( f"2024-07-{day_idx+1}", "Vecc_Nov25", ( daily_aggregated_tensors[0].shape[0]/8 ) , lr,  step , out, epoch_time, 0)
+        res = alg_optimization( f"2024-07-{day_idx+1}", "Vecc_Nov25", ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) , lr,  step , out, epoch_time, 0)
         loaded_data = res.load(input_filepath)
         loaded_data.append( res.toJSON() )
         res.save(input_filepath,loaded_data)
         fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'epoch'] # 0 for epoch
 
-        csv_filepath = input_path/f"vecchia_v{int(v*100):03d}_LBFGS_NOV25_{(daily_aggregated_tensors[0].shape[0]/8 )}.csv"
+        csv_filepath = input_path/f"vecchiaDW_v{int(v*100):03d}_LBFGS_NOV25_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
 if __name__ == "__main__":
