@@ -89,6 +89,7 @@ class full_vecc_dw_likelihoods:
     def likelihood_wrapper(self,daily_aggregated_tensors_dw, daily_hourly_maps_dw):
         full_nll = self.compute_full_likelihoods()
         vecc_nll = self.compute_vecchia_nll()
+ 
 
         # --- Debiased Whittle Configuration ---
         dwl = debiased_whittle_likelihood()
@@ -146,7 +147,7 @@ class full_vecc_dw_likelihoods:
         )
 
         outputs = [full_nll, vecc_nll, dwnll, n1, n2]
-        #outputs = [full_nll, vecc_nll, dwnll*8, n1, n2]
+        #outputs = [1, 1,  dwnll, n1, n2]
         return outputs
 
 class debiased_whittle_preprocess(full_vecc_dw_likelihoods):

@@ -133,13 +133,8 @@ def cli(
     print(f"Using device: {DEVICE}")
 
     # Global L-BFGS Settings
-    LBFGS_LR = 1.0
-    LBFGS_MAX_STEPS = 10       
-    LBFGS_HISTORY_SIZE = 100   
-    LBFGS_MAX_EVAL = 50        
-    DWL_MAX_STEPS = 20         
+    DWL_MAX_STEPS = 20      
 
-    DELTA_LAT, DELTA_LON = 0.044, 0.063 
     LAT_COL, LON_COL, VAL_COL, TIME_COL = 0, 1, 2, 3
 
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -189,8 +184,6 @@ def cli(
         init_phi1 = init_sigmasq * init_phi2            # sigmasq / range_lon
         init_phi3 = (init_range_lon / init_range_lat)**2  # (range_lon / range_lat)^2
         init_phi4 = (init_range_lon / init_range_time)**2      # (range_lon / range_time)^2
-
-        device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
 
         # Create Initial Parameters (Float64, Requires Grad)
         initial_vals = [np.log(init_phi1), np.log(init_phi2), np.log(init_phi3), 
@@ -294,7 +287,7 @@ def cli(
         
         # --- 💥 Instantiate the L-BFGS Class ---
         # NOTE: Assuming fit_vecchia_lbfgs is available via kernels_reparam_space_time
-        model_instance = kernels_reparam_space_time.fit_vecchia_lbfgs(
+        model_instance = kernels_reparam_space_time.fit_vecchia_adams(
                 smooth = v,
                 input_map = daily_hourly_map_vecc,
                 aggregated_data = daily_aggregated_tensor_vecc,
@@ -305,20 +298,28 @@ def cli(
 
         # --- 💥 Set L-BFGS Optimizer ---
         # L-BFGS specific arguments are passed here
-        optimizer_vecc = model_instance.set_optimizer(
+        lr = 0.01
+        factor=0.5
+        patience=5
+        epochs=100
+        optimizer_vecc, scheduler = model_instance.set_optimizer(
                     new_params_list,     
-                    lr=LBFGS_LR,            
-                    max_iter=LBFGS_MAX_EVAL,        
-                    history_size=LBFGS_HISTORY_SIZE 
+                    lr=lr,  
+                    betas=(0.9, 0.999),
+                    eps=1e-4,          
+                    scheduler_type='plateau',
+                    patience=patience,
+                    factor=factor,      
                 )
 
         start_time = time.time()
         # --- 💥 Call the L-BFGS Fit Method ---
-        out, steps_ran = model_instance.fit_vecc_lbfgs(
+        out, steps_ran = model_instance.fit_model(
                 new_params_list,
                 optimizer_vecc,
+                scheduler,
                 model_instance.matern_cov_aniso_STABLE_log_reparam, 
-                max_steps=LBFGS_MAX_STEPS # Outer loop steps
+                epochs=epochs # Outer loop steps
             )
 
         end_time = time.time()
@@ -326,7 +327,7 @@ def cli(
         
         print(f"Vecchia Optimization finished in {epoch_time:.2f}s. Results: {out}")
 
-        input_filepath = output_path / f"vecchiaDW_day_v05_LBFGS_NOV25_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
+        input_filepath = output_path / f"vecchiaDW_day_v05_ADAMS_NOV25_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
         
         res = alg_optimization( f"2024-07-{day_idx+1}", "Vecc_Nov25", ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) , lr,  step , out, epoch_time, 0)
         loaded_data = res.load(input_filepath)
@@ -334,7 +335,7 @@ def cli(
         res.save(input_filepath,loaded_data)
         fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'epoch'] # 0 for epoch
 
-        csv_filepath = input_path/f"vecchiaDW_v{int(v*100):03d}_LBFGS_NOV25_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
+        csv_filepath = input_path/f"vecchiaDW_v{int(v*100):03d}_ADAMS_NOV25_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
 if __name__ == "__main__":
