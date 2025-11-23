@@ -40,10 +40,10 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vec
 
 ## 
 
-```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/full_nll_wrapper_112025.py --v 0.5 --space "20, 20" --days "0,1" --mm-cond-number 8 --nheads 30```
+```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/full_nll_wrapper_112025.py --v 0.5 --space "20, 20" --days "0,1" --mm-cond-number 8 --nheads 30 --no-keep-exact-loc    ```
 
 
-```    srun --cpus-per-task=3 --mem=80G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/full_nll_wrapper_112025.py --v 0.5 --space "1, 1" --days "0,1" --mm-cond-number 8 --nheads 300```
+```    srun --cpus-per-task=3 --mem=8G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/full_nll_wrapper_112025.py --v 0.5 --space "14, 14" --days "0,1" --mm-cond-number 8 --nheads 30  --lat-range "0,3" --lon-range "125,127" --no-keep-exact-loc ```
 
 
 
@@ -80,6 +80,47 @@ conda activate faiss_env
 echo "Current date and time: $(date)"
 
 srun python /home/jl2815/tco/exercise_25/st_model/full_nll_wrapper_112025.py --v 0.5 --space "1, 1" --days "0,2" --mm-cond-number 8 --nheads 300 --no-keep-exact-loc 
+
+echo "Current date and time: $(date)"
+
+```
+
+
+```  nano full_nll_112225.sh  ``` 
+```  sbatch full_nll_112225.sh  ``` 
+
+
+``` 
+#!/bin/bash
+#SBATCH --job-name=full_nll_1125                       # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/full_nll_1122four_%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/full_nll_1122four_%j.err # Standard error file (%j = JobID)
+#SBATCH --time=6:00:00                                            # Time limit
+#SBATCH --ntasks=4                                                # Number of tasks
+#SBATCH --cpus-per-task=20                                        # Number of CPU cores per task
+#SBATCH --mem=400G                                              # Memory per node
+#SBATCH --partition=mem                                            # Partition name
+
+#### Load the Anaconda module to use srun 
+module purge                                              
+module use /projects/community/modulefiles                 
+module load anaconda/2024.06-ts840 
+
+#### Initialize conda for the current shell session if not already done for the current shell session.
+eval "$(conda shell.bash hook)"
+conda activate faiss_env
+
+echo "Current date and time: $(date)"
+
+
+srun python /home/jl2815/tco/exercise_25/st_model/full_nll_wrapper_112025.py --v 0.5 --space "1, 1" --days "0,5" --mm-cond-number 8 --nheads 300  --lat-range "0,3" --lon-range "123,128" --no-keep-exact-loc 
+
+srun python /home/jl2815/tco/exercise_25/st_model/full_nll_wrapper_112025.py --v 0.5 --space "1, 1" --days "0,5" --mm-cond-number 8 --nheads 300  --lat-range "0,3" --lon-range "123,128" --no-keep-exact-loc 
+
+srun python /home/jl2815/tco/exercise_25/st_model/full_nll_wrapper_112025.py --v 0.5 --space "1, 1" --days "0,5" --mm-cond-number 8 --nheads 300  --lat-range "2,5" --lon-range "128,133" --no-keep-exact-loc 
+
+srun python /home/jl2815/tco/exercise_25/st_model/full_nll_wrapper_112025.py --v 0.5 --space "1, 1" --days "0,5" --mm-cond-number 8 --nheads 300  --lat-range "2,5" --lon-range "128,133" --no-keep-exact-loc 
+
 
 echo "Current date and time: $(date)"
 

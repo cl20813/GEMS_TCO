@@ -96,7 +96,7 @@ class full_vecc_dw_likelihoods:
 
         TAPERING_FUNC = dwl.cgn_hamming # Use Hamming taper
         DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Using device: {DEVICE}")
+        #print(f"Using device: {DEVICE}")
 
         DELTA_LAT, DELTA_LON = 0.044, 0.063 
 
@@ -110,7 +110,7 @@ class full_vecc_dw_likelihoods:
         
         #(N-1)*(M-1) grid after differencing
 
-        print(subsetted_aggregated_day.shape)
+        #print(f'subsetted_aggregated_day.shape: {subsetted_aggregated_day.shape}')
         
         ####
         cur_df = subsetted_aggregated_day

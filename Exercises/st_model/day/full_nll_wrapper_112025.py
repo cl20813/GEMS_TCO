@@ -38,14 +38,16 @@ def cli(
     v: float = typer.Option(0.5, help="smooth"),
     space: List[str] = typer.Option(['20', '20'], help="spatial resolution"),
     days: List[str] = typer.Option(['0', '31'], help="Number of nearest neighbors in Vecchia approx."),
+    lat_range: List[str] = typer.Option(['1','3'], help="latitude range"),
+    lon_range: List[str] = typer.Option(['125','130'], help="longitude range"),
     mm_cond_number: int = typer.Option(10, help="Number of nearest neighbors in Vecchia approx."),
     nheads: int = typer.Option(200, help="Number of iterations in optimization"),
     keep_exact_loc: bool = typer.Option(True, help="whether to keep exact location data or not")
 ) -> None:
       
-
     # parsed_params = [float(p) for p in params[0].split(',')]
     # params = torch.tensor(parsed_params, requires_grad=True)
+
 
     ############################## 
     ## initialize setting
@@ -55,8 +57,12 @@ def cli(
     years = ['2024']
     month_range =[7]
 
-    lat_range= [1,3]
-    lon_range= [125, 130]
+    lat_range= [int(s) for s in lat_range[0].split(',')]
+    lon_range= [int(s) for s in lon_range[0].split(',')]
+
+    print('lat_range:', lat_range)
+    print('lon_range:', lon_range)
+
 
     data_load_instance = load_data2(config.amarel_data_load_path)
 
@@ -65,7 +71,7 @@ def cli(
     mm_cond_number=mm_cond_number,
     years_=years, 
     months_=month_range,
-    lat_range= lat_range,
+    lat_range= lat_range,  #lat_range
     lon_range= lon_range
     )
 
@@ -133,7 +139,7 @@ def cli(
     day4_dwl = [3.9351, 1.8070, 1.0980, -3.5154, 0.0214, -0.1712, -0.5348]
 
 
-    day1 = [day1_va, day1_vl, day1_vl2, day1_vl3, day1_dwl]
+    day1 = [day1_va, day1_vl3, day1_dwl]
     day2 = [day2_va, day2_vl, day2_vl2, day2_vl3, day2_dwl]
     day3 = [day3_va, day3_vl, day3_vl2, day3_vl3, day3_dwl]
     day4 = [day4_va, day4_vl, day4_vl2, day4_vl3, day4_dwl]
@@ -142,18 +148,21 @@ def cli(
 
     nn = daily_aggregated_tensors_vecc[0].shape[0]
 
+    opt_method = ['Vecc_Adams', 'Vecc_Lbfgs','DW_Lbfgs']
     print(f'nn: {nn}')
     for day_idx in days_list:  # 0-based
+        k = 0
         for i, model_params in enumerate(whole_params[day_idx]):
-            print(f"Day {day_idx+1}, Model {i+1} params: {[round(p,4) for p in model_params]}")
-
+            
+            print(f"Day {day_idx+1}, {opt_method[k]} estimates: \n {[round(p,4) for p in model_params]}")
+            k+=1
             instance = debiased_whittle.full_vecc_dw_likelihoods(daily_aggregated_tensors_vecc, daily_hourly_maps_vecc, day_idx= day_idx, params_list=model_params, lat_range=lat_range, lon_range=lon_range)
      
             instance.initiate_model_instance_vecchia(v, nns_map, mm_cond_number, nheads)
     
             res = instance.likelihood_wrapper(daily_aggregated_tensors_dw, daily_hourly_maps_dw)
             print(f' full likelihood: {torch.round(res[0]*nn, decimals=2)},\n vecchia: {torch.round(res[1]*nn, decimals=2)}, \n whittle de-biased: {torch.round(res[2], decimals = 2)}')
-            print(res[3:])
+            #print(res[3:])
 if __name__ == "__main__":
     app()
 
