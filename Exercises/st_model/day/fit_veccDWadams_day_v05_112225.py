@@ -270,7 +270,6 @@ def cli(
                     Parameter(p.detach().clone().to(DEVICE).requires_grad_(True)) 
                     for p in params_list
                 ] 
-        
         # detach otherwise vecc will try to backprop through dwl graph
   
         dw_estimates_loss = [x.item() for x in new_params_list] + [loss]
@@ -296,12 +295,12 @@ def cli(
                 nheads = nheads
             )
 
-        # --- 💥 Set L-BFGS Optimizer ---
-        # L-BFGS specific arguments are passed here
+        # --- 💥 Set ADAMS Optimizer ---
+
         lr = 0.01
         factor=0.5
         patience=5
-        epochs=100
+        epochs=80
         optimizer_vecc, scheduler = model_instance.set_optimizer(
                     new_params_list,     
                     lr=lr,  
@@ -313,7 +312,7 @@ def cli(
                 )
 
         start_time = time.time()
-        # --- 💥 Call the L-BFGS Fit Method ---
+        # --- 💥 Call the ADAMS Fit Method ---
         out, steps_ran = model_instance.fit_model(
                 new_params_list,
                 optimizer_vecc,
