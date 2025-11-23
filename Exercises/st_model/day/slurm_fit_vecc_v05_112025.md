@@ -14,7 +14,7 @@ scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/coarse_cen_map_without_de
 # mac
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_vecc_day_v05_112025.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_veccDW_day_v05_112125.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_veccDWlbfgs_day_v05_112125.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_veccDWadams_day_v05_112225.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
@@ -124,14 +124,14 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_112025.py --v
 ### vecc lbfgs + dw initiate 
 
 ``` cd ./jobscript/tco/gp_exercise ```
-```  nano fit_day_veccDW_v05_nov21_18126.sh  ``` 
-```  sbatch fit_day_veccDW_v05_nov21_18126.sh  ``` 
+```  nano fit_day_veccDWlbfgs_v05_nov21_18126.sh  ``` 
+```  sbatch fit_day_veccDWlbfgs_v05_nov21_18126.sh  ``` 
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=vecDW_v05_nov22_18126                         # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/vecDW_nov21_18126_%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/vecDW_nov21_18126_%j.err # Standard error file (%j = JobID)
+#SBATCH --job-name=vecDWlbfgs_v05_nov22_18126                         # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/vecDWlbfgs_nov21_18126_%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/vecDWlbfgs_nov21_18126_%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=48                                       # Number of CPU cores per task
@@ -150,7 +150,9 @@ conda activate faiss_env
 echo "Current date and time: $(date)"
 echo "fit_vecc_v05_nov_18126_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_veccDW_day_v05_112125.py --v 0.5 --lr 0.03 --step 80 --epochs 100 --space "1, 1" --days "0,10" --mm-cond-number 8 --nheads 400 --no-keep-exact-loc 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_veccDWlbfgs_day_v05_112125.py --v 0.5 --lr 0.03 --step 80 --epochs 100 --space "1, 1" --days "10,30" --mm-cond-number 8 --nheads 400 --no-keep-exact-loc 
+
+echo "Current date and time: $(date)"
 
 ```
 
