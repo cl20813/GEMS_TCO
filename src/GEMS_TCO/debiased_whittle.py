@@ -112,7 +112,6 @@ class full_vecc_dw_likelihoods:
         print(subsetted_aggregated_day.shape)
         
         ####
-
         cur_df = subsetted_aggregated_day
         unique_times = torch.unique(cur_df[:, TIME_COL])
         time_slices_list = [cur_df[cur_df[:, TIME_COL] == t_val] for t_val in unique_times]

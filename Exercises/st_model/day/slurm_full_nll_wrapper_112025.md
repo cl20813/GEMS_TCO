@@ -79,7 +79,7 @@ conda activate faiss_env
 
 echo "Current date and time: $(date)"
 
-srun python /home/jl2815/tco/exercise_25/st_model/full_nll_wrapper_112025.py --v 0.5 --space "1, 1" --days "0,5" --mm-cond-number 8 --nheads 300 --no-keep-exact-loc 
+srun python /home/jl2815/tco/exercise_25/st_model/full_nll_wrapper_112025.py --v 0.5 --space "1, 1" --days "0,2" --mm-cond-number 8 --nheads 300 --no-keep-exact-loc 
 
 echo "Current date and time: $(date)"
 
