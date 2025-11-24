@@ -194,3 +194,161 @@ Day 4, DW_Lbfgs estimates:
  vecchia: 38734.27, 
  whittle de-biased: 6501.71
 Current date and time: Mon Nov 24 01:28:08 EST 2025
+
+
+
+
+Current date and time: Sat Nov 22 20:40:00 EST 2025
+fit_veccDWadams_v05_nov_18126_save_estimates
+Subsetting data to lat: [0.0, 5.0], lon: [123.0, 133.0]
+Using device: cpu
+Using device: cpu
+
+========================================
+--- Starting Processing for Day 1 (2024-07-1) ---
+========================================
+
+--- Phase 1: Debiased Whittle Initialization ---
+Pre-computing J-vector (Hamming taper)...
+Running Whittle L-BFGS on cpu...
+--- Step 1/20 ---
+ Loss: 2.091277 | Max Grad: 5.799622e-03
+  Params (Raw Log): log_phi1: 4.2649, log_phi2: 1.7969, log_phi3: 0.7966, log_phi4: -3.3387, advec_lat: 0.0221, advec_lon: -0.1673, log_nugget: -3.5930
+--- Step 2/20 ---
+ Loss: 2.028361 | Max Grad: 1.086079e-05
+  Params (Raw Log): log_phi1: 4.2739, log_phi2: 1.8060, log_phi3: 0.7948, log_phi4: -3.3598, advec_lat: 0.0223, advec_lon: -0.1672, log_nugget: -14.0213
+--- Step 3/20 ---
+ Loss: 2.028234 | Max Grad: 2.690589e-06
+  Params (Raw Log): log_phi1: 4.2739, log_phi2: 1.8060, log_phi3: 0.7948, log_phi4: -3.3598, advec_lat: 0.0223, advec_lon: -0.1672, log_nugget: -14.7220
+--- Step 4/20 ---
+ Loss: 2.028234 | Max Grad: 2.690589e-06
+  Params (Raw Log): log_phi1: 4.2739, log_phi2: 1.8060, log_phi3: 0.7948, log_phi4: -3.3598, advec_lat: 0.0223, advec_lon: -0.1672, log_nugget: -14.7220
+
+--- Converged on gradient norm (max|grad| < 1e-05) at step 4 ---
+
+--- Training Complete ---
+
+FINAL BEST STATE ACHIEVED (during training):
+Best Loss: 2.028
+--- Epoch 1 / Loss: 1.245501 ---
+  Param 0: Value=4.2739, Grad=0.021811259413047637
+  Param 1: Value=1.8060, Grad=0.0007800173543430406
+  Param 2: Value=0.7948, Grad=0.020873325602530916
+  Param 3: Value=-3.3598, Grad=0.000981661375400031
+  Param 4: Value=0.0223, Grad=0.0003059727462372034
+  Param 5: Value=-0.1672, Grad=-0.0009550761471296433
+  Param 6: Value=-14.7220, Grad=2.981949789497366e-09
+  Max Abs Grad: 2.181126e-02
+------------------------------
+--- Epoch 11 / Loss: 1.243451 ---
+  Param 0: Value=4.2144, Grad=-0.01066107129546599
+  Param 1: Value=1.7118, Grad=0.002239186843379006
+  Param 2: Value=0.6989, Grad=0.009560104611793496
+  Param 3: Value=-3.4474, Grad=0.000548371510914041
+  Param 4: Value=0.0210, Grad=0.0003738500811754893
+  Param 5: Value=-0.1573, Grad=0.000800697014923844
+  Param 6: Value=-14.7220, Grad=-1.1000610218023505e-09
+  Max Abs Grad: 1.066107e-02
+------------------------------
+--- Epoch 21 / Loss: 1.242539 ---
+  Param 0: Value=4.2507, Grad=0.0027117988101346027
+  Param 1: Value=1.6360, Grad=-0.001122755930028261
+  Param 2: Value=0.6163, Grad=0.007356499600783704
+  Param 3: Value=-3.5274, Grad=0.000537225475567655
+  Param 4: Value=0.0203, Grad=0.0004959628846628943
+  Param 5: Value=-0.1539, Grad=0.0006607432291841038
+  Param 6: Value=-14.7220, Grad=2.5921814059190863e-10
+  Max Abs Grad: 7.356500e-03
+------------------------------
+--- Epoch 31 / Loss: 1.242162 ---
+  Param 0: Value=4.2569, Grad=-0.0026065221819483726
+  Param 1: Value=1.6426, Grad=-0.0007675411766574058
+  Param 2: Value=0.5468, Grad=0.002223701886525607
+  Param 3: Value=-3.6036, Grad=0.00037893943037893834
+  Param 4: Value=0.0196, Grad=0.0001165955802183825
+  Param 5: Value=-0.1554, Grad=0.0003246440744521279
+  Param 6: Value=-14.7220, Grad=-4.676912578991307e-10
+  Max Abs Grad: 2.606522e-03
+------------------------------
+--- Epoch 41 / Loss: 1.242052 ---
+  Param 0: Value=4.2703, Grad=-0.0012771639786470868
+  Param 1: Value=1.6685, Grad=-0.0005969778769864587
+  Param 2: Value=0.5132, Grad=0.0007343762951792644
+  Param 3: Value=-3.6533, Grad=0.000299230789322305
+  Param 4: Value=0.0196, Grad=-1.6789871088723643e-06
+  Param 5: Value=-0.1568, Grad=0.00010403719629920675
+  Param 6: Value=-14.7220, Grad=-2.8190782043144083e-10
+  Max Abs Grad: 1.277164e-03
+------------------------------
+--- Epoch 51 / Loss: 1.242033 ---
+  Param 0: Value=4.2761, Grad=0.00028289125914939293
+  Param 1: Value=1.6794, Grad=-0.0005910472967252625
+  Param 2: Value=0.5067, Grad=0.0007889163175364633
+  Param 3: Value=-3.6687, Grad=0.00028202716110879976
+  Param 4: Value=0.0199, Grad=7.994682208329095e-05
+  Param 5: Value=-0.1576, Grad=-2.515582259509962e-05
+  Param 6: Value=-14.7220, Grad=-6.763162717937036e-11
+  Max Abs Grad: 7.889163e-04
+------------------------------
+--- Epoch 61 / Loss: 1.242029 ---
+  Param 0: Value=4.2766, Grad=0.00017841267877508418
+  Param 1: Value=1.6831, Grad=-0.0005182081531118808
+  Param 2: Value=0.5053, Grad=0.0007115982718054589
+  Param 3: Value=-3.6732, Grad=0.00026856575565301213
+  Param 4: Value=0.0198, Grad=8.316912710566877e-06
+  Param 5: Value=-0.1577, Grad=-4.8796773557171355e-06
+  Param 6: Value=-14.7220, Grad=-7.016614502726712e-11
+  Max Abs Grad: 7.115983e-04
+------------------------------
+--- Epoch 71 / Loss: 1.242028 ---
+  Param 0: Value=4.2766, Grad=8.132907032810488e-05
+  Param 1: Value=1.6842, Grad=-0.0004899370793256672
+  Param 2: Value=0.5050, Grad=0.0006788492968301442
+  Param 3: Value=-3.6744, Grad=0.0002635880401664012
+  Param 4: Value=0.0197, Grad=-2.0896269912751818e-05
+  Param 5: Value=-0.1576, Grad=1.3201932125830728e-05
+  Param 6: Value=-14.7220, Grad=-7.884846703323834e-11
+  Max Abs Grad: 6.788493e-04
+------------------------------
+FINAL STATE: Epoch 80, Loss: 1.242027295512492
+  Raw (vecc) Parameters: [4.276634143839759, 1.6845706660797835, 0.5049421143784536, -3.6748571250485313, 0.01975709904058803, -0.1576501371312769, -14.722003002953935]
+  Interpretable Parameters:
+    sigma_sq  : 13.357306
+    range_lon : 0.185524
+    range_lat : 0.144130
+    range_time: 1.165159
+    advec_lat : 0.019757
+    advec_lon : -0.157650
+    nugget    : 0.000000
+Vecchia Optimization finished in 33777.22s. Results: [4.276634143839759, 1.6845706660797835, 0.5049421143784536, -3.6748571250485313, 0.01975709904058803, -0.1576501371312769, -14.722003002953935, 1.242027295512492]
+
+
+
+
+FINAL BEST STATE ACHIEVED (during training):
+Best Loss: -5.417
+--- Starting L-BFGS Optimization ---
+--- Step 1/10 / Loss: 0.873324 ---
+  Param 0: Value=3.4418, Grad=3.3592162907627095e-06
+  Param 1: Value=1.4701, Grad=-2.656205739085517e-07
+  Param 2: Value=0.6433, Grad=7.084165696749761e-07
+  Param 3: Value=-3.1100, Grad=1.6251055202362532e-07
+  Param 4: Value=-0.0201, Grad=4.0734998882772225e-07
+  Param 5: Value=-0.0499, Grad=9.37640110333851e-07
+  Param 6: Value=-3.5848, Grad=9.927500571744655e-08
+  Max Abs Grad: 3.359216e-06
+------------------------------
+
+Converged on gradient norm (max|grad| < 1e-05) at step 1
+FINAL STATE: Step 1, Loss: 0.8733236451494352
+  Raw (vecc) Parameters: [3.44179568715814, 1.470145607786535, 0.6433379654864579, -3.110008356526831, -0.020100419360925256, -0.049926096427264116, -3.584833563829665]
+  Interpretable Parameters:
+    sigma_sq  : 7.182518
+    range_lon : 0.229892
+    range_lat : 0.166657
+    range_time: 1.088563
+    advec_lat : -0.020100
+    advec_lon : -0.049926
+    nugget    : 0.027741
+Vecchia Optimization finished in 12023.22s. Results: [3.44179568715814, 1.470145607786535, 0.6433379654864579, -3.110008356526831, -0.020100419360925256, -0.049926096427264116, -3.584833563829665, 0.8733236451494352]
+

@@ -136,7 +136,7 @@ def cli(
     LBFGS_LR = 1.0
     LBFGS_MAX_STEPS = 10       
     LBFGS_HISTORY_SIZE = 100   
-    LBFGS_MAX_EVAL = 50        
+    LBFGS_MAX_EVAL = 80       # line search from 50 to 80
     DWL_MAX_STEPS = 20         
 
     DELTA_LAT, DELTA_LON = 0.044, 0.063 
@@ -253,7 +253,7 @@ def cli(
         # Set up Optimizer for Whittle
         optimizer_dw = torch.optim.LBFGS(
             params_list, lr=1.0, max_iter=20, history_size=100, 
-            line_search_fn="strong_wolfe", tolerance_grad=1e-5
+            line_search_fn="strong_wolfe", tolerance_grad=1e-7  # 1e-5 to 1e-7
         )
 
         print(f"Running Whittle L-BFGS on {DEVICE}...")
@@ -277,7 +277,15 @@ def cli(
                     Parameter(p.detach().clone().to(DEVICE).requires_grad_(True)) 
                     for p in params_list
                 ] 
-        
+
+        # 2. Apply the lower bound (-2) in-place on the parameter's data
+        last_param = params_list[-1]
+        last_param.data.clamp_min_(-2) 
+        # --- Verification ---
+        # The params_list is now implicitly updated with the capped parameter.
+        # The following line is NOT needed because clamp_min_ is IN-PLACE:
+        # params_list[-1] = last_param
+
         # detach otherwise vecc will try to backprop through dwl graph
   
         dw_estimates_loss = [x.item() for x in new_params_list] + [loss]
@@ -318,7 +326,8 @@ def cli(
                 new_params_list,
                 optimizer_vecc,
                 model_instance.matern_cov_aniso_STABLE_log_reparam, 
-                max_steps=LBFGS_MAX_STEPS # Outer loop steps
+                max_steps=LBFGS_MAX_STEPS, # Outer loop steps
+                grad_tol=1e-7  # Gradient tolerance
             )
 
         end_time = time.time()

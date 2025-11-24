@@ -14,7 +14,7 @@ scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/coarse_cen_map_without_de
 # mac
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_vecc_day_v05_112025.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_veccDWlbfgs_day_v05_112125.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_veccDWlbfgs_day_v05_112425.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_veccDWadams_day_v05_112225.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
@@ -52,86 +52,17 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vec
 
 
 
-
-### Job Order SLURM for both vecchia 
-
-# 18126   nov 20 2025
-``` cd ./jobscript/tco/gp_exercise ```
-```  nano fit_day_vecc_v05_nov20_18126.sh  ``` 
-```  sbatch fit_day_vecc_v05_nov20_18126.sh  ``` 
-
-``` 
-#!/bin/bash
-#SBATCH --job-name=vec_v05_nov20_18126                         # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/vec_nov20_18126_%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/vec_nov20_18126_%j.err # Standard error file (%j = JobID)
-#SBATCH --time=72:00:00                                            # Time limit
-#SBATCH --ntasks=1                                                # Number of tasks
-#SBATCH --cpus-per-task=40                                       # Number of CPU cores per task
-#SBATCH --mem=248G                                                 # Memory per node
-#SBATCH --partition=main                                           # Partition name
-
-#### Load the Anaconda module to use srun 
-module purge                                              
-module use /projects/community/modulefiles                 
-module load anaconda/2024.06-ts840 
-
-#### Initialize conda for the current shell session if not already done for the current shell session.
-eval "$(conda shell.bash hook)"
-conda activate faiss_env
-
-echo "Current date and time: $(date)"
-echo "fit_vecc_v05_nov_18126_save_estimates"
-
-srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_112025.py --v 0.5 --lr 0.03 --step 80 --epochs 100 --space "1, 1" --days "5,28" --mm-cond-number 8 --nheads 400 --no-keep-exact-loc 
-
-```
-
-## Exact location 
-
-``` cd ./jobscript/tco/gp_exercise ```
-```  nano el_fit_day_vecc_v05_nov20_18126.sh  ``` 
-```  sbatch el_fit_day_vecc_v05_nov20_18126.sh  ``` 
-
-``` 
-#!/bin/bash
-#SBATCH --job-name=vec_v05_nov20_18126                         # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/vec_nov20_18126_%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/vec_nov20_18126_%j.err # Standard error file (%j = JobID)
-#SBATCH --time=40:00:00                                            # Time limit
-#SBATCH --ntasks=1                                                # Number of tasks
-#SBATCH --cpus-per-task=16                                        # Number of CPU cores per task
-#SBATCH --mem=248G                                                 # Memory per node
-#SBATCH --partition=main                                            # Partition name
-
-#### Load the Anaconda module to use srun 
-module purge                                              
-module use /projects/community/modulefiles                 
-module load anaconda/2024.06-ts840 
-
-#### Initialize conda for the current shell session if not already done for the current shell session.
-eval "$(conda shell.bash hook)"
-conda activate faiss_env
-
-echo "Current date and time: $(date)"
-echo "fit_vecc_v05_nov_18126_save_estimates"
-
-srun python /home/jl2815/tco/exercise_25/st_model/fit_vecc_day_v05_112025.py --v 0.5 --lr 0.03 --step 80 --epochs 100 --space "1, 1" --days "0,6" --mm-cond-number 8 --nheads 400 --keep-exact-loc 
-
-```
-
-
 ### vecc lbfgs + dw initiate 
 
 ``` cd ./jobscript/tco/gp_exercise ```
-```  nano fit_day_veccDWlbfgs_v05_nov21_18126.sh  ``` 
-```  sbatch fit_day_veccDWlbfgs_v05_nov21_18126.sh  ``` 
+```  nano fit_day_veccDWlbfgs_v05_nov24_18126.sh  ``` 
+```  sbatch fit_day_veccDWlbfgs_v05_nov24_18126.sh  ``` 
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=vecDWlbfgs_v05_nov22_18126                         # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/vecDWlbfgs_nov21_18126_%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/vecDWlbfgs_nov21_18126_%j.err # Standard error file (%j = JobID)
+#SBATCH --job-name=vecDWlbfgs_v05_nov24_18126                         # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/vecDWlbfgs_nov24_18126_%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/vecDWlbfgs_nov24_18126_%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=48                                       # Number of CPU cores per task
@@ -150,7 +81,7 @@ conda activate faiss_env
 echo "Current date and time: $(date)"
 echo "fit_vecc_v05_nov_18126_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_veccDWlbfgs_day_v05_112125.py --v 0.5 --lr 0.03 --step 80 --epochs 100 --space "1, 1" --days "10,30" --mm-cond-number 8 --nheads 400 --no-keep-exact-loc 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_veccDWlbfgs_day_v05_112425.py --v 0.5 --lr 0.03 --step 80 --epochs 100 --space "1, 1" --days "0,10" --mm-cond-number 8 --nheads 400 --no-keep-exact-loc 
 
 echo "Current date and time: $(date)"
 

@@ -678,12 +678,13 @@ class fit_vecchia_lbfgs(VecchiaLikelihood):
                          params_list: List[torch.Tensor], 
                          optimizer: torch.optim.LBFGS, 
                          covariance_function: Callable, 
-                         max_steps: int = 50):
+                         max_steps: int = 50,
+                         grad_tol: float = 1e-7):
         """
         Fits the model using L-BFGS.
         """
 
-        grad_tol = 1e-5  # Outer convergence tolerance
+       # Outer convergence tolerance
         print("--- Starting L-BFGS Optimization ---")
 
         def closure():
