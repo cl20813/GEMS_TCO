@@ -1,0 +1,130 @@
+Current date and time: Sun Nov 23 23:43:54 EST 2025
+lat_range: [0, 3]
+lon_range: [123, 128]
+Subsetting data to lat: [0, 3], lon: [123, 128]
+nn: 43608
+Day 1, Vecc_Adams estimates: 
+ [4.2282, 1.664, 0.4819, -3.772, 0.0221, -0.1632, -1.7375]
+ full likelihood: 54505.22,
+ vecchia: 54543.99, 
+ whittle de-biased: 15738.31
+Day 1, Vecc_Lbfgs estimates: 
+ [4.2843, 1.7136, 0.4887, -3.7712, 0.0202, -0.1616, -14.722]
+ full likelihood: 54536.34,
+ vecchia: 54568.13, 
+ whittle de-biased: 15782.15
+Day 1, DW_Lbfgs estimates: 
+ [4.2739, 1.806, 0.7948, -3.3599, 0.0223, -0.1672, -11.8381]
+ full likelihood: 54605.76,
+ vecchia: 54635.08, 
+ whittle de-biased: 15341.55
+Day 2, Vecc_Adams estimates: 
+ [3.7634, 1.2864, 0.6458, -4.0586, 0.0018, -0.2219, 0.7243]
+ full likelihood: 58419.57,
+ vecchia: 58570.8, 
+ whittle de-biased: 15830.68
+Day 2, Vecc_Lbfgs estimates: 
+ [3.744, 1.2167, 0.6473, -4.0566, 0.0011, -0.2202, 0.7403]
+ full likelihood: 58418.44,
+ vecchia: 58568.89, 
+ whittle de-biased: 15855.98
+Day 2, DW_Lbfgs estimates: 
+ [4.12, 1.654, 0.8909, -3.4966, -0.0263, -0.2601, -0.0986]
+ full likelihood: 58621.87,
+ vecchia: 58787.83, 
+ whittle de-biased: 15351.46
+Day 3, Vecc_Adams estimates: 
+ [4.6186, 1.8689, 0.5469, -4.2134, -0.0402, -0.2456, -0.7427]
+ full likelihood: 59896.46,
+ vecchia: 60151.95, 
+ whittle de-biased: 16915.96
+Day 3, Vecc_Lbfgs estimates: 
+ [4.3943, 1.6058, 0.5026, -4.3046, -0.0389, -0.2451, 0.2605]
+ full likelihood: 59824.87,
+ vecchia: 60067.77, 
+ whittle de-biased: 16972.0
+Day 3, DW_Lbfgs estimates: 
+ [4.095, 1.6663, 0.6876, -3.3118, -0.05, -0.2666, -0.5033]
+ full likelihood: 60177.93,
+ vecchia: 60351.24, 
+ whittle de-biased: 15594.58
+Day 4, Vecc_Adams estimates: 
+ [4.1117, 1.6978, 0.7622, -4.0126, 0.0282, -0.1417, -0.2748]
+ full likelihood: 55965.0,
+ vecchia: 56162.47, 
+ whittle de-biased: 15066.37
+Day 4, Vecc_Lbfgs estimates: 
+ [3.9555, 1.4425, 0.7809, -4.0119, 0.0301, -0.1465, 0.1118]
+ full likelihood: 55989.96,
+ vecchia: 56183.33, 
+ whittle de-biased: 15228.33
+Day 4, DW_Lbfgs estimates: 
+ [3.9351, 1.807, 1.098, -3.5154, 0.0214, -0.1712, -0.5348]
+ full likelihood: 56345.31,
+ vecchia: 56658.67, 
+ whittle de-biased: 15890.49
+lat_range: [0, 3]
+lon_range: [128, 133]
+Subsetting data to lat: [0, 3], lon: [128, 133]
+nn: 44160
+Day 1, Vecc_Adams estimates: 
+ [4.2282, 1.664, 0.4819, -3.772, 0.0221, -0.1632, -1.7375]
+ full likelihood: 53506.71,
+ vecchia: 53633.2, 
+ whittle de-biased: 1179.4
+Day 1, Vecc_Lbfgs estimates: 
+ [4.2843, 1.7136, 0.4887, -3.7712, 0.0202, -0.1616, -14.722]
+ full likelihood: 53486.86,
+ vecchia: 53610.13, 
+ whittle de-biased: 1082.6
+Day 1, DW_Lbfgs estimates: 
+ [4.2739, 1.806, 0.7948, -3.3599, 0.0223, -0.1672, -11.8381]
+ full likelihood: 53573.44,
+ vecchia: 53721.36, 
+ whittle de-biased: 938.27
+Day 2, Vecc_Adams estimates: 
+ [3.7634, 1.2864, 0.6458, -4.0586, 0.0018, -0.2219, 0.7243]
+ full likelihood: 58778.52,
+ vecchia: 58774.32, 
+ whittle de-biased: 4650.8
+Day 2, Vecc_Lbfgs estimates: 
+ [3.744, 1.2167, 0.6473, -4.0566, 0.0011, -0.2202, 0.7403]
+ full likelihood: 58791.79,
+ vecchia: 58776.65, 
+ whittle de-biased: 4667.81
+Day 2, DW_Lbfgs estimates: 
+ [4.12, 1.654, 0.8909, -3.4966, -0.0263, -0.2601, -0.0986]
+ full likelihood: 58419.23,
+ vecchia: 58661.45, 
+ whittle de-biased: 3064.83
+Day 3, Vecc_Adams estimates: 
+ [4.6186, 1.8689, 0.5469, -4.2134, -0.0402, -0.2456, -0.7427]
+ full likelihood: 66269.82,
+ vecchia: 66307.99, 
+ whittle de-biased: 7439.51
+Day 3, Vecc_Lbfgs estimates: 
+ [4.3943, 1.6058, 0.5026, -4.3046, -0.0389, -0.2451, 0.2605]
+ full likelihood: 66400.63,
+ vecchia: 66327.02, 
+ whittle de-biased: 7526.47
+Day 3, DW_Lbfgs estimates: 
+ [4.095, 1.6663, 0.6876, -3.3118, -0.05, -0.2666, -0.5033]
+ full likelihood: 68794.79,
+ vecchia: 68973.86, 
+ whittle de-biased: 1520.57
+Day 4, Vecc_Adams estimates: 
+ [4.1117, 1.6978, 0.7622, -4.0126, 0.0282, -0.1417, -0.2748]
+ full likelihood: 60842.27,
+ vecchia: 61056.09, 
+ whittle de-biased: 2360.62
+Day 4, Vecc_Lbfgs estimates: 
+ [3.9555, 1.4425, 0.7809, -4.0119, 0.0301, -0.1465, 0.1118]
+ full likelihood: 60754.46,
+ vecchia: 60992.25, 
+ whittle de-biased: 2525.18
+Day 4, DW_Lbfgs estimates: 
+ [3.9351, 1.807, 1.098, -3.5154, 0.0214, -0.1712, -0.5348]
+ full likelihood: 61516.84,
+ vecchia: 61695.39, 
+ whittle de-biased: 501.28
+Current date and time: Mon Nov 24 00:17:16 EST 2025

@@ -186,7 +186,7 @@ conda activate faiss_env
 echo "Current date and time: $(date)"
 echo "fit_veccDWadams_v05_nov_18126_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_veccDWadams_day_v05_112225.py --v 0.5 --lr 0.01 --step 80 --epochs 80 --space "1, 1" --days "0,10" --mm-cond-number 8 --nheads 400 --no-keep-exact-loc 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_veccDWadams_day_v05_112225.py --v 0.5 --lr 0.01 --step 80 --epochs 80 --space "1, 1" --days "2,10" --mm-cond-number 8 --nheads 400 --no-keep-exact-loc 
 
 echo "Current date and time: $(date)"
 

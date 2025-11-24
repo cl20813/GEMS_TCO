@@ -297,14 +297,14 @@ def cli(
 
         # --- 💥 Set ADAMS Optimizer ---
 
-        lr = 0.01
+        lr = 0.1
         factor=0.5
         patience=5
-        epochs=80
+        epochs=60
         optimizer_vecc, scheduler = model_instance.set_optimizer(
                     new_params_list,     
                     lr=lr,  
-                    betas=(0.9, 0.999),
+                    betas=(0.9, 0.99),
                     eps=1e-4,          
                     scheduler_type='plateau',
                     patience=patience,
