@@ -35,7 +35,7 @@ sys.path.append("/cache/home/jl2815/tco")
 # Configure logging to a specific file path
 log_file_path = '/home/jl2815/tco/exercise_25/st_models/log/evaluate.log'
 
-from GEMS_TCO.kernels import spatio_temporal_kernels
+from GEMS_TCO.kernels_oct25 import spatio_temporal_kernels
 
 class diagnosis(spatio_temporal_kernels):
     ''' 

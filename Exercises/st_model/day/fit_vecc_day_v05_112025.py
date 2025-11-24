@@ -1,4 +1,5 @@
-# Standard libraries
+# difference from fit_veccDWlbfgs is that this one use fixed initial parameters
+# and does not use DW estimate as initial parameters
 import sys
 # Add your custom path
 sys.path.append("/cache/home/jl2815/tco")
