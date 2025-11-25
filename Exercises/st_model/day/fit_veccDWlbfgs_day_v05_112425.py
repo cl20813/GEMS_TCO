@@ -134,7 +134,7 @@ def cli(
 
     # Global L-BFGS Settings
     LBFGS_LR = 1.0
-    LBFGS_MAX_STEPS = 10       
+    LBFGS_MAX_STEPS = 20      # 10 to 20  
     LBFGS_HISTORY_SIZE = 100   
     LBFGS_MAX_EVAL = 80       # line search from 50 to 80
     DWL_MAX_STEPS = 20         

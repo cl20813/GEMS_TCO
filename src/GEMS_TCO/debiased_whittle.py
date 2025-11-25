@@ -195,8 +195,10 @@ class debiased_whittle_preprocess(full_vecc_dw_likelihoods):
         # convolution result, the kernel would need to be flipped. However, for a 
         # forward difference operator, defining the kernel for cross-correlation is more direct.
         # The kernel below is designed for cross-correlation to achieve the desired differencing.
-        diff_kernel = torch.tensor([[[[-2., 1.],
-                                    [ 1., 0.]]]], dtype=torch.float64)
+        #diff_kernel = torch.tensor([[[[-2., 1.],
+        #                            [ 1., 0.]]]], dtype=torch.float64)
+        diff_kernel = torch.tensor([[[[-1, 1],
+                                     [1, -1]]]], dtype=torch.float64)
 
         # 3. Apply convolution (which acts as cross-correlation)
         filtered_grid = F.conv2d(ozone_data, diff_kernel, padding='valid').squeeze()
@@ -878,7 +880,7 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         return final_natural_params_str, final_phi_params_str, final_raw_params_str, final_loss_rounded, epochs_completed
     
     @staticmethod
-    def run_lbfgs_tapered(params_list, optimizer, I_sample, n1, n2, p_time, taper_autocorr_grid, max_steps=50, device='cpu'):
+    def run_lbfgs_tapered(params_list, optimizer, I_sample, n1, n2, p_time, taper_autocorr_grid, max_steps=50, device='cpu',grad_tol=1e-5):
         """Training loop using L-BFGS optimizer with improved convergence checks."""
         
         params_list = [p.to(device) for p in params_list]
@@ -886,7 +888,6 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         steps_completed = 0
         DELTA_LAT, DELTA_LON = 0.044, 0.063 
         
-        grad_tol = 1e-5 
         loss_tol = 1e-12 
         
         best_loss = float('inf')
