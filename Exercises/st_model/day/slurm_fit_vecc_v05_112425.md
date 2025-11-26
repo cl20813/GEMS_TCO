@@ -97,8 +97,8 @@ echo "Current date and time: $(date)"
 ``` 
 #!/bin/bash
 #SBATCH --job-name=vecDWadams_v05_nov22_18126                         # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/vecDWadams_nov21_18126_%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/vecDWadams_nov21_18126_%j.err # Standard error file (%j = JobID)
+#SBATCH --output=/home/jl2815/tco/exercise_output/vecDWadams_nov26_18126_%j.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/vecDWadams_nov26_18126_%j.err # Standard error file (%j = JobID)
 #SBATCH --time=72:00:00                                            # Time limit
 #SBATCH --ntasks=1                                                # Number of tasks
 #SBATCH --cpus-per-task=48                                       # Number of CPU cores per task
@@ -117,7 +117,7 @@ conda activate faiss_env
 echo "Current date and time: $(date)"
 echo "fit_veccDWadams_v05_nov_18126_save_estimates"
 
-srun python /home/jl2815/tco/exercise_25/st_model/fit_veccDWadams_day_v05_112225.py --v 0.5 --lr 0.01 --step 80 --epochs 80 --space "1, 1" --days "2,10" --mm-cond-number 8 --nheads 400 --no-keep-exact-loc 
+srun python /home/jl2815/tco/exercise_25/st_model/fit_veccDWadams_day_v05_112225.py --v 0.5 --lr 0.01 --step 80 --epochs 80 --space "1, 1" --days "10,25" --mm-cond-number 8 --nheads 400 --no-keep-exact-loc 
 
 echo "Current date and time: $(date)"
 

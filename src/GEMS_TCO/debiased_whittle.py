@@ -713,7 +713,7 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
             print("Warning: NaN/Inf detected in final loss. Returning Inf penalty.")
             return torch.tensor(float('inf'), device=device, dtype=torch.float64)
 
-        return total_sum, n1, n2
+        return sum_loss, n1, n2 #total_sum to sum_loss
     
 
     # =========================================================================
