@@ -195,10 +195,10 @@ class debiased_whittle_preprocess(full_vecc_dw_likelihoods):
         # convolution result, the kernel would need to be flipped. However, for a 
         # forward difference operator, defining the kernel for cross-correlation is more direct.
         # The kernel below is designed for cross-correlation to achieve the desired differencing.
-        #diff_kernel = torch.tensor([[[[-2., 1.],
-        #                            [ 1., 0.]]]], dtype=torch.float64)
-        diff_kernel = torch.tensor([[[[-1, 1],
-                                     [1, -1]]]], dtype=torch.float64)
+        diff_kernel = torch.tensor([[[[-2., 1.],
+                                    [ 1., 0.]]]], dtype=torch.float64)
+        #diff_kernel = torch.tensor([[[[-1, 1],
+        #                             [1, -1]]]], dtype=torch.float64)
 
         # 3. Apply convolution (which acts as cross-correlation)
         filtered_grid = F.conv2d(ozone_data, diff_kernel, padding='valid').squeeze()
