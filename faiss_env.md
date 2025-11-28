@@ -20,15 +20,18 @@ Go to terminal in VSCode.
 ```conda create -n gems_gpu python=3.12 -y```    
 ```conda activate gems_gpu```    
 
+- This installs FAISS-CPU. It is NOT a dependency of PyTorch, so it won't override the GPU install.
+- To avoid dependency conflicts, it is safe to install conda first and then pip.
+-  ```pybind11``` is usually a dependency of ```FAISS``` and will be installed automatically
+  
+```conda install -c pytorch faiss-cpu numpy pandas matplotlib seaborn scikit-learn xarray netCDF4 ipykernel scipy -y```
+
 #### Install PyTorch, TorchVision, and TorchAudio via pip for MPS support
 #### the most reliable way to get the MPS-accelerated version for Apple Silicon.
 #### This command specifically installs the optimized PyTorch build for Mac GPU (MPS)
 ``` pip3 install torch torchvision torchaudio```    
 
-#### This installs FAISS-CPU. It is NOT a dependency of PyTorch, so it won't override the GPU install.
-#### ```pybind11``` is usually a dependency of ```FAISS``` and will be installed automatically
-``` conda install -c pytorch faiss-cpu ipykernel -y ```    
-```conda install numpy pandas matplotlib seaborn scikit-learn xarray netCDF4 ```         
+
 
 ### Install gems_tco packge on my macbook.     
 ```cd /Users/joonwonlee/Documents/GEMS_TCO-1/src```    
