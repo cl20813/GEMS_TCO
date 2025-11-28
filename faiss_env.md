@@ -5,13 +5,30 @@ Go to terminal in VSCode.
 ```conda create -n faiss_env python=3.12```       
 ```conda activate faiss_env```       
 ```conda install -c pytorch faiss-cpu```                                              # order matters, install this first because it's a core dependency.    
+```conda install pytorch::pytorch torchvision torchaudio -c pytorch```   
+
 ```conda install pybind11```                                                          # comfile c++ file       
 ```conda install numpy pandas matplotlib seaborn scikit-learn xarray netCDF4 ```            
-```conda install pytorch::pytorch torchvision torchaudio -c pytorch```       
+    
 ``` pip install typer```                                    
 ``` pip install git+https://github.com/patrick-kidger/torchcubicspline.git ```        # I need to install torch spline library.    
 
 ```for gpu use Amarel, os-mac doesn't support faiss-gpu```
+
+## Mac gpu environment
+
+```conda create -n gems_gpu python=3.12 -y```    
+```conda activate gems_gpu```    
+
+#### Install PyTorch, TorchVision, and TorchAudio via pip for MPS support
+#### the most reliable way to get the MPS-accelerated version for Apple Silicon.
+#### This command specifically installs the optimized PyTorch build for Mac GPU (MPS)
+``` pip3 install torch torchvision torchaudio```    
+
+#### This installs FAISS-CPU. It is NOT a dependency of PyTorch, so it won't override the GPU install.
+#### ```pybind11``` is usually a dependency of ```FAISS``` and will be installed automatically
+``` conda install -c pytorch faiss-cpu ipykernel -y ```    
+```conda install numpy pandas matplotlib seaborn scikit-learn xarray netCDF4 ```         
 
 ### Install gems_tco packge on my macbook.     
 ```cd /Users/joonwonlee/Documents/GEMS_TCO-1/src```    
