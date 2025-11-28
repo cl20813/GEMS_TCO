@@ -10,7 +10,9 @@ Go to terminal in VSCode.
 ```conda install pytorch::pytorch torchvision torchaudio -c pytorch```       
 ``` pip install typer```                                    
 ``` pip install git+https://github.com/patrick-kidger/torchcubicspline.git ```        # I need to install torch spline library.    
-        
+
+```for gpu use Amarel, os-mac doesn't support faiss-gpu```
+
 ### Install gems_tco packge on my macbook.     
 ```cd /Users/joonwonlee/Documents/GEMS_TCO-1/src```    
 ```/opt/anaconda3/envs/gems_tco/bin/python -m pip install -e . --use-pep517```   
@@ -100,6 +102,28 @@ This work but note that file name is .pyd for window and .so for linux and mac o
 # Amarel
 Make the same environment as above.
 
+#### Load CUDA module first, this is very important before creating environment and installing cuda
+
+module purge                                                  
+module use /projects/community/modulefiles                   
+module load anaconda/2024.06-ts840   
+module load cuda/11.7.1   
+
+conda create -n tco_gpu_env python=3.12    
+conda activate tco_gpu_env     
+   
+#### FAISS GPU
+conda install -c pytorch -c nvidia faiss-gpu
+
+#### PyTorch GPU (matching CUDA version)
+conda install pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvidia   
+
+#### Other libraries
+conda install pybind11 numpy pandas matplotlib seaborn scikit-learn xarray netCDF4    
+pip install typer     
+pip install git+https://github.com/patrick-kidger/torchcubicspline.git     
+
+# next    
 cd /home/jl2815/tco/GEMS_TCO/cpp_src
 
 NOTE: It should be ```maxmin_ancestor_cpp.so``` instead of ```maxmin_ancestor.so.``` The file should be compiled within the Linux system rather than compiling it on a local computer and transferring the file to Amarel, which is Linux-based.
@@ -111,8 +135,8 @@ NOTE: It should be ```maxmin_ancestor_cpp.so``` instead of ```maxmin_ancestor.so
 Now I need to add path so that python can find my libraries.
    
 nano ~/.bashrc      
-export PATH="/home/jl2815/.conda/envs/faiss_env/bin:$PATH"     
+export PATH="/home/jl2815/.conda/envs/tco_gpu_env/bin:$PATH"     
 source ~/.bashrc      
 
-conda activate faiss_env       
+conda activate tco_gpu_env       
  
