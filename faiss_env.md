@@ -107,21 +107,30 @@ Make the same environment as above.
 module purge                                                  
 module use /projects/community/modulefiles                   
 module load anaconda/2024.06-ts840   
-module load cuda/11.7.1   
+module load cuda/12.1.0   
 
-conda create -n tco_gpu_env python=3.12    
-conda activate tco_gpu_env     
-   
-#### FAISS GPU
-conda install -c pytorch -c nvidia faiss-gpu
+conda create -n gems_gpu python=3.12 -y    
+conda activate gems_gpu     
 
-#### PyTorch GPU (matching CUDA version)
-conda install pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvidia   
+pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu121
+#conda install pytorch torchvision torchaudio pytorch-cuda=12.1 faiss-gpu -c pytorch -c nvidia -y # use above
+
+#### Install Faiss and ipykernel (for Jupyter notebooks)
+conda install -c conda-forge faiss-gpu ipykernel -y
+
+#### verify 
+``` srun --partition=gpu --gres=gpu:1 --time=00:30:00 --mem=8G --pty bash ```
+``` module load cuda/12.1.0  ```
+``` python -c "import torch; print(f'CUDA 12.1 Installed: {torch.version.cuda}'); print(f'GPU Available: {torch.cuda.is_available()}')" ```
 
 #### Other libraries
 conda install pybind11 numpy pandas matplotlib seaborn scikit-learn xarray netCDF4    
 pip install typer     
 pip install git+https://github.com/patrick-kidger/torchcubicspline.git     
+
+####  remove installation file for space. It won't affect your environment
+conda clean --all -y
+pip cache purge
 
 # next    
 cd /home/jl2815/tco/GEMS_TCO/cpp_src
@@ -135,7 +144,7 @@ NOTE: It should be ```maxmin_ancestor_cpp.so``` instead of ```maxmin_ancestor.so
 Now I need to add path so that python can find my libraries.
    
 nano ~/.bashrc      
-export PATH="/home/jl2815/.conda/envs/tco_gpu_env/bin:$PATH"     
+export PATH="/home/jl2815/.conda/envs/gems_gpu/bin:$PATH"     
 source ~/.bashrc      
 
 conda activate tco_gpu_env       
