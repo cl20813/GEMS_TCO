@@ -59,7 +59,7 @@ class full_vecc_dw_likelihoods:
         self.params_tensor = torch.cat(self.params_list)
 
     def initiate_model_instance_vecchia(self, v, nns_map, mm_cond_number, nheads):
-        self.model_instance = kernels_reparam_space_time.fit_vecchia_adams(
+        self.model_instance = kernels_reparam_space_time.fit_vecchia_lbfgs(
                 smooth = v,
                 input_map = self.daily_hourly_map,
                 aggregated_data = self.daily_aggregated_tensor,
@@ -76,6 +76,7 @@ class full_vecc_dw_likelihoods:
         )
         return full_likelihood
     
+    '''   
     def compute_vecchia_nll(self):
         cov_map = self.model_instance.cov_structure_saver(self.params_tensor, self.model_instance.matern_cov_aniso_STABLE_log_reparam)
         vecchia_nll = self.model_instance.vecchia_space_time_fullbatch( # Change this to your chosen Vecchia implementation
@@ -84,6 +85,12 @@ class full_vecc_dw_likelihoods:
         cov_map = cov_map # Assuming cov_map is precomputed or computed internally
         )
         return vecchia_nll
+    '''
+
+    def compute_vecc_nll(self, params , covariance_function, cov_map):
+        vecc_nll = self.vecchia_space_time_fullbatch(params, covariance_function, cov_map)
+        return vecc_nll
+    
     
 
     def likelihood_wrapper(self,daily_aggregated_tensors_dw, daily_hourly_maps_dw):

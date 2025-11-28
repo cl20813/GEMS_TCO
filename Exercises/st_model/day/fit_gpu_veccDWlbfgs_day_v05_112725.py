@@ -18,7 +18,7 @@ import time
 # Custom imports
 
 
-from GEMS_TCO import kernels_reparam_space_time as kernels_reparam_space_time
+from GEMS_TCO import kernels_reparam_space_time_gpu as kernels_reparam_space_time
 from GEMS_TCO import orderings as _orderings 
 from GEMS_TCO import alg_optimization, alg_opt_Encoder
 
@@ -162,6 +162,10 @@ def cli(
         daily_hourly_map_vecc = daily_hourly_maps_vecc[day_idx]
         daily_aggregated_tensor_vecc = daily_aggregated_tensors_vecc[day_idx]
 
+        if isinstance(daily_aggregated_tensor_vecc, torch.Tensor):
+            daily_aggregated_tensor_vecc = daily_aggregated_tensor_vecc.to(DEVICE)
+
+
         # Create 1-item lists to satisfy class interfaces designed for lists
         # This prevents loading 30 days of unused data
 
@@ -290,10 +294,10 @@ def cli(
             new_params_list[-1].clamp_min_(-2.0)
 
         # Log Initial estimates (Whittle Results)
-        dw_estimates_loss = [x.item() for x in new_params_list] + [loss_scaled.item()]
+        dw_estimates_loss = [x.item() for x in new_params_list] + [loss_scaled]
         
         # (Your JSON/CSV saving code remains here...)
-        input_filepath = output_path / f"gpu_debiased_whittle_day_v05_LBFGS_NOV25_{ ( daily_aggregated_tensor_vecc[0].shape[0]/8 ) }.json"
+        input_filepath = output_path / f"gpu_debiased_whittle_day_v05_LBFGS_NOV25_{ ( daily_aggregated_tensor_vecc.shape[0]/8 ) }.json"
         res = alg_optimization( f"2024-07-{day_idx+1}", "DW_Nov25", ( daily_aggregated_tensor_vecc[0].shape[0]/8 ) , lr,  step , dw_estimates_loss, 0 , 0)
         # ... saving logic ...
 
@@ -308,6 +312,9 @@ def cli(
                 mm_cond_number = mm_cond_number,
                 nheads = nheads
             )
+
+
+
 
         # --- 💥 Set L-BFGS Optimizer ---
         optimizer_vecc = model_instance.set_optimizer(

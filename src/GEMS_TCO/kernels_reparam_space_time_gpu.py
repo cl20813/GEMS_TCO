@@ -405,8 +405,7 @@ class fit_vecchia_lbfgs(VecchiaBatched):
             print(f"\nWarning: Could not convert raw params. Error: {e}")
             return {}
 
-    def fit_vecc_lbfgs(self, params_list: List[torch.Tensor], optimizer: torch.optim.LBFGS, 
-                         covariance_function: Callable, max_steps: int = 50, grad_tol: float = 1e-7):
+    def fit_vecc_lbfgs(self, params_list: List[torch.Tensor], optimizer: torch.optim.LBFGS, max_steps: int = 50, grad_tol: float = 1e-7):
         
         # 1. Prepare GPU Data
         if not self.is_precomputed:
