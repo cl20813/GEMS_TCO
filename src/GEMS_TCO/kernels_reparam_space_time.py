@@ -82,7 +82,8 @@ class SpatioTemporalModel:
             else:
                 nns_map[i] = []
         self.nns_map = nns_map
-    
+
+
     # --- 💥 START REPLACEMENT ---
     # Re-adding the STABLE log-reparam functions 
     # that match your notebook code.
@@ -122,130 +123,136 @@ class SpatioTemporalModel:
 
             # 6. Calculate squared distance terms
             dist_sq = (delta_lat_adv.pow(2) * phi3) + delta_lon_adv.pow(2) + (delta_t.pow(2) * phi4)
-            
+          
             # 7. Return the final distance 'd'
             distance = torch.sqrt(dist_sq + 1e-8)
             
             return distance
+
+ 
+
     
     def matern_cov_aniso_STABLE_log_reparam(self, params: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-            """
-            Applies log-exp reparameterization.
-            This is the function your notebook is calling.
-            
-            params index map:
-            [0] log_phi1
-            [1] log_phi2
-            [2] log_phi3
-            [3] log_phi4
-            [4] advec_lat (unconstrained)
-            [5] advec_lon (unconstrained)
-            [6] log_nugget
-            """
-            
-            # --- A. Recover all parameters ---
-            phi1   = torch.exp(params[0])
-            phi2   = torch.exp(params[1]) # This is range_inv
-            phi3   = torch.exp(params[2]) # This is theta_3^2
-            phi4   = torch.exp(params[3]) # This is beta^2
-            nugget = torch.exp(params[6])
-            
-            advec_lat = params[4]
-            advec_lon = params[5]
-            
-            sigmasq = phi1 / phi2  # (sigma^2/range) / (1/range) = sigma^2
+        """
+        Applies log-exp reparameterization.
+        This is the function your notebook is calling.
+        
+        params index map:
+        [0] log_phi1
+        [1] log_phi2
+        [2] log_phi3
+        [3] log_phi4
+        [4] advec_lat (unconstrained)
+        [5] advec_lon (unconstrained)
+        [6] log_nugget
+        """
+        
+        # --- A. Recover all parameters ---
+        phi1   = torch.exp(params[0])
+        phi2   = torch.exp(params[1]) # This is range_inv
+        phi3   = torch.exp(params[2]) # This is theta_3^2
+        phi4   = torch.exp(params[3]) # This is beta^2
+        nugget = torch.exp(params[6])
+        
+        advec_lat = params[4]
+        advec_lon = params[5]
+        
+        sigmasq = phi1 / phi2  # (sigma^2/range) / (1/range) = sigma^2
 
-            # --- B. Call internal functions ---
-            dist_params = torch.stack([phi3, phi4, advec_lat, advec_lon])
-            distance = self.precompute_coords_aniso_STABLE(dist_params, x, y)
-            
-            # --- C. Calculate covariance ---
-            # NOTE: This assumes smooth=0.5 (Exponential kernel)
-            # C = sigma^2 * exp(-d / range) = sigmasq * exp(-d * range_inv)
-            cov = sigmasq * torch.exp(-distance * phi2)
+        # --- B. Call internal functions ---
+        dist_params = torch.stack([phi3, phi4, advec_lat, advec_lon])
+        distance = self.precompute_coords_aniso_STABLE(dist_params, x, y)
+        
+        # --- C. Calculate covariance ---
+        # NOTE: This assumes smooth=0.5 (Exponential kernel)
+        # C = sigma^2 * exp(-d / range) = sigmasq * exp(-d * range_inv)
+        cov = sigmasq * torch.exp(-distance * phi2)
 
-            # 4. Add nugget to the diagonal
-            if x.shape[0] == y.shape[0]:
-                 cov.diagonal().add_(nugget + 1e-8) 
-            
-            return cov
-    
-        # --- 💥 END REPLACEMENT ---
-        # The old matern_cov_anisotropy_v05, precompute_coords_anisotropy,
-        # and custom_distance_matrix functions are now gone.
+        # 4. Add nugget to the diagonal
+        if x.shape[0] == y.shape[0]:
+                cov.diagonal().add_(nugget + 1e-8) 
+        
+        return cov
+
+    # --- 💥 END REPLACEMENT ---
+    # The old matern_cov_anisotropy_v05, precompute_coords_anisotropy,
+    # and custom_distance_matrix functions are now gone.
         
     def full_likelihood_avg(self, params: torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
-                """
-                Calculates the AVERAGE Negative Log-Likelihood (NLL) per data point.
-                Includes an intercept (spatial trend).
-                """
-                input_data = input_data.to(torch.float64)
-                y = y.to(torch.float64)
+        """
+        Calculates the AVERAGE Negative Log-Likelihood (NLL) per data point.
+        Includes an intercept (spatial trend).
+        """
+        input_data = input_data.to(torch.float64)
+        y = y.to(torch.float64)
+        
+        # Get N (number of observations)
+        N = input_data.shape[0]
+        if N == 0:
+            return torch.tensor(0.0, device=self.device, dtype=torch.float64)
                 
-                # Get N (number of observations)
-                N = input_data.shape[0]
-                if N == 0:
-                    return torch.tensor(0.0, device=self.device, dtype=torch.float64)
-                        
-                # The covariance function is the spatio-temporal one
-                cov_matrix = covariance_function(params=params, y= input_data, x= input_data)
-                
-                try:
-                    jitter = torch.eye(cov_matrix.shape[0], device=self.device, dtype=torch.float64) * 1e-6
-                    L = torch.linalg.cholesky(cov_matrix + jitter)
-                except torch.linalg.LinAlgError:
-                    print("Warning: Cholesky decomposition failed.")
-                    return torch.tensor(torch.inf, device=params.device, dtype=params.dtype)
-                
-                log_det = 2 * torch.sum(torch.log(torch.diag(L)))
-                
-                # --- Spatial Trend (Intercept + Lat + Lon) ---
-                locs_original = input_data[:,:2].to(torch.float64) # [lat, lon]
-                intercept = torch.ones(locs_original.shape[0], 1, 
-                                    device=locs_original.device, 
-                                    dtype=torch.float64)
-                locs = torch.cat((intercept, locs_original), dim=1) # [1, lat, lon]
-                # --- End Trend ---
-                
-                if y.dim() == 1:
-                    y_col = y.unsqueeze(-1).to(torch.float64)
-                else:
-                    y_col = y.to(torch.float64)
+        # The covariance function is the spatio-temporal one
+        cov_matrix = covariance_function(params=params, y= input_data, x= input_data)
+        
+        try:
+            jitter = torch.eye(cov_matrix.shape[0], device=self.device, dtype=torch.float64) * 1e-6
+            L = torch.linalg.cholesky(cov_matrix + jitter)
+        except torch.linalg.LinAlgError:
+            print("Warning: Cholesky decomposition failed.")
+            return torch.tensor(torch.inf, device=params.device, dtype=params.dtype)
+        
+        log_det = 2 * torch.sum(torch.log(torch.diag(L)))
+        
+        # --- Spatial Trend (Intercept + Lat + Lon) ---
+        locs_original = input_data[:,:2].to(torch.float64) # [lat, lon]
+        intercept = torch.ones(locs_original.shape[0], 1, 
+                            device=locs_original.device, 
+                            dtype=torch.float64)
+        locs = torch.cat((intercept, locs_original), dim=1) # [1, lat, lon]
+        # --- End Trend ---
+        
+        if y.dim() == 1:
+            y_col = y.unsqueeze(-1).to(torch.float64)
+        else:
+            y_col = y.to(torch.float64)
 
-                C_inv_X = torch.cholesky_solve(locs, L, upper=False)  # (N, 3)
-                C_inv_y = torch.cholesky_solve(y_col, L, upper=False) # (N, 1)
+        combined_rhs = torch.cat((locs, y_col), dim=1) # (N, 4)
+        C_inv_combined = torch.cholesky_solve(combined_rhs, L, upper=False)
+        
+        C_inv_X = C_inv_combined[:, :3]
+        C_inv_y = C_inv_combined[:, 3:]
+        #C_inv_X = torch.cholesky_solve(locs, L, upper=False)  # (N, 3)
+        #C_inv_y = torch.cholesky_solve(y_col, L, upper=False) # (N, 1)
 
-                tmp1 = torch.matmul(locs.T, C_inv_X)       # (3, 3)
-                tmp2 = torch.matmul(locs.T, C_inv_y)       # (3, 1)
-                
-                try:
-                    jitter_beta = torch.eye(tmp1.shape[0], device=self.device, dtype=torch.float64) * 1e-8
-                    beta = torch.linalg.solve(tmp1 + jitter_beta, tmp2) # Solves for [b0, b1, b2]
-                except torch.linalg.LinAlgError:
-                    print("Warning: Could not solve for beta. X^T C_inv X may be singular.")
-                    return torch.tensor(torch.inf, device=locs.device, dtype=locs.dtype)
+        tmp1 = torch.matmul(locs.T, C_inv_X)       # (3, 3)
+        tmp2 = torch.matmul(locs.T, C_inv_y)       # (3, 1)
+        
+        try:
+            jitter_beta = torch.eye(tmp1.shape[0], device=self.device, dtype=torch.float64) * 1e-8
+            beta = torch.linalg.solve(tmp1 + jitter_beta, tmp2) # Solves for [b0, b1, b2]
+        except torch.linalg.LinAlgError:
+            print("Warning: Could not solve for beta. X^T C_inv X may be singular.")
+            return torch.tensor(torch.inf, device=locs.device, dtype=locs.dtype)
 
-                mu = torch.matmul(locs, beta) # (N, 1)
-                y_mu = y_col - mu
-                
-                C_inv_y_mu = torch.cholesky_solve(y_mu, L, upper=False)
-                quad_form = torch.matmul(y_mu.T, C_inv_y_mu) 
+        mu = torch.matmul(locs, beta) # (N, 1)
+        y_mu = y_col - mu
+        
+        C_inv_y_mu = torch.cholesky_solve(y_mu, L, upper=False)
+        quad_form = torch.matmul(y_mu.T, C_inv_y_mu) 
 
-                # --- NLL Calculation ---
-                
-                # 1. Core NLL (Log-det + Quad-form)
-                neg_log_lik_sum = 0.5 * (log_det + quad_form.squeeze())
-                
-                # 2. (Optional) Add constant term for the "true" NLL
-                # log_2pi = torch.log(torch.tensor(2 * np.pi, dtype=torch.float64, device=self.device))
-                # neg_log_lik_sum += 0.5 * N * log_2pi
-                
-                # 3. 💥 REVISED: Return the average NLL
-                neg_log_lik_avg = neg_log_lik_sum / N
-                
-                return  neg_log_lik_avg
-
-
+        # --- NLL Calculation ---
+        
+        # 1. Core NLL (Log-det + Quad-form)
+        neg_log_lik_sum = 0.5 * (log_det + quad_form.squeeze())
+        
+        # 2. (Optional) Add constant term for the "true" NLL
+        # log_2pi = torch.log(torch.tensor(2 * np.pi, dtype=torch.float64, device=self.device))
+        # neg_log_lik_sum += 0.5 * N * log_2pi
+        
+        # 3. 💥 REVISED: Return the average NLL
+        neg_log_lik_avg = neg_log_lik_sum / N
+        
+        return  neg_log_lik_avg
 
 
 # Assuming SpatioTemporalModel is defined above with 
@@ -257,103 +264,104 @@ class VecchiaLikelihood(SpatioTemporalModel):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
         self.nheads = nheads
 
-    def _build_conditioning_set(self, time_idx: int, index: int):
-        """
-        Helper function to build the conditioning set data.
-        (This function is unchanged, as its logic is correct)
-        """
-        current_np = self.input_map[self.key_list[time_idx]]
-        current_row = current_np[index].reshape(1, -1)
+        # Flag to ensure we only do this once
+        self.is_precomputed = False
+
+    def precompute_conditioning_sets(self):
+        print("Pre-computing Vecchia batches...")
+        self.precomputed_batches = [] 
         
-        mm_neighbors = self.nns_map[index]
-        past = list(mm_neighbors) 
-        data_list = []
+        key_list = list(self.input_map.keys())
+        cut_line = self.nheads
 
-        if past:
-            data_list.append(current_np[past])
-
-        if time_idx > 0:
-            one_hour_lag = self.input_map[self.key_list[time_idx - 1]]
-            data_list.append(one_hour_lag[past + [index], :])
-
-        if time_idx > 1:
-            two_hour_lag = self.input_map[self.key_list[time_idx - 2]]
-            data_list.append(two_hour_lag [past + [index], :])
-
-        if data_list:
-            conditioning_data = torch.vstack(data_list)
-        else:
-            conditioning_data = torch.empty((0, current_row.shape[1]), device=self.device, dtype=torch.float64)
-            
-        aggregated_arr = torch.vstack((current_row, conditioning_data))
-        return aggregated_arr.to(dtype=torch.float64)
-    
-    def cov_structure_saver(self, params: torch.Tensor, covariance_function: Callable) -> Dict[str,Any]:
-            """
-            Optimized version. Pre-computes all expensive parts.
-            NOW INCLUDES AN INTERCEPT (BETA_0).
-            """
-            cov_map = defaultdict(lambda: defaultdict(dict))
-            cut_line= self.nheads
-            key_list = list(self.input_map.keys())
-
-            # --- 💥 CHANGE 1: Loop over ALL time indices ---
-            # Was: for time_idx in range(0,3):
-            for time_idx in range(0, len(key_list)):
-            # --- END CHANGE 1 ---
-                if time_idx >= len(key_list):
-                    break
+        for time_idx in range(0, len(key_list)):
+            for index in range(cut_line, self.size_per_hour):
+                
+                # --- OLD LOGIC FROM _build_conditioning_set ---
+                # We run this logic ONCE.
                 current_np = self.input_map[key_list[time_idx]]
-
-                for index in range(cut_line, self.size_per_hour):
-                    
-                    aggregated_arr = self._build_conditioning_set(time_idx, index)
-                    
-                    locs_original = aggregated_arr[:, :2]
-                    intercept = torch.ones(locs_original.shape[0], 1, 
-                                        device=locs_original.device, 
-                                        dtype=torch.float64)
-                    locs = torch.cat((intercept, locs_original), dim=1)
-                    
-                    aggregated_y = aggregated_arr[:, 2] 
-
-                    cov_matrix = covariance_function(params=params, y= aggregated_arr, x= aggregated_arr )
-                    
-                    try:
-                        jitter = torch.eye(cov_matrix.shape[0], device=self.device, dtype=torch.float64) * 1e-6
-                        L_full = torch.linalg.cholesky(cov_matrix + jitter)
-                    except torch.linalg.LinAlgError:
-                        print(f"Warning: Cholesky (full) failed for {(time_idx, index)}")
-                        continue
-                        
-                    C_inv_locs = torch.cholesky_solve(locs, L_full, upper=False)
-                    tmp1 = torch.matmul(locs.T, C_inv_locs) # tmp1 is now (3, 3)
+                current_row = current_np[index].reshape(1, -1) # Target
                 
-                    sigma = cov_matrix[0, 0]
-                    cov_yx = cov_matrix[0, 1:]
-                    cov_xx = cov_matrix[1:, 1:]
-                    
-                    try:
-                        jitter_xx = torch.eye(cov_xx.shape[0], device=self.device, dtype=torch.float64) * 1e-6
-                        L_xx = torch.linalg.cholesky(cov_xx + jitter_xx)
-                    except torch.linalg.LinAlgError:
-                        print(f"Warning: Cholesky (partial) failed for {(time_idx, index)}")
-                        continue 
+                mm_neighbors = self.nns_map[index]
+                past = list(mm_neighbors) 
+                data_list = []
 
-                    z = torch.cholesky_solve(cov_yx.unsqueeze(-1), L_xx, upper=False)
-                    cond_mean_tmp = z.T 
-                    cov_ygivenx = sigma - torch.matmul(cond_mean_tmp, cov_yx.unsqueeze(-1)).squeeze()
-                    log_det = torch.log(cov_ygivenx)
+                if past:
+                    data_list.append(current_np[past])
+
+                if time_idx > 0:
+                    one_hour_lag = self.input_map[key_list[time_idx - 1]]
+                    data_list.append(one_hour_lag[past + [index], :])
+
+                #if time_idx > 1:
+                #    two_hour_lag = self.input_map[self.key_list[time_idx - 2]]
+                #    data_list.append(two_hour_lag [past + [index], :])
                 
-                    cov_map[(time_idx,index)] = {
-                        'tmp1': tmp1,
-                        'L_full': L_full, 
-                        'cov_ygivenx': cov_ygivenx, 
-                        'cond_mean_tmp': cond_mean_tmp, 
-                        'log_det': log_det, 
-                        'locs': locs.clone(),
-                    }
-            return cov_map
+                if data_list:
+                    conditioning_data = torch.vstack(data_list).to(dtype=torch.float64, device=self.device)
+                else:
+                    conditioning_data = torch.empty((0, current_row.shape[1]), device=self.device, dtype=torch.float64)
+                
+                #target_data = torch.tensor(current_row, dtype=torch.float64, device=self.device)
+                target_data = current_row.clone().detach().to(dtype=torch.float64, device=self.device)
+
+                # Store in the list
+                # We separate Neighbors and Target to make the math easier later
+                batch_item = {
+                    'key': (time_idx, index),
+                    'x_neigh': conditioning_data,       # Neighbors (Coordinates + Data)
+                    'x_target': target_data             # Target (Coordinates + Data)
+                }
+                self.precomputed_batches.append(batch_item)
+                
+        self.is_precomputed = True
+        print(f"Pre-computed {len(self.precomputed_batches)} batches.")
+
+    def cov_structure_saver(self, params: torch.Tensor, covariance_function: Callable) -> Dict[str,Any]:
+        """
+        Optimized version. 
+        Removed redundant explicit mean calculations.
+        """
+        cov_map = {} # Standard dict is slightly faster than defaultdict for simple storage
+
+        for batch in self.precomputed_batches:
+            map_key = batch['key'] # (time_idx, index)
+
+            aggregated_arr = torch.cat((batch['x_neigh'], batch['x_target']), dim=0)
+
+            locs_original = aggregated_arr[:, :2]
+            intercept = torch.ones(locs_original.shape[0], 1, 
+                                device=locs_original.device, 
+                                dtype=torch.float64)
+            locs = torch.cat((intercept, locs_original), dim=1)
+            
+            cov_matrix = covariance_function(params=params, y=aggregated_arr, x=aggregated_arr)
+            
+            try:
+                jitter = torch.eye(cov_matrix.shape[0], device=self.device, dtype=torch.float64) * 1e-6
+                L_full = torch.linalg.cholesky(cov_matrix + jitter)
+            except torch.linalg.LinAlgError:
+                print(f"Warning: Cholesky (full) failed for {map_key}")
+                continue
+
+            # --- PRE-COMPUTATION FOR BETA (GLS) ---
+            # Solve X = L @ A  ->  L^{-1} X
+            C_inv_locs = torch.cholesky_solve(locs, L_full, upper=False)
+            tmp1 = torch.matmul(locs.T, C_inv_locs) # (3, 3)
+                                
+            # We only need the Conditional Variance (bottom-right element)
+            sigma_cond = L_full[-1, -1]
+            log_det = 2 * torch.log(sigma_cond)
+        
+            cov_map[map_key] = {
+                'tmp1': tmp1,
+                'L_full': L_full, 
+                'log_det': log_det, 
+                'locs': locs.clone(),
+                # 'sigma_cond': sigma_cond # Optional: save if you want to debug
+            }
+        return cov_map
+
 
     def vecchia_space_time_fullbatch(self, params: torch.Tensor, covariance_function: Callable, cov_map:Dict[str,Any]) -> torch.Tensor:
             """
@@ -361,6 +369,9 @@ class VecchiaLikelihood(SpatioTemporalModel):
             (This function now correctly uses the specific cov_map 
              for every time_idx).
             """
+            if not self.is_precomputed:
+                raise RuntimeError("Error: You must call model.precompute_conditioning_sets() before fitting!")
+        
             cut_line= self.nheads
             key_list = list(self.input_map.keys())
             if not key_list:
@@ -386,54 +397,47 @@ class VecchiaLikelihood(SpatioTemporalModel):
             vecchia_nll_sum = torch.tensor(0.0, device=self.device, dtype=torch.float64)
             N_tail = 0
             
-            for time_idx in range(0,len(self.input_map)):
-        
-                for index in range(cut_line, self.size_per_hour):
-                    
-                    # --- 💥 CHANGE 2: Use the specific map_key for ALL t ---
-                    # Was: map_key = (time_idx, index) if time_idx < 2 else (2, index)
-                    map_key = (time_idx, index)
-                    # --- END CHANGE 2 ---
-                    
-                    if map_key not in cov_map:
-                        continue 
-                        
-                    # Load all pre-computed structural components
-                    tmp1 = cov_map[map_key]['tmp1']
-                    L_full = cov_map[map_key]['L_full']
-                    locs = cov_map[map_key]['locs']
-                    cov_ygivenx = cov_map[map_key]['cov_ygivenx']
-                    cond_mean_tmp = cov_map[map_key]['cond_mean_tmp']
-                    log_det = cov_map[map_key]['log_det']
-
-                    # Note: We re-build this small array, which is fast.
-                    # We don't save it in cov_map because it contains 'y' values.
-                    aggregated_arr = self._build_conditioning_set(time_idx, index)
-                    aggregated_y = aggregated_arr[:, 2]
-                    current_y = aggregated_y[0]
-                    mu_neighbors_y = aggregated_y[1:]
-
-                    C_inv_y = torch.cholesky_solve(aggregated_y.unsqueeze(-1), L_full, upper=False)
-                    tmp2 = torch.matmul(locs.T, C_inv_y) # (3, 1)
-                    
-                    try:
-                        jitter_beta = torch.eye(tmp1.shape[0], device=self.device, dtype=torch.float64) * 1e-8
-                        beta = torch.linalg.solve(tmp1 + jitter_beta, tmp2) 
-                    except torch.linalg.LinAlgError:
-                        print(f"Warning: Could not solve for beta (Vecchia) at {(time_idx, index)}")
-                        continue 
-                        
-                    mu = torch.matmul(locs, beta).squeeze() # (N+1,)
-                    mu_current = mu[0]
-                    mu_neighbors = mu[1:]
-                    
-                    cond_mean = mu_current + torch.matmul(cond_mean_tmp, (mu_neighbors_y - mu_neighbors).unsqueeze(-1)).squeeze()
-                    alpha = current_y - cond_mean
-                    quad_form = alpha**2 * (1 / cov_ygivenx)
+            for batch in self.precomputed_batches:
                 
-                    vecchia_nll_sum += 0.5 * (log_det + quad_form)
-                    N_tail += 1
-            # --- End Vecchia Calculation ---
+                # --- 💥 CHANGE 2: Use the specific map_key for ALL t ---
+                # Was: map_key = (time_idx, index) if time_idx < 2 else (2, index)
+                map_key = batch['key']
+                # --- END CHANGE 2 ---
+
+                if map_key not in cov_map:
+                    continue 
+                    
+                # Load all pre-computed structural components
+                tmp1 = cov_map[map_key]['tmp1']
+                L_full = cov_map[map_key]['L_full']
+                locs = cov_map[map_key]['locs']
+                log_det = cov_map[map_key]['log_det']
+
+                # Note: We re-build this small array, which is fast.
+                # We don't save it in cov_map because it contains 'y' values.
+                aggregated_arr = torch.cat((batch['x_neigh'], batch['x_target']), dim=0)
+                y_vector = aggregated_arr[:, 2]
+
+                C_inv_y = torch.cholesky_solve(y_vector.unsqueeze(-1), L_full, upper=False)
+                tmp2 = torch.matmul(locs.T, C_inv_y) # (3, 1)
+                
+                try:
+                    jitter_beta = torch.eye(tmp1.shape[0], device=self.device, dtype=torch.float64) * 1e-8
+                    beta = torch.linalg.solve(tmp1 + jitter_beta, tmp2) 
+                except torch.linalg.LinAlgError:
+                    print(f"Warning: Could not solve for beta (Vecchia) at {(time_idx, index)}")
+                    continue 
+                    
+                mu_vector = torch.matmul(locs, beta).squeeze() # (N+1,)
+
+                residuals = (y_vector - mu_vector).unsqueeze(-1) # Shape (N+1, 1)
+                z_full = torch.linalg.solve_triangular(L_full, residuals, upper=False)
+                z_target = z_full[-1, 0]       # The standardized conditional residual
+                quad_form = z_target ** 2
+
+                vecchia_nll_sum += 0.5 * (log_det + quad_form)
+                N_tail += 1
+        # --- End Vecchia Calculation ---
 
             
             # --- Final Calculation (Unchanged) ---
@@ -444,6 +448,7 @@ class VecchiaLikelihood(SpatioTemporalModel):
                 return torch.tensor(0.0, device=self.device, dtype=torch.float64)
 
             return total_nll_sum / total_points
+
 
     def compute_vecc_nll(self, params , covariance_function, cov_map):
         vecc_nll = self.vecchia_space_time_fullbatch(params, covariance_function, cov_map)
@@ -683,6 +688,10 @@ class fit_vecchia_lbfgs(VecchiaLikelihood):
         """
         Fits the model using L-BFGS.
         """
+
+
+        if not self.is_precomputed:
+            self.precompute_conditioning_sets()
 
        # Outer convergence tolerance
         print("--- Starting L-BFGS Optimization ---")
