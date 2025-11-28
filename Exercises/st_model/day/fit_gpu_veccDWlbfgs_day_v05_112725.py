@@ -136,7 +136,7 @@ def cli(
     LBFGS_LR = 1.0
     LBFGS_MAX_STEPS = 10      # 10 to 20  
     LBFGS_HISTORY_SIZE = 100   
-    LBFGS_MAX_EVAL = 80       # line search from 50 to 80
+    LBFGS_MAX_EVAL = 100       # line search from 50 to 80
     DWL_MAX_STEPS = 20         
 
     DELTA_LAT, DELTA_LON = 0.044, 0.063 
