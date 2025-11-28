@@ -187,80 +187,89 @@ class VecchiaBatched(SpatioTemporalModel):
         self.Heads_data = None 
 
     def precompute_conditioning_sets(self):
-        """Prepares GPU tensors with Padding for Batched execution."""
-        print("Pre-computing Batched Tensors (Padding Strategy)...", end=" ")
-        
-        key_list = list(self.input_map.keys())
-        cut_line = self.nheads
-        
-        # 1. Heads Data
-        heads_list = []
-        for key in key_list:
-            day_data = self.input_map[key]
-            if isinstance(day_data, np.ndarray):
-                head_chunk = torch.from_numpy(day_data[:cut_line]).to(self.device)
-            else:
-                head_chunk = day_data[:cut_line].clone().detach().to(self.device)
-            heads_list.append(head_chunk)
-        self.Heads_data = torch.cat(heads_list, dim=0).to(torch.float64)
-
-        # 2. Tails Data (Task List)
-        tasks = []
-        for time_idx, key in enumerate(key_list):
-            day_data = self.input_map[key]
-            indices = range(cut_line, len(day_data))
-            for idx in indices:
-                tasks.append((time_idx, idx))
-
-        total_vecchia_points = len(tasks)
-        
-        # 3. Allocating Tensors (1e6 padding for X makes distance infinite -> Cov 0)
-        self.X_batch = torch.full((total_vecchia_points, self.max_neighbors + 1, 3), 1e6, device=self.device, dtype=torch.float64)
-        self.Y_batch = torch.zeros((total_vecchia_points, self.max_neighbors + 1, 1), device=self.device, dtype=torch.float64)
-        self.Locs_batch = torch.zeros((total_vecchia_points, self.max_neighbors + 1, 3), device=self.device, dtype=torch.float64)
-
-        # 4. Fill Tensors
-        for i, (time_idx, index) in enumerate(tasks):
-            current_np = self.input_map[key_list[time_idx]]
-            current_row = current_np[index].reshape(1, -1) 
-            mm_neighbors = self.nns_map[index]
-            past = list(mm_neighbors)
+            """Prepares GPU tensors with Padding for Batched execution."""
+            print("Pre-computing Batched Tensors (Padding Strategy)...", end=" ")
             
-            data_list = []
-            if past: data_list.append(current_np[past])
-            if time_idx > 0: data_list.append(self.input_map[key_list[time_idx - 1]][past + [index], :])
-            if time_idx > 1: data_list.append(self.input_map[key_list[time_idx - 2]][past + [index], :])
-
-            if data_list:
-                if isinstance(data_list[0], np.ndarray):
-                    neighbors_block = torch.from_numpy(np.vstack(data_list)).to(self.device)
+            key_list = list(self.input_map.keys())
+            cut_line = self.nheads
+            
+            # 1. Heads Data
+            heads_list = []
+            for key in key_list:
+                day_data = self.input_map[key]
+                if isinstance(day_data, np.ndarray):
+                    head_chunk = torch.from_numpy(day_data[:cut_line]).to(self.device)
                 else:
-                    neighbors_block = torch.vstack(data_list).to(self.device)
-            else:
-                neighbors_block = torch.empty((0, current_row.shape[1]), device=self.device)
+                    head_chunk = day_data[:cut_line].clone().detach().to(self.device)
+                heads_list.append(head_chunk)
+            self.Heads_data = torch.cat(heads_list, dim=0).to(torch.float64)
 
-            if isinstance(current_row, np.ndarray):
-                target_block = torch.from_numpy(current_row).to(self.device)
-            else:
-                target_block = current_row.clone().detach().to(self.device)
+            # 2. Tails Data (Task List)
+            tasks = []
+            for time_idx, key in enumerate(key_list):
+                day_data = self.input_map[key]
+                indices = range(cut_line, len(day_data))
+                for idx in indices:
+                    tasks.append((time_idx, idx))
 
-            combined_data = torch.cat([neighbors_block, target_block], dim=0)
-            actual_len = combined_data.shape[0]
-            start_slot = (self.max_neighbors + 1) - actual_len
+            total_vecchia_points = len(tasks)
             
-            # Fill Batch (Columns: 0=Lat, 1=Lon, 2=Val, 3=Time)
-            self.X_batch[i, start_slot:, 0] = combined_data[:, 0]
-            self.X_batch[i, start_slot:, 1] = combined_data[:, 1]
-            self.X_batch[i, start_slot:, 2] = combined_data[:, 3]
-            self.Y_batch[i, start_slot:, 0] = combined_data[:, 2]
+            # --- 💥 FIX: ALLOCATE FOR MAX LAGS (Current + 2 Lags) ---
+            # Each block is (Neighbors + Target). We might have up to 3 blocks (t, t-1, t-2).
+            max_storage_dim = (self.max_neighbors + 1) * 3
             
-            # Trend Intercept + Coords
-            self.Locs_batch[i, start_slot:, 0] = 1.0 
-            self.Locs_batch[i, start_slot:, 1] = combined_data[:, 0] 
-            self.Locs_batch[i, start_slot:, 2] = combined_data[:, 1] 
+            # 3. Allocating Tensors (1e6 padding -> Covariance 0)
+            self.X_batch = torch.full((total_vecchia_points, max_storage_dim, 3), 1e6, device=self.device, dtype=torch.float64)
+            self.Y_batch = torch.zeros((total_vecchia_points, max_storage_dim, 1), device=self.device, dtype=torch.float64)
+            self.Locs_batch = torch.zeros((total_vecchia_points, max_storage_dim, 3), device=self.device, dtype=torch.float64)
 
-        self.is_precomputed = True
-        print(f"Done. Heads: {self.Heads_data.shape[0]}, Batched Tails: {self.X_batch.shape[0]}")
+            # 4. Fill Tensors
+            for i, (time_idx, index) in enumerate(tasks):
+                current_np = self.input_map[key_list[time_idx]]
+                current_row = current_np[index].reshape(1, -1) 
+                mm_neighbors = self.nns_map[index]
+                past = list(mm_neighbors)
+                
+                data_list = []
+                # Current
+                if past: data_list.append(current_np[past])
+                # Lag 1
+                if time_idx > 0: data_list.append(self.input_map[key_list[time_idx - 1]][past + [index], :])
+                # Lag 2
+                if time_idx > 1: data_list.append(self.input_map[key_list[time_idx - 2]][past + [index], :])
+
+                if data_list:
+                    if isinstance(data_list[0], np.ndarray):
+                        neighbors_block = torch.from_numpy(np.vstack(data_list)).to(self.device)
+                    else:
+                        neighbors_block = torch.vstack(data_list).to(self.device)
+                else:
+                    neighbors_block = torch.empty((0, current_row.shape[1]), device=self.device)
+
+                if isinstance(current_row, np.ndarray):
+                    target_block = torch.from_numpy(current_row).to(self.device)
+                else:
+                    target_block = current_row.clone().detach().to(self.device)
+
+                combined_data = torch.cat([neighbors_block, target_block], dim=0)
+                actual_len = combined_data.shape[0]
+                
+                # --- 💥 FIX: Start Slot based on new Max Dimension ---
+                start_slot = max_storage_dim - actual_len
+                
+                # Fill Batch (Columns: 0=Lat, 1=Lon, 2=Val, 3=Time)
+                self.X_batch[i, start_slot:, 0] = combined_data[:, 0]
+                self.X_batch[i, start_slot:, 1] = combined_data[:, 1]
+                self.X_batch[i, start_slot:, 2] = combined_data[:, 3]
+                self.Y_batch[i, start_slot:, 0] = combined_data[:, 2]
+                
+                # Trend Intercept + Coords
+                self.Locs_batch[i, start_slot:, 0] = 1.0 
+                self.Locs_batch[i, start_slot:, 1] = combined_data[:, 0] 
+                self.Locs_batch[i, start_slot:, 2] = combined_data[:, 1] 
+
+            self.is_precomputed = True
+            print(f"Done. Heads: {self.Heads_data.shape[0]}, Batched Tails: {self.X_batch.shape[0]}")
 
     def batched_manual_dist(self, dist_params, x_batch):
         """Batched Manual Broadcasting Distance."""
