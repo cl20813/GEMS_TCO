@@ -213,10 +213,10 @@ class debiased_whittle_preprocess(full_vecc_dw_likelihoods):
         # convolution result, the kernel would need to be flipped. However, for a 
         # forward difference operator, defining the kernel for cross-correlation is more direct.
         # The kernel below is designed for cross-correlation to achieve the desired differencing.
-        #diff_kernel = torch.tensor([[[[-2., 1.],
-        #                            [ 1., 0.]]]], dtype=torch.float64)
-        diff_kernel = torch.tensor([[[[-1, 1],
-                                     [1, -1]]]], dtype=torch.float64)
+        diff_kernel = torch.tensor([[[[-2., 1.],
+                                    [ 1., 0.]]]], dtype=torch.float64)
+        #diff_kernel = torch.tensor([[[[-1, 1],
+        #                             [1, -1]]]], dtype=torch.float64)
 
         # 3. Apply convolution (which acts as cross-correlation)
         filtered_grid = F.conv2d(ozone_data, diff_kernel, padding='valid').squeeze()
@@ -270,6 +270,7 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
     # =========================================================================
     # 1. Tapering & Data Functions
     # =========================================================================
+    ''' 
     @staticmethod
     def cgn_hamming(u, n1, n2):
         """Computes a 2D Hamming window."""
@@ -282,6 +283,22 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         hamming1 = 0.54 + 0.46 * torch.cos(2.0 * torch.pi * u1_tensor / n1_eff)
         hamming2 = 0.54 + 0.46 * torch.cos(2.0 * torch.pi * u2_tensor / n2_eff)
         return hamming1 * hamming2
+    '''
+    
+    @staticmethod
+    def cgn_hamming(u, n1, n2):
+        u1, u2 = u
+        device = u1.device if isinstance(u1, torch.Tensor) else (u2.device if isinstance(u2, torch.Tensor) else torch.device('cpu'))
+        u1_tensor = u1.to(device) if isinstance(u1, torch.Tensor) else torch.tensor(u1, device=device, dtype=torch.float64)
+        u2_tensor = u2.to(device) if isinstance(u2, torch.Tensor) else torch.tensor(u2, device=device, dtype=torch.float64)
+        n1_eff = float(n1) if n1 > 0 else 1.0
+        n2_eff = float(n2) if n2 > 0 else 1.0
+
+        # FIXED: Changed + to -
+        hamming1 = 0.54 - 0.46 * torch.cos(2.0 * torch.pi * u1_tensor / n1_eff)
+        hamming2 = 0.54 - 0.46 * torch.cos(2.0 * torch.pi * u2_tensor / n2_eff)
+        return hamming1 * hamming2
+    
 
     @staticmethod
     def calculate_taper_autocorrelation_fft(taper_grid, n1, n2, device):
