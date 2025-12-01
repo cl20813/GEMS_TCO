@@ -5,13 +5,40 @@ Go to terminal in VSCode.
 ```conda create -n faiss_env python=3.12```       
 ```conda activate faiss_env```       
 ```conda install -c pytorch faiss-cpu```                                              # order matters, install this first because it's a core dependency.    
+```conda install pytorch::pytorch torchvision torchaudio -c pytorch```   
+
 ```conda install pybind11```                                                          # comfile c++ file       
 ```conda install numpy pandas matplotlib seaborn scikit-learn xarray netCDF4 ```            
-```conda install pytorch::pytorch torchvision torchaudio -c pytorch```       
+    
 ``` pip install typer```                                    
 ``` pip install git+https://github.com/patrick-kidger/torchcubicspline.git ```        # I need to install torch spline library.    
 
 ```for gpu use Amarel, os-mac doesn't support faiss-gpu```
+
+## Mac gpu environment
+
+```conda create -n gems_gpu python=3.12 -y```    
+```conda activate gems_gpu```    
+
+Install FAISS-CPU (First! This sets the base libraries)
+```conda install -c pytorch faiss-cpu -y```
+
+- This installs FAISS-CPU. It is NOT a dependency of PyTorch, so it won't override the GPU install.
+- To avoid dependency conflicts, it is safe to install conda first and then pip.
+-  ```pybind11``` is usually a dependency of ```FAISS``` and will be installed automatically
+
+```conda install pytorch::pytorch torchvision torchaudio -c pytorch -y```
+```conda install pybind11 numpy pandas matplotlib seaborn scikit-learn xarray netCDF4 ipykernel -y```
+
+Install Pip-only dependencies (Added 'typer' here to fix your error)    
+pip install typer   
+pip install git+https://github.com/patrick-kidger/torchcubicspline.git
+
+# 7. Install your local package (GEMS_TCO)
+# We use "--no-build-isolation" to stop Pip from messing up the Conda NumPy
+cd /Users/joonwonlee/Documents/GEMS_TCO-1/src
+pip install -e . --no-build-isolation
+
 
 ### Install gems_tco packge on my macbook.     
 ```cd /Users/joonwonlee/Documents/GEMS_TCO-1/src```    
