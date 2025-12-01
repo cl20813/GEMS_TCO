@@ -92,7 +92,7 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_veccDWlbfgs_day_v05_11
     --step 80 \
     --epochs 100 \
     --space "1, 1" \
-    --days "0,30" \
+    --days "20,30" \
     --mm-cond-number 8 \
     --nheads 400 \
     --no-keep-exact-loc 

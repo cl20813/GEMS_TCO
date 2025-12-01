@@ -58,6 +58,8 @@ class full_vecc_dw_likelihoods:
         ]
         self.params_tensor = torch.cat(self.params_list)
 
+
+
     def initiate_model_instance_vecchia(self, v, nns_map, mm_cond_number, nheads):
         self.model_instance = kernels_reparam_space_time.fit_vecchia_lbfgs(
                 smooth = v,
@@ -67,6 +69,9 @@ class full_vecc_dw_likelihoods:
                 mm_cond_number = mm_cond_number,
                 nheads = nheads
             )
+
+
+
     def compute_full_likelihoods(self):
         full_likelihood = self.model_instance.full_likelihood_avg(
             params = self.params_tensor, 
@@ -87,15 +92,21 @@ class full_vecc_dw_likelihoods:
         return vecchia_nll
     '''
 
-    def compute_vecc_nll(self, params , covariance_function, cov_map):
-        vecc_nll = self.vecchia_space_time_fullbatch(params, covariance_function, cov_map)
+    def compute_vecchia_nll(self,params,  covariance_function):
+        if not self.model_instance.is_precomputed:
+            self.model_instance.precompute_conditioning_sets()
+
+
+        cov_map = self.model_instance.cov_structure_saver(params, covariance_function)
+        vecc_nll = self.model_instance.compute_vecc_nll(params, covariance_function, cov_map)
         return vecc_nll
     
     
 
-    def likelihood_wrapper(self,daily_aggregated_tensors_dw, daily_hourly_maps_dw):
+    def likelihood_wrapper(self,params, cov_fun, daily_aggregated_tensors_dw, daily_hourly_maps_dw):
         full_nll = self.compute_full_likelihoods()
-        vecc_nll = self.compute_vecchia_nll()
+        vecc_nll = self.compute_vecchia_nll(params, cov_fun)
+        #vecc_nll = self.compute_vecchia_nll()
  
 
         # --- Debiased Whittle Configuration ---
