@@ -295,6 +295,12 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         n2_eff = float(n2) if n2 > 0 else 1.0
 
         # FIXED: Changed + to -
+        # Edge: u=0 -> weight 0.08, this is the taper 
+        # At quarter u=N/4,   0.54 - 0.46*cos(pi/2) = 0.54
+        # At Center u=N,      0.54 - 0.46*cos(pi)   = 1
+        # After this again goes back to 0.54 and 0.08 to other edge.
+
+
         hamming1 = 0.54 - 0.46 * torch.cos(2.0 * torch.pi * u1_tensor / n1_eff)
         hamming2 = 0.54 - 0.46 * torch.cos(2.0 * torch.pi * u2_tensor / n2_eff)
         return hamming1 * hamming2
@@ -821,98 +827,6 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
                     f"log_nugget: {p_cat[6].item():.4f}")
         except Exception:
             return "[Error in raw param conversion]"
-
-    @staticmethod
-    def run_full_tapered(params_list, optimizer, scheduler, I_sample, n1, n2, p_time, taper_autocorr_grid, epochs=600, device='cpu'):
-        # *** REVISED: Use p_time ***
-        """Corrected training loop with gradient-based convergence."""
-        best_loss = float('inf')
-        params_list = [p.to(device) for p in params_list]
-        best_params_state = [p.detach().clone() for p in params_list]
-        epochs_completed = 0
-        DELTA_LAT, DELTA_LON = 0.044, 0.063 
-        
-        grad_tol = 1e-5
-
-        I_sample_dev = I_sample.to(device)
-        taper_autocorr_grid_dev = taper_autocorr_grid.to(device) 
-
-        for epoch in range(epochs):
-            epochs_completed = epoch + 1
-            optimizer.zero_grad()
-            params_tensor = torch.cat(params_list) 
-
-            loss = debiased_whittle_likelihood.whittle_likelihood_loss_tapered(
-                params_tensor, I_sample_dev, n1, n2, p_time, taper_autocorr_grid_dev, DELTA_LAT, DELTA_LON
-            )
-
-            if torch.isnan(loss) or torch.isinf(loss):
-                print(f"Loss became NaN or Inf at epoch {epoch+1}. Stopping.")
-                if epoch == 0: best_params_state = None
-                epochs_completed = epoch
-                break
-
-            loss.backward()
-
-            nan_grad = False
-            max_abs_grad = 0.0
-            for param in params_list:
-                if param.grad is not None:
-                    if (torch.isnan(param.grad).any() or torch.isinf(param.grad).any()):
-                        nan_grad = True
-                        break
-                    max_abs_grad = max(max_abs_grad, param.grad.abs().item())
-                
-            if nan_grad:
-                 print(f"Warning: NaN/Inf gradient at epoch {epoch+1}. Skipping step.")
-                 optimizer.zero_grad()
-                 continue
-
-            all_params_on_device = params_list
-            if all_params_on_device:
-                torch.nn.utils.clip_grad_norm_(all_params_on_device, max_norm=1.0)
-            
-            if epoch > 10 and max_abs_grad < grad_tol: # 10-epoch warmup
-                print(f"\n--- Converged on gradient norm (max|grad| < {grad_tol}) at epoch {epoch+1} ---")
-                epochs_completed = epoch + 1
-                break 
-
-            optimizer.step()
-            
-            current_loss_item = loss.item()
-            if isinstance(scheduler, ReduceLROnPlateau):
-                scheduler.step(current_loss_item)
-            else:
-                scheduler.step()
-
-            if current_loss_item < best_loss:
-                params_valid = not any(torch.isnan(p.data).any() or torch.isinf(p.data).any() for p in params_list)
-                if params_valid:
-                    best_loss = current_loss_item
-                    best_params_state = [p.detach().clone() for p in params_list]
-
-            current_lr = optimizer.param_groups[0]['lr'] if optimizer.param_groups else 0.0
-
-            if epoch % 50 == 0 or epoch == epochs - 1:
-                print(f'--- Epoch {epoch+1}/{epochs} (LR: {current_lr:.6f}) ---')
-                print(f' Loss: {current_loss_item:.4f} | Max Grad: {max_abs_grad:.6e}')
-                print(f'  Params (Raw Log): {debiased_whittle_likelihood.get_raw_log_params_7param(params_list)}')
-
-
-        print("\n--- Training Complete ---")
-        if best_params_state is None:
-            print("Training failed to find a valid model state.")
-            return None, None, None, None, epochs_completed # Return Nones
-
-        final_natural_params_str = debiased_whittle_likelihood.get_printable_params_7param(best_params_state)
-        final_phi_params_str = debiased_whittle_likelihood.get_phi_params_7param(best_params_state)
-        final_raw_params_str = debiased_whittle_likelihood.get_raw_log_params_7param(best_params_state)
-        final_loss_rounded = round(best_loss, 3) if best_loss != float('inf') else float('inf')
-
-        print(f'\nFINAL BEST STATE ACHIEVED (during training):')
-        print(f'Best Loss: {final_loss_rounded}')
-        
-        return final_natural_params_str, final_phi_params_str, final_raw_params_str, final_loss_rounded, epochs_completed
     
     @staticmethod
     def run_lbfgs_tapered(params_list, optimizer, I_sample, n1, n2, p_time, taper_autocorr_grid, max_steps=50, device='cpu',grad_tol=1e-5):
