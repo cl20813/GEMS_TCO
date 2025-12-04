@@ -168,7 +168,6 @@ class SpatioTemporalModel:
         neg_log_lik_sum = 0.5 * (log_det + quad_form.squeeze())
         return neg_log_lik_sum / N
 
-from scipy.spatial import cKDTree
 
 # --- BATCHED GPU CLASS ---
 class VecchiaBatched(SpatioTemporalModel):
@@ -187,73 +186,14 @@ class VecchiaBatched(SpatioTemporalModel):
         # Heads Tensor
         self.Heads_data = None 
 
-
     def precompute_conditioning_sets(self):
-            """Prepares GPU tensors using Vectorized Geometric Neighbor Selection."""
-            print("Pre-computing Batched Tensors (Optimized Geometric Strategy)...", end=" ")
+            """Prepares GPU tensors with Padding for Batched execution."""
+            print("Pre-computing Batched Tensors (Padding Strategy)...", end=" ")
             
-            # --- 1. SETUP & SAFETY CHECKS ---
             key_list = list(self.input_map.keys())
             cut_line = self.nheads
             
-            # Safety Check: Ensure grid is static
-            ref_shape = self.input_map[key_list[0]].shape
-            if not all(self.input_map[k].shape == ref_shape for k in key_list):
-                raise ValueError("Error: Input maps must have identical shapes for static neighbor lookup.")
-
-            # Build Tree on the first map
-            reference_map = self.input_map[key_list[0]] 
-            coords = reference_map[:, :2] # Col 0=Lat, Col 1=Lon
-            n_locs = coords.shape[0]
-            
-            spatial_tree = cKDTree(coords) 
-
-            # --- 2. DEFINE GEOMETRIC OFFSETS (CORRECTED FOR SCAN ORDER) ---
-            # Data Scan: North->South (Lat decreases), East->West (Lon decreases).
-            # "Past" Neighbors are North (+Lat) and East (+Lon).
-            
-            lat_step = 0.044
-            lon_step = 0.063
-            
-            # We use POSITIVE multipliers to look "Back" (North/East).
-            # (Lat multiplier, Lon multiplier)
-            # (0, 1) means: Same Lat, 1 Step East (Past)
-            # (1, 1) means: 1 Step North (Past), 1 Step East (Past)
-            offsets = [
-                # Col 1 (1 step East): p + 0.063
-                (0, 1),   # x (Same Row)
-                (1, 1),   # x + 0.044 (North 1)
-                (2, 1),   # x + 0.088 (North 2)
-                
-                # Col 2 (2 steps East): p + 0.063*2
-                (0, 2),   # x
-                (1, 2),   # x + 0.044
-                (2, 2),   # x + 0.088
-                
-                # Col 3 (3 steps East): p + 0.063*3
-                (0, 3),   # x
-                (1, 3)    # x + 0.044
-            ]
-            
-            # Generate Target Coordinates Vectorized
-            # Shape: (N_locs, 8, 2)
-            target_coords_all = np.zeros((n_locs, 8, 2))
-            
-            for k, (d_lat, d_lon) in enumerate(offsets):
-                # We ADD the step to find the higher values (North/East)
-                target_coords_all[:, k, 0] = coords[:, 0] + (d_lat * lat_step) 
-                target_coords_all[:, k, 1] = coords[:, 1] + (d_lon * lon_step) 
-
-            # Query Tree
-            dists, neighbors_indices = spatial_tree.query(target_coords_all, k=1, distance_upper_bound=1e-4)
-            
-            # Mask Invalid (Off-grid)
-            mask_invalid = dists == float('inf')
-            neighbors_indices[mask_invalid] = -1
-            
-            # -----------------------------------------------------------
-
-            # 3. Heads Data (Exact GP for the first 3 columns)
+            # 1. Heads Data
             heads_list = []
             for key in key_list:
                 day_data = self.input_map[key]
@@ -264,52 +204,40 @@ class VecchiaBatched(SpatioTemporalModel):
                 heads_list.append(head_chunk)
             self.Heads_data = torch.cat(heads_list, dim=0).to(torch.float64)
 
-            # 4. Tails Data (Task List)
+            # 2. Tails Data (Task List)
             tasks = []
             for time_idx, key in enumerate(key_list):
                 day_data = self.input_map[key]
-                # Tasks are the remaining points
                 indices = range(cut_line, len(day_data))
                 for idx in indices:
                     tasks.append((time_idx, idx))
 
             total_vecchia_points = len(tasks)
             
-            # 5. Allocation (Max 8 neighbors + 1 self) * 3 lags
-            max_geometric_neighbors = 8
-            max_storage_dim = (max_geometric_neighbors + 1) * 3
+            # --- 💥 FIX: ALLOCATE FOR MAX LAGS (Current + 2 Lags) ---
+            # Each block is (Neighbors + Target). We might have up to 3 blocks (t, t-1, t-2).
+            max_storage_dim = (self.max_neighbors + 1) * 3
             
+            # 3. Allocating Tensors (1e6 padding -> Covariance 0)
             self.X_batch = torch.full((total_vecchia_points, max_storage_dim, 3), 1e6, device=self.device, dtype=torch.float64)
             self.Y_batch = torch.zeros((total_vecchia_points, max_storage_dim, 1), device=self.device, dtype=torch.float64)
             self.Locs_batch = torch.zeros((total_vecchia_points, max_storage_dim, 3), device=self.device, dtype=torch.float64)
 
-            # 6. Fill Tensors
+            # 4. Fill Tensors
             for i, (time_idx, index) in enumerate(tasks):
                 current_np = self.input_map[key_list[time_idx]]
                 current_row = current_np[index].reshape(1, -1) 
+                mm_neighbors = self.nns_map[index]
+                past = list(mm_neighbors)
                 
-                # --- FAST LOOKUP ---
-                potential_neighbors = neighbors_indices[index]
-                past = potential_neighbors[potential_neighbors != -1].tolist()
-                # -------------------
-
                 data_list = []
-                
-                # T (Current)
-                if past: 
-                    data_list.append(current_np[past])
-                
-                # T-1 (Lag 1)
-                if time_idx > 0: 
-                    prev_np = self.input_map[key_list[time_idx - 1]]
-                    data_list.append(prev_np[past + [index], :])
-                
-                # T-2 (Lag 2)
-                if time_idx > 1: 
-                    prev_prev_np = self.input_map[key_list[time_idx - 2]]
-                    data_list.append(prev_prev_np[past + [index], :])
+                # Current
+                if past: data_list.append(current_np[past])
+                # Lag 1
+                if time_idx > 0: data_list.append(self.input_map[key_list[time_idx - 1]][past + [index], :])
+                # Lag 2
+                #if time_idx > 1: data_list.append(self.input_map[key_list[time_idx - 2]][past + [index], :])
 
-                # Stack
                 if data_list:
                     if isinstance(data_list[0], np.ndarray):
                         neighbors_block = torch.from_numpy(np.vstack(data_list)).to(self.device)
@@ -326,21 +254,22 @@ class VecchiaBatched(SpatioTemporalModel):
                 combined_data = torch.cat([neighbors_block, target_block], dim=0)
                 actual_len = combined_data.shape[0]
                 
-                # Fill Padding
+                # --- 💥 FIX: Start Slot based on new Max Dimension ---
                 start_slot = max_storage_dim - actual_len
                 
+                # Fill Batch (Columns: 0=Lat, 1=Lon, 2=Val, 3=Time)
                 self.X_batch[i, start_slot:, 0] = combined_data[:, 0]
                 self.X_batch[i, start_slot:, 1] = combined_data[:, 1]
-                self.X_batch[i, start_slot:, 2] = combined_data[:, 3] 
+                self.X_batch[i, start_slot:, 2] = combined_data[:, 3]
                 self.Y_batch[i, start_slot:, 0] = combined_data[:, 2]
                 
+                # Trend Intercept + Coords
                 self.Locs_batch[i, start_slot:, 0] = 1.0 
                 self.Locs_batch[i, start_slot:, 1] = combined_data[:, 0] 
                 self.Locs_batch[i, start_slot:, 2] = combined_data[:, 1] 
 
             self.is_precomputed = True
             print(f"Done. Heads: {self.Heads_data.shape[0]}, Batched Tails: {self.X_batch.shape[0]}")
-
 
     def batched_manual_dist(self, dist_params, x_batch):
         """Batched Manual Broadcasting Distance."""
@@ -386,65 +315,55 @@ class VecchiaBatched(SpatioTemporalModel):
         return cov
 
     def vecchia_batched_likelihood(self, params):
-            if not self.is_precomputed: raise RuntimeError("Run precompute first!")
-                
-            # --- 1. Heads (Exact GP) ---
-            # Adapter to map params correctly for the single-matrix function
-            def adapter_cov_func(params, x, y):
-                return self.matern_cov_aniso_STABLE_log_reparam(params, x, y)
+        if not self.is_precomputed: raise RuntimeError("Run precompute first!")
+            
+        # 1. Heads (Exact GP)
+        # Adapter to map params correctly for the single-matrix function
+        def adapter_cov_func(params, x, y):
+            return self.matern_cov_aniso_STABLE_log_reparam(params, x, y)
 
+        if self.Heads_data.shape[0] > 0:
+            head_nll_avg = self.full_likelihood_avg(params, self.Heads_data, self.Heads_data[:, 2], adapter_cov_func)
+            head_nll_sum = head_nll_avg * self.Heads_data.shape[0]
+        else:
             head_nll_sum = 0.0
-            # Calculate Exact GP for the "Heads" (first 3 cols) for EACH time step independently.
-            # This prevents creating a massive (Time * N_heads)^2 matrix.
-            if self.Heads_data.shape[0] > 0:
-                # Reshape to (Time, nheads, Features)
-                # This assumes every day has exactly 'nheads' points
-                heads_reshaped = self.Heads_data.view(len(self.key_list), self.nheads, -1)
-                
-                # Compute Exact GP for each day independently
-                for t in range(len(self.key_list)):
-                    day_head = heads_reshaped[t]
-                    # Summing NLL of each independent spatial block
-                    # Note: full_likelihood_avg returns (Sum / N), so we multiply by N to get Sum back
-                    head_nll_sum += self.full_likelihood_avg(params, day_head, day_head[:, 2], adapter_cov_func) * self.nheads
 
-            # --- 2. Tails (Batched GPU Vecchia) ---
-            cov_batch = self.matern_cov_batched(params, self.X_batch)
+        # 2. Tails (Batched GPU)
+        cov_batch = self.matern_cov_batched(params, self.X_batch)
+        
+        try:
+            L_batch = torch.linalg.cholesky(cov_batch)
+        except torch.linalg.LinAlgError:
+            print("Warning: GPU Cholesky failed.")
+            return torch.tensor(float('inf'), device=self.device)
             
-            try:
-                L_batch = torch.linalg.cholesky(cov_batch)
-            except torch.linalg.LinAlgError:
-                print("Warning: GPU Cholesky failed.")
-                return torch.tensor(float('inf'), device=self.device)
-                
-            # GLS Trend Removal (Batched)
-            C_inv_locs = torch.cholesky_solve(self.Locs_batch, L_batch, upper=False)
-            Xt_Cinv_X = torch.bmm(self.Locs_batch.transpose(1, 2), C_inv_locs)
-            
-            C_inv_y = torch.cholesky_solve(self.Y_batch, L_batch, upper=False)
-            Xt_Cinv_y = torch.bmm(self.Locs_batch.transpose(1, 2), C_inv_y)
-            
-            jitter = torch.eye(3, device=self.device, dtype=torch.float64).unsqueeze(0) * 1e-8
-            beta = torch.linalg.solve(Xt_Cinv_X + jitter, Xt_Cinv_y)
-            
-            mu = torch.bmm(self.Locs_batch, beta)
-            residuals = self.Y_batch - mu
-            
-            # NLL Components
-            z_full = torch.linalg.solve_triangular(L_batch, residuals, upper=False)
-            z_target = z_full[:, -1, :] 
-            
-            sigma_cond = L_batch[:, -1, -1]
-            log_det = 2 * torch.log(sigma_cond)
-            quad_form = z_target.squeeze() ** 2
-            
-            vecchia_nll_sum = 0.5 * (log_det + quad_form).sum()
-            
-            # Combine Likelihoods
-            total_nll = head_nll_sum + vecchia_nll_sum
-            total_count = self.Heads_data.shape[0] + self.X_batch.shape[0]
-            
-            return total_nll / total_count
+        # GLS Trend Removal (Batched)
+        C_inv_locs = torch.cholesky_solve(self.Locs_batch, L_batch, upper=False)
+        Xt_Cinv_X = torch.bmm(self.Locs_batch.transpose(1, 2), C_inv_locs)
+        
+        C_inv_y = torch.cholesky_solve(self.Y_batch, L_batch, upper=False)
+        Xt_Cinv_y = torch.bmm(self.Locs_batch.transpose(1, 2), C_inv_y)
+        
+        jitter = torch.eye(3, device=self.device, dtype=torch.float64).unsqueeze(0) * 1e-8
+        beta = torch.linalg.solve(Xt_Cinv_X + jitter, Xt_Cinv_y)
+        
+        mu = torch.bmm(self.Locs_batch, beta)
+        residuals = self.Y_batch - mu
+        
+        # NLL Components
+        z_full = torch.linalg.solve_triangular(L_batch, residuals, upper=False)
+        z_target = z_full[:, -1, :] 
+        
+        sigma_cond = L_batch[:, -1, -1]
+        log_det = 2 * torch.log(sigma_cond)
+        quad_form = z_target.squeeze() ** 2
+        
+        vecchia_nll_sum = 0.5 * (log_det + quad_form).sum()
+        
+        total_nll = head_nll_sum + vecchia_nll_sum
+        total_count = self.Heads_data.shape[0] + self.X_batch.shape[0]
+        
+        return total_nll / total_count
 
 
 # --- FITTING CLASS ---
