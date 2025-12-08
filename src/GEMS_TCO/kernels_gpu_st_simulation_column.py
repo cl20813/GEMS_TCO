@@ -203,7 +203,7 @@ class VecchiaBatched(SpatioTemporalModel):
             # Build Tree on the first map
             reference_map = self.input_map[key_list[0]] 
             
-            # --- 💥 FIX: Ensure Coords are NumPy for KDTree & Rounding ---
+            # Ensure Coords are NumPy for KDTree & Rounding
             if isinstance(reference_map, torch.Tensor):
                 coords = reference_map[:, :2].detach().cpu().numpy()
             else:
@@ -215,7 +215,6 @@ class VecchiaBatched(SpatioTemporalModel):
 
             # --- 2. IDENTIFY HEADS (FIRST 3 COLUMNS OF LONGITUDE) ---
             # 1. Get unique longitudes (round to 5 decimals to handle float noise)
-            # Now that 'coords' is numpy, .round(5) will work correctly.
             unique_lons = np.unique(coords[:, 1].round(5))
             
             # 2. Sort Descending (East -> West)
@@ -244,14 +243,20 @@ class VecchiaBatched(SpatioTemporalModel):
             lon_step = 0.063
             
             # Offsets (Lat multiplier, Lon multiplier)
+            # UPDATED: Added 3 points for the 15th column (Long range dependency)
             offsets = [
+                # Immediate neighbors (Cols 1, 2, 3)
                 (0, 1), (1, 1), (2, 1),   # Col 1
                 (0, 2), (1, 2), (2, 2),   # Col 2
-                (0, 3), (1, 3)            # Col 3
+                (0, 3), (1, 3),           # Col 3
+                
+                # New: 15th Column (Lower Frequency) - Choosing 3 points
+                (0, 15), (1, 15), (2, 15) 
             ]
             
-            # Generate Target Coordinates Vectorized
-            target_coords_all = np.zeros((n_locs, 8, 2))
+            # UPDATED: Increased second dimension from 8 to 11 to accommodate new offsets
+            target_coords_all = np.zeros((n_locs, 11, 2))
+            
             for k, (d_lat, d_lon) in enumerate(offsets):
                 target_coords_all[:, k, 0] = coords[:, 0] + (d_lat * lat_step) 
                 target_coords_all[:, k, 1] = coords[:, 1] + (d_lon * lon_step) 
@@ -283,7 +288,8 @@ class VecchiaBatched(SpatioTemporalModel):
             total_vecchia_points = len(tasks)
             
             # 6. Allocation
-            max_geometric_neighbors = 8
+            # UPDATED: Increased max_geometric_neighbors from 8 to 11
+            max_geometric_neighbors = 11
             max_storage_dim = (max_geometric_neighbors + 1) * 3
             
             self.X_batch = torch.full((total_vecchia_points, max_storage_dim, 3), 1e6, device=self.device, dtype=torch.float64)
@@ -347,7 +353,6 @@ class VecchiaBatched(SpatioTemporalModel):
 
             self.is_precomputed = True
             print(f"Done. Heads: {self.Heads_data.shape[0]} (Exact GP for 3 cols), Batched Tails: {self.X_batch.shape[0]}")
-
 
 
     def batched_manual_dist(self, dist_params, x_batch):
