@@ -189,6 +189,7 @@ def cli(
     
     dw_norm_list = []
     vecc_norm_list = []
+    vecc_col_norm_list = []
 
     num_iters = 5
     for num_iter in range(num_iters):
@@ -300,7 +301,7 @@ def cli(
 # -------------------------------------------------------
         # STEP C: Phase 1 - Debiased Whittle Optimization
         # -------------------------------------------------------
-        print("\n--- Phase 1: Debiased Whittle Initialization ---")
+        print(f"\n--- Debiased Whittle {num_iter} ---")
         
         # Helper list for preprocess (can use raw values or params_list)
         # We use the raw floats for the preprocessor init
@@ -371,10 +372,6 @@ def cli(
         
         # 1. Create fresh tensors for Vecchia
         # We DETACH from the Whittle graph so Vecchia starts fresh
-        new_params_list = [
-            p.detach().clone().to(DEVICE).requires_grad_(True)
-            for p in params_list2
-        ]
 
         dw_estimates_values = [p.item() for p in params_list]
         dw_estimates_loss = dw_estimates_values + [loss]
@@ -401,6 +398,9 @@ def cli(
         csv_filepath = input_path/f"sim_dW_v{int(v*100):03d}_121225_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
+
+
+        # 2 - Vecchia L-BFGS Optimization
         
         # --- 💥 Instantiate the GPU Batched Class ---
         # NOTE: Ensure fit_vecchia_lbfgs is the NEW class we defined
@@ -413,6 +413,11 @@ def cli(
                 nheads = nheads
             )
 
+        new_params_list = [
+            p.detach().clone().to(DEVICE).requires_grad_(True)
+            for p in params_list2
+        ]
+
         # --- 💥 Set L-BFGS Optimizer ---
         optimizer_vecc = model_instance.set_optimizer(
                     new_params_list,     
@@ -421,7 +426,7 @@ def cli(
                     history_size=LBFGS_HISTORY_SIZE 
                 )
 
-        print(f"\n--- Starting Phase 2: Vecchia Optimization (Day {day_idx+1}) ---")
+        print(f"\n--- Vecchia Optimization ( {num_iter+1}) ---")
         start_time = time.time()
         
         # --- 💥 Call the Batched Fit Method ---
@@ -457,11 +462,77 @@ def cli(
         csv_filepath = input_path/f"sim_vecc_1212_v{int(v*100):03d}_LBFGS_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
-        dw_norm_list.append( frob_norm_dw.item() )
-        vecc_norm_list.append( frob_norm.item() )
 
+        # 3 - Vecchia L-BFGS, but column conditioning set
+        # --- CONFIGURATION ---
+        v = 0.5              # Smoothness
+        mm_cond_number = 14    # Neighbors
+        nheads = 113*3           # 0 = Pure Vecchia
+        lr = 1.0             # LBFGS learning rate
+        LBFGS_MAX_STEPS = 10
+        LBFGS_HISTORY_SIZE = 100
+        LBFGS_LR = 1.0
+        LBFGS_MAX_EVAL = 100    
 
-        print(f'average dw norm: {np.mean( dw_norm_list )}, vecc norm: {np.mean( vecc_norm_list ) }')
+        new_params_list_col = [
+            p.detach().clone().to(DEVICE).requires_grad_(True)
+            for p in params_list2
+        ]
+
+        model_instance_col = kernels_gpu_st_simulation_column.fit_vecchia_lbfgs(
+            smooth=v,
+            input_map=input_map,
+            aggregated_data=aggregated_data,
+            nns_map=nns_map,
+            mm_cond_number=mm_cond_number,
+            nheads=nheads
+        )
+        
+        optimizer_vecc_col = model_instance_col.set_optimizer(
+                    new_params_list_col,     
+                    lr=LBFGS_LR,            
+                    max_iter=LBFGS_MAX_EVAL,        
+                    history_size=LBFGS_HISTORY_SIZE 
+                )
+
+        start_time = time.time()
+
+        out_col, steps_ran = model_instance_col.fit_vecc_lbfgs(
+                new_params_list_col,
+                optimizer_vecc_col,
+                # covariance_function argument is GONE
+                max_steps=LBFGS_MAX_STEPS, 
+                grad_tol=1e-7
+            )
+
+        end_time = time.time()
+        epoch_time = end_time - start_time
+        print(f"\nOptimization finished in {epoch_time:.2f}s.")
+
+        C = out_col[:-1]
+
+        frob_norm_col = sum((p_true.item() - p_est)**2 
+                        for p_true, p_est in zip(params_list2, C))
+
+        frob_norm_col = frob_norm_col ** 0.5
+        print(f"Vecchia Optimization finished in {epoch_time:.2f}s. Results: {out_col}")
+
+        # (Your Result Saving Logic...)
+        input_filepath = output_path / f"sim_vecc_col_1212_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
+        res = alg_optimization( f"2024-07-{day_idx+1}", f"Vecc_{num_iter}", ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) , lr,  step , out_col, epoch_time, frob_norm_col )
+        loaded_data = res.load(input_filepath)
+        loaded_data.append( res.toJSON() )
+        res.save(input_filepath,loaded_data)
+        fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'frob_norm'] # 0 for epoch
+
+        csv_filepath = input_path/f"sim_vecc_col_1212_v{int(v*100):03d}_LBFGS_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
+        res.tocsv( loaded_data, fieldnames,csv_filepath )
+
+        dw_norm_list.append( frob_norm_dw )
+        vecc_norm_list.append( frob_norm )
+        vecc_col_norm_list.append( frob_norm_col )
+
+    print(f'average dw norm: {np.mean( dw_norm_list )}, vecc norm: {np.mean( vecc_norm_list )}, vecc col norm: {np.mean( vecc_col_norm_list )}')
 
 if __name__ == "__main__":
     app()
