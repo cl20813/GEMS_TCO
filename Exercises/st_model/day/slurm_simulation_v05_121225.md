@@ -12,11 +12,7 @@ scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/coarse_cen_map_without_de
 
 ### Copy run file from ```local``` to ```Amarel HPC```
 # mac
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/torch_gpu_test.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
-
-
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_gpu_veccDWlbfgs_day_v05_112725.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
-
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_gpu_veccDWlbfgs_day_v05_121125.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
@@ -36,7 +32,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vec
 
 ```conda list | grep torch ```
 
-```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/torch_gpu_test.py ```
+```    srun --cpus-per-task=3 --mem=5G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/sim_gpu_veccDWlbfgs_day_v05_121125.py```
 
 ## space 5 5: 5x10, 4 4: 25x50, 2 2: 50x100
 
@@ -50,17 +46,17 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vec
 
 
 
-### vecc lbfgs + dw initiate 
+### simulation
 
 ``` cd ./jobscript/tco/gp_exercise ```
-```  nano fit_gpu_veccDWlbfgs_v05_nov24_18126.sh  ``` 
-```  sbatch fit_gpu_veccDWlbfgs_v05_nov24_18126.sh  ``` 
+```  nano sim_121225.sh  ``` 
+```  sbatch sim_121225.sh  ``` 
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=vecDWlbfgs_v05_nov24_18126_GPU       # Job name (Added GPU tag)
-#SBATCH --output=/home/jl2815/tco/exercise_output/gpu_veccDWlbfgs_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/gpu_veccDWlbfgs_%j.err
+#SBATCH --job-name=sim_121225       # Job name (Added GPU tag)
+#SBATCH --output=/home/jl2815/tco/exercise_output/sim_121225_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/sim_121225_%j.err
 #SBATCH --time=24:00:00                                 # Reduced time (GPU is faster)
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8                               # CHANGED: Reduced from 48 (GPU does the work now)
@@ -86,7 +82,7 @@ echo "Node: $(hostname)"
 nvidia-smi
 
 # Run the script
-srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_veccDWlbfgs_day_v05_112725.py \
+srun python /home/jl2815/tco/exercise_25/st_model/sim_gpu_veccDWlbfgs_day_v05_121125.py \
     --v 0.5 \
     --lr 0.03 \
     --step 80 \
@@ -94,7 +90,7 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_veccDWlbfgs_day_v05_11
     --space "1, 1" \
     --days "20,30" \
     --mm-cond-number 8 \
-    --nheads 400 \
+    --nheads 100 \
     --no-keep-exact-loc 
 
 echo "Current date and time: $(date)"

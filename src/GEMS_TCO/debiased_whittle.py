@@ -218,6 +218,8 @@ class debiased_whittle_preprocess(full_vecc_dw_likelihoods):
         #diff_kernel = torch.tensor([[[[-1, 1],
         #                             [1, -1]]]], dtype=torch.float64)
 
+        diff_kernel = diff_kernel.to(df_tensor.device)
+        
         # 3. Apply convolution (which acts as cross-correlation)
         filtered_grid = F.conv2d(ozone_data, diff_kernel, padding='valid').squeeze()
 

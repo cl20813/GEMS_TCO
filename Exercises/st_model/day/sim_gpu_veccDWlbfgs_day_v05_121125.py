@@ -84,7 +84,7 @@ def cli(
 
     params_list = [
         # Changed: uses dynamic DTYPE
-        torch.tensor([val], requires_grad=True, dtype=torch.float64, device=DEVICE)
+        torch.tensor([val], requires_grad=True, dtype=DTYPE, device=DEVICE)
         for val in initial_vals
     ]
 
@@ -188,7 +188,7 @@ def cli(
             return ord_mm, nns_map
     
 
-    num_iters = 2
+    num_iters = 100
     for num_iter in range(num_iters):
         print(f"Iteration {num_iter+1}/{num_iters}")
 
