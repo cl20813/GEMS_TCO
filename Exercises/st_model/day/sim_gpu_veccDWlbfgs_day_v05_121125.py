@@ -89,7 +89,7 @@ def cli(
     ]
 
     params_list2 = copy.deepcopy(params_list)
-
+    params_list_gen_data = copy.deepcopy(params_list)
     # Mean Ozone
     OZONE_MEAN = 260.0
 
@@ -187,15 +187,23 @@ def cli(
             nns_map = _orderings.find_nns_l2(locs=coords1_reordered, max_nn=mm_cond_number)
             return ord_mm, nns_map
     
+    dw_norm_list = []
+    vecc_norm_list = []
 
-    num_iters = 100
+    num_iters = 5
     for num_iter in range(num_iters):
         print(f"Iteration {num_iter+1}/{num_iters}")
 
-        params_list = [
+        params_list_vecc = [
             p.detach().clone().to(DEVICE).requires_grad_(True) 
             for p in params_list2
         ]
+
+        params_list_dw = [
+                    p.detach().clone().to(DEVICE).requires_grad_(True) 
+                    for p in params_list2
+                ]
+
 
 
         lats_sim = torch.arange(0, 5.0 + 0.001, 0.044, device=DEVICE, dtype=DTYPE)
@@ -203,13 +211,13 @@ def cli(
         t_def = 8
         
         print("1. Generating True Field...")
-        sim_field = generate_exact_gems_field(lats_sim, lons_sim, t_def, params_list)
+        sim_field = generate_exact_gems_field(lats_sim, lons_sim, t_def, params_list_gen_data)
         
         print("2. Formatting Output...")
         input_map = {}
         aggregated_list = [] 
         
-        nugget_std = torch.sqrt(torch.exp(params_list[6]))
+        nugget_std = torch.sqrt(torch.exp(params_list_vecc[6]))
         
         # Flip to Descending Order
         lats_flip = torch.flip(lats_sim, dims=[0])
@@ -296,8 +304,7 @@ def cli(
         
         # Helper list for preprocess (can use raw values or params_list)
         # We use the raw floats for the preprocessor init
-        raw_init_floats = [init_sigmasq, init_range_lat, init_range_lon, init_range_time, 
-                           init_advec_lat, init_advec_lon, init_nugget]
+
 
         day_idx=0
         # Initialize Preprocessor with the wrapper lists (0-index because list has length 1)
@@ -305,7 +312,7 @@ def cli(
             daily_aggregated_tensors_dw, 
             daily_hourly_maps_dw, 
             day_idx= day_idx, # It is index 0 in our wrapper list # this automatically lead to day_idx
-            params_list=raw_init_floats, 
+            params_list= params_list_dw, 
             lat_range=[0,5], 
             lon_range=[123.0, 133.0]
         )
@@ -369,17 +376,30 @@ def cli(
             for p in params_list2
         ]
 
-        # 2. Apply lower bound to nugget (index -1)
-        with torch.no_grad():
-            new_params_list[-1].clamp_min_(-2.0)
+        dw_estimates_values = [p.item() for p in params_list]
+        dw_estimates_loss = dw_estimates_values + [loss]
 
-        # Log Initial estimates (Whittle Results)
-        dw_estimates_loss = [x.item() for x in new_params_list] + [loss_scaled]
-        
+
+        # 2. Apply lower bound to nugget (index -1)
+        #with torch.no_grad():
+        #    new_params_list[-1].clamp_min_(-2.0)
+
+
+        frob_norm_dw = sum((p_true.item() - p_est)**2 
+                        for p_true, p_est in zip(params_list2, dw_estimates_values))
+
+        # Optional: Take sqrt if you want the actual Euclidean/Frobenius distance
+        frob_norm_dw = frob_norm_dw ** 0.5
+
         # (Your JSON/CSV saving code remains here...)
-        input_filepath = output_path / f"sim_{num_iter}_dw_1212{ ( daily_aggregated_tensors_dw[0].shape[0]/8 ) }.json"
-        res = alg_optimization( f"2024-07-{day_idx+1}", "DW_Dec12", ( daily_aggregated_tensors_dw[0].shape[0]/8 ) , lr,  step , dw_estimates_loss, 0 , 0)
-        # ... saving logic ...
+        input_filepath = output_path / f"sim_dw_1212{ ( daily_aggregated_tensors_dw[0].shape[0]/8 ) }.json"
+        res = alg_optimization( f"2024-07-{day_idx+1}", f"DW_{num_iter}", ( daily_aggregated_tensors_dw[0].shape[0]/8 ) , lr,  step , dw_estimates_loss, 0 , frob_norm_dw)
+        loaded_data = res.load(input_filepath)
+        loaded_data.append( res.toJSON() )
+        res.save(input_filepath,loaded_data)
+        fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'frob_norm'] # 0 for epoch
+        csv_filepath = input_path/f"sim_dW_v{int(v*100):03d}_121225_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
+        res.tocsv( loaded_data, fieldnames,csv_filepath )
 
         
         # --- 💥 Instantiate the GPU Batched Class ---
@@ -392,7 +412,6 @@ def cli(
                 mm_cond_number = mm_cond_number,
                 nheads = nheads
             )
-
 
         # --- 💥 Set L-BFGS Optimizer ---
         optimizer_vecc = model_instance.set_optimizer(
@@ -418,19 +437,31 @@ def cli(
         end_time = time.time()
         epoch_time = end_time - start_time
         
+        B = out[:-1]
+
+        frob_norm = sum((p_true.item() - p_est)**2 
+                        for p_true, p_est in zip(params_list2, B))
+
+        frob_norm = frob_norm ** 0.5
         print(f"Vecchia Optimization finished in {epoch_time:.2f}s. Results: {out}")
 
         # (Your Result Saving Logic...)
-        input_filepath = output_path / f"sim_{num_iter}_vecc_1212_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
+        input_filepath = output_path / f"sim_vecc_1212_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
         
-        res = alg_optimization( f"2024-07-{day_idx+1}", "Vecc_Dec12", ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) , lr,  step , out, epoch_time, 0)
+        res = alg_optimization( f"2024-07-{day_idx+1}", f"Vecc_{num_iter}", ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) , lr,  step , out, epoch_time, frob_norm )
         loaded_data = res.load(input_filepath)
         loaded_data.append( res.toJSON() )
         res.save(input_filepath,loaded_data)
-        fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'epoch'] # 0 for epoch
+        fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'frob_norm'] # 0 for epoch
 
-        csv_filepath = input_path/f"sim_{num_iter}_vecc_1212_v{int(v*100):03d}_LBFGS_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
+        csv_filepath = input_path/f"sim_vecc_1212_v{int(v*100):03d}_LBFGS_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
+
+        dw_norm_list.append( frob_norm_dw.item() )
+        vecc_norm_list.append( frob_norm.item() )
+
+
+        print(f'average dw norm: {np.mean( dw_norm_list )}, vecc norm: {np.mean( vecc_norm_list ) }')
 
 if __name__ == "__main__":
     app()

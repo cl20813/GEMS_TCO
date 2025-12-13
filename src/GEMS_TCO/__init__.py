@@ -88,7 +88,7 @@ class log_semivariograms:
                 writer.writerow(data)
 
 class alg_optimization:
-    def __init__(self, day: int, cov_name: str, lat_lon_resolution: List[int], lr: float, stepsize: float, params: List[float], time: float, epoch: int):
+    def __init__(self, day: int, cov_name: str, lat_lon_resolution: List[int], lr: float, stepsize: float, params: List[float], time: float, frob_norm: float):
         """
         Initialize the optimization algorithm parameters.
 
@@ -100,7 +100,6 @@ class alg_optimization:
         - stepsize (float): Step size for the optimization.
         - params (List[float]): List of parameters for the model.
         - time (float): Time parameter.
-        - epoch (int): Number of epochs.
         """
         self.day = day
         self.cov_name = cov_name
@@ -116,7 +115,7 @@ class alg_optimization:
         self.nugget = params[6]
         self.loss = params[7]
         self.time = time
-        self.epoch = epoch
+        self.frob_norm = frob_norm
 
     def toJSON(self) -> str:
         """
