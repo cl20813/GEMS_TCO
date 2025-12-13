@@ -60,7 +60,8 @@ def cli(
 
     output_path = input_path = Path(config.amarel_estimates_day_path)
     # --- simulate data
-    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    DEVICE = torch.device("cpu")
     DTYPE= torch.float32 if DEVICE.type == 'mps' else torch.float64
 
     # TRUE PARAMETERS
@@ -191,7 +192,7 @@ def cli(
     vecc_norm_list = []
     vecc_col_norm_list = []
 
-    num_iters = 5
+    num_iters = 100
     for num_iter in range(num_iters):
         print(f"Iteration {num_iter+1}/{num_iters}")
 
@@ -204,7 +205,6 @@ def cli(
                     p.detach().clone().to(DEVICE).requires_grad_(True) 
                     for p in params_list2
                 ]
-
 
 
         lats_sim = torch.arange(0, 5.0 + 0.001, 0.044, device=DEVICE, dtype=DTYPE)
@@ -426,7 +426,7 @@ def cli(
                     history_size=LBFGS_HISTORY_SIZE 
                 )
 
-        print(f"\n--- Vecchia Optimization ( {num_iter+1}) ---")
+        print(f"\n--- Vecchia max min Optimization ( {num_iter+1}) ---")
         start_time = time.time()
         
         # --- 💥 Call the Batched Fit Method ---
@@ -464,6 +464,8 @@ def cli(
 
 
         # 3 - Vecchia L-BFGS, but column conditioning set
+        print(f"\n--- Vecchia column conditioning Optimization ( {num_iter+1}) ---")
+
         # --- CONFIGURATION ---
         v = 0.5              # Smoothness
         mm_cond_number = 14    # Neighbors
