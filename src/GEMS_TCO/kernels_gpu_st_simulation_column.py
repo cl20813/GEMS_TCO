@@ -243,19 +243,26 @@ class VecchiaBatched(SpatioTemporalModel):
             lon_step = 0.063
             
             # Offsets (Lat multiplier, Lon multiplier)
-            # UPDATED: Added 3 points for the 15th column (Long range dependency)
+            # Format: (d_lat, d_lon) -> Target = Lat + d_lat*step, Lon + d_lon*step
             offsets = [
+                # --- NEW: Same Column (Vertical / North) ---
+                # d_lon is 0, so we stay in the same column
+                (1, 0), (2, 0), (3, 0),   
+
+                # --- PREVIOUS: Right Columns (East) ---
                 # Immediate neighbors (Cols 1, 2, 3)
                 (0, 1), (1, 1), (2, 1),   # Col 1
                 (0, 2), (1, 2), (2, 2),   # Col 2
                 (0, 3), (1, 3),           # Col 3
                 
-                # New: 15th Column (Lower Frequency) - Choosing 3 points
+                # 15th Column (Long range dependency)
                 (0, 15), (1, 15), (2, 15) 
             ]
             
-            # UPDATED: Increased second dimension from 8 to 11 to accommodate new offsets
-            target_coords_all = np.zeros((n_locs, 11, 2))
+            # Dynamically calculate the number of geometric neighbors
+            num_offsets = len(offsets)
+            
+            target_coords_all = np.zeros((n_locs, num_offsets, 2))
             
             for k, (d_lat, d_lon) in enumerate(offsets):
                 target_coords_all[:, k, 0] = coords[:, 0] + (d_lat * lat_step) 
@@ -288,8 +295,8 @@ class VecchiaBatched(SpatioTemporalModel):
             total_vecchia_points = len(tasks)
             
             # 6. Allocation
-            # UPDATED: Increased max_geometric_neighbors from 8 to 11
-            max_geometric_neighbors = 11
+            # UPDATED: Use the dynamic num_offsets calculated above
+            max_geometric_neighbors = num_offsets 
             max_storage_dim = (max_geometric_neighbors + 1) * 3
             
             self.X_batch = torch.full((total_vecchia_points, max_storage_dim, 3), 1e6, device=self.device, dtype=torch.float64)
@@ -352,7 +359,7 @@ class VecchiaBatched(SpatioTemporalModel):
                 self.Locs_batch[i, start_slot:, 2] = combined_data[:, 1] 
 
             self.is_precomputed = True
-            print(f"Done. Heads: {self.Heads_data.shape[0]} (Exact GP for 3 cols), Batched Tails: {self.X_batch.shape[0]}")
+            print(f"Done. Heads: {self.Heads_data.shape[0]}, Batched Tails: {self.X_batch.shape[0]}, Neighbors per point: {max_geometric_neighbors}")
 
 
     def batched_manual_dist(self, dist_params, x_batch):
