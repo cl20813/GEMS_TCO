@@ -60,8 +60,8 @@ def cli(
 
     output_path = input_path = Path(config.amarel_estimates_day_path)
     # --- simulate data
-    #DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    DEVICE = torch.device("cpu")
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #DEVICE = torch.device("cpu")
     DTYPE= torch.float32 if DEVICE.type == 'mps' else torch.float64
 
     # TRUE PARAMETERS
@@ -269,7 +269,7 @@ def cli(
     # --- 1. Global Configuration & Constants ---
         dwl = debiased_whittle.debiased_whittle_likelihood()
         TAPERING_FUNC = dwl.cgn_hamming 
-        DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
         print(f"Using device: {DEVICE}")
 
         # Global L-BFGS Settings
