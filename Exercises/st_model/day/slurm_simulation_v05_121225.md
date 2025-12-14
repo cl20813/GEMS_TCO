@@ -214,16 +214,15 @@ echo "Current date and time: $(date)"
 #SBATCH --error=/home/jl2815/tco/exercise_output/sim_cpu_irr_121225_%j.err
 #SBATCH --time=24:00:00                                 # Reduced time (GPU is faster)
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8                               # CHANGED: Reduced from 48 (GPU does the work now)
-#SBATCH --mem=64G                                       # CHANGED: Reduced from 400G (GPU handles the matrices)
-#SBATCH --partition=gpu                                 # 💥 CRITICAL: Change to your cluster's GPU partition name
-#SBATCH --gres=gpu:1                                    # 💥 CRITICAL: Request 1 GPU
+#SBATCH --cpus-per-task=40                               # CHANGED: Reduced from 48 (GPU does the work now)
+#SBATCH --mem=400G                                       # CHANGED: Reduced from 400G (GPU handles the matrices)
+#SBATCH --partition=mem                                 # 💥 
 
 #### Load Modules
 module purge                                              
 module use /projects/community/modulefiles                 
 module load anaconda/2024.06-ts840 
-module load cuda/12.1.0
+
 
 #### Initialize conda
 eval "$(conda shell.bash hook)"
