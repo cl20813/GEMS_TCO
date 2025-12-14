@@ -834,7 +834,9 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
     def run_lbfgs_tapered(params_list, optimizer, I_sample, n1, n2, p_time, taper_autocorr_grid, max_steps=50, device='cpu',grad_tol=1e-5):
         """Training loop using L-BFGS optimizer with improved convergence checks."""
         
-        params_list = [p.to(device) for p in params_list]
+        #params_list = [p.to(device) for p in params_list]
+        # You should assume the params_list passed to the function is already on the correct device
+        
         best_params_state = [p.detach().clone() for p in params_list]
         steps_completed = 0
         DELTA_LAT, DELTA_LON = 0.044, 0.063 

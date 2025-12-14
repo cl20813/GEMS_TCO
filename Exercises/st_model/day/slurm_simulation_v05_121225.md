@@ -97,6 +97,7 @@ echo "Current date and time: $(date)"
 
 ```
 
+``` cd ./jobscript/tco/gp_exercise ```
 ```  nano simc_121225.sh  ``` 
 ```  sbatch simc_121225.sh  ``` 
 

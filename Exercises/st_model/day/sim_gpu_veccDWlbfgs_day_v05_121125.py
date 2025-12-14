@@ -463,6 +463,7 @@ def cli(
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
 
+        ''' 
         # 3 - Vecchia L-BFGS, but column conditioning set
         print(f"\n--- Vecchia column conditioning Optimization ( {num_iter+1}) ---")
 
@@ -530,11 +531,15 @@ def cli(
         csv_filepath = input_path/f"sim_vecc_col_1212_v{int(v*100):03d}_LBFGS_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
+        '''
+
+        
         dw_norm_list.append( frob_norm_dw )
         vecc_norm_list.append( frob_norm )
-        vecc_col_norm_list.append( frob_norm_col )
+        #vecc_col_norm_list.append( frob_norm_col )
+    print(f'average dw norm: {np.mean( dw_norm_list )}, vecc norm: {np.mean( vecc_norm_list )}')
 
-    print(f'average dw norm: {np.mean( dw_norm_list )}, vecc norm: {np.mean( vecc_norm_list )}, vecc col norm: {np.mean( vecc_col_norm_list )}')
+    #print(f'average dw norm: {np.mean( dw_norm_list )}, vecc norm: {np.mean( vecc_norm_list )}, vecc col norm: {np.mean( vecc_col_norm_list )}')
 
 if __name__ == "__main__":
     app()
