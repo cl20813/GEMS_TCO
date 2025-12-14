@@ -14,7 +14,7 @@ import torch
 import torch.optim as optim
 import copy                    # clone tensor
 import time
-
+from sklearn.neighbors import BallTree
 # Custom imports
 
 
@@ -60,8 +60,10 @@ def cli(
 
     output_path = input_path = Path(config.amarel_estimates_day_path)
     # --- simulate data
-    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #DEVICE = torch.device("cpu")
+    #DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    DEVICE = torch.device("cpu")
+
+    
     DTYPE= torch.float32 if DEVICE.type == 'mps' else torch.float64
 
     # TRUE PARAMETERS
@@ -116,16 +118,12 @@ def cli(
         
         print(f"Exact Grid Size: {Nx} (Lat) x {Ny} (Lon) x {Nt} (Time) = {Nx*Ny*Nt} points")
         
-        # 1. Calculate Steps
         dlat = float(lat_coords[1] - lat_coords[0])
         dlon = float(lon_coords[1] - lon_coords[0])
         dt = 1.0 
         
-        # 2. Padding (2x for non-circular simulation)
         Px, Py, Pt = 2*Nx, 2*Ny, 2*Nt
         
-        # 3. Lags Construction
-        # Changed: uses dynamic DTYPE
         Lx_len = Px * dlat   
         lags_x = torch.arange(Px, device=DEVICE, dtype=DTYPE) * dlat
         lags_x[Px//2:] -= Lx_len 
@@ -138,20 +136,83 @@ def cli(
         lags_t = torch.arange(Pt, device=DEVICE, dtype=DTYPE) * dt
         lags_t[Pt//2:] -= Lt_len
 
-        # Meshgrid & Covariance
         L_x, L_y, L_t = torch.meshgrid(lags_x, lags_y, lags_t, indexing='ij')
         C_vals = get_model_covariance_on_grid(L_x, L_y, L_t, params)
 
-        # FFT & Convolution
         S = torch.fft.fftn(C_vals)
         S.real = torch.clamp(S.real, min=0)
 
-        # Changed: uses dynamic DTYPE
         random_phase = torch.fft.fftn(torch.randn(Px, Py, Pt, device=DEVICE, dtype=DTYPE))
         weighted_freq = torch.sqrt(S.real) * random_phase
         field_sim = torch.fft.ifftn(weighted_freq).real
         
         return field_sim[:Nx, :Ny, :Nt]
+
+    # --- 4. REGULAR GRID FUNCTIONS (FIXED WITH ROUNDING) ---
+
+    def make_target_grid(lat_start, lat_end, lat_step, lon_start, lon_end, lon_step, device, dtype):
+        """
+        Constructs a grid explicitly from start to end.
+        CRITICAL: Includes rounding to 4 decimal places to prevent "Tensor size does not match" errors.
+        """
+        # 1. Generate Latitudes (Descending from 5.0)
+        # We use a small epsilon to ensure the 'end' is included if it's a multiple
+        lats = torch.arange(lat_start, lat_end - 0.0001, lat_step, device=device, dtype=dtype)
+        lats = torch.round(lats * 10000) / 10000  # <--- FIX: Round to 4 decimals
+        
+        # 2. Generate Longitudes (Descending from 133.0)
+        lons = torch.arange(lon_start, lon_end - 0.0001, lon_step, device=device, dtype=dtype)
+        lons = torch.round(lons * 10000) / 10000  # <--- FIX: Round to 4 decimals
+
+        print(f"Grid Generation debug: Lat Range {lats[0]:.4f}-{lats[-1]:.4f}, Lon Range {lons[0]:.4f}-{lons[-1]:.4f}")
+        print(f"Unique Lats: {len(lats)}, Unique Lons: {len(lons)}")
+
+        # 3. Meshgrid (indexing='ij' -> Lat is rows, Lon is cols)
+        grid_lat, grid_lon = torch.meshgrid(lats, lons, indexing='ij')
+
+        # 4. Flatten
+        flat_lats = grid_lat.flatten()
+        flat_lons = grid_lon.flatten()
+
+        # 5. Stack
+        center_points = torch.stack([flat_lats, flat_lons], dim=1)
+        
+        # Return grid AND dimensions (Nx, Ny) for verification
+        return center_points, len(lats), len(lons)
+
+    def coarse_by_center_tensor(input_map_tensors: dict, target_grid_tensor: torch.Tensor):
+        coarse_map = {}
+        
+        # BallTree requires CPU Numpy
+        query_points_np = target_grid_tensor.cpu().numpy()
+        query_points_rad = np.radians(query_points_np)
+        
+        for key, val_tensor in input_map_tensors.items():
+            # Source locations (Perturbed)
+            source_locs_np = val_tensor[:, :2].cpu().numpy()
+            source_locs_rad = np.radians(source_locs_np)
+            
+            # NN Search
+            tree = BallTree(source_locs_rad, metric='haversine')
+            dist, ind = tree.query(query_points_rad, k=1)
+            nearest_indices = ind.flatten()
+            
+            # Map values back to tensor
+            indices_tensor = torch.tensor(nearest_indices, device=val_tensor.device, dtype=torch.long)
+            gathered_vals = val_tensor[indices_tensor, 2]
+            gathered_times = val_tensor[indices_tensor, 3]
+            
+            # Construct Regular Tensor
+            new_tensor = torch.stack([
+                target_grid_tensor[:, 0], # Regular Lat
+                target_grid_tensor[:, 1], # Regular Lon
+                gathered_vals,            # Mapped Value
+                gathered_times            # Mapped Time
+            ], dim=1)
+            
+            coarse_map[key] = new_tensor
+
+        return coarse_map
 
     def get_spatial_ordering(
             
@@ -192,7 +253,7 @@ def cli(
     vecc_norm_list = []
     vecc_col_norm_list = []
 
-    num_iters = 100
+    num_iters = 10
     for num_iter in range(num_iters):
         print(f"Iteration {num_iter+1}/{num_iters}")
 
@@ -207,8 +268,11 @@ def cli(
                 ]
 
 
-        lats_sim = torch.arange(0, 5.0 + 0.001, 0.044, device=DEVICE, dtype=DTYPE)
-        lons_sim = torch.arange(123.0, 133.0 + 0.001, 0.063, device=DEVICE, dtype=DTYPE)
+        perturbation_scale = 0.001  # Adjust this value as needed
+        LOC_ERR_STD = 0.002 
+
+        lats_sim = torch.arange(0, 5.0 + perturbation_scale, 0.044, device=DEVICE, dtype=DTYPE)
+        lons_sim = torch.arange(123.0, 133.0 + perturbation_scale, 0.063, device=DEVICE, dtype=DTYPE)
         t_def = 8
         
         print("1. Generating True Field...")
@@ -235,17 +299,21 @@ def cli(
             flat_vals = field_t_flipped.flatten()
             # Add Noise + Mean
             obs_vals = flat_vals + (torch.randn_like(flat_vals) * nugget_std) + OZONE_MEAN
+
+            # Add Location Perturbation
+            lat_noise = torch.randn_like(flat_lats) * LOC_ERR_STD
+            lon_noise = torch.randn_like(flat_lons) * LOC_ERR_STD
+            perturbed_lats = flat_lats + lat_noise
+            perturbed_lons = flat_lons + lon_noise
+
             time_val = 21.0 + t
             flat_times = torch.full_like(flat_lats, time_val)
             
-            row_tensor = torch.stack([flat_lats, flat_lons, obs_vals, flat_times], dim=1)
-            
-            # Changed: REMOVED .cpu() call. Keeps data on Mac GPU (mps)
-            clean_tensor = row_tensor.detach()
-            
+            row_tensor = torch.stack([perturbed_lats, perturbed_lons, obs_vals, flat_times], dim=1)
+    
             key_str = f'2024_07_y24m07day01_hm{t:02d}:53'
-            input_map[key_str] = clean_tensor
-            aggregated_list.append(clean_tensor)
+            input_map[key_str] = row_tensor.detach()
+            aggregated_list.append(input_map[key_str])
 
         aggregated_data = torch.cat(aggregated_list, dim=0)
 
@@ -259,6 +327,53 @@ def cli(
         print(aggregated_data[:6])
         
         print(f"\nGradient Check: {aggregated_data.requires_grad} (Should be False)")
+
+
+        # Step sizes
+        step_lat = 0.044
+        step_lon = 0.063
+
+        # Generate Target Grid: TOP-DOWN to ensure 5.0 and 133.0 are included
+        # 5.0 -> 0.0 (Descending) | 133.0 -> 123.0 (Descending)
+        target_grid, Nx_reg, Ny_reg = make_target_grid(
+            lat_start=5.0, lat_end=0.0, lat_step=-step_lat,
+            lon_start=133.0, lon_end=123.0, lon_step=-step_lon,
+            device=DEVICE, dtype=DTYPE
+        )
+
+        print(f"Target Regular Grid Shape: {target_grid.shape}")
+
+        # Map Perturbed Data to Regular Grid
+        coarse_map = coarse_by_center_tensor(input_map, target_grid)
+
+        # Aggregate Clean Data
+        coarse_aggregated_list = list(coarse_map.values())
+        coarse_aggregated_data = torch.cat(coarse_aggregated_list, dim=0)
+
+        # --- CRITICAL: OVERWRITE VARIABLES FOR DOWNSTREAM TASKS ---
+        input_map = coarse_map
+        aggregated_data = coarse_aggregated_data
+
+        print(f"Target Regular Grid Shape: {target_grid.shape}")
+
+        print("\n--- Regularization Complete ---")
+        print(f"Final Data Shape: {aggregated_data.shape}")
+
+        # --- 7. VERIFICATION ---
+        # Verify integrity for Whittle (Must be perfect rect)
+        u_lat = torch.unique(aggregated_data[:, 0])
+        u_lon = torch.unique(aggregated_data[:, 1])
+
+        print(f"\nGrid Integrity Check:")
+        print(f"Unique Latitudes: {len(u_lat)}")
+        print(f"Unique Longitudes: {len(u_lon)}")
+        print(f"Expected Total Points per Day: {len(u_lat) * len(u_lon)}")
+        print(f"Actual Points per Day: {aggregated_data.shape[0] // t_def}")
+
+        if (len(u_lat) * len(u_lon)) == (aggregated_data.shape[0] // t_def):
+            print("SUCCESS: Grid is perfect and ready for Whittle.")
+        else:
+            print("WARNING: Grid mismatch detected! Whittle will fail.")
 
         ord_mm, nns_map = get_spatial_ordering(input_map, mm_cond_number=10)
         mm_input_map = {}
@@ -389,13 +504,13 @@ def cli(
         frob_norm_dw = frob_norm_dw ** 0.5
 
         # (Your JSON/CSV saving code remains here...)
-        input_filepath = output_path / f"sim_dw_1212{ ( daily_aggregated_tensors_dw[0].shape[0]/8 ) }.json"
+        input_filepath = output_path / f"sim_irre_dw_1212{ ( daily_aggregated_tensors_dw[0].shape[0]/8 ) }.json"
         res = alg_optimization( f"2024-07-{day_idx+1}", f"DW_{num_iter}", ( daily_aggregated_tensors_dw[0].shape[0]/8 ) , lr,  step , dw_estimates_loss, 0 , frob_norm_dw)
         loaded_data = res.load(input_filepath)
         loaded_data.append( res.toJSON() )
         res.save(input_filepath,loaded_data)
         fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'frob_norm'] # 0 for epoch
-        csv_filepath = input_path/f"sim_dW_v{int(v*100):03d}_121225_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
+        csv_filepath = input_path/f"sim_irre_dW_v{int(v*100):03d}_121225_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
 
@@ -451,7 +566,7 @@ def cli(
         print(f"Vecchia Optimization finished in {epoch_time:.2f}s. Results: {out}")
 
         # (Your Result Saving Logic...)
-        input_filepath = output_path / f"sim_vecc_1212_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
+        input_filepath = output_path / f"sim_irre_vecc_1212_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
         
         res = alg_optimization( f"2024-07-{day_idx+1}", f"Vecc_{num_iter}", ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) , lr,  step , out, epoch_time, frob_norm )
         loaded_data = res.load(input_filepath)
@@ -459,7 +574,7 @@ def cli(
         res.save(input_filepath,loaded_data)
         fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'frob_norm'] # 0 for epoch
 
-        csv_filepath = input_path/f"sim_vecc_1212_v{int(v*100):03d}_LBFGS_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
+        csv_filepath = input_path/f"sim_irre_vecc_1212_v{int(v*100):03d}_LBFGS_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
 
