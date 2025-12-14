@@ -100,18 +100,18 @@ echo "Current date and time: $(date)"
 ```
 
 ``` cd ./jobscript/tco/gp_exercise ```
-```  nano simc_121225.sh  ``` 
-```  sbatch simc_121225.sh  ``` 
+```  nano sim_reg_cpu_121225.sh  ``` 
+```  sbatch sim_reg_cpu_121225.sh  ``` 
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=simc_121225       # Job name (Added GPU tag)
-#SBATCH --output=/home/jl2815/tco/exercise_output/simc_121225_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/simc_121225_%j.err
-#SBATCH --time=24:00:00                                 # Reduced time (GPU is faster)
+#SBATCH --job-name=sim_reg_cpu_121225       # Job name (Added GPU tag)
+#SBATCH --output=/home/jl2815/tco/exercise_output/sim_reg_cpu_121225_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/simc_reg_cpu_121225_%j.err
+#SBATCH --time=24:00:00                                 
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=40                               # CHANGED: Reduced from 48 (GPU does the work now)
-#SBATCH --mem=400G                                       # CHANGED: Reduced from 400G (GPU handles the matrices)
+#SBATCH --cpus-per-task=40                               
+#SBATCH --mem=400G                                       
 #SBATCH --partition=mem                                 # 💥 
 
 #### Load Modules
