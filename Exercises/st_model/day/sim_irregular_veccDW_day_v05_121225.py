@@ -253,7 +253,7 @@ def cli(
     vecc_norm_list = []
     vecc_col_norm_list = []
 
-    num_iters = 10
+    num_iters = 100
     for num_iter in range(num_iters):
         print(f"Iteration {num_iter+1}/{num_iters}")
 
