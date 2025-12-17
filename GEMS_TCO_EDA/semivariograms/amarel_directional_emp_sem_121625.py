@@ -108,16 +108,32 @@ def cli(
         np.arange(0.176, 2.3, 0.044 * 5)
     ])
 
+    tmp_lon_uni = np.concatenate([
+        [0, 0.063, 0.126],
+        np.arange(0.18, 2, 0.063 * 3)
+    ])
+
+    tmp_lat_uni = np.concatenate([
+        [0, 0.044, 0.132],
+        np.arange(0.176, 2.3, 0.044 * 5)
+    ])
+
+
     lon_deltas = [ (0, round(a,3)) for a in tmp_lon]
     lat_deltas = [ ( round(a,3),0 ) for a in tmp_lat]
-    tolerance = 0.02
+    #tolerance = 0.02
+    tolerance = 0.015
+    # Create deltas for univariate only
+    lat_deltas_uni = [(round(lat, 3), 0) for lat in tmp_lat_uni]
+    lon_deltas_uni = [(0, round(lon, 3)) for lon in tmp_lon_uni]
+
     
     # Avoid redundant computation of symmetric semivariograms 
-    lat_lag_sem = instance_sem.compute_directional_semivariogram(lat_deltas[len(lat_deltas)//2 :], daily_hourly_maps, days_list, tolerance)
-    lon_lag_sem = instance_sem.compute_directional_semivariogram(lon_deltas[len(lon_deltas)//2 :], daily_hourly_maps, days_list, tolerance)
+    lat_lag_sem = instance_sem.compute_directional_semivariogram(lat_deltas_uni, daily_hourly_maps, days_list, tolerance)
+    lon_lag_sem = instance_sem.compute_directional_semivariogram(lon_deltas_uni, daily_hourly_maps, days_list, tolerance)
 
-    #cross_lat_lag_sem = instance_sem.compute_cross_lon_lat(lat_deltas, daily_hourly_maps, days_list, tolerance)
-    #cross_lon_lag_sem = instance_sem.compute_cross_lon_lat(lon_deltas, daily_hourly_maps, days_list, tolerance)
+    cross_lat_lag_sem = instance_sem.compute_cross_lon_lat(lat_deltas, daily_hourly_maps, days_list, tolerance)
+    cross_lon_lag_sem = instance_sem.compute_cross_lon_lat(lon_deltas, daily_hourly_maps, days_list, tolerance)
     print(lon_lag_sem)
     print(lat_lag_sem)
 
@@ -138,12 +154,12 @@ def cli(
         pickle.dump(lon_lag_sem, pickle_file)   
 
     cross_lat_filepath = os.path.join(output_path, cross_lat_filename)
-    #with open(cross_lat_filepath, 'wb') as pickle_file:
-    #    pickle.dump(cross_lat_lag_sem, pickle_file)  
+    with open(cross_lat_filepath, 'wb') as pickle_file:
+        pickle.dump(cross_lat_lag_sem, pickle_file)  
 
     cross_lon_filepath = os.path.join(output_path, cross_lon_filename)
-    #with open(cross_lon_filepath, 'wb') as pickle_file:
-    #    pickle.dump(cross_lon_lag_sem, pickle_file)  
+    with open(cross_lon_filepath, 'wb') as pickle_file:
+        pickle.dump(cross_lon_lag_sem, pickle_file)  
 
 
 if __name__ == '__main__':
