@@ -9,7 +9,7 @@ For significant updates or installations, use pip install --force-reinstall or p
 
 ### Copy run file from ```local``` to ```Amarel HPC```
 # mac
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/semivariograms/amarel_directional_emp_sem522.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/semivariograms/amarel_directional_emp_sem_121625.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25
 
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/GEMS_TCO_EDA/semivariograms/empirical_sem_map_short_lag.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25
 

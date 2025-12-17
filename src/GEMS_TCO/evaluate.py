@@ -109,147 +109,227 @@ class CrossVariogram:
         self.save_path = save_path
         self.length_of_analysis = length_of_analysis
 
-    def compute_directional_semivariogram(self, deltas, map, days, tolerance):
-        lon_lag_sem = {0: deltas} # Save deltas for reference
-        num_lags = 8
-        key_list = sorted(map)
-        '''
-        days assume 0 based index, day 1 is index 0.
-        Ozone values are centered, it matters for short lags
-        '''
-        for day in days:
-            lon_lag_sem[day+1] = [[0]*len(deltas) for _ in range(num_lags)]
+    def compute_directional_semivariogram(self, deltas, map_data, days, tolerance):
+            """
+            Optimized to pre-compute spatial indices once, avoiding N^2 loops per time step.
+            """
+            lon_lag_sem = {0: deltas}  # Save deltas for reference
+            num_lags = 8
+            key_list = sorted(map_data.keys())
+
+            # --- STEP 1: Pre-compute Pair Indices (Run Once) ---
+            print("Pre-computing spatial pairs for defined lags...")
             
-            for i in range(8 * day, 8 * day + num_lags):  
-                cur_data = map[key_list[i]]
-     
-                coordinates = cur_data[:, :2]
-                cur_values = cur_data[:, 2] - torch.mean(cur_data[:, 2])
-      
-                lat_diffs = coordinates[:, None, 0] - coordinates[None, :, 0]
-                lon_diffs = coordinates[:, None, 1] - coordinates[None, :, 1]
+            # Get coordinates from the first available timestamp
+            first_data = map_data[key_list[0]]
+            coordinates = first_data[:, :2]  # Shape (N, 2)
 
-                for j, (delta_lat, delta_lon) in enumerate(deltas):
-                    valid_pairs = np.where(
-                        (np.abs(lat_diffs - delta_lat) <= tolerance) & 
-                        (np.abs(lon_diffs - delta_lon) <= tolerance)
-                    )
-                    if len(valid_pairs[0]) == 0:
-                        print(f"No valid pairs found for day {day+1}, time step {i - 8 * day + 1}, delta ({delta_lat}, {delta_lon})")
-                        lon_lag_sem[day + 1][i - 8 * day][j] = np.nan
-                        continue
-                    semivariances = 0.5 * torch.mean((cur_values[valid_pairs[1]] - cur_values[valid_pairs[0]]) ** 2)
-                    semivariances = torch.round(semivariances, decimals=4)
-                    lon_lag_sem[day+1][i - 8*day][j] = semivariances.item()
-        return lon_lag_sem
-
-    def compute_cross_lon_lat(self, deltas, map, days, tolerance):
-        lon_lag_sem = {0: deltas} # Save deltas for reference
-        num_lags = 7
-        key_list = sorted(map)
-        '''
-        days assume 0 based index, day 1 is index 0.
-        Ozone values are centered, it matters for short lags
-        '''
-        for day in days:
-            lon_lag_sem[day+1] = [[0]*len(deltas) for _ in range(num_lags)]
+            # Use GPU if available for faster indexing
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            coords_t = torch.tensor(coordinates, device=device, dtype=torch.float32)
             
-            for i in range(8 * day, 8 * day + num_lags):  # change 7 to 6
-                cur_data = map[key_list[i]]
-                next_data = map[key_list[i+1]]
-                coordinates = cur_data[:, :2]
-                cur_values = cur_data[:, 2] - torch.mean(cur_data[:, 2])
-                next_values = next_data[:, 2] - torch.mean(next_data[:, 2])
-                lat_diffs = coordinates[:, None, 0] - coordinates[None, :, 0]
-                lon_diffs = coordinates[:, None, 1] - coordinates[None, :, 1]
+            # Store valid indices for each delta: list of (row_idx, col_idx) tensors
+            delta_indices_cache = []
 
-                for j, (delta_lat, delta_lon) in enumerate(deltas):
-                    valid_pairs = np.where(
-                        (np.abs(lat_diffs - delta_lat) <= tolerance) & 
-                        (np.abs(lon_diffs - delta_lon) <= tolerance)
-                    )
-                    if len(valid_pairs[0]) == 0:
-                        print(f"No valid pairs found for day {day+1}, time step {i - 8 * day + 1}, delta ({delta_lat}, {delta_lon})")
-                        lon_lag_sem[day + 1][i - 8 * day][j] = np.nan
-                        continue
-                    semivariances = 0.5 * torch.mean((cur_values[valid_pairs[1]] - next_values[valid_pairs[0]]) ** 2)
-                    semivariances = torch.round(semivariances, decimals=4)
-                    lon_lag_sem[day+1][i - 8*day][j] = semivariances.item()
-        return lon_lag_sem
-    
-    def cross_directional_sem(self,deltas, map,  days, tolerance, direction1, direction2):
+            # Calculate difference matrices ONCE
+            # Note: If N is very large (>30k), do this in blocks to avoid OOM.
+            # For N=20k, this takes ~3GB VRAM/RAM which is usually fine.
+            lat_diffs = coords_t[:, None, 0] - coords_t[None, :, 0]
+            lon_diffs = coords_t[:, None, 1] - coords_t[None, :, 1]
+
+            for (delta_lat, delta_lon) in deltas:
+                # Create boolean mask for pairs matching this specific lag
+                mask = (torch.abs(lat_diffs - delta_lat) <= tolerance) & \
+                    (torch.abs(lon_diffs - delta_lon) <= tolerance)
+                
+                # Extract indices of valid pairs
+                pairs = torch.nonzero(mask, as_tuple=True)
+                delta_indices_cache.append(pairs)
+            
+            # Free memory of large matrices immediately
+            del lat_diffs, lon_diffs, mask, coords_t
+            if device == 'cuda':
+                torch.cuda.empty_cache()
+                
+            print("Pre-computation complete. Starting daily analysis...")
+
+            # --- STEP 2: Fast Analysis Loop ---
+            for day in days:
+                # Initialize storage for this day
+                lon_lag_sem[day + 1] = [[np.nan] * len(deltas) for _ in range(num_lags)]
+                
+                for i in range(num_lags):
+                    # Calculate global index (e.g., day 0 -> indices 0-7)
+                    global_idx = 8 * day + i
+                    if global_idx >= len(key_list):
+                        break
+
+                    # Load data for this specific hour
+                    cur_data = map_data[key_list[global_idx]]
+                    
+                    # Prepare values (centered)
+                    vals = torch.tensor(cur_data[:, 2], device=device, dtype=torch.float32)
+                    vals = vals - torch.mean(vals)
+
+                    # Iterate through pre-computed lags
+                    for j, (idx_row, idx_col) in enumerate(delta_indices_cache):
+                        if len(idx_row) == 0:
+                            # No pairs found for this lag (already set to NaN or handled here)
+                            continue
+                        
+                        # Vectorized calculation: gather values using cached indices
+                        # This is O(K) where K is number of pairs, extremely fast
+                        diffs = vals[idx_col] - vals[idx_row]
+                        semivariance = 0.5 * torch.mean(diffs ** 2)
+                        
+                        lon_lag_sem[day + 1][i][j] = round(semivariance.item(), 4)
+                        
+            return lon_lag_sem
+
+    def compute_cross_lon_lat(self, deltas, map_data, days, tolerance):
+            # 1. Initialize logic matches original
+            lon_lag_sem = {0: deltas}
+            num_lags = 7  # Matches your variable
+            key_list = sorted(map_data.keys())
+            
+            # --- PRE-COMPUTATION (Optimization) ---
+            # Calculates indices ONCE. Logic remains: (row, col)
+            first_data = map_data[key_list[0]]
+            coordinates = first_data[:, :2]
+            
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            coords_t = torch.tensor(coordinates, device=device, dtype=torch.float32)
+            
+            lat_diffs = coords_t[:, None, 0] - coords_t[None, :, 0]
+            lon_diffs = coords_t[:, None, 1] - coords_t[None, :, 1]
+            
+            delta_indices_cache = []
+            for (delta_lat, delta_lon) in deltas:
+                mask = (torch.abs(lat_diffs - delta_lat) <= tolerance) & \
+                    (torch.abs(lon_diffs - delta_lon) <= tolerance)
+                pairs = torch.nonzero(mask, as_tuple=True)
+                delta_indices_cache.append(pairs)
+                
+            del lat_diffs, lon_diffs, mask, coords_t
+            if device == 'cuda': torch.cuda.empty_cache()
+            # --------------------------------------
+
+            for day in days:
+                # Matches your initialization
+                lon_lag_sem[day + 1] = [[np.nan] * len(deltas) for _ in range(num_lags)]
+                
+                # Loop range matches: 8*day to 8*day + num_lags
+                for i in range(num_lags): 
+                    t_idx = 8 * day + i
+                    if t_idx + 1 >= len(key_list): break
+                    
+                    cur_data = map_data[key_list[t_idx]]
+                    next_data = map_data[key_list[t_idx + 1]]
+                    
+                    cur_vals = torch.tensor(cur_data[:, 2], device=device, dtype=torch.float32)
+                    cur_vals = cur_vals - torch.mean(cur_vals)
+                    
+                    next_vals = torch.tensor(next_data[:, 2], device=device, dtype=torch.float32)
+                    next_vals = next_vals - torch.mean(next_vals)
+
+                    for j, (idx_row, idx_col) in enumerate(delta_indices_cache):
+                        if len(idx_row) == 0:
+                            continue
+                        
+                        # LOGIC CHECK: Preserved Original Indexing
+                        # Original: cur_values[valid_pairs[1]] - next_values[valid_pairs[0]]
+                        # valid_pairs[1] is col, valid_pairs[0] is row
+                        diffs = cur_vals[idx_col] - next_vals[idx_row]
+                        
+                        semivariance = 0.5 * torch.mean(diffs ** 2)
+                        
+                        # LOGIC CHECK: Rounding enabled (matches original)
+                        lon_lag_sem[day + 1][i][j] = round(semivariance.item(), 4)
+                        
+            return lon_lag_sem
+
+    def cross_directional_sem(self, deltas, map_data, days, tolerance, direction1, direction2):
         directional_sem = {}
         directional_sem[0] = deltas
+        
+        # --- PRE-COMPUTATION ---
+        key_list = sorted(map_data.keys())
+        first_data = map_data[key_list[0]]
+        coordinates = first_data[:, :2]
+
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        coords_t = torch.tensor(coordinates, device=device, dtype=torch.float32)
+
+        lat_diffs = coords_t[:, None, 0] - coords_t[None, :, 0]
+        lon_diffs = coords_t[:, None, 1] - coords_t[None, :, 1]
+        
+        # Pre-calc geometry
+        dist_matrix = torch.sqrt(lat_diffs**2 + lon_diffs**2)
+        angle_matrix = torch.atan2(lat_diffs, lon_diffs)
+
+        delta_indices_cache = []
+        mid_point = len(deltas) / 2
+        
+        for j, distance in enumerate(deltas):
+            # Direction Logic: Matches your "j <= len/2" check
+            target_dir = direction1 if j <= mid_point else direction2
+            
+            # Mask Logic: Matches "abs(angle - dir) <= pi/8"
+            dir_mask = torch.abs(angle_matrix - target_dir) <= (np.pi / 8)
+            dist_mask = torch.abs(dist_matrix - distance) <= tolerance
+            
+            if distance == 0:
+                final_mask = dist_mask # Matches "if distance==0"
+            else:
+                final_mask = dir_mask & dist_mask 
+                # Note: This is SAFER than original "filtered_lat_diffs != 0" 
+                # because it doesn't accidentally drop pairs with lat_diff=0
+
+            pairs = torch.nonzero(final_mask, as_tuple=True)
+            delta_indices_cache.append(pairs)
+
+        del lat_diffs, lon_diffs, dist_matrix, angle_matrix, coords_t
+        if device == 'cuda': torch.cuda.empty_cache()
+        # -----------------------
 
         for index, day in enumerate(days):
-            directional_sem[day] = [[0]*len(deltas) for _ in range(7)]
+            # LOGIC FIX: Initialize with NaN, not 0
+            directional_sem[day] = [[np.nan]*len(deltas) for _ in range(7)]
             
-            t = day - 1
-            ori_semi_var_timeseries = [[0] * len(deltas) for _ in range(7)]
-            key_list = sorted(map)
+            # Logic Check: Preserved "t = day - 1"
+            t = day - 1 
 
-            for i in range(8 * t, 8 * t + 7):         # change 7 to 6
-                cur_data = map[key_list[i]]
-                next_data = map[key_list[i+1]]
-                coordinates = cur_data[:,:2]   # latitude and longitude
-                cur_values = cur_data[:,2]- torch.mean(cur_data[:,2])
-                next_values = (next_data[:,2]) - torch.mean( (next_data[:,2]) )
+            for i in range(7): # Matches "range(8*t, 8*t+7)"
+                global_idx = 8 * t + i
+                
+                # Safety for negative indexing or out of bounds
+                if global_idx < 0: global_idx += len(key_list) 
+                if global_idx + 1 >= len(key_list): break
 
-                # Calculate pairwise differences in both latitude and longitude
-                lat_diffs = coordinates[:, None, 0] - coordinates[None, :, 0]
-                lon_diffs = coordinates[:, None, 1] - coordinates[None, :, 1]
+                cur_data = map_data[key_list[global_idx]]
+                next_data = map_data[key_list[global_idx + 1]]
 
-                # Calculate the pairwise distances between all points
+                cur_vals = torch.tensor(cur_data[:, 2], device=device, dtype=torch.float32)
+                cur_vals = cur_vals - torch.mean(cur_vals)
+                
+                next_vals = torch.tensor(next_data[:, 2], device=device, dtype=torch.float32)
+                next_vals = next_vals - torch.mean(next_vals)
 
-                angle = np.arctan2(lat_diffs, lon_diffs) 
-                direction1_filter = np.abs(angle - direction1) <= np.pi/8 
-                direction2_filter = np.abs(angle -direction2) <= np.pi/8
-
-                for j, (distance) in enumerate(deltas):
-
-
-                    if j<= len(deltas)/2:
-                        direction_filtered = direction1_filter
-                        direction = direction1
-                    else:
-                        direction_filtered = direction2_filter
-                        direction = direction2
-                    
-                    # Apply the boolean mask directly to the 2D arrays
-                    filtered_lat_diffs = lat_diffs*direction_filtered
-                    filtered_lon_diffs = lon_diffs*direction_filtered
-
-                    # Check if we have valid filtered lat/lon diffs
-                    # print(filtered_lat_diffs,filtered_lat_diffs.shape)  # Check the filtered lat diffs before the comparison
-
-                    if distance==0:
-                        valid_pairs = np.where(
-                            (np.abs(np.sqrt(lat_diffs**2 + lon_diffs**2) - distance) <= tolerance)
-                        )
-                    else:
-                        valid_pairs = np.where(
-                            (filtered_lat_diffs != 0) &  # allow earlier filter
-                            (np.abs(np.sqrt(filtered_lat_diffs**2 + filtered_lon_diffs**2) - distance) <= tolerance)
-                        )
-
-                    if len(valid_pairs[0]) == 0:
-                        print(f"No valid pairs found for t{j+1:02d}_{i+1} at lag ({distance},  direction {direction})")
-                        ori_semi_var_timeseries[i % 8][j] = np.nan
+                for j, (idx_row, idx_col) in enumerate(delta_indices_cache):
+                    if len(idx_row) == 0:
                         continue
 
-                    # Compute the semivariance for those valid pairs
-                    semivariances = 0.5 * torch.mean((cur_values[valid_pairs[0]] - next_values[valid_pairs[1]]) ** 2)
+                    # LOGIC CHECK: Preserved Original Indexing (Swapped compared to first func)
+                    # Original: cur_values[valid_pairs[0]] - next_values[valid_pairs[1]]
+                    # valid_pairs[0] is row, valid_pairs[1] is col
+                    diffs = cur_vals[idx_row] - next_vals[idx_col]
                     
-                    # Normalize the semivariance
-                    # variance_of_data = np.var(values)
-                    # normalized_semivariance = semivariances / variance_of_data
+                    semivariance = 0.5 * torch.mean(diffs ** 2)
+                    
+                    # LOGIC CHECK: No Rounding (matches original)
+                    directional_sem[day][i][j] = semivariance.item()
 
-                    directional_sem[day][i % 8][j] = semivariances.item()
-                    # Append the normalized semivariance to the timeseries
-                    ori_semi_var_timeseries[i % 8][j] = semivariances.item()
-                
         return directional_sem
-
 
     def theoretical_gamma_kv(self, params: torch.Tensor, lat_diff: torch.Tensor, lon_diff: torch.Tensor, time_diff: torch.Tensor) -> (torch.Tensor, torch.Tensor):
         """
@@ -412,111 +492,126 @@ class CrossVariogram_empirical(CrossVariogram):
         plt.show()
 
     def plot_lat_empirical(self, lat_lag_sem, days, deltas):
-        fig, axs = plt.subplots(2, 2, figsize=(15, 10))
+            fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
-        # https://betterfigures.org/2015/06/23/picking-a-colour-scale-for-scientific-graphics/
-        colors = [
-            (222/255, 235/255, 247/255),
-            (198/255, 219/255, 239/255),
-            (158/255, 202/255, 225/255),
-            (107/255, 174/255, 214/255),
-            (66/255, 146/255, 198/255),
-            (33/255, 113/255, 181/255),
-            (8/255, 69/255, 148/255),
-            (0/255, 51/255, 128/255)  # New 8th color
-        ]
+            colors = [
+                (222/255, 235/255, 247/255),
+                (198/255, 219/255, 239/255),
+                (158/255, 202/255, 225/255),
+                (107/255, 174/255, 214/255),
+                (66/255, 146/255, 198/255),
+                (33/255, 113/255, 181/255),
+                (8/255, 69/255, 148/255),
+                (0/255, 51/255, 128/255)
+            ]
 
+            # 1. Extract raw lags from deltas
+            raw_lat_lags = [lat for lat, lon in deltas]
 
-        for index, day in enumerate(days):
-            ax = axs[index // 2, index % 2]
+            # 2. Get indices that would sort these lags
+            # This ensures we plot from smallest lag to largest lag (removes zig-zags)
+            sorted_indices = sorted(range(len(raw_lat_lags)), key=lambda k: raw_lat_lags[k])
+            
+            # 3. Create the sorted x-axis list
+            lat_lags = [raw_lat_lags[i] for i in sorted_indices]
 
-            lat_lags = [lat for lat, lon in deltas]
+            for index, day in enumerate(days):
+                ax = axs[index // 2, index % 2]
 
-            # for j, (lat, lon) in enumerate(deltas):
-            #    x_values.append(lat)  # Use negative index for negative lags
-            # weight = [-0.55, -0.5, -0.25, -0.15, -0.05, 0, 0.05, 0.15, 0.25, 0.5, 0.55]
-            # weight2 = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]
+                for i in range(8):
+                    # Get raw y values for this hour
+                    raw_y_values = lat_lag_sem[day][i]
+                    
+                    # 4. Reorder y_values using the SAME sorted_indices
+                    # This ensures the Y value matches the correct X (lag) value
+                    y_values = [raw_y_values[i] for i in sorted_indices]
+                    
+                    ax.plot(lat_lags, y_values, color=colors[i], label=f'Empirical Sem. Hour {i + 1}')
 
-            # Plotting for each orbit
-            for i in range(8):
-                #y_values = [y**2 for y in lat_lag_sem[day][i]]
-                y_values = [y for y in lat_lag_sem[day][i]]
-                ax.plot(lat_lags, y_values, color=colors[i], label=f'Empirical Sem. Hour {i + 1}')
-                #ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
+                ax.grid(True)
+                ax.set_xlabel('Latitude Lags', fontsize=12)
+                ax.set_ylabel('Variogram Values', fontsize=12)
+                ax.set_title(f'Semi-Variogram on 2024-07-{day:02d} ({self.length_of_analysis})', fontsize=14)
                 
-            ax.grid(True)
-            ax.set_xlabel('Latitude Lags', fontsize=12)
-            ax.set_ylabel('Variogram Values', fontsize=12)
-            ax.set_title(f'Semi-Variogram on 2024-07-{day:02d} ({self.length_of_analysis})', fontsize=14)
-            # ax.set_xscale('linear')
-            ax.set_xscale('symlog', linthresh=0.95)
+                # Use symlog as requested
+                ax.set_xscale('symlog', linthresh=0.95)
 
-            ax.set_xticks(lat_lags)
-            ticks = [str(round(x, 2)) for x in lat_lags]
-            ax.set_xticklabels(ticks)
-            #ax.set_ylim(1e-4, 670)
-            ax.set_ylim(1e-4, 25)
-            plt.setp(ax.get_xticklabels(), rotation=65, ha='right')
+                # Ticks must also be sorted (lat_lags is now sorted)
+                ax.set_xticks(lat_lags)
+                
+                # Format ticks
+                ticks = [str(round(x, 2)) for x in lat_lags]
+                ax.set_xticklabels(ticks)
+                
+                ax.set_ylim(1e-4, 25)
+                plt.setp(ax.get_xticklabels(), rotation=65, ha='right')
 
-            # Add vertical red line at x=0
-            ax.axvline(x=0, color='red', linestyle='--') # , label='x=0'
-            ax.legend()
+                ax.axvline(x=0, color='red', linestyle='--')
+                ax.legend()
 
-        plt.tight_layout()
-        save_path = Path(self.save_path) / f'emp_sem_latitude_days{days[0]}_{days[-1]}.png'
-        plt.savefig(save_path)
-        # plt.savefig(f'/Users/joonwonlee/Documents/GEMS_TCO-1/plots/directional_semivariograms/dir_sem_latitude_days{days[0]}_{days[-1]}.png')
-        plt.show()
+            plt.tight_layout()
+            save_path = Path(self.save_path) / f'emp_sem_latitude_days{days[0]}_{days[-1]}.png'
+            plt.savefig(save_path)
+            plt.show()
 
     def plot_lon_empirical(self, lon_lag_sem, days, deltas):
-        fig, axs = plt.subplots(2, 2, figsize=(15, 10))
+            fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
-        # https://betterfigures.org/2015/06/23/picking-a-colour-scale-for-scientific-graphics/
-        colors = [
-            (222/255, 235/255, 247/255),
-            (198/255, 219/255, 239/255),
-            (158/255, 202/255, 225/255),
-            (107/255, 174/255, 214/255),
-            (66/255, 146/255, 198/255),
-            (33/255, 113/255, 181/255),
-            (8/255, 69/255, 148/255),
-            (0/255, 51/255, 128/255)  # New 8th color
-        ]
+            colors = [
+                (222/255, 235/255, 247/255),
+                (198/255, 219/255, 239/255),
+                (158/255, 202/255, 225/255),
+                (107/255, 174/255, 214/255),
+                (66/255, 146/255, 198/255),
+                (33/255, 113/255, 181/255),
+                (8/255, 69/255, 148/255),
+                (0/255, 51/255, 128/255)  # New 8th color
+            ]
 
-        for index, day in enumerate(days):
-            ax = axs[index // 2, index % 2]
+            # 1. Extract raw lags
+            raw_lon_lags = [lon for lat, lon in deltas]
 
-            lon_lags = [lon for lat, lon in deltas]
+            # 2. Get indices that would sort these lags
+            # This guarantees the line is drawn left-to-right without zig-zags
+            sorted_indices = sorted(range(len(raw_lon_lags)), key=lambda k: raw_lon_lags[k])
+            
+            # 3. Create the sorted x-axis list
+            lon_lags = [raw_lon_lags[i] for i in sorted_indices]
 
-            for i in range(8):
-                #y_values = [y**2 for y in lon_lag_sem[day][i]]
-                y_values = [y for y in lon_lag_sem[day][i]]
-                ax.plot(lon_lags, y_values, color=colors[i], label=f'Empirical Sem. Hour {i + 1}')
-                #ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
+            for index, day in enumerate(days):
+                ax = axs[index // 2, index % 2]
+
+                for i in range(8):
+                    # Get raw y values
+                    raw_y_values = lon_lag_sem[day][i]
+
+                    # 4. Reorder y_values using the SAME sorted_indices
+                    y_values = [raw_y_values[i] for i in sorted_indices]
+
+                    ax.plot(lon_lags, y_values, color=colors[i], label=f'Empirical Sem. Hour {i + 1}')
+                    
+                ax.grid(True)
+                ax.set_xlabel('Longitude Lags', fontsize=12)
+                ax.set_ylabel('Variogram Values', fontsize=12)
+                ax.set_title(f'Semi-Variogram on 2024-07-{day:02d} ({self.length_of_analysis})', fontsize=14)
+                ax.set_xscale('symlog', linthresh=0.95)
                 
-            ax.grid(True)
-            ax.set_xlabel('Longitude Lags', fontsize=12)
-            ax.set_ylabel('Variogram Values', fontsize=12)
-            ax.set_title(f'Semi-Variogram on 2024-07-{day:02d} ({self.length_of_analysis})', fontsize=14)
-            ax.set_xscale('symlog', linthresh=0.95)
-            # ax.set_xscale('linear')
-            # ax.set_yscale('linear')
-            ax.set_xticks(lon_lags)
-            ticks = [str(round(x, 2)) for x in lon_lags]
-            ax.set_xticklabels(ticks)
-            #ax.set_ylim(1e-4, 670)
-            ax.set_ylim(1e-4, 25)
-            plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
+                # Use the sorted lags for ticks
+                ax.set_xticks(lon_lags)
+                ticks = [str(round(x, 2)) for x in lon_lags]
+                ax.set_xticklabels(ticks)
+                
+                ax.set_ylim(1e-4, 25)
+                plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
 
-            # Add vertical red line at x=0
-            ax.axvline(x=0, color='red', linestyle='--') # , label='x=0'
-            ax.legend()
+                # Add vertical red line at x=0
+                ax.axvline(x=0, color='red', linestyle='--') 
+                ax.legend()
 
-        plt.tight_layout()
-        # plt.savefig(f'/Users/joonwonlee/Documents/GEMS_TCO-1/plots/directional_semivariograms/dir_sem_longitude_days{days[0]}_{days[-1]}.png')
-        save_path = Path(self.save_path) / f'emp_sem_longitude_days{days[0]}_{days[-1]}.png'
-        plt.savefig(save_path)
-        plt.show()
+            plt.tight_layout()
+            save_path = Path(self.save_path) / f'emp_sem_longitude_days{days[0]}_{days[-1]}.png'
+            plt.savefig(save_path)
+            plt.show()
 
 
 
