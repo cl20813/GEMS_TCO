@@ -12,9 +12,11 @@ scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/coarse_cen_map_without_de
 
 ### Copy run file from ```local``` to ```Amarel HPC```
 # mac
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_gpu_veccDWlbfgs_day_v05_121125.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_regular_veccDWlbfgs_day_v05_121725.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_irregular_veccDW_day_v05_121225.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_irregular_veccDW_day_v05_121725.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_heads_regular_vecc_testing_day_v05_121725.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
@@ -48,7 +50,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vec
 
 
 
-### simulation
+### simulation regular grid
 
 ``` cd ./jobscript/tco/gp_exercise ```
 ```  nano sim_121225.sh  ``` 
@@ -100,14 +102,14 @@ echo "Current date and time: $(date)"
 ```
 
 ``` cd ./jobscript/tco/gp_exercise ```
-```  nano sim_reg_cpu_121225.sh  ``` 
-```  sbatch sim_reg_cpu_121225.sh  ``` 
+```  nano sim_reg_cpu_121725.sh  ``` 
+```  sbatch sim_reg_cpu_121725.sh  ``` 
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=sim_reg_cpu_121225       # Job name (Added GPU tag)
-#SBATCH --output=/home/jl2815/tco/exercise_output/sim_reg_cpu_121225_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/simc_reg_cpu_121225_%j.err
+#SBATCH --job-name=sim_reg_cpu_121725       # Job name (Added GPU tag)
+#SBATCH --output=/home/jl2815/tco/exercise_output/sim_reg_cpu_121725_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/simc_reg_cpu_121725_%j.err
 #SBATCH --time=24:00:00                                 
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=40                               
@@ -130,7 +132,7 @@ echo "Node: $(hostname)"
 
 
 # Run the script
-srun python /home/jl2815/tco/exercise_25/st_model/sim_gpu_veccDWlbfgs_day_v05_121125.py \
+srun python /home/jl2815/tco/exercise_25/st_model/sim_regular_veccDWlbfgs_day_v05_121725.py \
     --v 0.5 \
     --lr 0.03 \
     --step 80 \
@@ -147,23 +149,23 @@ echo "Current date and time: $(date)"
 
 
 
-################ irregular grid
+############# irregular grid
 
 
 
 ``` cd ./jobscript/tco/gp_exercise ```
-```  nano sim_irr_121225.sh  ``` 
-```  sbatch sim_irr_121225.sh  ``` 
+```  nano sim_irr_121725.sh  ``` 
+```  sbatch sim_irr_121725.sh  ``` 
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=sim_irr_121225       # Job name (Added GPU tag)
-#SBATCH --output=/home/jl2815/tco/exercise_output/sim_irr_121225_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/sim_irr_121225_%j.err
+#SBATCH --job-name=sim_irr_121725       # Job name (Added GPU tag)
+#SBATCH --output=/home/jl2815/tco/exercise_output/sim_irr_121725_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/sim_irr_121725_%j.err
 #SBATCH --time=24:00:00                                 # Reduced time (GPU is faster)
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=40                               # CHANGED: Reduced from 48 (GPU does the work now)
-#SBATCH --mem=400G                                       # CHANGED: Reduced from 400G (GPU handles the matrices)
+#SBATCH --mem=400G                                       
 #SBATCH --partition=mem                                 # 💥 
 
 #### Load Modules
@@ -171,22 +173,16 @@ module purge
 module use /projects/community/modulefiles                 
 module load anaconda/2024.06-ts840 
 
-
 #### Initialize conda
 eval "$(conda shell.bash hook)"
 conda activate faiss_env  # Ensure this env has PyTorch with CUDA installed!
 
 echo "Current date and time: $(date)"
-echo "Running GPU Batched Vecchia Optimization"
 echo "Node: $(hostname)"
 
 
-
-# Check if GPU is actually visible
-nvidia-smi
-
 # Run the script
-srun python /home/jl2815/tco/exercise_25/st_model/sim_irregular_veccDW_day_v05_121225.py \
+srun python /home/jl2815/tco/exercise_25/st_model/sim_irregular_veccDW_day_v05_121725.py \
     --v 0.5 \
     --lr 0.03 \
     --step 80 \
@@ -201,7 +197,7 @@ echo "Current date and time: $(date)"
 
 ```
 
-
+## irregular grid using
 
 ``` cd ./jobscript/tco/gp_exercise ```
 ```  nano sim_irr_cpu_121225.sh  ``` 
@@ -235,6 +231,55 @@ echo "Node: $(hostname)"
 
 # Run the script
 srun python /home/jl2815/tco/exercise_25/st_model/sim_irregular_veccDW_day_v05_121225.py \
+    --v 0.5 \
+    --lr 0.03 \
+    --step 80 \
+    --epochs 100 \
+    --space "1, 1" \
+    --days "20,30" \
+    --mm-cond-number 8 \
+    --nheads 100 \
+    --no-keep-exact-loc 
+
+echo "Current date and time: $(date)"
+
+```
+
+
+## regular grid testing heads and tail separation setting
+
+``` cd ./jobscript/tco/gp_exercise ```
+```  nano sim_vecc_heads_testing_cpu_121725.sh  ``` 
+```  sbatch sim_vecc_heads_testing_cpu_121725.sh  ``` 
+
+``` 
+#!/bin/bash
+#SBATCH --job-name=sim_vecc_heads_testing_cpu_121725      # Job name (Added GPU tag)
+#SBATCH --output=/home/jl2815/tco/exercise_output/sim_vecc_heads_testing_cpu_121725_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/sim_vecc_heads_testing_cpu_121725_%j.err
+#SBATCH --time=24:00:00                                 # Reduced time (GPU is faster)
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=40                               # CHANGED: Reduced from 48 (GPU does the work now)
+#SBATCH --mem=400G                                       # CHANGED: Reduced from 400G (GPU handles the matrices)
+#SBATCH --partition=mem                                 # 💥 
+
+#### Load Modules
+module purge                                              
+module use /projects/community/modulefiles                 
+module load anaconda/2024.06-ts840 
+
+
+#### Initialize conda
+eval "$(conda shell.bash hook)"
+conda activate faiss_env  # Ensure this env has PyTorch with CUDA installed!
+
+echo "Current date and time: $(date)"
+echo "Running GPU Batched Vecchia Optimization"
+echo "Node: $(hostname)"
+
+
+# Run the script
+srun python /home/jl2815/tco/exercise_25/st_model/sim_heads_regular_vecc_testing_day_v05_121725.py \
     --v 0.5 \
     --lr 0.03 \
     --step 80 \

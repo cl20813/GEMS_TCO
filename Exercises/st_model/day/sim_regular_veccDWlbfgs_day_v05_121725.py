@@ -187,10 +187,55 @@ def cli(
             # Calculate nearest neighbors map
             nns_map = _orderings.find_nns_l2(locs=coords1_reordered, max_nn=mm_cond_number)
             return ord_mm, nns_map
-    
+
+    def calculate_original_scale_metrics(est_params, true_init_dict):
+        # Convert list to tensor for unified math operations
+        est_t = torch.tensor(est_params, device='cpu', dtype=torch.float64).flatten()
+        
+        # 1. Transform back from optimization space (phi and logs)
+        phi1_e, phi2_e, phi3_e, phi4_e = torch.exp(est_t[0]), torch.exp(est_t[1]), torch.exp(est_t[2]), torch.exp(est_t[3])
+        adv_lat_e, adv_lon_e = est_t[4], est_t[5]
+        nugget_e = torch.exp(est_t[6])
+
+        # 2. Derive physical parameters (Original Scale)
+        sigmasq_e = phi1_e / phi2_e
+        range_lon_e = 1.0 / phi2_e
+        range_lat_e = range_lon_e / torch.sqrt(phi3_e)
+        range_time_e = range_lon_e / torch.sqrt(phi4_e)
+
+        est_array = torch.stack([sigmasq_e, range_lat_e, range_lon_e, range_time_e, adv_lat_e, adv_lon_e, nugget_e])
+        
+        true_array = torch.tensor([
+            true_init_dict['sigmasq'], true_init_dict['range_lat'], true_init_dict['range_lon'],
+            true_init_dict['range_time'], true_init_dict['advec_lat'], true_init_dict['advec_lon'], 
+            true_init_dict['nugget']
+        ], device='cpu', dtype=torch.float64)
+
+        # 3. Calculate MAPE (Mean Absolute Percentage Error)
+        mape = torch.mean(torch.abs((true_array - est_array) / true_array)).item() * 100 
+        
+        return mape
+
+    true_params_dict = {
+        'sigmasq': 13.059, 'range_lat': 0.154, 'range_lon': 0.195,
+        'range_time': 1.0, 'advec_lat': 0.0218, 'advec_lon': -0.1689, 'nugget': 0.247
+    }
+
     dw_norm_list = []
     vecc_norm_list = []
-    vecc_col_norm_list = []
+    #vecc_col_norm_list = []
+
+
+    # --- Move these outside the loop to fix the NameError and save time ---
+    lats_sim = torch.arange(0, 5.0 + 0.001, 0.044, device=DEVICE, dtype=DTYPE)
+    lons_sim = torch.arange(123.0, 133.0 + 0.001, 0.063, device=DEVICE, dtype=DTYPE)
+    lats_flip = torch.flip(lats_sim, dims=[0])
+    lons_flip = torch.flip(lons_sim, dims=[0])
+
+    grid_lat, grid_lon = torch.meshgrid(lats_flip, lons_flip, indexing='ij')
+    flat_lats = grid_lat.flatten()
+    flat_lons = grid_lon.flatten()
+
 
     num_iters = 100
     for num_iter in range(num_iters):
@@ -207,8 +252,8 @@ def cli(
                 ]
 
 
-        lats_sim = torch.arange(0, 5.0 + 0.001, 0.044, device=DEVICE, dtype=DTYPE)
-        lons_sim = torch.arange(123.0, 133.0 + 0.001, 0.063, device=DEVICE, dtype=DTYPE)
+        #lats_sim = torch.arange(0, 5.0 + 0.001, 0.044, device=DEVICE, dtype=DTYPE)
+        #lons_sim = torch.arange(123.0, 133.0 + 0.001, 0.063, device=DEVICE, dtype=DTYPE)
         t_def = 8
         
         print("1. Generating True Field...")
@@ -221,12 +266,12 @@ def cli(
         nugget_std = torch.sqrt(torch.exp(params_list_vecc[6]))
         
         # Flip to Descending Order
-        lats_flip = torch.flip(lats_sim, dims=[0])
-        lons_flip = torch.flip(lons_sim, dims=[0])
+        #lats_flip = torch.flip(lats_sim, dims=[0])
+        #lons_flip = torch.flip(lons_sim, dims=[0])
         
-        grid_lat, grid_lon = torch.meshgrid(lats_flip, lons_flip, indexing='ij')
-        flat_lats = grid_lat.flatten()
-        flat_lons = grid_lon.flatten()
+        #grid_lat, grid_lon = torch.meshgrid(lats_flip, lons_flip, indexing='ij')
+        #flat_lats = grid_lat.flatten()
+        #flat_lons = grid_lon.flatten()
         
         for t in range(t_def):
             # Flip field to match coordinates
@@ -377,20 +422,28 @@ def cli(
         dw_estimates_loss = dw_estimates_values + [loss]
 
 
-        # 2. Apply lower bound to nugget (index -1)
-        #with torch.no_grad():
-        #    new_params_list[-1].clamp_min_(-2.0)
-
-
-        frob_norm_dw = sum((p_true.item() - p_est)**2 
-                        for p_true, p_est in zip(params_list2, dw_estimates_values))
+        #frob_norm_dw = sum((p_true.item() - p_est)**2 
+        #                for p_true, p_est in zip(params_list2, dw_estimates_values))
 
         # Optional: Take sqrt if you want the actual Euclidean/Frobenius distance
-        frob_norm_dw = frob_norm_dw ** 0.5
+        #frob_norm_dw = frob_norm_dw ** 0.5
 
+
+        # Transform and calculate MAPE
+        mape_dw = calculate_original_scale_metrics(dw_estimates_values, true_params_dict)
+
+  
         # (Your JSON/CSV saving code remains here...)
         input_filepath = output_path / f"sim_dw_1212{ ( daily_aggregated_tensors_dw[0].shape[0]/8 ) }.json"
-        res = alg_optimization( f"2024-07-{day_idx+1}", f"DW_{num_iter}", ( daily_aggregated_tensors_dw[0].shape[0]/8 ) , lr,  step , dw_estimates_loss, 0 , frob_norm_dw)
+        
+        res = alg_optimization(
+            f"2024-07-{day_idx+1}", 
+            f"DW_{num_iter}", 
+            (daily_aggregated_tensors_dw[0].shape[0]/8), 
+            lr, step, 
+            dw_estimates_loss, 0, mape_dw
+        )
+
         loaded_data = res.load(input_filepath)
         loaded_data.append( res.toJSON() )
         res.save(input_filepath,loaded_data)
@@ -444,22 +497,36 @@ def cli(
         
         B = out[:-1]
 
-        frob_norm = sum((p_true.item() - p_est)**2 
-                        for p_true, p_est in zip(params_list2, B))
+        #frob_norm = sum((p_true.item() - p_est)**2 
+        #                for p_true, p_est in zip(params_list2, B))
+        #frob_norm = frob_norm ** 0.5
 
-        frob_norm = frob_norm ** 0.5
         print(f"Vecchia Optimization finished in {epoch_time:.2f}s. Results: {out}")
 
         # (Your Result Saving Logic...)
-        input_filepath = output_path / f"sim_vecc_1212_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
+        input_filepath = output_path / f"sim_reg_vecc_1217_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
         
-        res = alg_optimization( f"2024-07-{day_idx+1}", f"Vecc_{num_iter}", ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) , lr,  step , out, epoch_time, frob_norm )
+        # --- Vecchia Metrics ---
+
+        mape_vecc = calculate_original_scale_metrics(out[:-1], true_params_dict)
+
+        print(f"Vecchia Optimization finished. MAPE: {mape_vecc:.2f}%")
+
+        # Update the results object
+        res = alg_optimization(
+            f"2024-07-{day_idx+1}", 
+            f"Vecc_{num_iter}", 
+            (daily_aggregated_tensors_vecc[0].shape[0]/8), 
+            lr, step, 
+            out, epoch_time, mape_vecc
+        )
+
         loaded_data = res.load(input_filepath)
         loaded_data.append( res.toJSON() )
         res.save(input_filepath,loaded_data)
         fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'frob_norm'] # 0 for epoch
 
-        csv_filepath = input_path/f"sim_vecc_1212_v{int(v*100):03d}_LBFGS_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
+        csv_filepath = input_path/f"sim_reg_vecc_1217_v{int(v*100):03d}_LBFGS_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
 
@@ -534,8 +601,8 @@ def cli(
         '''
 
         
-        dw_norm_list.append( frob_norm_dw )
-        vecc_norm_list.append( frob_norm )
+        dw_norm_list.append( mape_dw)
+        vecc_norm_list.append( mape_vecc)  
         #vecc_col_norm_list.append( frob_norm_col )
         print(f'average dw norm: {np.mean( dw_norm_list )}, vecc norm: {np.mean( vecc_norm_list )}')
 
