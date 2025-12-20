@@ -201,7 +201,7 @@ def cli(
                         np.log(init_phi4), init_advec_lat, init_advec_lon, np.log(init_nugget)]
 
         params_list = [
-            torch.tensor([val], requires_grad=True, dtype=torch.float64, device=DEVICE)
+            torch.tensor(val, requires_grad=True, dtype=torch.float64, device=DEVICE)
             for val in initial_vals
         ]
 

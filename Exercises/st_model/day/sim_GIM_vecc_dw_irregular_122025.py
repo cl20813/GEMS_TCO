@@ -1,28 +1,5 @@
 # Standard libraries
 import sys
-# Add your custom path
-sys.path.append("/cache/home/jl2815/tco")
-# Data manipulation and analysis
-import pandas as pd
-import numpy as np
-import torch
-import torch.optim as optim
-import random
-# Custom imports
-from typing import Optional, List, Tuple
-from pathlib import Path
-import typer
-import json
-from json import JSONEncoder
-from GEMS_TCO import configuration as config
-from GEMS_TCO.data_loader import load_data2, exact_location_filter
-from GEMS_TCO import debiased_whittle
-from torch.nn import Parameter
-import torch
-import torch.fft
-
-# Standard libraries
-import sys
 import os
 import logging
 import argparse 
@@ -39,21 +16,22 @@ from pathlib import Path
 import typer
 import json
 from json import JSONEncoder
-from sklearn.neighbors import BallTree # 필수 추가: Irregular -> Regular 매핑용
+from sklearn.neighbors import BallTree 
 
-# Custom imports (사용자 환경에 맞게 경로 확인 필요)
+# Custom imports
 sys.path.append("/cache/home/jl2815/tco")
 
 from GEMS_TCO import kernels_reparam_space_time_gpu as kernels_reparam_space_time
 from GEMS_TCO import orderings as _orderings 
 from GEMS_TCO import alg_optimization
 from GEMS_TCO import configuration as config
-from GEMS_TCO import debiased_whittle # Whittle 모듈
+from GEMS_TCO import debiased_whittle 
 
 # --- GLOBAL SETTINGS ---
+# [Safety Check] 디버깅을 위해 CPU 사용 권장. 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DTYPE = torch.float64
-NUM_SIMS = 100  # GIM 계산을 위한 시뮬레이션 횟수
+NUM_SIMS = 100  
 
 # --- GRID STEPS ---
 DELTA_LAT = 0.044
@@ -72,6 +50,8 @@ def set_seed(seed=42):
 # --- 1. CORE SIMULATION FUNCTIONS ---
 
 def get_model_covariance_on_grid(lags_x, lags_y, lags_t, params):
+    # [Fix] Parameter Clamping for stability
+    params = torch.clamp(params, min=-15.0, max=15.0)
     phi1, phi2, phi3, phi4 = torch.exp(params[0]), torch.exp(params[1]), torch.exp(params[2]), torch.exp(params[3])
     advec_lat, advec_lon = params[4], params[5]
     sigmasq = phi1 / phi2
@@ -112,12 +92,7 @@ def generate_exact_gems_field(lat_coords, lon_coords, t_steps, params):
     
     return field_sim[:Nx, :Ny, :Nt]
 
-# --- 2. IRREGULAR TO REGULAR MAPPING ---
-
 def make_target_grid(lat_start, lat_end, lat_step, lon_start, lon_end, lon_step):
-    """
-    Rounding error 방지를 위해 정수 연산 후 float 변환하여 정확한 타겟 그리드 생성
-    """
     lats = torch.arange(lat_start, lat_end - 0.0001, lat_step, device=DEVICE, dtype=DTYPE)
     lats = torch.round(lats * 10000) / 10000
     
@@ -132,45 +107,35 @@ def make_target_grid(lat_start, lat_end, lat_step, lon_start, lon_end, lon_step)
     return center_points, len(lats), len(lons), lats, lons
 
 def coarse_by_center_tensor(input_map_tensors: dict, target_grid_tensor: torch.Tensor):
-    """Irregular 데이터를 Regular 그리드의 가장 가까운 점으로 매핑 (Coarsening)"""
     coarse_map = {}
-    
-    # BallTree는 CPU Numpy 필요
     query_points_np = target_grid_tensor.cpu().numpy()
     query_points_rad = np.radians(query_points_np)
     
     for key, val_tensor in input_map_tensors.items():
-        # Source locations (Perturbed)
         source_locs_np = val_tensor[:, :2].cpu().numpy()
         source_locs_rad = np.radians(source_locs_np)
         
-        # NN Search
         tree = BallTree(source_locs_rad, metric='haversine')
         dist, ind = tree.query(query_points_rad, k=1)
         nearest_indices = ind.flatten()
         
-        # Map values back to tensor
         indices_tensor = torch.tensor(nearest_indices, device=val_tensor.device, dtype=torch.long)
         gathered_vals = val_tensor[indices_tensor, 2]
         gathered_times = val_tensor[indices_tensor, 3]
         
-        # Construct Regular Tensor
         new_tensor = torch.stack([
-            target_grid_tensor[:, 0], # Regular Lat
-            target_grid_tensor[:, 1], # Regular Lon
-            gathered_vals,            # Mapped Value
-            gathered_times            # Mapped Time
+            target_grid_tensor[:, 0],
+            target_grid_tensor[:, 1],
+            gathered_vals,
+            gathered_times
         ], dim=1)
         
         coarse_map[key] = new_tensor
 
     return coarse_map
 
+# [중요] Irregular Data 생성 후 Regular Grid로 매핑하는 함수 사용
 def generate_irregular_then_regular_data(params_tensor, grid_config, noise_std=0.018):
-    """
-    True Grid 생성 -> 위치 섭동(Irregular) -> Regular Grid로 Coarsening -> 데이터 반환
-    """
-    # 1. Generate True Field on Simulation Grid
     lats_sim = grid_config['lats']
     lons_sim = grid_config['lons']
     t_def = grid_config['t_def']
@@ -178,11 +143,9 @@ def generate_irregular_then_regular_data(params_tensor, grid_config, noise_std=0
     
     sim_field = generate_exact_gems_field(lats_sim, lons_sim, t_def, params_tensor)
     
-    # 2. Create Irregular Data (Add Noise + Perturb Locations)
     input_map_irregular = {}
     nugget_std = torch.sqrt(torch.exp(params_tensor[6]))
     
-    # Simulation grid is used for "underlying truth", flip to match standard desc order if needed
     lats_flip = torch.flip(lats_sim, dims=[0])
     lons_flip = torch.flip(lons_sim, dims=[0])
     grid_lat, grid_lon = torch.meshgrid(lats_flip, lons_flip, indexing='ij')
@@ -194,10 +157,8 @@ def generate_irregular_then_regular_data(params_tensor, grid_config, noise_std=0
         field_t_flipped = torch.flip(field_t, dims=[0, 1]) 
         flat_vals = field_t_flipped.flatten()
         
-        # Add Value Noise
         obs_vals = flat_vals + (torch.randn_like(flat_vals) * nugget_std) + ozone_mean
         
-        # Add Location Noise (Perturbation)
         lat_noise = torch.randn_like(flat_lats) * noise_std
         lon_noise = torch.randn_like(flat_lons) * noise_std
         perturbed_lats = flat_lats + lat_noise
@@ -210,22 +171,16 @@ def generate_irregular_then_regular_data(params_tensor, grid_config, noise_std=0
         key_str = f't_{t:02d}'
         input_map_irregular[key_str] = row_tensor
 
-    # 3. Create Target Regular Grid (To map back onto)
-    # Using the same range as sim but ensuring it's "Regular"
     target_grid, _, _, _, _ = make_target_grid(
         lat_start=lats_sim[-1].item(), lat_end=lats_sim[0].item(), lat_step=-0.044,
         lon_start=lons_sim[-1].item(), lon_end=lons_sim[0].item(), lon_step=-0.063
     ) 
 
-    # 4. Coarsening (Irregular -> Regular)
     coarse_map = coarse_by_center_tensor(input_map_irregular, target_grid)
-    
     aggregated_list = list(coarse_map.values())
     aggregated_data = torch.cat(aggregated_list, dim=0)
     
     return coarse_map, aggregated_data
-
-# --- 3. HELPER & GIM ENGINE ---
 
 def get_spatial_ordering(input_maps, mm_cond_number=10):
     key_list = list(input_maps.keys())
@@ -267,7 +222,6 @@ def print_metrics_table(title, true_vec, est_vec, se_vec, param_names):
     print(f"Total Coverage: {covered_cnt}/{len(param_names)}")
     print(f'{"="*105}\n')
 
-# --- MAIN CLI COMMAND ---
 app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
 
 @app.command()
@@ -282,8 +236,6 @@ def cli(
     
     mm_cond_number: int = typer.Option(8, help="Number of nearest neighbors in Vecchia approx."),
     params: List[str] = typer.Option(['20', '8.25', '5.25', '.2', '.2', '.05', '5'], help="Initial parameters"),
-    ## mm-cond-number should be called in command line not mm_cond_number
-    ## negative number can be a problem when parsing with typer
     epochs: int = typer.Option(120, help="Number of iterations in optimization"),
     nheads: int = typer.Option(300, help="Number of iterations in optimization"),
     keep_exact_loc: bool = typer.Option(True, help="whether to keep exact location data or not")
@@ -293,14 +245,9 @@ def cli(
     set_seed(SEED_VAL)
     print(f"Running on: {DEVICE}")
 
-    # 1. Setup True Parameters
-    init_sigmasq   = 13.059
-    init_range_lon = 0.195 
-    init_range_lat = 0.154 
-    init_advec_lat = 0.0218
-    init_range_time = 1.0
-    init_advec_lon = -0.1689
-    init_nugget    = 0.247
+    # True Parameters
+    init_sigmasq, init_range_lon, init_range_lat = 13.059, 0.195, 0.154 
+    init_advec_lat, init_range_time, init_advec_lon, init_nugget = 0.0218, 1.0, -0.1689, 0.247
 
     init_phi2 = 1.0 / init_range_lon
     init_phi1 = init_sigmasq * init_phi2
@@ -314,7 +261,6 @@ def cli(
     
     PARAM_NAMES = ["log_phi1", "log_phi2", "log_phi3", "log_phi4", "advec_lat", "advec_lon", "log_nugget"]
 
-    # Simulation Grid Config
     grid_cfg = {
         'lats': torch.arange(0, 5.0 + 0.001, 0.044, device=DEVICE, dtype=DTYPE),
         'lons': torch.arange(123.0, 133.0 + 0.001, 0.063, device=DEVICE, dtype=DTYPE),
@@ -322,23 +268,16 @@ def cli(
         'mean': 260.0
     }
 
-    # ---------------------------------------------------------
-    # [Step 1] Generate Observed Data (Irregular -> Regular)
-    # ---------------------------------------------------------
+    # [Step 1] Generate Data (Irregular -> Regular Coarsening)
     print("\n[Step 1] Generating Observed Data (Irregular -> Regular Coarsening)...")
-    # ✅ FIX: Use Irregular generator
     obs_input_map, obs_agg_data = generate_irregular_then_regular_data(true_params_vec, grid_cfg)
-    
     print(f"Data Generated. Shape: {obs_agg_data.shape}")
 
-    # ---------------------------------------------------------
-    # [Step 2] Model 1: Debiased Whittle
-    # ---------------------------------------------------------
+    # [Step 2] Debiased Whittle
     print("\n" + "="*50)
     print(" >>> MODEL 1: DEBIASED WHITTLE <<<")
     print("="*50)
 
-    # Whittle Setup
     dwl = debiased_whittle.debiased_whittle_likelihood()
     TAPERING_FUNC = dwl.cgn_hamming 
     
@@ -347,7 +286,6 @@ def cli(
     
     params_dw = [p.clone().detach().requires_grad_(True) for p in true_params_vec]
     
-    # Preprocessing
     db = debiased_whittle.debiased_whittle_preprocess(
         daily_aggregated_tensors, daily_hourly_maps, day_idx=0, 
         params_list=params_dw, lat_range=[0,5], lon_range=[123.0, 133.0]
@@ -363,17 +301,17 @@ def cli(
     I_sample_obs = dwl.calculate_sample_periodogram_vectorized(J_vec_obs)
     taper_autocorr_grid = dwl.calculate_taper_autocorrelation_fft(taper_grid, n1, n2, DEVICE)
 
-    # Optimization
     optimizer_dw = torch.optim.LBFGS(params_dw, lr=1.0, max_iter=20, line_search_fn="strong_wolfe")
     print("Fitting Whittle...")
     
     def dw_closure():
         optimizer_dw.zero_grad()
-        p_tensor = torch.cat(params_dw)
+        p_tensor = torch.stack(params_dw)
         
-        # ✅ FIX: Use correct method name and pass Delta args
+        curr_n1, curr_n2 = I_sample_obs.shape[0], I_sample_obs.shape[1]
+        
         nll = dwl.whittle_likelihood_loss_tapered(
-            p_tensor, I_sample_obs, n1, n2, p_time, taper_autocorr_grid, DELTA_LAT, DELTA_LON
+            p_tensor, I_sample_obs, curr_n1, curr_n2, p_time, taper_autocorr_grid, DELTA_LAT, DELTA_LON
         )
         
         if isinstance(nll, tuple): nll = nll[0]
@@ -381,40 +319,45 @@ def cli(
         return nll
 
     optimizer_dw.step(dw_closure)
-    best_params_dw = torch.cat(params_dw).detach().requires_grad_(True)
+    best_params_dw = torch.stack(params_dw).detach().requires_grad_(True)
     
-    # GIM for Whittle
     def nll_whittle_wrapper(p_tensor):
-        # ✅ FIX: Use correct method name and pass Delta args
+        curr_n1, curr_n2 = I_sample_obs.shape[0], I_sample_obs.shape[1]
         loss = dwl.whittle_likelihood_loss_tapered(
-            p_tensor, I_sample_obs, n1, n2, p_time, taper_autocorr_grid, DELTA_LAT, DELTA_LON
+            p_tensor, I_sample_obs, curr_n1, curr_n2, p_time, taper_autocorr_grid, DELTA_LAT, DELTA_LON
         )
         if isinstance(loss, tuple): return loss[0]
         return loss
 
-    # Hessian
+    print("Calculating Hessian (Whittle)...")
     H_dw = torch.autograd.functional.hessian(nll_whittle_wrapper, best_params_dw)
     H_inv_dw = torch.linalg.inv(H_dw + torch.eye(len(best_params_dw), device=DEVICE)*1e-5)
 
-    # J (Bootstrap)
     print("Calculating Whittle Variability (J)...")
     grad_list_dw = []
+    
+    obs_n1, obs_n2 = I_sample_obs.shape[0], I_sample_obs.shape[1]
+    
     for i in range(NUM_SIMS):
-        # ✅ FIX: Use Irregular generator for bootstrap
         with torch.no_grad():
             _, boot_agg = generate_irregular_then_regular_data(best_params_dw, grid_cfg)
         
         boot_slices = [boot_agg[boot_agg[:, 3] == t_val] for t_val in unique_times]
-        J_vec_boot, _, _, _, _ = dwl.generate_Jvector_tapered(
+        J_vec_boot, boot_n1, boot_n2, _, boot_taper_grid = dwl.generate_Jvector_tapered(
              boot_slices, tapering_func=TAPERING_FUNC, lat_col=0, lon_col=1, val_col=2, device=DEVICE
         )
         I_sample_boot = dwl.calculate_sample_periodogram_vectorized(J_vec_boot)
         
+        # [Fix] Dynamic Taper Recalculation based on bootstrap grid size
+        if (boot_n1 != obs_n1) or (boot_n2 != obs_n2):
+            current_taper_autocorr = dwl.calculate_taper_autocorrelation_fft(boot_taper_grid, boot_n1, boot_n2, DEVICE)
+        else:
+            current_taper_autocorr = taper_autocorr_grid
+
         if best_params_dw.grad is not None: best_params_dw.grad.zero_()
         
-        # ✅ FIX: Use correct method name
         loss = dwl.whittle_likelihood_loss_tapered(
-            best_params_dw, I_sample_boot, n1, n2, p_time, taper_autocorr_grid, DELTA_LAT, DELTA_LON
+            best_params_dw, I_sample_boot, boot_n1, boot_n2, p_time, current_taper_autocorr, DELTA_LAT, DELTA_LON
         )
         if isinstance(loss, tuple): loss = loss[0]
         
@@ -428,21 +371,16 @@ def cli(
 
     print_metrics_table("DEBIASED WHITTLE", true_params_vec, best_params_dw, SE_dw, PARAM_NAMES)
 
-
-    # ---------------------------------------------------------
-    # [Step 3] Model 2: Vecchia Approximation
-    # ---------------------------------------------------------
+    # [Step 3] Vecchia Approximation
     print("\n" + "="*50)
     print(" >>> MODEL 2: VECCHIA APPROXIMATION <<<")
     print("="*50)
 
-    # Spatial Ordering
     ord_mm, nns_map = get_spatial_ordering(obs_input_map, mm_cond_number=mm_cond_number)
     mm_input_map_vecc = {}
     for key in obs_input_map:
         mm_input_map_vecc[key] = obs_input_map[key][ord_mm]
 
-    # Initialize & Fit
     params_vecc = [p.clone().detach().requires_grad_(True) for p in true_params_vec]
 
     model_vecc = kernels_reparam_space_time.fit_vecchia_lbfgs(
@@ -453,23 +391,29 @@ def cli(
     model_vecc.precompute_conditioning_sets()
     
     print("Fitting Vecchia...")
-    final_vals, _ = model_vecc.fit_vecc_lbfgs(params_vecc, optimizer_vecc, max_steps=epochs, grad_tol=1e-6)
-    best_params_vecc = torch.tensor(final_vals[:-1], device=DEVICE, dtype=DTYPE, requires_grad=True)
+    try:
+        final_vals, _ = model_vecc.fit_vecc_lbfgs(params_vecc, optimizer_vecc, max_steps=epochs, grad_tol=1e-6)
+        if isinstance(final_vals, list):
+            best_params_vecc = torch.tensor(final_vals[:-1], device=DEVICE, dtype=DTYPE, requires_grad=True)
+        elif isinstance(final_vals, torch.Tensor):
+            best_params_vecc = final_vals[:-1].detach().clone().requires_grad_(True)
+        else:
+            best_params_vecc = torch.tensor(final_vals[:-1], device=DEVICE, dtype=DTYPE, requires_grad=True)
+    except RuntimeError as e:
+        print(f"Error in Vecchia fit: {e}. Falling back to initial params.")
+        best_params_vecc = torch.stack(params_vecc).detach().requires_grad_(True)
 
-    # GIM for Vecchia
     def nll_vecc_wrapper(p_tensor):
         return model_vecc.vecchia_batched_likelihood(p_tensor)
 
-    # Hessian
+    print("Calculating Hessian (Vecchia)...")
     H_vecc = torch.autograd.functional.hessian(nll_vecc_wrapper, best_params_vecc)
     H_inv_vecc = torch.linalg.inv(H_vecc + torch.eye(len(best_params_vecc), device=DEVICE)*1e-6)
 
-    # J (Bootstrap)
     print("Calculating Vecchia Variability (J)...")
     grad_list_vecc = []
     
     for i in range(NUM_SIMS):
-        # ✅ FIX: Use Irregular generator for bootstrap
         with torch.no_grad():
             boot_map_raw, _ = generate_irregular_then_regular_data(best_params_vecc, grid_cfg)
         
@@ -494,4 +438,3 @@ def cli(
 
 if __name__ == "__main__":
     app()
-

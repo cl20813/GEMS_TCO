@@ -424,7 +424,7 @@ class fit_vecchia_lbfgs(VecchiaBatched):
 
         def closure():
             optimizer.zero_grad()
-            params = torch.cat(params_list)
+            params = torch.stack(params_list)
             # Batched Likelihood Calculation
             loss = self.vecchia_batched_likelihood(params)
             loss.backward()
@@ -453,7 +453,7 @@ class fit_vecchia_lbfgs(VecchiaBatched):
                 print(f"\nConverged at step {i+1}")
                 break
 
-        final_params_tensor = torch.cat(params_list).detach()
+        final_params_tensor = torch.stack(params_list).detach()
         final_raw_params_list = [p.item() for p in final_params_tensor]
         final_loss = loss.item()
         

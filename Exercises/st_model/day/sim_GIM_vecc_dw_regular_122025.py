@@ -54,12 +54,43 @@ from GEMS_TCO import alg_optimization
 from GEMS_TCO import configuration as config
 from GEMS_TCO import debiased_whittle # Whittle 모듈 (제공해주신 클래스가 여기에 있다고 가정)
 
+# Standard libraries
+import sys
+import os
+import logging
+import argparse 
+import pandas as pd
+import numpy as np
+import pickle
+import torch
+import torch.optim as optim
+import copy 
+import time
+import random
+from typing import Optional, List, Tuple
+from pathlib import Path
+import typer
+import json
+from json import JSONEncoder
+from sklearn.neighbors import BallTree 
+
+# Custom imports
+sys.path.append("/cache/home/jl2815/tco")
+
+from GEMS_TCO import kernels_reparam_space_time_gpu as kernels_reparam_space_time
+from GEMS_TCO import orderings as _orderings 
+from GEMS_TCO import alg_optimization
+from GEMS_TCO import configuration as config
+from GEMS_TCO import debiased_whittle 
+
 # --- GLOBAL SETTINGS ---
+# [Safety Check] 에러 발생 시 원인 파악을 위해 CPU 사용 권장. 
+# 문제 해결 후 GPU 사용 시: DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DTYPE = torch.float64
-NUM_SIMS = 100  # GIM 계산을 위한 시뮬레이션 횟수
+NUM_SIMS = 100  
 
-# --- GRID STEPS (Provided in reference) ---
+# --- GRID STEPS ---
 DELTA_LAT = 0.044
 DELTA_LON = 0.063
 
@@ -76,6 +107,8 @@ def set_seed(seed=42):
 # --- 1. CORE SIMULATION FUNCTIONS ---
 
 def get_model_covariance_on_grid(lags_x, lags_y, lags_t, params):
+    # [수정] 수치 안정성을 위한 파라미터 클램핑
+    params = torch.clamp(params, min=-15.0, max=15.0)
     phi1, phi2, phi3, phi4 = torch.exp(params[0]), torch.exp(params[1]), torch.exp(params[2]), torch.exp(params[3])
     advec_lat, advec_lon = params[4], params[5]
     sigmasq = phi1 / phi2
@@ -221,14 +254,9 @@ def cli(
     set_seed(SEED_VAL)
     print(f"Running on: {DEVICE}")
 
-    # 1. Setup True Parameters
-    init_sigmasq   = 13.059
-    init_range_lon = 0.195 
-    init_range_lat = 0.154 
-    init_advec_lat = 0.0218
-    init_range_time = 1.0
-    init_advec_lon = -0.1689
-    init_nugget    = 0.247
+    # True Parameters
+    init_sigmasq, init_range_lon, init_range_lat = 13.059, 0.195, 0.154 
+    init_advec_lat, init_range_time, init_advec_lon, init_nugget = 0.0218, 1.0, -0.1689, 0.247
 
     init_phi2 = 1.0 / init_range_lon
     init_phi1 = init_sigmasq * init_phi2
@@ -250,22 +278,16 @@ def cli(
         'mean': 260.0
     }
 
-    # ---------------------------------------------------------
-    # [Step 1] Generate Observed Data
-    # ---------------------------------------------------------
+    # [Step 1] Generate Data (Regular)
     print("\n[Step 1] Generating Observed Data (Direct Regular Grid)...")
     obs_input_map, obs_agg_data = generate_regular_data_directly(true_params_vec, grid_cfg)
-    
     print(f"Data Generated. Shape: {obs_agg_data.shape}")
 
-    # ---------------------------------------------------------
-    # [Step 2] Model 1: Debiased Whittle
-    # ---------------------------------------------------------
+    # [Step 2] Debiased Whittle
     print("\n" + "="*50)
     print(" >>> MODEL 1: DEBIASED WHITTLE <<<")
     print("="*50)
 
-    # Whittle Setup
     dwl = debiased_whittle.debiased_whittle_likelihood()
     TAPERING_FUNC = dwl.cgn_hamming 
     
@@ -274,7 +296,6 @@ def cli(
     
     params_dw = [p.clone().detach().requires_grad_(True) for p in true_params_vec]
     
-    # Preprocessing
     db = debiased_whittle.debiased_whittle_preprocess(
         daily_aggregated_tensors, daily_hourly_maps, day_idx=0, 
         params_list=params_dw, lat_range=[0,5], lon_range=[123.0, 133.0]
@@ -290,62 +311,66 @@ def cli(
     I_sample_obs = dwl.calculate_sample_periodogram_vectorized(J_vec_obs)
     taper_autocorr_grid = dwl.calculate_taper_autocorrelation_fft(taper_grid, n1, n2, DEVICE)
 
-    # Optimization
     optimizer_dw = torch.optim.LBFGS(params_dw, lr=1.0, max_iter=20, line_search_fn="strong_wolfe")
     print("Fitting Whittle...")
     
     def dw_closure():
         optimizer_dw.zero_grad()
-        p_tensor = torch.cat(params_dw) # Changed from stack to cat for 1D param vector
+        # [수정] cat -> stack
+        p_tensor = torch.stack(params_dw)
         
-        # --- FIX: Changed method name and added Delta arguments ---
+        # [수정] 현재 I_sample_obs의 크기에 맞춰 n1, n2 전달
+        curr_n1, curr_n2 = I_sample_obs.shape[0], I_sample_obs.shape[1]
+        
         nll = dwl.whittle_likelihood_loss_tapered(
-            p_tensor, I_sample_obs, n1, n2, p_time, taper_autocorr_grid, DELTA_LAT, DELTA_LON
+            p_tensor, I_sample_obs, curr_n1, curr_n2, p_time, taper_autocorr_grid, DELTA_LAT, DELTA_LON
         )
         
-        # whittle_likelihood_loss_tapered might return (loss, n1, n2) if using the _sum version,
-        # but the provided class has 'whittle_likelihood_loss_tapered' returning just avg_loss.
-        # Assuming we use the one returning scalar loss.
-        if isinstance(nll, tuple):
-             nll = nll[0]
-
+        if isinstance(nll, tuple): nll = nll[0]
         nll.backward()
         return nll
 
     optimizer_dw.step(dw_closure)
-    best_params_dw = torch.cat(params_dw).detach().requires_grad_(True)
+    best_params_dw = torch.stack(params_dw).detach().requires_grad_(True)
     
-    # GIM for Whittle
     def nll_whittle_wrapper(p_tensor):
-        # --- FIX: Updated wrapper similarly ---
+        curr_n1, curr_n2 = I_sample_obs.shape[0], I_sample_obs.shape[1]
         loss = dwl.whittle_likelihood_loss_tapered(
-            p_tensor, I_sample_obs, n1, n2, p_time, taper_autocorr_grid, DELTA_LAT, DELTA_LON
+            p_tensor, I_sample_obs, curr_n1, curr_n2, p_time, taper_autocorr_grid, DELTA_LAT, DELTA_LON
         )
         if isinstance(loss, tuple): return loss[0]
         return loss
 
-    # Hessian
+    print("Calculating Hessian (Whittle)...")
     H_dw = torch.autograd.functional.hessian(nll_whittle_wrapper, best_params_dw)
     H_inv_dw = torch.linalg.inv(H_dw + torch.eye(len(best_params_dw), device=DEVICE)*1e-5)
 
-    # J (Bootstrap)
     print("Calculating Whittle Variability (J)...")
     grad_list_dw = []
+    
+    # 관측 데이터의 그리드 크기 저장
+    obs_n1, obs_n2 = I_sample_obs.shape[0], I_sample_obs.shape[1]
+
     for i in range(NUM_SIMS):
         with torch.no_grad():
             _, boot_agg = generate_regular_data_directly(best_params_dw, grid_cfg)
         
         boot_slices = [boot_agg[boot_agg[:, 3] == t_val] for t_val in unique_times]
-        J_vec_boot, _, _, _, _ = dwl.generate_Jvector_tapered(
+        J_vec_boot, boot_n1, boot_n2, _, boot_taper_grid = dwl.generate_Jvector_tapered(
              boot_slices, tapering_func=TAPERING_FUNC, lat_col=0, lon_col=1, val_col=2, device=DEVICE
         )
         I_sample_boot = dwl.calculate_sample_periodogram_vectorized(J_vec_boot)
         
+        # [중요] 부트스트랩 샘플 크기가 다를 경우 taper grid 재계산 (Safety Check)
+        if (boot_n1 != obs_n1) or (boot_n2 != obs_n2):
+            current_taper_autocorr = dwl.calculate_taper_autocorrelation_fft(boot_taper_grid, boot_n1, boot_n2, DEVICE)
+        else:
+            current_taper_autocorr = taper_autocorr_grid
+
         if best_params_dw.grad is not None: best_params_dw.grad.zero_()
         
-        # --- FIX: Updated call inside loop ---
         loss = dwl.whittle_likelihood_loss_tapered(
-            best_params_dw, I_sample_boot, n1, n2, p_time, taper_autocorr_grid, DELTA_LAT, DELTA_LON
+            best_params_dw, I_sample_boot, boot_n1, boot_n2, p_time, current_taper_autocorr, DELTA_LAT, DELTA_LON
         )
         if isinstance(loss, tuple): loss = loss[0]
         
@@ -359,21 +384,16 @@ def cli(
 
     print_metrics_table("DEBIASED WHITTLE", true_params_vec, best_params_dw, SE_dw, PARAM_NAMES)
 
-
-    # ---------------------------------------------------------
-    # [Step 3] Model 2: Vecchia Approximation
-    # ---------------------------------------------------------
+    # [Step 3] Vecchia Approximation
     print("\n" + "="*50)
     print(" >>> MODEL 2: VECCHIA APPROXIMATION <<<")
     print("="*50)
 
-    # Spatial Ordering
     ord_mm, nns_map = get_spatial_ordering(obs_input_map, mm_cond_number=mm_cond_number)
     mm_input_map_vecc = {}
     for key in obs_input_map:
         mm_input_map_vecc[key] = obs_input_map[key][ord_mm]
 
-    # Initialize & Fit
     params_vecc = [p.clone().detach().requires_grad_(True) for p in true_params_vec]
 
     model_vecc = kernels_reparam_space_time.fit_vecchia_lbfgs(
@@ -387,15 +407,13 @@ def cli(
     final_vals, _ = model_vecc.fit_vecc_lbfgs(params_vecc, optimizer_vecc, max_steps=epochs, grad_tol=1e-6)
     best_params_vecc = torch.tensor(final_vals[:-1], device=DEVICE, dtype=DTYPE, requires_grad=True)
 
-    # GIM for Vecchia
     def nll_vecc_wrapper(p_tensor):
         return model_vecc.vecchia_batched_likelihood(p_tensor)
 
-    # Hessian
+    print("Calculating Hessian (Vecchia)...")
     H_vecc = torch.autograd.functional.hessian(nll_vecc_wrapper, best_params_vecc)
     H_inv_vecc = torch.linalg.inv(H_vecc + torch.eye(len(best_params_vecc), device=DEVICE)*1e-6)
 
-    # J (Bootstrap)
     print("Calculating Vecchia Variability (J)...")
     grad_list_vecc = []
     
@@ -424,5 +442,4 @@ def cli(
 
 if __name__ == "__main__":
     app()
-
 
