@@ -548,7 +548,7 @@ def cli(
 
 
         # (Your JSON/CSV saving code remains here...)
-        input_filepath = output_path / f"sim_irre_dw_1217{ ( daily_aggregated_tensors_dw[0].shape[0]/8 ) }.json"
+        input_filepath = output_path / f"sim_irre_dw_1220{ ( daily_aggregated_tensors_dw[0].shape[0]/8 ) }.json"
         
         res = alg_optimization(
             f"2024-07-{day_idx+1}", 
@@ -562,7 +562,7 @@ def cli(
         loaded_data.append( res.toJSON() )
         res.save(input_filepath,loaded_data)
         fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'frob_norm'] # 0 for epoch
-        csv_filepath = input_path/f"sim_irre_dW_v{int(v*100):03d}_121725_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
+        csv_filepath = input_path/f"sim_irre_dW_v{int(v*100):03d}_1220_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
 
@@ -616,7 +616,7 @@ def cli(
         print(f"Vecchia Optimization finished. MAPE: {mape_vecc:.2f}%")
 
         # (Your Result Saving Logic...)
-        input_filepath = output_path / f"sim_irre_vecc_1217_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
+        input_filepath = output_path / f"sim_irre_vecc_1220_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
         
         res = alg_optimization(
             f"2024-07-{day_idx+1}", 
@@ -631,7 +631,7 @@ def cli(
         res.save(input_filepath,loaded_data)
         fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'frob_norm'] # 0 for epoch
 
-        csv_filepath = input_path/f"sim_irre_vecc_1217_v{int(v*100):03d}_LBFGS_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
+        csv_filepath = input_path/f"sim_irre_vecc_1220_v{int(v*100):03d}_LBFGS_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
 

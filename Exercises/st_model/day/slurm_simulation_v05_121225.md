@@ -22,10 +22,9 @@ scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_heads_reg
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
 
-# 아마 이 버전이 0.018 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_irre_dW_v050_121725_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_irre_dW_v050_1220_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_irre_vecc_1217_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_irre_vecc_1220_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
 
 
 ### Run this part
