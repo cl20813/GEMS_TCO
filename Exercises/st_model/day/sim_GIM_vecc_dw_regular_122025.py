@@ -11,68 +11,12 @@ import torch.optim as optim
 import copy 
 import time
 import random
+import torch.nn.functional as F  # For Spatial Differencing
 from typing import Optional, List, Tuple
 from pathlib import Path
 import typer
 import json
 from json import JSONEncoder
-
-# Custom imports (사용자 환경에 맞게 경로 확인 필요)
-sys.path.append("/cache/home/jl2815/tco")
-
-from GEMS_TCO import kernels_reparam_space_time_gpu as kernels_reparam_space_time
-from GEMS_TCO import orderings as _orderings 
-from GEMS_TCO import alg_optimization
-from GEMS_TCO import configuration as config
-from GEMS_TCO import debiased_whittle # Whittle 모듈
-
-# Standard libraries
-import sys
-import os
-import logging
-import argparse 
-import pandas as pd
-import numpy as np
-import pickle
-import torch
-import torch.optim as optim
-import copy 
-import time
-import random
-from typing import Optional, List, Tuple
-from pathlib import Path
-import typer
-import json
-from json import JSONEncoder
-
-# Custom imports (사용자 환경에 맞게 경로 확인 필요)
-sys.path.append("/cache/home/jl2815/tco")
-
-from GEMS_TCO import kernels_reparam_space_time_gpu as kernels_reparam_space_time
-from GEMS_TCO import orderings as _orderings 
-from GEMS_TCO import alg_optimization
-from GEMS_TCO import configuration as config
-from GEMS_TCO import debiased_whittle # Whittle 모듈 (제공해주신 클래스가 여기에 있다고 가정)
-
-# Standard libraries
-import sys
-import os
-import logging
-import argparse 
-import pandas as pd
-import numpy as np
-import pickle
-import torch
-import torch.optim as optim
-import copy 
-import time
-import random
-from typing import Optional, List, Tuple
-from pathlib import Path
-import typer
-import json
-from json import JSONEncoder
-from sklearn.neighbors import BallTree 
 
 # Custom imports
 sys.path.append("/cache/home/jl2815/tco")
@@ -83,9 +27,10 @@ from GEMS_TCO import alg_optimization
 from GEMS_TCO import configuration as config
 from GEMS_TCO import debiased_whittle 
 
+
+
 # --- GLOBAL SETTINGS ---
-# [Safety Check] 에러 발생 시 원인 파악을 위해 CPU 사용 권장. 
-# 문제 해결 후 GPU 사용 시: DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# [Safety Check] 에러 디버깅을 위해 CPU 사용 권장. 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DTYPE = torch.float64
 NUM_SIMS = 100  
@@ -104,10 +49,54 @@ def set_seed(seed=42):
     torch.backends.cudnn.benchmark = False
     print(f"[Info] Random Seed set to {seed}")
 
+# --- HELPER: SPATIAL DIFFERENCING (CRITICAL FOR WHITTLE SE) ---
+def apply_spatial_difference(df_tensor):
+    """
+    Applies the 1st order spatial differencing to bootstrap samples.
+    This matches the preprocessing step, preventing SE explosion.
+    """
+    if df_tensor.size(0) == 0: return df_tensor
+    
+    # 1. Grid Dimensions
+    u_lat = torch.unique(df_tensor[:, 0])
+    u_lon = torch.unique(df_tensor[:, 1])
+    n_lat, n_lon = len(u_lat), len(u_lon)
+    
+    if df_tensor.size(0) != n_lat * n_lon:
+        return df_tensor
+
+    # 2. Reshape for Conv2d (Batch, Channel, Height, Width)
+    # Assumes df_tensor is sorted as (Lat, Lon, Val, Time)
+    vals = df_tensor[:, 2].view(1, 1, n_lat, n_lon)
+    
+    # 3. Define Kernel (Correlation style to match differencing Z(s) = X(s+d) - X(s))
+    diff_kernel = torch.tensor([[[[-2., 1.],
+                                  [ 1., 0.]]]], dtype=torch.float64, device=df_tensor.device)
+    
+    # 4. Apply Convolution (Valid Padding)
+    out_vals = F.conv2d(vals, diff_kernel, padding='valid')
+    
+    # 5. Reconstruct Coordinates (Valid padding reduces dim by 1)
+    new_lats = u_lat[:-1]
+    new_lons = u_lon[:-1]
+    
+    grid_lat, grid_lon = torch.meshgrid(new_lats, new_lons, indexing='ij')
+    
+    flat_lat = grid_lat.flatten()
+    flat_lon = grid_lon.flatten()
+    flat_val = out_vals.flatten()
+    
+    time_val = df_tensor[0, 3]
+    flat_time = torch.full_like(flat_lat, time_val)
+    
+    # 6. Stack
+    result = torch.stack([flat_lat, flat_lon, flat_val, flat_time], dim=1)
+    return result
+
 # --- 1. CORE SIMULATION FUNCTIONS ---
 
 def get_model_covariance_on_grid(lags_x, lags_y, lags_t, params):
-    # [수정] 수치 안정성을 위한 파라미터 클램핑
+    # Parameter Clamping
     params = torch.clamp(params, min=-15.0, max=15.0)
     phi1, phi2, phi3, phi4 = torch.exp(params[0]), torch.exp(params[1]), torch.exp(params[2]), torch.exp(params[3])
     advec_lat, advec_lon = params[4], params[5]
@@ -202,31 +191,63 @@ def get_spatial_ordering(input_maps, mm_cond_number=10):
     nns_map = _orderings.find_nns_l2(locs=coords_reordered, max_nn=mm_cond_number)
     return ord_mm, nns_map
 
-def print_metrics_table(title, true_vec, est_vec, se_vec, param_names):
-    true_v = true_vec.cpu().detach().numpy()
-    est_v = est_vec.cpu().detach().numpy()
-    se_v = se_vec.cpu().detach().numpy()
-
-    mape = np.mean(np.abs((true_v - est_v) / true_v)) * 100
-
-    print(f'\n{"="*105}')
-    print(f" TABLE: {title} (MAPE: {mape:.4f}%)")
-    print(f'{"="*105}')
+def print_final_metrics_formatted(true_params_vec, best_params_tensor, SE_GIM, H_inv, J, nll_val):
+    """요청하신 포맷대로 결과 출력 (Avg SE, MAPE, TIC 포함)"""
+    TRUE_VALUES = {
+        "log_phi1": true_params_vec[0].item(),
+        "log_phi2": true_params_vec[1].item(),
+        "log_phi3": true_params_vec[2].item(),
+        "log_phi4": true_params_vec[3].item(),
+        "advec_lat": true_params_vec[4].item(),
+        "advec_lon": true_params_vec[5].item(),
+        "log_nugget": true_params_vec[6].item()
+    }
+    
+    param_names = list(TRUE_VALUES.keys())
+    true_vals_list = true_params_vec.detach().cpu().numpy()
+    est_vals_list = best_params_tensor.detach().cpu().numpy()
+    se_vals_list = SE_GIM.detach().cpu().numpy()
+    
+    covered_count = 0
+    
     print(f"{'Param':<15} | {'True':<10} | {'Est':<10} | {'SE(GIM)':<10} | {'95% CI (Lower, Upper)':<30} | {'Covered?'}")
     print("-" * 105)
-    
-    covered_cnt = 0
+
     for i in range(len(param_names)):
-        p = param_names[i]
-        t, e, s = true_v[i], est_v[i], se_v[i]
-        low, high = e - 1.96*s, e + 1.96*s
-        covered = (t >= low) and (t <= high)
-        if covered: covered_cnt += 1
+        p_name = param_names[i]
+        true_v = true_vals_list[i]
+        est_v = est_vals_list[i]
+        se_v = se_vals_list[i]
         
-        print(f"{p:<15} | {t:<10.4f} | {e:<10.4f} | {s:<10.4f} | ({low:.4f}, {high:.4f})     | {'YES' if covered else 'NO'}")
+        ci_lower = est_v - 1.96 * se_v
+        ci_upper = est_v + 1.96 * se_v
+        
+        is_covered = (true_v >= ci_lower) and (true_v <= ci_upper)
+        if is_covered: covered_count += 1
+        cover_str = "YES" if is_covered else "NO"
+        
+        print(f"{p_name:<15} | {true_v:<10.4f} | {est_v:<10.4f} | {se_v:<10.4f} | ({ci_lower:.4f}, {ci_upper:.4f})     | {cover_str}")
+
     print("-" * 105)
-    print(f"Total Coverage: {covered_cnt}/{len(param_names)}")
-    print(f'{"="*105}\n')
+    print(f"Total Coverage: {covered_count}/{len(param_names)}")
+
+    # [1] Avg SE (GIM)
+    avg_se = torch.mean(SE_GIM).item()
+    
+    # [2] Avg Bias (MAPE)
+    mape = torch.mean(torch.abs((true_params_vec - best_params_tensor) / true_params_vec)).item() * 100
+    
+    # [3] TIC (Takeuchi Information Criterion)
+    with torch.no_grad():
+        penalty = torch.trace(H_inv @ J)
+        tic = 2 * nll_val + 2 * penalty.item()
+
+    print(f"\n=== [FINAL MODEL PERFORMANCE METRICS] ===")
+    print(f"1. Avg SE (GIM): {avg_se:.6f}  <-- 작을수록 정밀함")
+    print(f"2. Avg Bias (%): {mape:.4f}%  <-- 작을수록 정확함")
+    print(f"3. TIC Score   : {tic:.4f}    <-- 작을수록 적합함")
+    print("=" * 50)
+
 
 # --- MAIN CLI COMMAND ---
 app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
@@ -268,8 +289,6 @@ def cli(
         init_advec_lat, init_advec_lon, np.log(init_nugget)
     ], device=DEVICE, dtype=DTYPE)
     
-    PARAM_NAMES = ["log_phi1", "log_phi2", "log_phi3", "log_phi4", "advec_lat", "advec_lon", "log_nugget"]
-
     # Simulation Grid Config
     grid_cfg = {
         'lats': torch.arange(5.0, 0.0 - 0.0001, -DELTA_LAT, device=DEVICE, dtype=DTYPE), 
@@ -300,6 +319,7 @@ def cli(
         daily_aggregated_tensors, daily_hourly_maps, day_idx=0, 
         params_list=params_dw, lat_range=[0,5], lon_range=[123.0, 133.0]
     )
+    # Preprocess handles differencing for Observed Data
     cur_df = db.generate_spatially_filtered_days(0, 5, 123, 133)
     unique_times = torch.unique(cur_df[:, 3])
     time_slices_list = [cur_df[cur_df[:, 3] == t_val] for t_val in unique_times]
@@ -316,16 +336,11 @@ def cli(
     
     def dw_closure():
         optimizer_dw.zero_grad()
-        # [수정] cat -> stack
         p_tensor = torch.stack(params_dw)
-        
-        # [수정] 현재 I_sample_obs의 크기에 맞춰 n1, n2 전달
         curr_n1, curr_n2 = I_sample_obs.shape[0], I_sample_obs.shape[1]
-        
         nll = dwl.whittle_likelihood_loss_tapered(
             p_tensor, I_sample_obs, curr_n1, curr_n2, p_time, taper_autocorr_grid, DELTA_LAT, DELTA_LON
         )
-        
         if isinstance(nll, tuple): nll = nll[0]
         nll.backward()
         return nll
@@ -333,6 +348,15 @@ def cli(
     optimizer_dw.step(dw_closure)
     best_params_dw = torch.stack(params_dw).detach().requires_grad_(True)
     
+    # Calculate NLL for TIC
+    with torch.no_grad():
+        curr_n1, curr_n2 = I_sample_obs.shape[0], I_sample_obs.shape[1]
+        nll_dw_val = dwl.whittle_likelihood_loss_tapered(
+            best_params_dw, I_sample_obs, curr_n1, curr_n2, p_time, taper_autocorr_grid, DELTA_LAT, DELTA_LON
+        )
+        if isinstance(nll_dw_val, tuple): nll_dw_val = nll_dw_val[0]
+        nll_dw_val = nll_dw_val.item()
+
     def nll_whittle_wrapper(p_tensor):
         curr_n1, curr_n2 = I_sample_obs.shape[0], I_sample_obs.shape[1]
         loss = dwl.whittle_likelihood_loss_tapered(
@@ -348,20 +372,25 @@ def cli(
     print("Calculating Whittle Variability (J)...")
     grad_list_dw = []
     
-    # 관측 데이터의 그리드 크기 저장
     obs_n1, obs_n2 = I_sample_obs.shape[0], I_sample_obs.shape[1]
 
     for i in range(NUM_SIMS):
         with torch.no_grad():
             _, boot_agg = generate_regular_data_directly(best_params_dw, grid_cfg)
         
-        boot_slices = [boot_agg[boot_agg[:, 3] == t_val] for t_val in unique_times]
+        # [CRITICAL FIX] Apply Spatial Differencing to Bootstrap Data!
+        unique_times_boot = torch.unique(boot_agg[:, 3])
+        boot_slices = []
+        for t_val in unique_times_boot:
+            day_slice = boot_agg[boot_agg[:, 3] == t_val]
+            day_slice_diff = apply_spatial_difference(day_slice) # <--- THIS IS THE FIX
+            boot_slices.append(day_slice_diff)
+            
         J_vec_boot, boot_n1, boot_n2, _, boot_taper_grid = dwl.generate_Jvector_tapered(
              boot_slices, tapering_func=TAPERING_FUNC, lat_col=0, lon_col=1, val_col=2, device=DEVICE
         )
         I_sample_boot = dwl.calculate_sample_periodogram_vectorized(J_vec_boot)
         
-        # [중요] 부트스트랩 샘플 크기가 다를 경우 taper grid 재계산 (Safety Check)
         if (boot_n1 != obs_n1) or (boot_n2 != obs_n2):
             current_taper_autocorr = dwl.calculate_taper_autocorrelation_fft(boot_taper_grid, boot_n1, boot_n2, DEVICE)
         else:
@@ -382,7 +411,9 @@ def cli(
     GIM_inv_dw = H_inv_dw @ J_mat_dw @ H_inv_dw
     SE_dw = torch.sqrt(torch.diag(GIM_inv_dw))
 
-    print_metrics_table("DEBIASED WHITTLE", true_params_vec, best_params_dw, SE_dw, PARAM_NAMES)
+    # Output Results (Whittle)
+    print_final_metrics_formatted(true_params_vec, best_params_dw, SE_dw, H_inv_dw, J_mat_dw, nll_dw_val)
+
 
     # [Step 3] Vecchia Approximation
     print("\n" + "="*50)
@@ -404,8 +435,22 @@ def cli(
     model_vecc.precompute_conditioning_sets()
     
     print("Fitting Vecchia...")
-    final_vals, _ = model_vecc.fit_vecc_lbfgs(params_vecc, optimizer_vecc, max_steps=epochs, grad_tol=1e-6)
-    best_params_vecc = torch.tensor(final_vals[:-1], device=DEVICE, dtype=DTYPE, requires_grad=True)
+    try:
+        final_vals, _ = model_vecc.fit_vecc_lbfgs(params_vecc, optimizer_vecc, max_steps=epochs, grad_tol=1e-6)
+    except RuntimeError as e:
+        print(f"[Error in Vecchia Fit] {e}. Falling back to initial params.")
+        final_vals = torch.stack(params_vecc).detach()
+
+    if isinstance(final_vals, list):
+        best_params_vecc = torch.tensor(final_vals[:-1], device=DEVICE, dtype=DTYPE, requires_grad=True)
+    elif isinstance(final_vals, torch.Tensor):
+        best_params_vecc = final_vals[:-1].detach().clone().requires_grad_(True)
+    else:
+        best_params_vecc = torch.tensor(final_vals[:-1], device=DEVICE, dtype=DTYPE, requires_grad=True)
+
+    # Calculate NLL for TIC
+    with torch.no_grad():
+        nll_vecc_val = model_vecc.vecchia_batched_likelihood(best_params_vecc).item()
 
     def nll_vecc_wrapper(p_tensor):
         return model_vecc.vecchia_batched_likelihood(p_tensor)
@@ -438,7 +483,8 @@ def cli(
     GIM_inv_vecc = H_inv_vecc @ J_mat_vecc @ H_inv_vecc
     SE_vecc = torch.sqrt(torch.diag(GIM_inv_vecc))
 
-    print_metrics_table("VECCHIA APPROX", true_params_vec, best_params_vecc, SE_vecc, PARAM_NAMES)
+    # Output Results (Vecchia)
+    print_final_metrics_formatted(true_params_vec, best_params_vecc, SE_vecc, H_inv_vecc, J_mat_vecc, nll_vecc_val)
 
 if __name__ == "__main__":
     app()

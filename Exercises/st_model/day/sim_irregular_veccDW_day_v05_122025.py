@@ -66,6 +66,8 @@ def cli(
 
     DTYPE= torch.float32 if DEVICE.type == 'mps' else torch.float64
 
+    LOC_ERR_STD = 0.02
+
     # TRUE PARAMETERS
     init_sigmasq   = 13.059
     init_range_lon = 0.195 
@@ -314,7 +316,7 @@ def cli(
 
         perturbation_scale = 0.001  # Adjust this value as needed
         
-        LOC_ERR_STD = 0.018
+        
 
         #lats_sim = torch.arange(0, 5.0 + perturbation_scale, 0.044, device=DEVICE, dtype=DTYPE)
         #lons_sim = torch.arange(123.0, 133.0 + perturbation_scale, 0.063, device=DEVICE, dtype=DTYPE)

@@ -20,7 +20,26 @@ scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_GIM_vecc_
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vecchia_v05_r2s10_1250.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/estimates/df_cv_smooth_05" 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_vecc_300heads_1217_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_vecc_100heads_1217_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_vecc_0heads_1217_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
+
+
+# irr vs ir   vecc vs dw
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_re_and_irr_dw_vs_vecc_121225/sim_dW_v050_121225_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_re_and_irr_dw_vs_vecc_121225/sim_irre_dW_v050_121225_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_re_and_irr_dw_vs_vecc_121225/sim_vecc_1212_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_re_and_irr_dw_vs_vecc_121225/sim_irre_vecc_1212_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
+
+# 아마 이 버전이 0.018 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_irre_dW_v050_121725_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_irre_vecc_1217_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
 
 
 ### Run this part
@@ -159,16 +178,15 @@ echo "Current date and time: $(date)"
 #SBATCH --error=/home/jl2815/tco/exercise_output/sim_GIM_irr_veccDW_122025_%j.err
 #SBATCH --time=24:00:00                                 # Reduced time (GPU is faster)
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8                               # CHANGED: Reduced from 48 (GPU does the work now)
-#SBATCH --mem=64G                                       # CHANGED: Reduced from 400G (GPU handles the matrices)
-#SBATCH --partition=gpu                                 # 💥 CRITICAL: Change to your cluster's GPU partition name
-#SBATCH --gres=gpu:1                                    # 💥 CRITICAL: Request 1 GPU
+#SBATCH --cpus-per-task=40                               # CHANGED: Reduced from 48 (GPU does the work now)
+#SBATCH --mem=400G                                       # CHANGED: Reduced from 400G (GPU handles the matrices)
+#SBATCH --partition=mem                                 # 💥 
 
 #### Load Modules
 module purge                                              
 module use /projects/community/modulefiles                 
 module load anaconda/2024.06-ts840 
-module load cuda/12.1.0
+
 
 #### Initialize conda
 eval "$(conda shell.bash hook)"
@@ -177,9 +195,6 @@ conda activate faiss_env  # Ensure this env has PyTorch with CUDA installed!
 echo "Current date and time: $(date)"
 echo "Running GPU Batched Vecchia Optimization"
 echo "Node: $(hostname)"
-
-# Check if GPU is actually visible
-nvidia-smi
 
 # Run the script
 srun python /home/jl2815/tco/exercise_25/st_model/sim_GIM_vecc_dw_irregular_122025.py \
@@ -210,16 +225,15 @@ echo "Current date and time: $(date)"
 #SBATCH --error=/home/jl2815/tco/exercise_output/sim_GIM_reg_veccDW_122025_%j.err
 #SBATCH --time=24:00:00                                 # Reduced time (GPU is faster)
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8                               # CHANGED: Reduced from 48 (GPU does the work now)
-#SBATCH --mem=64G                                       # CHANGED: Reduced from 400G (GPU handles the matrices)
-#SBATCH --partition=gpu                                 # 💥 CRITICAL: Change to your cluster's GPU partition name
-#SBATCH --gres=gpu:1                                    # 💥 CRITICAL: Request 1 GPU
+#SBATCH --cpus-per-task=40                               # CHANGED: Reduced from 48 (GPU does the work now)
+#SBATCH --mem=400G                                       # CHANGED: Reduced from 400G (GPU handles the matrices)
+#SBATCH --partition=mem                                 # 💥 
 
 #### Load Modules
 module purge                                              
 module use /projects/community/modulefiles                 
 module load anaconda/2024.06-ts840 
-module load cuda/12.1.0
+
 
 #### Initialize conda
 eval "$(conda shell.bash hook)"
@@ -228,9 +242,6 @@ conda activate faiss_env  # Ensure this env has PyTorch with CUDA installed!
 echo "Current date and time: $(date)"
 echo "Running GPU Batched Vecchia Optimization"
 echo "Node: $(hostname)"
-
-# Check if GPU is actually visible
-nvidia-smi
 
 # Run the script
 srun python /home/jl2815/tco/exercise_25/st_model/sim_GIM_vecc_dw_regular_122025.py \
