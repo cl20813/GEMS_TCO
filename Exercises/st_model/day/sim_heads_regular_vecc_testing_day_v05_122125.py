@@ -187,22 +187,24 @@ def cli(
             # Calculate nearest neighbors map
             nns_map = _orderings.find_nns_l2(locs=coords1_reordered, max_nn=mm_cond_number)
             return ord_mm, nns_map
+    
+
 
     def calculate_original_scale_metrics(est_params, true_init_dict):
-        # Convert list to tensor for unified math operations
+        # Ensure we are working with a CPU tensor for metric calculation
         est_t = torch.tensor(est_params, device='cpu', dtype=torch.float64).flatten()
         
-        # 1. Transform back from optimization space (phi and logs)
+        # 1. Transform back to physical space
         phi1_e, phi2_e, phi3_e, phi4_e = torch.exp(est_t[0]), torch.exp(est_t[1]), torch.exp(est_t[2]), torch.exp(est_t[3])
         adv_lat_e, adv_lon_e = est_t[4], est_t[5]
         nugget_e = torch.exp(est_t[6])
 
-        # 2. Derive physical parameters (Original Scale)
         sigmasq_e = phi1_e / phi2_e
         range_lon_e = 1.0 / phi2_e
         range_lat_e = range_lon_e / torch.sqrt(phi3_e)
         range_time_e = range_lon_e / torch.sqrt(phi4_e)
 
+        # 2. Use Torch for both arrays
         est_array = torch.stack([sigmasq_e, range_lat_e, range_lon_e, range_time_e, adv_lat_e, adv_lon_e, nugget_e])
         
         true_array = torch.tensor([
@@ -211,21 +213,23 @@ def cli(
             true_init_dict['nugget']
         ], device='cpu', dtype=torch.float64)
 
-        # 3. Calculate MAPE (Mean Absolute Percentage Error)
+        # 3. Use torch.linalg.norm for consistency
+        frob_norm = torch.linalg.norm(true_array - est_array).item()
         mape = torch.mean(torch.abs((true_array - est_array) / true_array)).item() * 100 
         
-        return mape
+        return frob_norm, mape
 
     true_params_dict = {
         'sigmasq': 13.059, 'range_lat': 0.154, 'range_lon': 0.195,
         'range_time': 1.0, 'advec_lat': 0.0218, 'advec_lon': -0.1689, 'nugget': 0.247
     }
 
-    dw_norm_list = []
-    vecc_norm_list = []
-    #vecc_col_norm_list = []
 
+    vecc_0_heads_norm_list = []
+    vecc_100_heads_norm_list = []
+    vecc_300_heads_norm_list = []
 
+    
     # --- Move these outside the loop to fix the NameError and save time ---
     lats_sim = torch.arange(0, 5.0 + 0.001, 0.044, device=DEVICE, dtype=DTYPE)
     lons_sim = torch.arange(123.0, 133.0 + 0.001, 0.063, device=DEVICE, dtype=DTYPE)
@@ -235,7 +239,6 @@ def cli(
     grid_lat, grid_lon = torch.meshgrid(lats_flip, lons_flip, indexing='ij')
     flat_lats = grid_lat.flatten()
     flat_lons = grid_lon.flatten()
-
 
     num_iters = 100
     for num_iter in range(num_iters):
@@ -268,10 +271,6 @@ def cli(
         # Flip to Descending Order
         #lats_flip = torch.flip(lats_sim, dims=[0])
         #lons_flip = torch.flip(lons_sim, dims=[0])
-        
-        #grid_lat, grid_lon = torch.meshgrid(lats_flip, lons_flip, indexing='ij')
-        #flat_lats = grid_lat.flatten()
-        #flat_lons = grid_lon.flatten()
         
         for t in range(t_def):
             # Flip field to match coordinates
@@ -326,15 +325,10 @@ def cli(
         LAT_COL, LON_COL, VAL_COL, TIME_COL = 0, 1, 2, 3
         #DELTA_LAT, DELTA_LON = 0.044, 0.063 
         
-
         # Assuming data access is correct
-        daily_aggregated_tensors_dw = [aggregated_data]
-        daily_hourly_maps_dw = [input_map]
         daily_aggregated_tensors_vecc = [aggregated_data]
         daily_hourly_maps_vecc = [mm_input_map]
-
-        daily_hourly_map_dw = input_map
-        daily_aggregated_tensor_dw = aggregated_data
+        day_idx = 0  # Since we have only one day in this simulation
 
         daily_hourly_map_vecc = mm_input_map
         daily_aggregated_tensor_vecc = aggregated_data
@@ -343,117 +337,9 @@ def cli(
             daily_aggregated_tensor_vecc = daily_aggregated_tensor_vecc.to(DEVICE)
 
 
-# -------------------------------------------------------
-        # STEP C: Phase 1 - Debiased Whittle Optimization
-        # -------------------------------------------------------
-        print(f"\n--- Debiased Whittle {num_iter} ---")
-        
-        # Helper list for preprocess (can use raw values or params_list)
-        # We use the raw floats for the preprocessor init
-
-
-        day_idx=0
-        # Initialize Preprocessor with the wrapper lists (0-index because list has length 1)
-        db = debiased_whittle.debiased_whittle_preprocess(
-            daily_aggregated_tensors_dw, 
-            daily_hourly_maps_dw, 
-            day_idx= day_idx, # It is index 0 in our wrapper list # this automatically lead to day_idx
-            params_list= params_list_dw, 
-            lat_range=[0,5], 
-            lon_range=[123.0, 133.0]
-        )
-
-        cur_df = db.generate_spatially_filtered_days(0, 5, 123, 133)
-        
-        unique_times = torch.unique(cur_df[:, TIME_COL])
-        time_slices_list = [cur_df[cur_df[:, TIME_COL] == t_val] for t_val in unique_times]
-
-        # --- 1. Pre-compute J-vector, Taper Grid, and Taper Autocorrelation ---
-        print("Pre-computing J-vector (Hamming taper)...")
-        
-        # --- 💥 REVISED: Renamed 'p' to 'p_time' 💥 ---
-        J_vec, n1, n2, p_time, taper_grid = dwl.generate_Jvector_tapered( 
-            time_slices_list,
-            tapering_func=TAPERING_FUNC, 
-            lat_col=LAT_COL, lon_col=LON_COL, val_col=VAL_COL,
-            device=DEVICE
-        )
-
-        if J_vec is None or J_vec.numel() == 0 or n1 == 0 or n2 == 0 or p_time == 0:
-            print(f"Error: J-vector generation failed for Day {day_idx+1}.")
-            exit()
-        
-
-        I_sample = dwl.calculate_sample_periodogram_vectorized(J_vec)
-        taper_autocorr_grid = dwl.calculate_taper_autocorrelation_fft(taper_grid, n1, n2, DEVICE)
-
-        # Set up Optimizer for Whittle
-        optimizer_dw = torch.optim.LBFGS(
-            params_list, lr=1.0, max_iter=20, history_size=100, 
-            line_search_fn="strong_wolfe", tolerance_grad=1e-5  # 1e-5 to 1e-7
-        )
-
-        print(f"Running Whittle L-BFGS on {DEVICE}...")
-        # --- END REVISION ---
-
-        # Run Whittle Optimization      
-        nat_str, phi_str, raw_str, loss, steps = dwl.run_lbfgs_tapered(
-            params_list=params_list,
-            optimizer=optimizer_dw,
-            I_sample=I_sample,
-            n1=n1, n2=n2, p_time=p_time,
-            taper_autocorr_grid=taper_autocorr_grid, 
-            max_steps=DWL_MAX_STEPS,
-            device=DEVICE
-        )
-
-# -------------------------------------------------------
-# -------------------------------------------------------
-        # STEP D: Handoff - Create 'new_params_list'
-        # -------------------------------------------------------
-        
-        # Scale loss for reporting (optional, based on your logic)
-        loss_scaled = loss * n1 * n2 * 8  
-        
-        # 1. Create fresh tensors for Vecchia
-        # We DETACH from the Whittle graph so Vecchia starts fresh
-
-        dw_estimates_values = [p.item() for p in params_list]
-        dw_estimates_loss = dw_estimates_values + [loss]
-
-
-        #frob_norm_dw = sum((p_true.item() - p_est)**2 
-        #                for p_true, p_est in zip(params_list2, dw_estimates_values))
-
-        # Optional: Take sqrt if you want the actual Euclidean/Frobenius distance
-        #frob_norm_dw = frob_norm_dw ** 0.5
-
-
-        # Transform and calculate MAPE
-        mape_dw = calculate_original_scale_metrics(dw_estimates_values, true_params_dict)
-
-  
-        # (Your JSON/CSV saving code remains here...)
-        input_filepath = output_path / f"sim_dw_122025_{ ( daily_aggregated_tensors_dw[0].shape[0]/8 ) }.json"
-        
-        res = alg_optimization(
-            f"2024-07-{day_idx+1}", 
-            f"DW_{num_iter}", 
-            (daily_aggregated_tensors_dw[0].shape[0]/8), 
-            lr, step, 
-            dw_estimates_loss, 0, mape_dw
-        )
-
-        loaded_data = res.load(input_filepath)
-        loaded_data.append( res.toJSON() )
-        res.save(input_filepath,loaded_data)
-        fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'frob_norm'] # 0 for epoch
-        csv_filepath = input_path/f"sim_dW_v{int(v*100):03d}_122025_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
-        res.tocsv( loaded_data, fieldnames,csv_filepath )
-
-
 
         # 2 - Vecchia L-BFGS Optimization
+        # heads (heads 300)
         
         # --- 💥 Instantiate the GPU Batched Class ---
         # NOTE: Ensure fit_vecchia_lbfgs is the NEW class we defined
@@ -463,7 +349,7 @@ def cli(
                 aggregated_data = daily_aggregated_tensor_vecc,
                 nns_map = nns_map,
                 mm_cond_number = mm_cond_number,
-                nheads = nheads
+                nheads = 300
             )
 
         new_params_list = [
@@ -479,7 +365,7 @@ def cli(
                     history_size=LBFGS_HISTORY_SIZE 
                 )
 
-        print(f"\n--- Vecchia max min Optimization ( {num_iter+1}) ---")
+        print(f"\n--- Vecchia max min Optimization. 0 heads ( {num_iter+1}) ---")
         start_time = time.time()
         
         # --- 💥 Call the Batched Fit Method ---
@@ -497,79 +383,65 @@ def cli(
         
         B = out[:-1]
 
-        #frob_norm = sum((p_true.item() - p_est)**2 
-        #                for p_true, p_est in zip(params_list2, B))
-        #frob_norm = frob_norm ** 0.5
+        heads1 = 300
+        heads2 = 400
+        heads3 = 500
+        testing_date = "1221"
 
-        print(f"Vecchia Optimization finished in {epoch_time:.2f}s. Results: {out}")
+
+        # For 0 heads
+        frob_norm_0_heads, mape_0 = calculate_original_scale_metrics(out, true_params_dict)
+        print(f"Vecchia 0-heads | F-Norm (Orig): {frob_norm_0_heads:.4f} | MAPE: {mape_0:.2f}%")
+
+
+        print(f"Vecchia Optimization 0heads finished in {epoch_time:.2f}s. Results: {out}")
 
         # (Your Result Saving Logic...)
-        input_filepath = output_path / f"sim_reg_vecc_1220_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
+        input_filepath = output_path / f"sim_vecc_{heads1}heads_{testing_date}_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
         
-        # --- Vecchia Metrics ---
-
-        mape_vecc = calculate_original_scale_metrics(out[:-1], true_params_dict)
-
-        print(f"Vecchia Optimization finished. MAPE: {mape_vecc:.2f}%")
-
-        # Update the results object
-        res = alg_optimization(
-            f"2024-07-{day_idx+1}", 
-            f"Vecc_{num_iter}", 
-            (daily_aggregated_tensors_vecc[0].shape[0]/8), 
-            lr, step, 
-            out, epoch_time, mape_vecc
-        )
-
+        res = alg_optimization( f"2024-07-{day_idx+1}", f"Vecc_{num_iter}", ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) , lr,  step , out, epoch_time, mape_0 )
         loaded_data = res.load(input_filepath)
         loaded_data.append( res.toJSON() )
         res.save(input_filepath,loaded_data)
         fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'frob_norm'] # 0 for epoch
 
-        csv_filepath = input_path/f"sim_reg_vecc_1220_v{int(v*100):03d}_LBFGS_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
+        csv_filepath = input_path/f"sim_vecc_{heads1}heads_{testing_date}_v{int(v*100):03d}_LBFGS_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
 
-        ''' 
-        # 3 - Vecchia L-BFGS, but column conditioning set
-        print(f"\n--- Vecchia column conditioning Optimization ( {num_iter+1}) ---")
+        ## heads 400
 
-        # --- CONFIGURATION ---
-        v = 0.5              # Smoothness
-        mm_cond_number = 14    # Neighbors
-        nheads = 113*3           # 0 = Pure Vecchia
-        lr = 1.0             # LBFGS learning rate
-        LBFGS_MAX_STEPS = 10
-        LBFGS_HISTORY_SIZE = 100
-        LBFGS_LR = 1.0
-        LBFGS_MAX_EVAL = 100    
 
-        new_params_list_col = [
+        model_instance = kernels_reparam_space_time.fit_vecchia_lbfgs(
+                smooth = v,
+                input_map = daily_hourly_map_vecc,
+                aggregated_data = daily_aggregated_tensor_vecc,
+                nns_map = nns_map,
+                mm_cond_number = mm_cond_number,
+                nheads = heads2
+            )
+
+        new_params_list = [
             p.detach().clone().to(DEVICE).requires_grad_(True)
             for p in params_list2
         ]
 
-        model_instance_col = kernels_gpu_st_simulation_column.fit_vecchia_lbfgs(
-            smooth=v,
-            input_map=input_map,
-            aggregated_data=aggregated_data,
-            nns_map=nns_map,
-            mm_cond_number=mm_cond_number,
-            nheads=nheads
-        )
-        
-        optimizer_vecc_col = model_instance_col.set_optimizer(
-                    new_params_list_col,     
+        # --- 💥 Set L-BFGS Optimizer ---
+        optimizer_vecc = model_instance.set_optimizer(
+                    new_params_list,     
                     lr=LBFGS_LR,            
                     max_iter=LBFGS_MAX_EVAL,        
                     history_size=LBFGS_HISTORY_SIZE 
                 )
 
+        print(f"\n--- Vecchia max min Optimization. {heads2} heads ( {num_iter+1}) ---")
         start_time = time.time()
-
-        out_col, steps_ran = model_instance_col.fit_vecc_lbfgs(
-                new_params_list_col,
-                optimizer_vecc_col,
+        
+        # --- 💥 Call the Batched Fit Method ---
+        # REMOVED: model_instance.matern_cov_aniso_STABLE_log_reparam
+        out, steps_ran = model_instance.fit_vecc_lbfgs(
+                new_params_list,
+                optimizer_vecc,
                 # covariance_function argument is GONE
                 max_steps=LBFGS_MAX_STEPS, 
                 grad_tol=1e-7
@@ -577,34 +449,96 @@ def cli(
 
         end_time = time.time()
         epoch_time = end_time - start_time
-        print(f"\nOptimization finished in {epoch_time:.2f}s.")
+        
+        B = out[:-1]
 
-        C = out_col[:-1]
+        # For 100 heads
+        frob_norm_100_heads, mape_100 = calculate_original_scale_metrics(out, true_params_dict)
+        print(f"Vecchia 100-heads | F-Norm (Orig): {frob_norm_100_heads:.4f} | MAPE: {mape_100:.2f}%")
 
-        frob_norm_col = sum((p_true.item() - p_est)**2 
-                        for p_true, p_est in zip(params_list2, C))
+        # ... and so on
 
-        frob_norm_col = frob_norm_col ** 0.5
-        print(f"Vecchia Optimization finished in {epoch_time:.2f}s. Results: {out_col}")
+        print(f"Vecchia Optimization {heads2}heads finished in {epoch_time:.2f}s. Results: {out}")
 
         # (Your Result Saving Logic...)
-        input_filepath = output_path / f"sim_vecc_col_1212_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
-        res = alg_optimization( f"2024-07-{day_idx+1}", f"Vecc_{num_iter}", ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) , lr,  step , out_col, epoch_time, frob_norm_col )
+        input_filepath = output_path / f"sim_vecc_{heads2}heads_{testing_date}_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
+        
+        res = alg_optimization( f"2024-07-{day_idx+1}", f"Vecc_{num_iter}", ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) , lr,  step , out, epoch_time, mape_100 )
         loaded_data = res.load(input_filepath)
         loaded_data.append( res.toJSON() )
         res.save(input_filepath,loaded_data)
         fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'frob_norm'] # 0 for epoch
 
-        csv_filepath = input_path/f"sim_vecc_col_1212_v{int(v*100):03d}_LBFGS_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
+        csv_filepath = input_path/f"sim_vecc_{heads2}heads_{testing_date}_v{int(v*100):03d}_LBFGS_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
         res.tocsv( loaded_data, fieldnames,csv_filepath )
 
-        '''
 
+        ## heads 500
+        model_instance = kernels_reparam_space_time.fit_vecchia_lbfgs(
+                smooth = v,
+                input_map = daily_hourly_map_vecc,
+                aggregated_data = daily_aggregated_tensor_vecc,
+                nns_map = nns_map,
+                mm_cond_number = mm_cond_number,
+                nheads = heads3
+            )
+
+        new_params_list = [
+            p.detach().clone().to(DEVICE).requires_grad_(True)
+            for p in params_list2
+        ]
+
+        # --- 💥 Set L-BFGS Optimizer ---
+        optimizer_vecc = model_instance.set_optimizer(
+                    new_params_list,     
+                    lr=LBFGS_LR,            
+                    max_iter=LBFGS_MAX_EVAL,        
+                    history_size=LBFGS_HISTORY_SIZE 
+                )
+
+        print(f"\n--- Vecchia max min Optimization. {heads3} heads ( {num_iter+1}) ---")
+        start_time = time.time()
         
-        dw_norm_list.append( mape_dw)
-        vecc_norm_list.append( mape_vecc)  
+        # --- 💥 Call the Batched Fit Method ---
+        # REMOVED: model_instance.matern_cov_aniso_STABLE_log_reparam
+        out, steps_ran = model_instance.fit_vecc_lbfgs(
+                new_params_list,
+                optimizer_vecc,
+                # covariance_function argument is GONE
+                max_steps=LBFGS_MAX_STEPS, 
+                grad_tol=1e-7
+            )
+
+        end_time = time.time()
+        epoch_time = end_time - start_time
+        
+        B = out[:-1]
+
+        frob_norm_300_heads, mape_300 = calculate_original_scale_metrics(out, true_params_dict)
+        print(f"Vecchia 300-heads | F-Norm (Orig): {frob_norm_300_heads:.4f} | MAPE: {mape_300:.2f}%")
+        print(f"Vecchia Optimization {heads3}heads finished in {epoch_time:.2f}s. Results: {out}")
+
+        # (Your Result Saving Logic...)
+        input_filepath = output_path / f"sim_vecc_{heads3}heads_{testing_date}_{ ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) }.json"
+        
+        res = alg_optimization( f"2024-07-{day_idx+1}", f"Vecc_{num_iter}", ( daily_aggregated_tensors_vecc[0].shape[0]/8 ) , lr,  step , out, epoch_time, mape_300 )
+        loaded_data = res.load(input_filepath)
+        loaded_data.append( res.toJSON() )
+        res.save(input_filepath,loaded_data)
+        fieldnames = ['day', 'cov_name', 'lat_lon_resolution', 'lr', 'stepsize',  'sigma','range_lat','range_lon','advec_lat','advec_lon','beta','nugget','loss', 'time', 'frob_norm'] # 0 for epoch
+
+        csv_filepath = input_path/f"sim_vecc_{heads3}heads_{testing_date}_v{int(v*100):03d}_LBFGS_{(daily_aggregated_tensors_vecc[0].shape[0]/8 )}.csv"
+        res.tocsv( loaded_data, fieldnames,csv_filepath )
+
+
+
+   
+        vecc_0_heads_norm_list.append(mape_0)
+        vecc_100_heads_norm_list.append( mape_100 )
+        vecc_300_heads_norm_list.append( mape_300 )
+
         #vecc_col_norm_list.append( frob_norm_col )
-        print(f'average dw norm: {np.mean( dw_norm_list )}, vecc norm: {np.mean( vecc_norm_list )}')
+        print(f'average {heads1} heads norm: {np.mean( vecc_0_heads_norm_list )}, average {heads2} heads norm: {np.mean( vecc_100_heads_norm_list )}, average {heads3} heads norm: {np.mean( vecc_300_heads_norm_list )}')
 
     #print(f'average dw norm: {np.mean( dw_norm_list )}, vecc norm: {np.mean( vecc_norm_list )}, vecc col norm: {np.mean( vecc_col_norm_list )}')
 
