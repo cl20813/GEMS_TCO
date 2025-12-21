@@ -20,11 +20,6 @@ scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_GIM_vecc_
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_vecc_300heads_1217_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
-
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_vecc_100heads_1217_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
-
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_vecc_0heads_1217_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
 
 
 # irr vs ir   vecc vs dw

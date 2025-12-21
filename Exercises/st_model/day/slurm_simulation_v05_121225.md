@@ -27,11 +27,25 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim
 
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_irre_vecc_1220_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_irre_dW_v050_1221_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_irre_vecc_1221_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
+
 # regular
 
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_dW_v050_122025_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
 
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_reg_vecc_1220_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
+
+
+# testing heads 
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_vecc_300heads_1221_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_vecc_400heads_1221_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_vecc_500heads_1221_v050_LBFGS_18126.0.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day" 
+
 
 
 ### Run this part
