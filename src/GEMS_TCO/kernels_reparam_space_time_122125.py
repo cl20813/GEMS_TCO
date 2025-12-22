@@ -6,7 +6,7 @@
 # Special functions and optimizations
 # from scipy.spatial.distance import cdist  # For space and time distance
 # from scipy.optimize import minimize  # For optimization
-
+from sklearn.neighbors import KDTree
 import sys
 gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
 sys.path.append(gems_tco_path)
@@ -122,68 +122,51 @@ class SpatioTemporalModel:
         
         return cov
         
-    def full_likelihood_avg(self, params: torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, covariance_function: Callable, temporal_period=None) -> torch.Tensor:
-            """Exact GP NLL calculation with optional Harmonic Trend."""
-            input_data = input_data.to(torch.float64)
-            y = y.to(torch.float64)
-            N = input_data.shape[0]
-            if N == 0: return torch.tensor(0.0, device=self.device, dtype=torch.float64)
-                    
-            cov_matrix = covariance_function(params=params, y=input_data, x=input_data)
-            
-            try:
-                jitter = torch.eye(cov_matrix.shape[0], device=self.device, dtype=torch.float64) * 1e-6
-                L = torch.linalg.cholesky(cov_matrix + jitter)
-            except torch.linalg.LinAlgError:
-                return torch.tensor(torch.inf, device=params.device, dtype=params.dtype)
-            
-            log_det = 2 * torch.sum(torch.log(torch.diag(L)))
-            
-            # --- [MODIFIED] Spatial + Harmonic Trend ---
-            ones = torch.ones(N, 1, device=self.device, dtype=torch.float64)
-            coords = input_data[:, :2] # Lat, Lon
-            
-            if temporal_period:
-                # input_data columns: [lat, lon, val, time] -> time is index 3
-                t_vals = input_data[:, 3]
-                omega = 2 * np.pi / temporal_period
-                sin_t = torch.sin(omega * t_vals).unsqueeze(1)
-                cos_t = torch.cos(omega * t_vals).unsqueeze(1)
-                # Cols: [Intercept, Lat, Lon, Sin, Cos]
-                locs = torch.cat((ones, coords, sin_t, cos_t), dim=1)
-            else:
-                # Cols: [Intercept, Lat, Lon]
-                locs = torch.cat((ones, coords), dim=1)
-            # -------------------------------------------
-            
-            if y.dim() == 1: y_col = y.unsqueeze(-1)
-            else: y_col = y
+    def full_likelihood_avg(self, params: torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
+        """Exact GP NLL calculation."""
+        input_data = input_data.to(torch.float64)
+        y = y.to(torch.float64)
+        N = input_data.shape[0]
+        if N == 0: return torch.tensor(0.0, device=self.device, dtype=torch.float64)
+                
+        cov_matrix = covariance_function(params=params, y=input_data, x=input_data)
+        
+        try:
+            jitter = torch.eye(cov_matrix.shape[0], device=self.device, dtype=torch.float64) * 1e-6
+            L = torch.linalg.cholesky(cov_matrix + jitter)
+        except torch.linalg.LinAlgError:
+            return torch.tensor(torch.inf, device=params.device, dtype=params.dtype)
+        
+        log_det = 2 * torch.sum(torch.log(torch.diag(L)))
+        
+        # Spatial Trend
+        locs = torch.cat((torch.ones(N, 1, device=self.device, dtype=torch.float64), input_data[:,:2]), dim=1)
+        
+        if y.dim() == 1: y_col = y.unsqueeze(-1)
+        else: y_col = y
 
-            # Optimize: Solve for [X, y] together
-            combined_rhs = torch.cat((locs, y_col), dim=1)
-            C_inv_combined = torch.cholesky_solve(combined_rhs, L, upper=False)
-            
-            # Split back based on number of trend columns
-            n_trend = locs.shape[1]
-            C_inv_X, C_inv_y = C_inv_combined[:, :n_trend], C_inv_combined[:, n_trend:]
+        # Optimize: Solve for [X, y] together
+        combined_rhs = torch.cat((locs, y_col), dim=1)
+        C_inv_combined = torch.cholesky_solve(combined_rhs, L, upper=False)
+        C_inv_X, C_inv_y = C_inv_combined[:, :3], C_inv_combined[:, 3:]
 
-            tmp1 = torch.matmul(locs.T, C_inv_X)
-            tmp2 = torch.matmul(locs.T, C_inv_y)
-            
-            try:
-                jitter_beta = torch.eye(tmp1.shape[0], device=self.device, dtype=torch.float64) * 1e-8
-                beta = torch.linalg.solve(tmp1 + jitter_beta, tmp2)
-            except torch.linalg.LinAlgError:
-                return torch.tensor(torch.inf, device=locs.device, dtype=locs.dtype)
+        tmp1 = torch.matmul(locs.T, C_inv_X)
+        tmp2 = torch.matmul(locs.T, C_inv_y)
+        
+        try:
+            jitter_beta = torch.eye(tmp1.shape[0], device=self.device, dtype=torch.float64) * 1e-8
+            beta = torch.linalg.solve(tmp1 + jitter_beta, tmp2)
+        except torch.linalg.LinAlgError:
+            return torch.tensor(torch.inf, device=locs.device, dtype=locs.dtype)
 
-            mu = torch.matmul(locs, beta)
-            y_mu = y_col - mu
-            
-            C_inv_y_mu = torch.cholesky_solve(y_mu, L, upper=False)
-            quad_form = torch.matmul(y_mu.T, C_inv_y_mu) 
+        mu = torch.matmul(locs, beta)
+        y_mu = y_col - mu
+        
+        C_inv_y_mu = torch.cholesky_solve(y_mu, L, upper=False)
+        quad_form = torch.matmul(y_mu.T, C_inv_y_mu) 
 
-            neg_log_lik_sum = 0.5 * (log_det + quad_form.squeeze())
-            return neg_log_lik_sum / N
+        neg_log_lik_sum = 0.5 * (log_det + quad_form.squeeze())
+        return neg_log_lik_sum / N
 
 
 # --- BATCHED GPU CLASS ---
@@ -203,19 +186,48 @@ class VecchiaBatched(SpatioTemporalModel):
         # Heads Tensor
         self.Heads_data = None 
 
+    
+
+    def build_dilated_nns_map(coords, k_near=8, k_far=4, k_farther=4):
+        """
+        구성: [Near(8) | Far(4) | Farther(4)] 총 16개 저장
+        - Far: 약 3~4칸 거리 (인덱스 15~30 구간에서 추출)
+        - Farther: 약 5~8칸 거리 (인덱스 40~60 구간에서 추출)
+        """
+        tree = KDTree(coords)
+        
+        # 넉넉하게 100개 검색
+        _, indices = tree.query(coords, k=100)
+        
+        final_map = {}
+        for i in range(len(coords)):
+            # 1. Near: 가장 가까운 8개 (자기 자신 제외, indices[i, 0]은 본인)
+            near_idx = indices[i, 1:1+k_near] # 1~8
+            
+            # 2. Far: 조금 떨어진 곳 (예: 15번째~30번째 중 듬성듬성 4개)
+            # 방향성을 모르므로 4방위를 커버하기 위해 간격을 둠
+            far_idx = indices[i, [15, 20, 25, 30]] 
+            
+            # 3. Farther: 더 떨어진 곳 (예: 45번째~60번째 중 4개)
+            farther_idx = indices[i, [45, 50, 55, 60]]
+            
+            # 하나로 합침 (순서 중요: Near -> Far -> Farther)
+            combined = np.concatenate([near_idx, far_idx, farther_idx])
+            final_map[i] = combined.astype(int)
+            
+        return final_map
+
+# [사용법] 모델에 넣기 전에 이걸로 맵을 업데이트
+# updated_nns_map = build_dilated_nns_map(coords_only, k_near=8, k_far=4, k_farther=4)
+
     def precompute_conditioning_sets(self, temporal_period=None):
-                
-        # [NEW] Store period for use in likelihood function later
-        self.temporal_period = temporal_period  
-        
-        print(f"Pre-computing Batched Tensors (Padding Strategy, Period: {temporal_period})...", end=" ")
-        
-        # ... (Heads Data, Tails Data 처리 로직은 동일) ...
+        self.temporal_period = temporal_period
+        print(f"Pre-computing with Hybrid Strategy (Reuse + Upwind Bracketing ±0.022)...", end=" ")
         
         key_list = list(self.input_map.keys())
         cut_line = self.nheads
         
-        # 1. Heads Data
+        # 1. Heads Data (기존 동일)
         heads_list = []
         for key in key_list:
             day_data = self.input_map[key]
@@ -226,7 +238,7 @@ class VecchiaBatched(SpatioTemporalModel):
             heads_list.append(head_chunk)
         self.Heads_data = torch.cat(heads_list, dim=0).to(torch.float64)
 
-        # 2. Tails Data (Task List)
+        # 2. Tasks (기존 동일)
         tasks = []
         for time_idx, key in enumerate(key_list):
             day_data = self.input_map[key]
@@ -234,30 +246,114 @@ class VecchiaBatched(SpatioTemporalModel):
             for idx in indices:
                 tasks.append((time_idx, idx))
 
-        total_vecchia_points = len(tasks)
-        max_storage_dim = (self.max_neighbors + 1) * 3
-        
-        # 3. Allocating Tensors
-        self.X_batch = torch.full((total_vecchia_points, max_storage_dim, 3), 1e6, device=self.device, dtype=torch.float64)
-        self.Y_batch = torch.zeros((total_vecchia_points, max_storage_dim, 1), device=self.device, dtype=torch.float64)
-        
-        # --- ✅ FIX 1: 컬럼 개수 동적 할당 ---
-        n_trend_cols = 5 if temporal_period else 3
-        self.Locs_batch = torch.zeros((total_vecchia_points, max_storage_dim, n_trend_cols), device=self.device, dtype=torch.float64)
+        # -------------------------------------------------------------------------
+        # [중요] Upwind Bracketing Strategy (위/아래 양방향 오프셋)
+        # Latitude 변동성이 크므로, 소스 위치를 위(+0.022)/아래(-0.022)로 
+        # 벌려서(Bracket) 보간 효과를 노립니다.
+        # -------------------------------------------------------------------------
+        ref_map = self.input_map[key_list[0]]
+        if isinstance(ref_map, torch.Tensor):
+            coords_np = ref_map[:, :2].detach().cpu().numpy()
+        else:
+            coords_np = ref_map[:, :2]
 
-        # 4. Fill Tensors
+        from scipy.spatial import cKDTree
+        tree = cKDTree(coords_np)
+        
+        # 기본 동쪽 이동 거리 (Longitude)
+        base_east = 0.20
+        
+        # (A) Look North-East (동쪽 + 북쪽 0.044)
+        upwind_NE_offsets = np.zeros_like(coords_np)
+        upwind_NE_offsets[:, 0] = 0.04   # North (+Lat)
+        upwind_NE_offsets[:, 1] = base_east
+        
+        # (B) Look South-East (동쪽 - 남쪽 0.044)
+        upwind_SE_offsets = np.zeros_like(coords_np)
+        upwind_SE_offsets[:, 0] = -0.04  # South (-Lat)
+        upwind_SE_offsets[:, 1] = base_east
+        
+        target_NE = coords_np + upwind_NE_offsets
+        target_SE = coords_np + upwind_SE_offsets
+        
+        # 두 번의 쿼리로 각각의 인덱스 확보
+        _, indices_NE = tree.query(target_NE, k=1)
+        _, indices_SE = tree.query(target_SE, k=1)
+        
+        # -------------------------------------------------------------------------
+
+        total_vecchia_points = len(tasks)
+        
+        # 메모리 할당 계산 (넉넉하게 수정):
+        # T:   Self(1) + Neighbor(8) = 9
+        # T-1: Self(1) + Neighbor(8) + Upwind_NE(1) + Upwind_SE(1) = 11
+        # T-2: Self(1) + Neighbor(8) + Upwind_NE(1) + Upwind_SE(1) = 11
+        # Target: 1
+        # Total per row ≈ 32 ~ 33
+        # Safety Margin을 위해 40으로 설정
+        max_storage_dim = 40
+        
+        self.X_batch = torch.zeros((total_vecchia_points, max_storage_dim, 3), device=self.device, dtype=torch.float64)
+        
+        # 패딩 초기화 (Singular 방지)
+        dummy = torch.arange(max_storage_dim, device=self.device, dtype=torch.float64) * 10000.0 + 1e6
+        self.X_batch[:, :, 0] = dummy.unsqueeze(0)
+        self.X_batch[:, :, 1] = dummy.unsqueeze(0)
+        
+        self.Y_batch = torch.zeros((total_vecchia_points, max_storage_dim, 1), device=self.device, dtype=torch.float64)
+        n_trend = 5 if temporal_period else 3
+        self.Locs_batch = torch.zeros((total_vecchia_points, max_storage_dim, n_trend), device=self.device, dtype=torch.float64)
+
         for i, (time_idx, index) in enumerate(tasks):
-            # ... (데이터 블록 합치는 로직 동일) ...
             current_np = self.input_map[key_list[time_idx]]
-            current_row = current_np[index].reshape(1, -1) 
-            mm_neighbors = self.nns_map[index]
-            past = list(mm_neighbors)
+            current_row = current_np[index].reshape(1, -1)
+            
+            # 1. Spatial Neighbors (Reuse Strategy)
+            spatial_neighbors = self.nns_map[index]
             
             data_list = []
-            if past: data_list.append(current_np[past])
-            if time_idx > 0: data_list.append(self.input_map[key_list[time_idx - 1]][past + [index], :])
-            if time_idx > 1: data_list.append(self.input_map[key_list[time_idx - 2]][past + [index], :])
+            
+            # --- (A) Time T (Current) ---
+            if len(spatial_neighbors) > 0:
+                data_list.append(current_np[spatial_neighbors])
 
+            # --- (B) Time T-1 (Lag 1) ---
+            if time_idx > 0:
+                prev_np = self.input_map[key_list[time_idx - 1]]
+                
+                # [Strategy] Self + Neighbors + Upwind(NE) + Upwind(SE)
+                idx_ne = indices_NE[index]
+                idx_se = indices_SE[index]
+                
+                idx_t_1 = np.concatenate([
+                    [index],            # Self
+                    spatial_neighbors,  # Reuse Neighbors
+                    [idx_ne, idx_se]    # Upwind Bracket (2 points)
+                ]).astype(int)
+                
+                # 중복 제거
+                idx_t_1 = np.unique(idx_t_1)
+                
+                data_list.append(prev_np[idx_t_1])
+
+            # --- (C) Time T-2 (Lag 2) ---
+            if time_idx > 1:
+                prev_prev_np = self.input_map[key_list[time_idx - 2]]
+                
+                idx_ne = indices_NE[index]
+                idx_se = indices_SE[index]
+                
+                idx_t_2 = np.concatenate([
+                    [index],
+                    spatial_neighbors,
+                    [idx_ne, idx_se]    # Upwind Bracket (2 points)
+                ]).astype(int)
+                
+                idx_t_2 = np.unique(idx_t_2)
+                
+                data_list.append(prev_prev_np[idx_t_2])
+
+            # --- Data Merge (기존과 동일) ---
             if data_list:
                 if isinstance(data_list[0], np.ndarray):
                     neighbors_block = torch.from_numpy(np.vstack(data_list)).to(self.device)
@@ -280,13 +376,217 @@ class VecchiaBatched(SpatioTemporalModel):
             self.X_batch[i, start_slot:, 2] = combined_data[:, 3]
             self.Y_batch[i, start_slot:, 0] = combined_data[:, 2]
             
-            # --- ✅ FIX 2: Loop 안에서 값 채워넣기 ---
-            # Col 0, 1, 2
+            self.Locs_batch[i, start_slot:, 0] = 1.0 
+            self.Locs_batch[i, start_slot:, 1] = combined_data[:, 0] 
+            self.Locs_batch[i, start_slot:, 2] = combined_data[:, 1]
+            
+            if temporal_period:
+                t_vals = combined_data[:, 3]
+                omega = 2 * np.pi / temporal_period
+                self.Locs_batch[i, start_slot:, 3] = torch.sin(omega * t_vals)
+                self.Locs_batch[i, start_slot:, 4] = torch.cos(omega * t_vals)
+
+        self.is_precomputed = True
+        print(f"Done. Batch size: {self.X_batch.shape[0]}")
+    
+    # Final Interpretable Params: {'sigma_sq': 7.510395564042606, 'range_lon': 0.09945995588743121, 'range_lat': 0.09998786309540021, 'range_time': 0.5801881001939552, 'advec_lat': 0.00711489265840434, 'advec_lon': -0.44135718085641384, 'nugget': 0.3863708436821134}
+    # for below
+
+    '''
+    import numpy as np
+    import torch
+    from sklearn.neighbors import KDTree 
+    from GEMS_TCO import orderings as _orderings
+    from typing import Tuple
+
+    def get_spatial_ordering_dilated(
+            input_maps: dict,
+            mm_cond_number: int = 16 
+        ) -> Tuple[np.ndarray, list]:  # <--- 반환 타입이 list로 변경됨
+            
+            key_list = list(input_maps.keys())
+            data_for_coord = input_maps[key_list[0]]
+            
+            if isinstance(data_for_coord, torch.Tensor):
+                data_for_coord = data_for_coord.cpu().numpy()
+
+            x1 = data_for_coord[:, 0]
+            y1 = data_for_coord[:, 1]
+            coords1 = np.stack((x1, y1), axis=-1)
+
+            # MaxMin Ordering
+            ord_mm = _orderings.maxmin_cpp(coords1)
+            
+            data_for_coord_reordered = data_for_coord[ord_mm]
+            coords1_reordered = np.stack(
+                (data_for_coord_reordered[:, 0], data_for_coord_reordered[:, 1]), 
+                axis=-1
+            )
+            
+            print("Building KDTree for Dilated Neighbors...")
+            tree = KDTree(coords1_reordered)
+            
+            _, indices = tree.query(coords1_reordered, k=65)
+            
+            # --- [FIX] Dict가 아니라 List로 생성 ---
+            nns_map_list = [] 
+            
+            for i in range(len(coords1_reordered)):
+                # (1) Near: 가장 가까운 8개
+                near_idx = indices[i, 1:9]
+                
+                # (2) Far: 격자 3~4칸 거리 (15, 20, 25, 30번째)
+                far_idx = indices[i, [15, 20, 25, 30]]
+                
+                # (3) Farther: 격자 5~8칸 거리 (45, 50, 55, 60번째)
+                farther_idx = indices[i, [45, 50, 55, 60]]
+                
+                # 합치기
+                combined = np.concatenate([near_idx, far_idx, farther_idx])
+                
+                # 과거(자신보다 순서가 앞선) 이웃만 필터링
+                valid_neighbors = combined[combined < i]
+                
+                # --- [FIX] 리스트에 Append (순서대로 쌓임) ---
+                nns_map_list.append(valid_neighbors.astype(int))
+                
+            return ord_mm, nns_map_list  # 리스트 반환
+
+    ord_mm, nns_map = get_spatial_ordering_dilated(input_map, mm_cond_number=16)
+
+
+    mm_input_map = {}
+    for key in input_map:
+        mm_input_map[key] = input_map[key][ord_mm]  # Extract only Lat and Lon columns
+        
+
+    def precompute_conditioning_sets(self, temporal_period=None):
+        self.temporal_period = temporal_period
+        print(f"Pre-computing Batched Tensors (Dilated Strategy, Period: {temporal_period})...", end=" ")
+        
+        key_list = list(self.input_map.keys())
+        cut_line = self.nheads
+        
+        # 1. Heads Data 처리 (기존 동일)
+        heads_list = []
+        for key in key_list:
+            day_data = self.input_map[key]
+            if isinstance(day_data, np.ndarray):
+                head_chunk = torch.from_numpy(day_data[:cut_line]).to(self.device)
+            else:
+                head_chunk = day_data[:cut_line].clone().detach().to(self.device)
+            heads_list.append(head_chunk)
+        self.Heads_data = torch.cat(heads_list, dim=0).to(torch.float64)
+
+        # 2. Tasks 생성 (기존 동일)
+        tasks = []
+        for time_idx, key in enumerate(key_list):
+            day_data = self.input_map[key]
+            indices = range(cut_line, len(day_data))
+            for idx in indices:
+                tasks.append((time_idx, idx))
+
+        total_vecchia_points = len(tasks)
+        
+        # --- 💥 FIX: 메모리 할당 계산 ---
+        # 전략에 따른 포인트 수 계산:
+        # T   (Current): Target(1) + Near(8) = 9
+        # T-1 (Lag 1)  : Self(1)   + Near(5) + Far(4) = 10
+        # T-2 (Lag 2)  : Self(1)   + Near(4) + Far(4) + Farther(4) = 13
+        # Total per row = 9 + 10 + 13 = 32
+        max_storage_dim = 32 + 5  # 여유분 5개 추가
+        
+        # 3. Allocating Tensors (패딩: 서로 다른 먼 좌표로 초기화)
+        self.X_batch = torch.zeros((total_vecchia_points, max_storage_dim, 3), device=self.device, dtype=torch.float64)
+        
+        # 패딩 좌표 분산 (Singular Matrix 방지)
+        dummy_coords = torch.arange(max_storage_dim, device=self.device, dtype=torch.float64) * 10000.0 + 1e6
+        self.X_batch[:, :, 0] = dummy_coords.unsqueeze(0)
+        self.X_batch[:, :, 1] = dummy_coords.unsqueeze(0)
+        
+        self.Y_batch = torch.zeros((total_vecchia_points, max_storage_dim, 1), device=self.device, dtype=torch.float64)
+        
+        n_trend_cols = 5 if temporal_period else 3
+        self.Locs_batch = torch.zeros((total_vecchia_points, max_storage_dim, n_trend_cols), device=self.device, dtype=torch.float64)
+
+        # 4. Fill Tensors (Dilated Logic 적용)
+        for i, (time_idx, index) in enumerate(tasks):
+            current_np = self.input_map[key_list[time_idx]]
+            current_row = current_np[index].reshape(1, -1) 
+            
+            # nns_map에서 전체 리스트 가져오기 (16개 가정: 0~7 Near, 8~11 Far, 12~15 Farther)
+            all_neighbors = self.nns_map[index] 
+            
+            data_list = []
+            
+            # --- (1) Time t (Current) ---
+            # Strategy: 이웃 8개 (Near 8)
+            # all_neighbors[:8] 사용
+            idx_t = all_neighbors[:8]
+            if len(idx_t) > 0:
+                data_list.append(current_np[idx_t])
+            
+            # --- (2) Time t-1 (Lag 1) ---
+            if time_idx > 0:
+                prev_np = self.input_map[key_list[time_idx - 1]]
+                # Strategy: 본인 + 이웃 5개(Near) + 먼 4개(Far)
+                # 본인: [index]
+                # Near 5: all_neighbors[:5]
+                # Far 4: all_neighbors[8:12] (인덱스 주의: build_dilated_nns_map 기준)
+                
+                idx_t_1 = np.concatenate([
+                    [index],              # Self
+                    all_neighbors[:5],    # Near 5
+                    all_neighbors[8:12]   # Far 4
+                ]).astype(int)
+                
+                data_list.append(prev_np[idx_t_1])
+
+            # --- (3) Time t-2 (Lag 2) ---
+            if time_idx > 1:
+                prev_prev_np = self.input_map[key_list[time_idx - 2]]
+                # Strategy: 본인 + 이웃 4개(Near) + 먼 4개(Far) + 더 먼 4개(Farther)
+                # Far 4: all_neighbors[8:12]
+                # Farther 4: all_neighbors[12:16]
+                
+                idx_t_2 = np.concatenate([
+                    [index],               # Self
+                    all_neighbors[:4],     # Near 4
+                    all_neighbors[8:12],   # Far 4 (Reuse from t-1 logic)
+                    all_neighbors[12:16]   # Farther 4
+                ]).astype(int)
+                
+                data_list.append(prev_prev_np[idx_t_2])
+
+            # --- Merge & Fill ---
+            if data_list:
+                if isinstance(data_list[0], np.ndarray):
+                    neighbors_block = torch.from_numpy(np.vstack(data_list)).to(self.device)
+                else:
+                    neighbors_block = torch.vstack(data_list).to(self.device)
+            else:
+                neighbors_block = torch.empty((0, current_row.shape[1]), device=self.device)
+
+            if isinstance(current_row, np.ndarray):
+                target_block = torch.from_numpy(current_row).to(self.device)
+            else:
+                target_block = current_row.clone().detach().to(self.device)
+
+            combined_data = torch.cat([neighbors_block, target_block], dim=0)
+            actual_len = combined_data.shape[0]
+            start_slot = max_storage_dim - actual_len
+            
+            # Data Fill
+            self.X_batch[i, start_slot:, 0] = combined_data[:, 0]
+            self.X_batch[i, start_slot:, 1] = combined_data[:, 1]
+            self.X_batch[i, start_slot:, 2] = combined_data[:, 3]
+            self.Y_batch[i, start_slot:, 0] = combined_data[:, 2]
+            
+            # Trend Fill
             self.Locs_batch[i, start_slot:, 0] = 1.0 
             self.Locs_batch[i, start_slot:, 1] = combined_data[:, 0] 
             self.Locs_batch[i, start_slot:, 2] = combined_data[:, 1] 
             
-            # Col 3, 4 (Harmonic)
             if temporal_period:
                 t_vals = combined_data[:, 3]
                 omega = 2 * np.pi / temporal_period
@@ -295,6 +595,8 @@ class VecchiaBatched(SpatioTemporalModel):
 
         self.is_precomputed = True
         print(f"Done. Heads: {self.Heads_data.shape[0]}, Batched Tails: {self.X_batch.shape[0]}")
+    '''
+
 
     def batched_manual_dist(self, dist_params, x_batch):
         """Batched Manual Broadcasting Distance."""
@@ -343,23 +645,15 @@ class VecchiaBatched(SpatioTemporalModel):
         if not self.is_precomputed: raise RuntimeError("Run precompute first!")
             
         # 1. Heads (Exact GP)
+        # Adapter to map params correctly for the single-matrix function
         def adapter_cov_func(params, x, y):
             return self.matern_cov_aniso_STABLE_log_reparam(params, x, y)
 
         if self.Heads_data.shape[0] > 0:
-            # [MODIFIED] Pass self.temporal_period to full_likelihood_avg
-            head_nll_avg = self.full_likelihood_avg(
-                params, 
-                self.Heads_data, 
-                self.Heads_data[:, 2], 
-                adapter_cov_func,
-                temporal_period=self.temporal_period  # <--- HERE
-            )
+            head_nll_avg = self.full_likelihood_avg(params, self.Heads_data, self.Heads_data[:, 2], adapter_cov_func)
             head_nll_sum = head_nll_avg * self.Heads_data.shape[0]
         else:
             head_nll_sum = 0.0
-
-
 
         # 2. Tails (Batched GPU)
         cov_batch = self.matern_cov_batched(params, self.X_batch)
@@ -377,12 +671,7 @@ class VecchiaBatched(SpatioTemporalModel):
         C_inv_y = torch.cholesky_solve(self.Y_batch, L_batch, upper=False)
         Xt_Cinv_y = torch.bmm(self.Locs_batch.transpose(1, 2), C_inv_y)
         
-
-
-        # --- ✅ FIX 3: Jitter 크기 동적 할당 ---
-        n_trend = self.Locs_batch.shape[-1]  # 3 or 5
-        jitter = torch.eye(n_trend, device=self.device, dtype=torch.float64).unsqueeze(0) * 1e-8
-        
+        jitter = torch.eye(3, device=self.device, dtype=torch.float64).unsqueeze(0) * 1e-8
         beta = torch.linalg.solve(Xt_Cinv_X + jitter, Xt_Cinv_y)
         
         mu = torch.bmm(self.Locs_batch, beta)

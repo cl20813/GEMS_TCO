@@ -15,7 +15,11 @@ scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/coarse_cen_map_without_de
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_regular_veccDWlbfgs_day_v05_122125.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 #### 12:20 nheads 400 LOC_ERR_STD 0.02. 12:21 nheads 300 LOC_ERR_STD 0.02
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_irregular_veccDW_day_v05_122125.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+#### 12:22 nheads 300 LOC_ERR_STD 0.02 kernels_reparam_space_time_122125
+
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_irregular_veccDW_day_v05_122225.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+
+
 
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_heads_regular_vecc_testing_day_v05_122125.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
@@ -130,14 +134,14 @@ echo "Current date and time: $(date)"
 
 
 ``` cd ./jobscript/tco/gp_exercise ```
-```  nano sim_irr_122125.sh  ``` 
-```  sbatch sim_irr_122125.sh  ``` 
+```  nano sim_irr_122225.sh  ``` 
+```  sbatch sim_irr_122225.sh  ``` 
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=sim_irr_122125       # Job name (Added GPU tag)
-#SBATCH --output=/home/jl2815/tco/exercise_output/sim_irr_122125_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/sim_irr_122125_%j.err
+#SBATCH --job-name=sim_irr_122225       # Job name (Added GPU tag)
+#SBATCH --output=/home/jl2815/tco/exercise_output/sim_irr_122225.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/sim_irr_122225.err
 #SBATCH --time=24:00:00                                 # Reduced time (GPU is faster)
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=40                               # CHANGED: Reduced from 48 (GPU does the work now)
@@ -158,7 +162,7 @@ echo "Node: $(hostname)"
 
 
 # Run the script
-srun python /home/jl2815/tco/exercise_25/st_model/sim_irregular_veccDW_day_v05_122125.py \
+srun python /home/jl2815/tco/exercise_25/st_model/sim_irregular_veccDW_day_v05_122225.py \
     --v 0.5 \
     --lr 0.03 \
     --step 80 \
