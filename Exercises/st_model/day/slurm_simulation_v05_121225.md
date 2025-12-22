@@ -131,7 +131,7 @@ echo "Current date and time: $(date)"
 ############# irregular grid
 
 # 1220: nheads 400 LOC_ERR_STR 0.02
-
+# 1222: nheads 300 LOC_ERR_STR 0.02. mm:30
 
 ``` cd ./jobscript/tco/gp_exercise ```
 ```  nano sim_irr_122225.sh  ``` 
@@ -169,7 +169,7 @@ srun python /home/jl2815/tco/exercise_25/st_model/sim_irregular_veccDW_day_v05_1
     --epochs 100 \
     --space "1, 1" \
     --days "20,30" \
-    --mm-cond-number 8 \
+    --mm-cond-number 30 \
     --nheads 300 \
     --no-keep-exact-loc 
 

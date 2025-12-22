@@ -18,10 +18,10 @@ from sklearn.neighbors import BallTree
 # Custom imports
 
 
-from GEMS_TCO import kernels_reparam_space_time_122125 as kernels_reparam_space_time
+from GEMS_TCO import kernels_reparam_space_time_gpu_122225 as kernels_reparam_space_time
 from GEMS_TCO import orderings as _orderings 
 from GEMS_TCO import alg_optimization, alg_opt_Encoder
-from GEMS_TCO import kernels_gpu_st_simulation_column as kernels_gpu_st_simulation_column
+
 
 
 from typing import Optional, List, Tuple
@@ -433,7 +433,7 @@ def cli(
         else:
             print("WARNING: Grid mismatch detected! Whittle will fail.")
 
-        ord_mm, nns_map = get_spatial_ordering(input_map, mm_cond_number=10)
+        ord_mm, nns_map = get_spatial_ordering(input_map, mm_cond_number= mm_cond_number)
         mm_input_map = {}
         for key in input_map:
             mm_input_map[key] = input_map[key][ord_mm]  # Extract only Lat and Lon columns
