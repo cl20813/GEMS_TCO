@@ -39,7 +39,7 @@ import matplotlib.pyplot as plt
 from GEMS_TCO import kernels_reparam_space_time 
 from GEMS_TCO import data_preprocess, data_preprocess as dmbh
 from GEMS_TCO import orderings as _orderings 
-from GEMS_TCO import alg_optimization, alg_opt_Encoder
+from GEMS_TCO import alg_optimization
 from GEMS_TCO import configuration as config
 from GEMS_TCO.data_loader import load_data2
 
