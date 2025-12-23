@@ -98,6 +98,9 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_122325.py
     --no-keep-exact-loc
 ```
 
+
+
+``` cd ./jobscript/tco/gp_exercise ```
 ```  nano fit_vecc_gpu2_122325.sh  ``` 
 ```  sbatch fit_vecc_gpu2_122325.sh  ``` 
 
@@ -105,14 +108,15 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_122325.py
 ```
 #!/bin/bash
 #SBATCH --job-name=fit_vecc_high
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_vecc_high.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_vecc_high.err
+#SBATCH --output=/home/jl2815/tco/exercise_output/fit_vecc_high_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/fit_vecc_high_%j.err
 #SBATCH --time=48:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=64G                      # 고성능 노드들이라 메모리 넉넉합니다.
-#SBATCH --partition=gpu                 # 'gpu' 파티션 사용
-#SBATCH --gres=gpu:1                    # GPU 1개 요청
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=120G
+#SBATCH --partition=gpu-redhat           # 💥 파티션 이름 확인 필요
+#SBATCH --gres=gpu:1
+#SBATCH --nodelist=gpu032               # 💥 확인하신 idle 노드 중 하나 입력
 
 #### Load Modules
 module purge
@@ -124,19 +128,21 @@ module load cuda/12.1.0
 eval "$(conda shell.bash hook)"
 conda activate faiss_env
 
-echo "Running on High-End Node: $(hostname)"
+echo "Running on High-End AdaLovelace Node: $(hostname)"
 nvidia-smi
 
 # Run the script
-# A100/V100급이므로 nheads 1000으로 과감하게 갑니다.
-srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_122325.py\
+srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_122325.py \
     --v 0.5 \
     --space "1, 1" \
     --days "0,31" \
     --mm-cond-number 16 \
-    --nheads 300 \
+    --nheads 1000 \
     --no-keep-exact-loc
+
 ```
+
+
 
 
 

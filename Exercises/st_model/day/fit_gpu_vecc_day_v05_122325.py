@@ -187,8 +187,9 @@ def cli(
                 rmsre=0.0 # Real data
             )
             
+            date = '122325'
             # 파일명 설정 (real_vecc_summary...)
-            common_filename = f"real_vecc_summary_mm{mm_cond_number}_LBFGS_{grid_res}"
+            common_filename = f"real_vecc_summary_mm{mm_cond_number}_{date}"
             
             # 1. JSON 저장
             json_filepath = output_path / f"{common_filename}.json"
