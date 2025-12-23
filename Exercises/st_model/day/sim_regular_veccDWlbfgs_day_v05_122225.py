@@ -74,9 +74,15 @@ def generate_exact_gems_field(lat_coords, lon_coords, t_steps, params, device, d
     
     return field_sim[:Nx, :Ny, :Nt]
 
-# [중요] Regular Grid 시뮬레이션에서는 make_target_grid가 필요 없거나,
-# 시뮬레이션 그리드 자체가 타겟 그리드가 됩니다.
-# 여기서는 시뮬레이션 좌표를 그대로 사용하므로 별도의 Regularization 과정이 생략됩니다.
+def make_target_grid(lat_start, lat_end, lat_step, lon_start, lon_end, lon_step, device, dtype):
+    lats = torch.arange(lat_start, lat_end - 0.0001, lat_step, device=device, dtype=dtype)
+    lats = torch.round(lats * 10000) / 10000
+    lons = torch.arange(lon_start, lon_end - 0.0001, lon_step, device=device, dtype=dtype)
+    lons = torch.round(lons * 10000) / 10000
+    grid_lat, grid_lon = torch.meshgrid(lats, lons, indexing='ij')
+    return torch.stack([grid_lat.flatten(), grid_lon.flatten()], dim=1), len(lats), len(lons)
+
+# [NOTE] coarse_by_center_tensor is REMOVED/SKIPPED for Regular Grid Simulation
 
 def get_spatial_ordering(input_maps, mm_cond_number=10):
     key_list = list(input_maps.keys())
@@ -98,17 +104,20 @@ def calculate_original_scale_metrics(est_params, true_init_dict):
         est_params = est_params[:7]
 
     est_t = torch.tensor(est_params, device='cpu', dtype=torch.float64).flatten()
-    phi1, phi2 = torch.exp(est_t[0]), torch.exp(est_t[1])
-    phi3, phi4 = torch.exp(est_t[2]), torch.exp(est_t[3])
-    adv_lat, adv_lon = est_t[4], est_t[5]
-    nugget = torch.exp(est_t[6])
+    
+    # 🟢 [변수명 에러 수정됨] adv_lat -> adv_lat_e
+    phi1_e, phi2_e = torch.exp(est_t[0]), torch.exp(est_t[1])
+    phi3_e, phi4_e = torch.exp(est_t[2]), torch.exp(est_t[3])
+    adv_lat_e, adv_lon_e = est_t[4], est_t[5]  
+    nugget_e = torch.exp(est_t[6])
 
-    sigmasq_e = phi1 / phi2
-    range_lon_e = 1.0 / phi2
-    range_lat_e = range_lon_e / torch.sqrt(phi3)
-    range_time_e = range_lon_e / torch.sqrt(phi4)
+    sigmasq_e = phi1_e / phi2_e
+    range_lon_e = 1.0 / phi2_e
+    range_lat_e = range_lon_e / torch.sqrt(phi3_e)
+    range_time_e = range_lon_e / torch.sqrt(phi4_e)
 
-    est_array = torch.stack([sigmasq_e, range_lat_e, range_lon_e, range_time_e, adv_lat_e, adv_lon_e, nugget])
+    est_array = torch.stack([sigmasq_e, range_lat_e, range_lon_e, range_time_e, adv_lat_e, adv_lon_e, nugget_e])
+    
     true_array = torch.tensor([
         true_init_dict['sigmasq'], true_init_dict['range_lat'], true_init_dict['range_lon'],
         true_init_dict['range_time'], true_init_dict['advec_lat'], true_init_dict['advec_lon'], 
@@ -132,18 +141,27 @@ def cli(
     DEVICE = torch.device("cpu")
     DTYPE= torch.float32 if DEVICE.type == 'mps' else torch.float64
 
+    # 🟢 [상수 복구]
+    LOC_ERR_STD = 0.02
     OZONE_MEAN = 260.0
-    
+    LBFGS_LR = 1.0
+    LBFGS_MAX_STEPS = 10      # 10 to 20  
+    LBFGS_HISTORY_SIZE = 100   
+    LBFGS_MAX_EVAL = 100       # line search from 50 to 80
+    DWL_MAX_STEPS = 20         
+    LAT_COL, LON_COL, VAL_COL, TIME_COL = 0, 1, 2, 3
+
+    # Regular Simulation Parameters
     true_params_dict = {
         'sigmasq': 13.059, 'range_lat': 0.154, 'range_lon': 0.195,
-        'range_time': 1.0, 'advec_lat': 0.042, 'advec_lon': -0.1689, 'nugget': 0.247
+        'range_time': 0.7, 'advec_lat': 0.0218, 'advec_lon': -0.1689, 'nugget': 0.247
     }
 
     init_sigmasq   = 13.059
-    init_range_lon = 0.195 
     init_range_lat = 0.154 
-    init_advec_lat = 0.042
-    init_range_time = 1.0
+    init_range_lon = 0.195
+    init_advec_lat = 0.0218
+    init_range_time = 0.7
     init_advec_lon = -0.1689
     init_nugget    = 0.247
 
@@ -160,8 +178,7 @@ def cli(
     dw_norm_list = []
     vecc_norm_list = []
 
-    # Simulation Grid (Regular Grid)
-    # [주의] Regular Simulation은 이 좌표 자체가 Grid이므로 Perturbation 없이 사용
+    # Simulation Grid (Also serves as the Target Grid in Regular Sim)
     lats_sim = torch.arange(0, 5.0 + 0.001, 0.044, device=DEVICE, dtype=DTYPE)
     lons_sim = torch.arange(123.0, 133.0 + 0.001, 0.063, device=DEVICE, dtype=DTYPE)
     lats_flip = torch.flip(lats_sim, dims=[0])
@@ -174,12 +191,12 @@ def cli(
     for num_iter in range(num_iters):
         print(f"\n================ Iteration {num_iter+1}/{num_iters} [REGULAR] ================")
 
-        # 🟢 [Step 1] 파라미터 초기화
+        # 🟢 [Step 1] 파라미터 초기화 (매번 새로 생성 -> 오염 방지)
         params_gen = [torch.tensor([val], device=DEVICE, dtype=DTYPE) for val in initial_vals_numpy]
         params_list_dw = [torch.tensor([val], device=DEVICE, dtype=DTYPE, requires_grad=True) for val in initial_vals_numpy]
         params_list_vecc = [torch.tensor([val], device=DEVICE, dtype=DTYPE, requires_grad=True) for val in initial_vals_numpy]
 
-        # 🟢 [Step 2] 데이터 생성 (True Params 사용)
+        # 🟢 [Step 2] 데이터 생성 (Regular Grid)
         t_def = 8
         print("1. Generating True Field (Regular)...")
         sim_field = generate_exact_gems_field(lats_sim, lons_sim, t_def, params_gen, DEVICE, DTYPE)
@@ -193,25 +210,24 @@ def cli(
             field_t_flipped = torch.flip(field_t, dims=[0, 1]) 
             flat_vals = field_t_flipped.flatten()
             
-            # [Reg 차이점] Location Perturbation 없음! (Regular Grid 유지)
-            # obs_vals = flat_vals + Noise + Mean
+            # 🟢 [Regular 특징] 위치 섭동(Perturbation) 없음! 정규 격자 유지
             obs_vals = flat_vals + (torch.randn_like(flat_vals) * nugget_std) + OZONE_MEAN
             
-            # 좌표는 Perturbation 없는 정규 격자 그대로 사용
             time_val = 21.0 + t
             flat_times = torch.full_like(flat_lats, time_val)
             
-            # (Lat, Lon) 그대로 Stack
+            # (Lat, Lon) 그대로 Stack (노이즈 추가 안함)
             row_tensor = torch.stack([flat_lats, flat_lons, obs_vals, flat_times], dim=1)
+            
+            clean_tensor = row_tensor.detach()
             key_str = f'2024_07_y24m07day01_hm{t:02d}:53'
-            input_map[key_str] = row_tensor.detach()
-            aggregated_list.append(input_map[key_str])
+            input_map[key_str] = clean_tensor
+            aggregated_list.append(clean_tensor)
 
         aggregated_data = torch.cat(aggregated_list, dim=0)
 
         # 🟢 [Step 3] Regularization 생략 (이미 Regular Grid임)
-        # coarse_by_center_tensor 호출 안 함.
-        # input_map, aggregated_data 그대로 사용.
+        # coarsening 과정 없이 바로 사용
 
         # Ordering
         ord_mm, nns_map = get_spatial_ordering(input_map, mm_cond_number=mm_cond_number)
@@ -233,11 +249,12 @@ def cli(
             params_list=params_list_dw, lat_range=[0,5], lon_range=[123.0, 133.0]
         )
         cur_df = db.generate_spatially_filtered_days(0, 5, 123, 133)
-        time_slices_list = [cur_df[cur_df[:, 3] == t_val] for t_val in torch.unique(cur_df[:, 3])]
+        time_slices_list = [cur_df[cur_df[:, TIME_COL] == t_val] for t_val in torch.unique(cur_df[:, TIME_COL])]
 
         J_vec, n1, n2, p_time, taper_grid = dwl.generate_Jvector_tapered( 
             time_slices_list, tapering_func=TAPERING_FUNC, 
-            lat_col=0, lon_col=1, val_col=2, device=DEVICE
+            lat_col=LAT_COL, lon_col=LON_COL, val_col=VAL_COL,
+            device=DEVICE
         )
         
         I_sample = dwl.calculate_sample_periodogram_vectorized(J_vec)
@@ -252,7 +269,7 @@ def cli(
             params_list=params_list_dw,
             optimizer=optimizer_dw,
             I_sample=I_sample, n1=n1, n2=n2, p_time=p_time,
-            taper_autocorr_grid=taper_autocorr_grid, max_steps=20, device=DEVICE
+            taper_autocorr_grid=taper_autocorr_grid, max_steps=DWL_MAX_STEPS, device=DEVICE
         )
 
         # DW Save (Filename: sim_reg_dw...)
@@ -263,7 +280,7 @@ def cli(
         a_date = '1222'
         grid_res = int(aggregated_data.shape[0] / 8)
         
-        # 🟢 [파일명 변경] irre -> reg
+        # 🟢 [파일명 확인] sim_reg_dw
         input_filepath_dw = output_path / f"sim_reg_dw_{a_date}_{grid_res}.json"
         
         res_dw = alg_optimization(
@@ -276,7 +293,7 @@ def cli(
         with input_filepath_dw.open('w', encoding='utf-8') as f:
             json.dump(current_data, f, separators=(",", ":"), indent=4)
         
-        # 🟢 [파일명 변경] irre -> reg
+        # 🟢 [파일명 확인] sim_reg_dW
         pd.DataFrame(current_data).to_csv(input_path / f"sim_reg_dW_v{int(v*100):03d}_{a_date}_{grid_res}.csv", index=False)
 
 
@@ -291,12 +308,13 @@ def cli(
         )
 
         optimizer_vecc = model_instance.set_optimizer(
-            params_list_vecc, lr=1.0, max_iter=100, history_size=100 
+            params_list_vecc, lr=LBFGS_LR, max_iter=LBFGS_MAX_EVAL, 
+            history_size=LBFGS_HISTORY_SIZE
         )
 
         start_time = time.time()
         out, steps_ran = model_instance.fit_vecc_lbfgs(
-            params_list_vecc, optimizer_vecc, max_steps=7, grad_tol=1e-7
+            params_list_vecc, optimizer_vecc, max_steps=LBFGS_MAX_STEPS, grad_tol=1e-7
         )
         epoch_time = time.time() - start_time
         
@@ -304,7 +322,7 @@ def cli(
         print(f"Vecchia RMSRE: {rmsre_vecc:.2f}%")
 
         # Vecc Save (Filename: sim_reg_vecc...)
-        # 🟢 [파일명 변경] irre -> reg
+        # 🟢 [파일명 확인] sim_reg_vecc
         input_filepath_vecc = output_path / f"sim_reg_vecc_{a_date}_{grid_res}.json"
         
         res_vecc = alg_optimization(
@@ -317,7 +335,7 @@ def cli(
         with input_filepath_vecc.open('w', encoding='utf-8') as f:
             json.dump(current_data_vecc, f, separators=(",", ":"), indent=4)
         
-        # 🟢 [파일명 변경] irre -> reg
+        # 🟢 [파일명 확인] sim_reg_vecc
         pd.DataFrame(current_data_vecc).to_csv(input_path / f"sim_reg_vecc_{a_date}_v{int(v*100):03d}_LBFGS_{grid_res}.csv", index=False)
 
         dw_norm_list.append(rmsre_dw)
@@ -326,5 +344,3 @@ def cli(
 
 if __name__ == "__main__":
     app()
-
-

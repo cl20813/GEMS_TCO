@@ -19,7 +19,6 @@ from sklearn.neighbors import BallTree
 import typer
 
 # --- Custom Imports ---
-# (경로는 사용자 환경에 맞게 유지)
 sys.path.append("/cache/home/jl2815/tco") 
 
 from GEMS_TCO import kernels_reparam_space_time_gpu_122225 as kernels_reparam_space_time
@@ -29,7 +28,7 @@ from GEMS_TCO import configuration as config
 from GEMS_TCO.data_loader import load_data2, exact_location_filter
 from GEMS_TCO import debiased_whittle
 
-# 🟢 [Import] GEMS_TCO/__init__.py 에 정의된 클래스 가져오기
+# 🟢 [Import] GEMS_TCO classes
 from GEMS_TCO import alg_optimization, BaseLogger
 
 app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
@@ -112,23 +111,24 @@ def get_spatial_ordering(input_maps, mm_cond_number=10):
     return ord_mm, [nns_map_dict[i] for i in range(len(nns_map_dict))]
 
 def calculate_original_scale_metrics(est_params, true_init_dict):
-    # est_params에 loss가 포함되어 있다면 제거하고 계산
-    # (일반적으로 파라미터 7개 + Loss 1개 = 8개)
     if len(est_params) > 7:
         est_params = est_params[:7]
 
     est_t = torch.tensor(est_params, device='cpu', dtype=torch.float64).flatten()
-    phi1, phi2 = torch.exp(est_t[0]), torch.exp(est_t[1])
-    phi3, phi4 = torch.exp(est_t[2]), torch.exp(est_t[3])
-    adv_lat, adv_lon = est_t[4], est_t[5]
-    nugget = torch.exp(est_t[6])
+    
+    # 🟢 [Fix] Variable naming consistency
+    phi1_e, phi2_e = torch.exp(est_t[0]), torch.exp(est_t[1])
+    phi3_e, phi4_e = torch.exp(est_t[2]), torch.exp(est_t[3])
+    adv_lat_e, adv_lon_e = est_t[4], est_t[5]  
+    nugget_e = torch.exp(est_t[6])
 
-    sigmasq_e = phi1 / phi2
-    range_lon_e = 1.0 / phi2
-    range_lat_e = range_lon_e / torch.sqrt(phi3)
-    range_time_e = range_lon_e / torch.sqrt(phi4)
+    sigmasq_e = phi1_e / phi2_e
+    range_lon_e = 1.0 / phi2_e
+    range_lat_e = range_lon_e / torch.sqrt(phi3_e)
+    range_time_e = range_lon_e / torch.sqrt(phi4_e)
 
-    est_array = torch.stack([sigmasq_e, range_lat_e, range_lon_e, range_time_e, adv_lat_e, adv_lon_e, nugget])
+    est_array = torch.stack([sigmasq_e, range_lat_e, range_lon_e, range_time_e, adv_lat_e, adv_lon_e, nugget_e])
+    
     true_array = torch.tensor([
         true_init_dict['sigmasq'], true_init_dict['range_lat'], true_init_dict['range_lon'],
         true_init_dict['range_time'], true_init_dict['advec_lat'], true_init_dict['advec_lon'], 
@@ -155,12 +155,19 @@ def cli(
     LOC_ERR_STD = 0.02
     OZONE_MEAN = 260.0
     
+    # 🟢 [Constants Defined]
+    LBFGS_LR = 1.0
+    LBFGS_MAX_STEPS = 10      
+    LBFGS_HISTORY_SIZE = 100   
+    LBFGS_MAX_EVAL = 100       
+    DWL_MAX_STEPS = 20         
+    LAT_COL, LON_COL, VAL_COL, TIME_COL = 0, 1, 2, 3
+
     true_params_dict = {
         'sigmasq': 13.059, 'range_lat': 0.154, 'range_lon': 0.195,
         'range_time': 1.0, 'advec_lat': 0.042, 'advec_lon': -0.1689, 'nugget': 0.247
     }
 
-    # Initial Guesses (Starting Points)
     init_sigmasq   = 13.059
     init_range_lon = 0.195 
     init_range_lat = 0.154 
@@ -182,7 +189,7 @@ def cli(
     dw_norm_list = []
     vecc_norm_list = []
 
-    # Simulation Grid (Fixed)
+    # Simulation Grid
     lats_sim = torch.arange(0, 5.0 + 0.001, 0.044, device=DEVICE, dtype=DTYPE)
     lons_sim = torch.arange(123.0, 133.0 + 0.001, 0.063, device=DEVICE, dtype=DTYPE)
     lats_flip = torch.flip(lats_sim, dims=[0])
@@ -191,7 +198,7 @@ def cli(
     flat_lats = grid_lat.flatten()
     flat_lons = grid_lon.flatten()
     
-    # Target Grid (Fixed)
+    # Target Grid
     step_lat = 0.044
     step_lon = 0.063
     target_grid, Nx_reg, Ny_reg = make_target_grid(
@@ -202,14 +209,14 @@ def cli(
 
     num_iters = 100
     for num_iter in range(num_iters):
-        print(f"\n================ Iteration {num_iter+1}/{num_iters} ================")
+        print(f"\n================ Iteration {num_iter+1}/{num_iters} [IRREGULAR] ================")
 
-        # 🟢 [Step 1] 파라미터 초기화 (매번 같은 시작점, 새로운 텐서)
+        # 🟢 [Step 1] Fresh Parameters
         params_gen = [torch.tensor([val], device=DEVICE, dtype=DTYPE) for val in initial_vals_numpy]
         params_list_dw = [torch.tensor([val], device=DEVICE, dtype=DTYPE, requires_grad=True) for val in initial_vals_numpy]
         params_list_vecc = [torch.tensor([val], device=DEVICE, dtype=DTYPE, requires_grad=True) for val in initial_vals_numpy]
 
-        # 🟢 [Step 2] 데이터 생성 (True Params 사용)
+        # 🟢 [Step 2] Data Generation (Irregular Data)
         t_def = 8
         print("1. Generating True Field...")
         sim_field = generate_exact_gems_field(lats_sim, lons_sim, t_def, params_gen, DEVICE, DTYPE)
@@ -225,6 +232,7 @@ def cli(
             
             obs_vals = flat_vals + (torch.randn_like(flat_vals) * nugget_std) + OZONE_MEAN
             
+            # 🟢 [Irregular Feature] Perturbation Added
             lat_noise = torch.randn_like(flat_lats) * LOC_ERR_STD
             lon_noise = torch.randn_like(flat_lons) * LOC_ERR_STD
             perturbed_lats = flat_lats + lat_noise
@@ -240,11 +248,10 @@ def cli(
 
         aggregated_data = torch.cat(aggregated_list, dim=0)
 
-        # 🟢 [Step 3] Regularization
+        # 🟢 [Step 3] Regularization (Irregular -> Regular)
         coarse_map = coarse_by_center_tensor(input_map, target_grid)
         coarse_aggregated_data = torch.cat(list(coarse_map.values()), dim=0)
 
-        # 데이터 업데이트
         input_map = coarse_map
         aggregated_data = coarse_aggregated_data
         
@@ -253,109 +260,122 @@ def cli(
         mm_input_map = {key: val[ord_mm] for key, val in input_map.items()}
 
         # ------------------------------------------------------------------
-        # STEP 4: Debiased Whittle Optimization
+        # 🟢 [TRY-EXCEPT Scope Extended]
+        #    Covers DW Opt -> Save -> Vecc Opt -> Save
         # ------------------------------------------------------------------
-        print(f"\n--- Debiased Whittle Optimization ---")
-        
-        dwl = debiased_whittle.debiased_whittle_likelihood()
-        TAPERING_FUNC = dwl.cgn_hamming 
-        
-        # 최신 데이터 주입
-        daily_aggregated_tensors_dw = [aggregated_data]
-        daily_hourly_maps_dw = [input_map]
-        
-        db = debiased_whittle.debiased_whittle_preprocess(
-            daily_aggregated_tensors_dw, daily_hourly_maps_dw, day_idx=0,
-            params_list=params_list_dw, lat_range=[0,5], lon_range=[123.0, 133.0]
-        )
-        cur_df = db.generate_spatially_filtered_days(0, 5, 123, 133)
-        time_slices_list = [cur_df[cur_df[:, 3] == t_val] for t_val in torch.unique(cur_df[:, 3])]
+        try:
+            # ------------------------------------------------------------------
+            # STEP 4: Debiased Whittle Optimization
+            # ------------------------------------------------------------------
+            print(f"\n--- Debiased Whittle Optimization ---")
+            
+            dwl = debiased_whittle.debiased_whittle_likelihood()
+            TAPERING_FUNC = dwl.cgn_hamming 
+            
+            daily_aggregated_tensors_dw = [aggregated_data]
+            daily_hourly_maps_dw = [input_map]
+            
+            db = debiased_whittle.debiased_whittle_preprocess(
+                daily_aggregated_tensors_dw, daily_hourly_maps_dw, day_idx=0,
+                params_list=params_list_dw, lat_range=[0,5], lon_range=[123.0, 133.0]
+            )
+            cur_df = db.generate_spatially_filtered_days(0, 5, 123, 133)
+            time_slices_list = [cur_df[cur_df[:, TIME_COL] == t_val] for t_val in torch.unique(cur_df[:, TIME_COL])]
 
-        J_vec, n1, n2, p_time, taper_grid = dwl.generate_Jvector_tapered( 
-            time_slices_list, tapering_func=TAPERING_FUNC, 
-            lat_col=0, lon_col=1, val_col=2, device=DEVICE
-        )
-        
-        I_sample = dwl.calculate_sample_periodogram_vectorized(J_vec)
-        taper_autocorr_grid = dwl.calculate_taper_autocorrelation_fft(taper_grid, n1, n2, DEVICE)
+            J_vec, n1, n2, p_time, taper_grid = dwl.generate_Jvector_tapered( 
+                time_slices_list, tapering_func=TAPERING_FUNC, 
+                lat_col=LAT_COL, lon_col=LON_COL, val_col=VAL_COL,
+                device=DEVICE
+            )
+            
+            I_sample = dwl.calculate_sample_periodogram_vectorized(J_vec)
+            taper_autocorr_grid = dwl.calculate_taper_autocorrelation_fft(taper_grid, n1, n2, DEVICE)
 
-        optimizer_dw = torch.optim.LBFGS(
-            params_list_dw, lr=1.0, max_iter=20, history_size=100, 
-            line_search_fn="strong_wolfe", tolerance_grad=1e-5
-        )
+            optimizer_dw = torch.optim.LBFGS(
+                params_list_dw, lr=1.0, max_iter=20, history_size=100, 
+                line_search_fn="strong_wolfe", tolerance_grad=1e-5
+            )
 
-        nat_str, phi_str, raw_str, loss, steps = dwl.run_lbfgs_tapered(
-            params_list=params_list_dw,
-            optimizer=optimizer_dw,
-            I_sample=I_sample, n1=n1, n2=n2, p_time=p_time,
-            taper_autocorr_grid=taper_autocorr_grid, max_steps=DWL_MAX_STEPS, device=DEVICE
-        )
+            # [DW Run] Raises exception on numerical failure
+            nat_str, phi_str, raw_str, loss, steps = dwl.run_lbfgs_tapered(
+                params_list=params_list_dw,
+                optimizer=optimizer_dw,
+                I_sample=I_sample, n1=n1, n2=n2, p_time=p_time,
+                taper_autocorr_grid=taper_autocorr_grid, max_steps=DWL_MAX_STEPS, device=DEVICE
+            )
 
-        # DW Save
-        dw_estimates_values = [p.item() for p in params_list_dw]
-        dw_estimates_loss = dw_estimates_values + [loss]
-        rmsre_dw = calculate_original_scale_metrics(dw_estimates_values, true_params_dict)
+            # [DW Save]
+            dw_estimates_values = [p.item() for p in params_list_dw]
+            dw_estimates_loss = dw_estimates_values + [loss]
+            rmsre_dw = calculate_original_scale_metrics(dw_estimates_values, true_params_dict)
 
-        a_date = '1222'
-        grid_res = int(aggregated_data.shape[0] / 8) # 정수형 변환 (파일명 깔끔하게)
-        
-        input_filepath_dw = output_path / f"sim_irre_dw_{a_date}_{grid_res}.json"
-        
-        res_dw = alg_optimization(
-            day=f"2024-07-01", cov_name=f"DW_{num_iter}", space_size=grid_res,
-            lr=lr, params=dw_estimates_loss, time=0, rmsre=rmsre_dw
-        )
-        
-        current_data = BaseLogger.load_list(input_filepath_dw)
-        current_data.append(res_dw.__dict__)
-        with input_filepath_dw.open('w', encoding='utf-8') as f:
-            json.dump(current_data, f, separators=(",", ":"), indent=4)
-        pd.DataFrame(current_data).to_csv(input_path / f"sim_irre_dW_v{int(v*100):03d}_{a_date}_{grid_res}.csv", index=False)
+            a_date = '1222'
+            grid_res = int(aggregated_data.shape[0] / 8)
+            
+            # Filename: irre
+            input_filepath_dw = output_path / f"sim_irre_dw_{a_date}_{grid_res}.json"
+            
+            res_dw = alg_optimization(
+                day=f"2024-07-01", cov_name=f"DW_{num_iter}", space_size=grid_res,
+                lr=lr, params=dw_estimates_loss, time=0, rmsre=rmsre_dw
+            )
+            
+            current_data = BaseLogger.load_list(input_filepath_dw)
+            current_data.append(res_dw.__dict__)
+            with input_filepath_dw.open('w', encoding='utf-8') as f:
+                json.dump(current_data, f, separators=(",", ":"), indent=4)
+            pd.DataFrame(current_data).to_csv(input_path / f"sim_irre_dW_v{int(v*100):03d}_{a_date}_{grid_res}.csv", index=False)
 
+
+            # ------------------------------------------------------------------
+            # STEP 5: Vecchia Optimization (Only runs if DW passed)
+            # ------------------------------------------------------------------
+            print(f"\n--- Vecchia Optimization ---")
+            
+            model_instance = kernels_reparam_space_time_gpu.fit_vecchia_lbfgs(
+                smooth=v, input_map=mm_input_map, aggregated_data=aggregated_data,
+                nns_map=nns_map, mm_cond_number=mm_cond_number, nheads=nheads
+            )
+
+            optimizer_vecc = model_instance.set_optimizer(
+                params_list_vecc, lr=LBFGS_LR, max_iter=LBFGS_MAX_EVAL, 
+                history_size=LBFGS_HISTORY_SIZE
+            )
+
+            start_time = time.time()
+            out, steps_ran = model_instance.fit_vecc_lbfgs(
+                params_list_vecc, optimizer_vecc, max_steps=LBFGS_MAX_STEPS, grad_tol=1e-7
+            )
+            epoch_time = time.time() - start_time
+            
+            rmsre_vecc = calculate_original_scale_metrics(out, true_params_dict)
+            print(f"Vecchia RMSRE: {rmsre_vecc:.2f}%")
+
+            # [Vecc Save]
+            # Filename: irre
+            input_filepath_vecc = output_path / f"sim_irre_vecc_{a_date}_{grid_res}.json"
+            
+            res_vecc = alg_optimization(
+                day=f"2024-07-01", cov_name=f"Vecc_{num_iter}", space_size=grid_res,
+                lr=lr, params=out, time=epoch_time, rmsre=rmsre_vecc
+            )
+            
+            current_data_vecc = BaseLogger.load_list(input_filepath_vecc)
+            current_data_vecc.append(res_vecc.__dict__)
+            with input_filepath_vecc.open('w', encoding='utf-8') as f:
+                json.dump(current_data_vecc, f, separators=(",", ":"), indent=4)
+            pd.DataFrame(current_data_vecc).to_csv(input_path / f"sim_irre_vecc_{a_date}_v{int(v*100):03d}_LBFGS_{grid_res}.csv", index=False)
+
+            dw_norm_list.append(rmsre_dw)
+            vecc_norm_list.append(rmsre_vecc)
+            print(f'Average DW Norm: {np.mean(dw_norm_list):.4f}, Vecc Norm: {np.mean(vecc_norm_list):.4f}')
 
         # ------------------------------------------------------------------
-        # STEP 5: Vecchia Optimization
+        # Exception Handling: Skip entire iteration if any step fails
         # ------------------------------------------------------------------
-        print(f"\n--- Vecchia Optimization ---")
-        
-        # 🟢 [중요] aggregated_data를 직접 주입 (이전 변수 참조 안함)
-        model_instance = kernels_reparam_space_time_gpu.fit_vecchia_lbfgs(
-            smooth=v, input_map=mm_input_map, aggregated_data=aggregated_data,
-            nns_map=nns_map, mm_cond_number=mm_cond_number, nheads=nheads
-        )
-
-        optimizer_vecc = model_instance.set_optimizer(
-            params_list_vecc, lr=1.0, max_iter=100, history_size=100 
-        )
-
-        start_time = time.time()
-        out, steps_ran = model_instance.fit_vecc_lbfgs(
-            params_list_vecc, optimizer_vecc, max_steps=7, grad_tol=1e-7
-        )
-        epoch_time = time.time() - start_time
-        
-        # [주의] out은 파라미터 리스트만 포함할 수도, Loss까지 포함할 수도 있음
-        # 안전하게 slicing 처리 (calculate_original_scale_metrics 함수 내부에서 처리함)
-        rmsre_vecc = calculate_original_scale_metrics(out, true_params_dict)
-        print(f"Vecchia RMSRE: {rmsre_vecc:.2f}%")
-
-        # Vecc Save
-        input_filepath_vecc = output_path / f"sim_irre_vecc_{a_date}_{grid_res}.json"
-        
-        res_vecc = alg_optimization(
-            day=f"2024-07-01", cov_name=f"Vecc_{num_iter}", space_size=grid_res,
-            lr=lr, params=out, time=epoch_time, rmsre=rmsre_vecc
-        )
-        
-        current_data_vecc = BaseLogger.load_list(input_filepath_vecc)
-        current_data_vecc.append(res_vecc.__dict__)
-        with input_filepath_vecc.open('w', encoding='utf-8') as f:
-            json.dump(current_data_vecc, f, separators=(",", ":"), indent=4)
-        pd.DataFrame(current_data_vecc).to_csv(input_path / f"sim_irre_vecc_{a_date}_v{int(v*100):03d}_LBFGS_{grid_res}.csv", index=False)
-
-        dw_norm_list.append(rmsre_dw)
-        vecc_norm_list.append(rmsre_vecc)
-        print(f'Average DW Norm: {np.mean(dw_norm_list):.4f}, Vecc Norm: {np.mean(vecc_norm_list):.4f}')
+        except Exception as e:
+            print(f"🔴 Iteration {num_iter+1} FAILED & SKIPPED due to error: {e}")
+            continue 
 
 if __name__ == "__main__":
     app()

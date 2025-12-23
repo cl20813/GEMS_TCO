@@ -104,14 +104,9 @@ echo "Node: $(hostname)"
 # Run the script
 srun python /home/jl2815/tco/exercise_25/st_model/sim_regular_veccDWlbfgs_day_v05_122225.py \
     --v 0.5 \
-    --lr 0.03 \
-    --step 80 \
-    --epochs 100 \
-    --space "1, 1" \
-    --days "20,30" \
     --mm-cond-number 16 \
     --nheads 300 \
-    --no-keep-exact-loc 
+
 
 echo "Current date and time: $(date)"
 
@@ -154,14 +149,8 @@ echo "Node: $(hostname)"
 # Run the script
 srun python /home/jl2815/tco/exercise_25/st_model/sim_irregular_veccDW_day_v05_122225.py \
     --v 0.5 \
-    --lr 0.03 \
-    --step 80 \
-    --epochs 100 \
-    --space "1, 1" \
-    --days "20,30" \
     --mm-cond-number 16 \
     --nheads 300 \
-    --no-keep-exact-loc 
 
 echo "Current date and time: $(date)"
 

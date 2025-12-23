@@ -849,6 +849,11 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         I_sample_dev = I_sample.to(device)
         taper_autocorr_grid_dev = taper_autocorr_grid.to(device) 
 
+
+        
+
+        # (debiased_whittle.py 내부의 run_lbfgs_tapered 메소드 안)
+
         def closure():
             optimizer.zero_grad()
             params_tensor = torch.cat(params_list) 
@@ -857,20 +862,23 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
                 params_tensor, I_sample_dev, n1, n2, p_time, taper_autocorr_grid_dev, DELTA_LAT, DELTA_LON
             )
             
-            if torch.isnan(loss) or torch.isinf(loss):
-                print("Loss is NaN/Inf inside closure. Returning.")
-                return loss 
+            # 1. Loss 자체가 NaN인 경우
+            if not torch.isfinite(loss):
+                print("⚠️ Loss is NaN/Inf inside closure.")
+                # 여기서 에러를 던져야 메인 루프의 except로 바로 점프합니다.
+                raise RuntimeError("Numerical Instability: Loss is NaN/Inf") 
             
             loss.backward()
-            
-            nan_grad = False
+    
+            # 2. 기울기(Gradient)가 NaN인 경우
             for param in params_list:
-                if param.grad is not None and (torch.isnan(param.grad).any() or torch.isinf(param.grad).any()):
-                    nan_grad = True; break
-            if nan_grad:
-                 print(f"Warning: NaN/Inf gradient detected. Zeroing grad.")
-                 optimizer.zero_grad() 
+                if param.grad is not None and not torch.isfinite(param.grad).all():
+                    print(f"⚠️ Warning: NaN/Inf gradient detected.")
+                    # 마찬가지로 즉시 에러 발생
+                    raise RuntimeError("Numerical Instability: Gradient is NaN/Inf")
+            
             return loss
+
         # --- End of closure ---
 
         for i in range(max_steps):
