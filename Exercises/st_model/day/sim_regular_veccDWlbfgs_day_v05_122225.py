@@ -74,27 +74,9 @@ def generate_exact_gems_field(lat_coords, lon_coords, t_steps, params, device, d
     
     return field_sim[:Nx, :Ny, :Nt]
 
-def make_target_grid(lat_start, lat_end, lat_step, lon_start, lon_end, lon_step, device, dtype):
-    lats = torch.arange(lat_start, lat_end - 0.0001, lat_step, device=device, dtype=dtype)
-    lats = torch.round(lats * 10000) / 10000
-    lons = torch.arange(lon_start, lon_end - 0.0001, lon_step, device=device, dtype=dtype)
-    lons = torch.round(lons * 10000) / 10000
-    grid_lat, grid_lon = torch.meshgrid(lats, lons, indexing='ij')
-    return torch.stack([grid_lat.flatten(), grid_lon.flatten()], dim=1), len(lats), len(lons)
-
-def coarse_by_center_tensor(input_map_tensors, target_grid_tensor):
-    coarse_map = {}
-    query_points_rad = np.radians(target_grid_tensor.cpu().numpy())
-    for key, val_tensor in input_map_tensors.items():
-        source_locs_rad = np.radians(val_tensor[:, :2].cpu().numpy())
-        tree = BallTree(source_locs_rad, metric='haversine')
-        _, ind = tree.query(query_points_rad, k=1)
-        indices_tensor = torch.tensor(ind.flatten(), device=val_tensor.device, dtype=torch.long)
-        coarse_map[key] = torch.stack([
-            target_grid_tensor[:, 0], target_grid_tensor[:, 1],
-            val_tensor[indices_tensor, 2], val_tensor[indices_tensor, 3]
-        ], dim=1)
-    return coarse_map
+# [중요] Regular Grid 시뮬레이션에서는 make_target_grid가 필요 없거나,
+# 시뮬레이션 그리드 자체가 타겟 그리드가 됩니다.
+# 여기서는 시뮬레이션 좌표를 그대로 사용하므로 별도의 Regularization 과정이 생략됩니다.
 
 def get_spatial_ordering(input_maps, mm_cond_number=10):
     key_list = list(input_maps.keys())
@@ -112,8 +94,6 @@ def get_spatial_ordering(input_maps, mm_cond_number=10):
     return ord_mm, [nns_map_dict[i] for i in range(len(nns_map_dict))]
 
 def calculate_original_scale_metrics(est_params, true_init_dict):
-    # est_params에 loss가 포함되어 있다면 제거하고 계산
-    # (일반적으로 파라미터 7개 + Loss 1개 = 8개)
     if len(est_params) > 7:
         est_params = est_params[:7]
 
@@ -152,7 +132,6 @@ def cli(
     DEVICE = torch.device("cpu")
     DTYPE= torch.float32 if DEVICE.type == 'mps' else torch.float64
 
-    LOC_ERR_STD = 0.02
     OZONE_MEAN = 260.0
     
     true_params_dict = {
@@ -160,7 +139,6 @@ def cli(
         'range_time': 1.0, 'advec_lat': 0.042, 'advec_lon': -0.1689, 'nugget': 0.247
     }
 
-    # Initial Guesses (Starting Points)
     init_sigmasq   = 13.059
     init_range_lon = 0.195 
     init_range_lat = 0.154 
@@ -182,7 +160,8 @@ def cli(
     dw_norm_list = []
     vecc_norm_list = []
 
-    # Simulation Grid (Fixed)
+    # Simulation Grid (Regular Grid)
+    # [주의] Regular Simulation은 이 좌표 자체가 Grid이므로 Perturbation 없이 사용
     lats_sim = torch.arange(0, 5.0 + 0.001, 0.044, device=DEVICE, dtype=DTYPE)
     lons_sim = torch.arange(123.0, 133.0 + 0.001, 0.063, device=DEVICE, dtype=DTYPE)
     lats_flip = torch.flip(lats_sim, dims=[0])
@@ -191,27 +170,18 @@ def cli(
     flat_lats = grid_lat.flatten()
     flat_lons = grid_lon.flatten()
     
-    # Target Grid (Fixed)
-    step_lat = 0.044
-    step_lon = 0.063
-    target_grid, Nx_reg, Ny_reg = make_target_grid(
-        lat_start=5.0, lat_end=0.0, lat_step=-step_lat,
-        lon_start=133.0, lon_end=123.0, lon_step=-step_lon,
-        device=DEVICE, dtype=DTYPE
-    )
-
     num_iters = 100
     for num_iter in range(num_iters):
-        print(f"\n================ Iteration {num_iter+1}/{num_iters} ================")
+        print(f"\n================ Iteration {num_iter+1}/{num_iters} [REGULAR] ================")
 
-        # 🟢 [Step 1] 파라미터 초기화 (매번 같은 시작점, 새로운 텐서)
+        # 🟢 [Step 1] 파라미터 초기화
         params_gen = [torch.tensor([val], device=DEVICE, dtype=DTYPE) for val in initial_vals_numpy]
         params_list_dw = [torch.tensor([val], device=DEVICE, dtype=DTYPE, requires_grad=True) for val in initial_vals_numpy]
         params_list_vecc = [torch.tensor([val], device=DEVICE, dtype=DTYPE, requires_grad=True) for val in initial_vals_numpy]
 
         # 🟢 [Step 2] 데이터 생성 (True Params 사용)
         t_def = 8
-        print("1. Generating True Field...")
+        print("1. Generating True Field (Regular)...")
         sim_field = generate_exact_gems_field(lats_sim, lons_sim, t_def, params_gen, DEVICE, DTYPE)
         
         input_map = {}
@@ -223,31 +193,26 @@ def cli(
             field_t_flipped = torch.flip(field_t, dims=[0, 1]) 
             flat_vals = field_t_flipped.flatten()
             
+            # [Reg 차이점] Location Perturbation 없음! (Regular Grid 유지)
+            # obs_vals = flat_vals + Noise + Mean
             obs_vals = flat_vals + (torch.randn_like(flat_vals) * nugget_std) + OZONE_MEAN
             
-            lat_noise = torch.randn_like(flat_lats) * LOC_ERR_STD
-            lon_noise = torch.randn_like(flat_lons) * LOC_ERR_STD
-            perturbed_lats = flat_lats + lat_noise
-            perturbed_lons = flat_lons + lon_noise
-
+            # 좌표는 Perturbation 없는 정규 격자 그대로 사용
             time_val = 21.0 + t
             flat_times = torch.full_like(flat_lats, time_val)
             
-            row_tensor = torch.stack([perturbed_lats, perturbed_lons, obs_vals, flat_times], dim=1)
+            # (Lat, Lon) 그대로 Stack
+            row_tensor = torch.stack([flat_lats, flat_lons, obs_vals, flat_times], dim=1)
             key_str = f'2024_07_y24m07day01_hm{t:02d}:53'
             input_map[key_str] = row_tensor.detach()
             aggregated_list.append(input_map[key_str])
 
         aggregated_data = torch.cat(aggregated_list, dim=0)
 
-        # 🟢 [Step 3] Regularization
-        coarse_map = coarse_by_center_tensor(input_map, target_grid)
-        coarse_aggregated_data = torch.cat(list(coarse_map.values()), dim=0)
+        # 🟢 [Step 3] Regularization 생략 (이미 Regular Grid임)
+        # coarse_by_center_tensor 호출 안 함.
+        # input_map, aggregated_data 그대로 사용.
 
-        # 데이터 업데이트
-        input_map = coarse_map
-        aggregated_data = coarse_aggregated_data
-        
         # Ordering
         ord_mm, nns_map = get_spatial_ordering(input_map, mm_cond_number=mm_cond_number)
         mm_input_map = {key: val[ord_mm] for key, val in input_map.items()}
@@ -260,7 +225,6 @@ def cli(
         dwl = debiased_whittle.debiased_whittle_likelihood()
         TAPERING_FUNC = dwl.cgn_hamming 
         
-        # 최신 데이터 주입
         daily_aggregated_tensors_dw = [aggregated_data]
         daily_hourly_maps_dw = [input_map]
         
@@ -288,18 +252,19 @@ def cli(
             params_list=params_list_dw,
             optimizer=optimizer_dw,
             I_sample=I_sample, n1=n1, n2=n2, p_time=p_time,
-            taper_autocorr_grid=taper_autocorr_grid, max_steps=DWL_MAX_STEPS, device=DEVICE
+            taper_autocorr_grid=taper_autocorr_grid, max_steps=20, device=DEVICE
         )
 
-        # DW Save
+        # DW Save (Filename: sim_reg_dw...)
         dw_estimates_values = [p.item() for p in params_list_dw]
         dw_estimates_loss = dw_estimates_values + [loss]
         rmsre_dw = calculate_original_scale_metrics(dw_estimates_values, true_params_dict)
 
         a_date = '1222'
-        grid_res = int(aggregated_data.shape[0] / 8) # 정수형 변환 (파일명 깔끔하게)
+        grid_res = int(aggregated_data.shape[0] / 8)
         
-        input_filepath_dw = output_path / f"sim_irre_dw_{a_date}_{grid_res}.json"
+        # 🟢 [파일명 변경] irre -> reg
+        input_filepath_dw = output_path / f"sim_reg_dw_{a_date}_{grid_res}.json"
         
         res_dw = alg_optimization(
             day=f"2024-07-01", cov_name=f"DW_{num_iter}", space_size=grid_res,
@@ -310,7 +275,9 @@ def cli(
         current_data.append(res_dw.__dict__)
         with input_filepath_dw.open('w', encoding='utf-8') as f:
             json.dump(current_data, f, separators=(",", ":"), indent=4)
-        pd.DataFrame(current_data).to_csv(input_path / f"sim_irre_dW_v{int(v*100):03d}_{a_date}_{grid_res}.csv", index=False)
+        
+        # 🟢 [파일명 변경] irre -> reg
+        pd.DataFrame(current_data).to_csv(input_path / f"sim_reg_dW_v{int(v*100):03d}_{a_date}_{grid_res}.csv", index=False)
 
 
         # ------------------------------------------------------------------
@@ -318,7 +285,6 @@ def cli(
         # ------------------------------------------------------------------
         print(f"\n--- Vecchia Optimization ---")
         
-        # 🟢 [중요] aggregated_data를 직접 주입 (이전 변수 참조 안함)
         model_instance = kernels_reparam_space_time_gpu.fit_vecchia_lbfgs(
             smooth=v, input_map=mm_input_map, aggregated_data=aggregated_data,
             nns_map=nns_map, mm_cond_number=mm_cond_number, nheads=nheads
@@ -334,13 +300,12 @@ def cli(
         )
         epoch_time = time.time() - start_time
         
-        # [주의] out은 파라미터 리스트만 포함할 수도, Loss까지 포함할 수도 있음
-        # 안전하게 slicing 처리 (calculate_original_scale_metrics 함수 내부에서 처리함)
         rmsre_vecc = calculate_original_scale_metrics(out, true_params_dict)
         print(f"Vecchia RMSRE: {rmsre_vecc:.2f}%")
 
-        # Vecc Save
-        input_filepath_vecc = output_path / f"sim_irre_vecc_{a_date}_{grid_res}.json"
+        # Vecc Save (Filename: sim_reg_vecc...)
+        # 🟢 [파일명 변경] irre -> reg
+        input_filepath_vecc = output_path / f"sim_reg_vecc_{a_date}_{grid_res}.json"
         
         res_vecc = alg_optimization(
             day=f"2024-07-01", cov_name=f"Vecc_{num_iter}", space_size=grid_res,
@@ -351,7 +316,9 @@ def cli(
         current_data_vecc.append(res_vecc.__dict__)
         with input_filepath_vecc.open('w', encoding='utf-8') as f:
             json.dump(current_data_vecc, f, separators=(",", ":"), indent=4)
-        pd.DataFrame(current_data_vecc).to_csv(input_path / f"sim_irre_vecc_{a_date}_v{int(v*100):03d}_LBFGS_{grid_res}.csv", index=False)
+        
+        # 🟢 [파일명 변경] irre -> reg
+        pd.DataFrame(current_data_vecc).to_csv(input_path / f"sim_reg_vecc_{a_date}_v{int(v*100):03d}_LBFGS_{grid_res}.csv", index=False)
 
         dw_norm_list.append(rmsre_dw)
         vecc_norm_list.append(rmsre_vecc)
@@ -359,7 +326,5 @@ def cli(
 
 if __name__ == "__main__":
     app()
-
-
 
 

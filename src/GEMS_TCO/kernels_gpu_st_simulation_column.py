@@ -259,6 +259,7 @@ class VecchiaBatched(SpatioTemporalModel):
                 (0, 15), (1, 15), (2, 15) 
             ]
             
+            
             # Dynamically calculate the number of geometric neighbors
             num_offsets = len(offsets)
             

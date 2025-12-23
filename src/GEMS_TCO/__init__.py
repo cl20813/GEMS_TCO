@@ -9,7 +9,8 @@ from pathlib import Path
 import json
 from json import JSONEncoder
 import csv
-from typing import List, Tuple, Dict, Any
+
+from typing import Optional, List, Tuple, Dict, Any, Union
 
 gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
 sys.path.append(gems_tco_path)
@@ -17,270 +18,78 @@ sys.path.append(gems_tco_path)
 from GEMS_TCO import orderings as _orderings
 from GEMS_TCO import configuration as config
 
-
 # This line makes the class available directly from the package
 from .data_loader import load_data2
 
-
-class log_semivariograms:
-    def __init__(self, deltas: List[Tuple[float, float]], semivariograms, tolerance: float):
-        """
-        Initialize the log semivariograms parameters.
-
-        Parameters:
-        - deltas (List[Tuple[float, float]]): List of deltas for semivariogram calculation.
-        - tolerance (float): Tolerance level for semivariogram calculation.
-        """
-        self.deltas = deltas
-        self.tolerance = tolerance
-
-    def toJSON(self) -> str:
-        """
-        Convert the object to a JSON string.
-
-        Returns:
-        - str: JSON representation of the object.
-        """
-        return json.dumps(self, cls=alg_opt_Encoder, sort_keys=False)
-
-    def save(self, input_filepath: Path, data: Any) -> None:
-        """
-        Save the aggregated data back to the JSON file.
-
-        Parameters:
-        - input_filepath (Path): Path to the JSON file.
-        - data (Any): Data to be saved.
-        """
-        with input_filepath.open('w', encoding='utf-8') as json_file:
-            json_file.write(json.dumps(data, separators=(",", ":"), indent=4))
-
-    def load(self, input_filepath: Path) -> Any:
-        """
-        Load data from a JSON file.
-
-        Parameters:
-        - input_filepath (Path): Path to the JSON file.
-
-        Returns:
-        - Any: Loaded data.
-        """
-        try:
-            with input_filepath.open('r', encoding='utf-8') as f:
-                loaded_data = json.load(f)
-        except FileNotFoundError:
-            loaded_data = []
-        return loaded_data
+import math  # Tensor 없이 가볍게 연산하기 위해 사용
+class BaseLogger:
+    """JSON 및 CSV 저장/로드를 위한 공통 메서드를 제공하는 베이스 클래스"""
     
-    def tocsv(self, jsondata: List[str], fieldnames: List[str], csv_filepath: Path) -> None:
-        """
-        Convert JSON data to CSV format.
-
-        Parameters:
-        - jsondata (List[str]): List of JSON strings.
-        - fieldnames (List[str]): List of field names for the CSV.
-        - csv_filepath (Path): Path to the CSV file.
-        """
-        data_dicts = [json.loads(data) for data in jsondata]
-        with csv_filepath.open(mode='w', newline='') as file:
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-            writer.writeheader()
-            for data in data_dicts:
-                writer.writerow(data)
-
-class alg_optimization:
-    def __init__(self, day: int, cov_name: str, lat_lon_resolution: List[int], lr: float, stepsize: float, params: List[float], time: float, frob_norm: float):
-        """
-        Initialize the optimization algorithm parameters.
-
-        Parameters:
-        - day (int): Day of the optimization.
-        - cov_name (str): Name of the covariance model.
-        - lat_lon_resolution (List[int]): Resolution for latitude and longitude.
-        - lr (float): Learning rate.
-        - stepsize (float): Step size for the optimization.
-        - params (List[float]): List of parameters for the model.
-        - time (float): Time parameter.
-        """
-        self.day = day
-        self.cov_name = cov_name
-        self.lat_lon_resolution = lat_lon_resolution
-        self.lr = lr
-        self.stepsize = stepsize
-        self.sigma = params[0]
-        self.range_lat = params[1]
-        self.range_lon = params[2]
-        self.advec_lat = params[3]
-        self.advec_lon = params[4]
-        self.beta = params[5]
-        self.nugget = params[6]
-        self.loss = params[7]
-        self.time = time
-        self.frob_norm = frob_norm
-
-    def toJSON(self) -> str:
-        """
-        Convert the object to a JSON string.
-
-        Returns:
-        - str: JSON representation of the object.
-        """
-        return json.dumps(self, cls=alg_opt_Encoder, sort_keys=False)
-
-    def save(self, input_filepath: Path, data: Any) -> None:
-        """
-        Save the aggregated data back to the JSON file.
-
-        Parameters:
-        - input_filepath (Path): Path to the JSON file.
-        - data (Any): Data to be saved.
-        """
-        with input_filepath.open('w', encoding='utf-8') as json_file:
-            json_file.write(json.dumps(data, separators=(",", ":"), indent=4))
-
-    def load(self, input_filepath: Path) -> Any:
-        """
-        Load data from a JSON file.
-
-        Parameters:
-        - input_filepath (Path): Path to the JSON file.
-
-        Returns:
-        - Any: Loaded data.
-        """
-        try:
-            with input_filepath.open('r', encoding='utf-8') as f:
-                loaded_data = json.load(f)
-        except FileNotFoundError:
-            loaded_data = []
-        return loaded_data
-    
-    def tocsv(self, jsondata: List[str], fieldnames: List[str], csv_filepath: Path) -> None:
-        """
-        Convert JSON data to CSV format.
-
-        Parameters:
-        - jsondata (List[str]): List of JSON strings.
-        - fieldnames (List[str]): List of field names for the CSV.
-        - csv_filepath (Path): Path to the CSV file.
-        """
-        data_dicts = [json.loads(data) for data in jsondata]
-        with csv_filepath.open(mode='w', newline='') as file:
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-            writer.writeheader()
-            for data in data_dicts:
-                writer.writerow(data)
-                
-
-class alg_opt_Encoder(JSONEncoder):
-    """
-    Custom JSON encoder for alg_optimization objects.
-    """
-    def default(self, o: Any) -> Dict[str, Any]:
-        """
-        Override the default method to handle alg_optimization objects.
-
-        Parameters:
-        - o (Any): Object to be encoded.
-
-        Returns:
-        - Dict[str, Any]: Dictionary representation of the object.
-        """
-        if isinstance(o, alg_optimization):
-            return o.__dict__
-        return super().default(o)  # delegates the serialization process to the standard JSONEncoder
-
-
-class likelihood_comparison:
-    def __init__(self, day: int, cov_name: str, lat_lon_resolution: List[int], params: List[float], time: float):
-        """
-        Initialize the likelihood comparison parameters.
-
-        Parameters:
-        - day (int): Day of the comparison.
-        - cov_name (str): Name of the covariance model.
-        - lat_lon_resolution (List[int]): Resolution for latitude and longitude.
-        - params (List[float]): List of parameters for the model.
-        - time (float): Time parameter.
-        """
-        self.day = day
-        self.cov_name = cov_name
-        self.lat_lon_resolution = lat_lon_resolution
+    def _clean_val(self, val: Any, digits: int = 4) -> float:
+        """Tensor, Numpy 등을 순수 float로 변환하고 반올림"""
+        if hasattr(val, 'item'):
+            val = val.item()
+        elif hasattr(val, '__len__') and not isinstance(val, (str, list, tuple)):
+             if len(val) == 1: val = val[0]
         
-        self.sigma = params[0]
-        self.range_lat = params[1]
-        self.range_lon = params[2]
-        self.advec_lat = params[3]
-        self.advec_lon = params[4]
-        self.beta = params[5]
-        self.nugget = params[6]
-        self.loss = params[7]
-        self.time = time
-   
-    def toJSON(self) -> str:
-        """
-        Convert the object to a JSON string.
+        try:
+            return round(float(val), digits)
+        except (ValueError, TypeError):
+            return val
 
-        Returns:
-        - str: JSON representation of the object.
-        """
-        return json.dumps(self, cls=likelihood_comp_Encoder, sort_keys=False)
-
-    def save(self, input_filepath: Path, data: Any) -> None:
-        """
-        Save the aggregated data back to the JSON file.
-
-        Parameters:
-        - input_filepath (Path): Path to the JSON file.
-        - data (Any): Data to be saved.
-        """
-        with input_filepath.open('w', encoding='utf-8') as json_file:
-            json_file.write(json.dumps(data, separators=(",", ":"), indent=4))
-
-    def load(self, input_filepath: Path) -> Any:
-        """
-        Load data from a JSON file.
-
-        Parameters:
-        - input_filepath (Path): Path to the JSON file.
-
-        Returns:
-        - Any: Loaded data.
-        """
+    @staticmethod
+    def load_list(input_filepath: Path) -> List[Dict]:
+        """JSON 파일 로드 (파일 없으면 빈 리스트)"""
         try:
             with input_filepath.open('r', encoding='utf-8') as f:
-                loaded_data = json.load(f)
+                return json.load(f)
         except FileNotFoundError:
-            loaded_data = []
-        return loaded_data
-    
-    def tocsv(self, jsondata: List[str], fieldnames: List[str], csv_filepath: Path) -> None:
+            return []
+
+    def _extract_scalar(self, val):
+        """내부 계산용: 반올림 없이 순수 값만 추출"""
+        if hasattr(val, 'item'): val = val.item()
+        return float(val)
+
+class alg_optimization(BaseLogger):
+    def __init__(self, day: Union[str, int], cov_name: str, space_size: int, 
+                 lr: float, params: List[float], time: float, rmsre: float = 0.0): 
         """
-        Convert JSON data to CSV format.
-
-        Parameters:
-        - jsondata (List[str]): List of JSON strings.
-        - fieldnames (List[str]): List of field names for the CSV.
-        - csv_filepath (Path): Path to the CSV file.
+        params: Log-Phi 스케일(최적화 결과) 입력 -> 내부에서 Physical Scale로 자동 변환 저장
         """
-        data_dicts = [json.loads(data) for data in jsondata]
-        with csv_filepath.open(mode='w', newline='') as file:
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-            writer.writeheader()
-            for data in data_dicts:
-                writer.writerow(data)
-
-class likelihood_comp_Encoder(JSONEncoder):
-    def default(self, o: Any) -> Dict[str, Any]:
-        """
-        Custom JSON encoder for likelihood_comparison objects.
-
-        Parameters:
-        - o (Any): Object to be encoded.
-
-        Returns:
-        - Dict[str, Any]: Dictionary representation of the object.
-        """
-        if isinstance(o, likelihood_comparison):
-            return o.__dict__
-        return super().default(o)  # delegates the serialization process to the standard JSONEncoder
-
+        self.day = str(day)
+        self.cov_name = str(cov_name)
+        self.space_size = self._clean_val(space_size, digits=0)
+        self.lr = self._clean_val(lr, digits=1)
+        
+        # --- Log-Phi Scale -> Physical Scale 변환 로직 ---
+        raw = [self._extract_scalar(p) for p in params]
+        
+        # 입력 순서: [log_phi1, log_phi2, log_phi3, log_phi4, adv_lat, adv_lon, log_nugget, loss]
+        # (혹시 loss가 포함 안 된 7개라면 에러 방지 처리 필요하지만, 코드 흐름상 loss 포함됨)
+        log_phi1, log_phi2, log_phi3, log_phi4 = raw[0], raw[1], raw[2], raw[3]
+        adv_lat_raw, adv_lon_raw = raw[4], raw[5]
+        log_nugget = raw[6]
+        loss_val = raw[7] if len(raw) > 7 else 0.0
+        
+        phi1, phi2 = math.exp(log_phi1), math.exp(log_phi2)
+        phi3, phi4 = math.exp(log_phi3), math.exp(log_phi4)
+        
+        calc_range_lon  = 1.0 / phi2
+        calc_sigma_sq   = phi1 / phi2
+        calc_range_lat  = calc_range_lon / math.sqrt(phi3)
+        calc_range_time = calc_range_lon / math.sqrt(phi4) 
+        calc_nugget     = math.exp(log_nugget)
+        
+        # 저장 (소수 4째 자리)
+        self.sigma      = self._clean_val(calc_sigma_sq, digits=4)
+        self.range_lat  = self._clean_val(calc_range_lat, digits=4)
+        self.range_lon  = self._clean_val(calc_range_lon, digits=4)
+        self.range_time = self._clean_val(calc_range_time, digits=4)
+        self.advec_lat  = self._clean_val(adv_lat_raw, digits=4)
+        self.advec_lon  = self._clean_val(adv_lon_raw, digits=4)
+        self.nugget     = self._clean_val(calc_nugget, digits=4)
+        self.loss       = self._clean_val(loss_val, digits=4)
+        
+        self.time       = self._clean_val(time, digits=4)
+        self.rmsre      = self._clean_val(rmsre, digits=4)
