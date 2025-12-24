@@ -12,12 +12,7 @@ scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/coarse_cen_map_without_de
 
 ### Copy run file from ```local``` to ```Amarel HPC```
 # mac
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/full_nll_wrapper_112025.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
-
-
-# window
-scp "C:\Users\joonw\tco\GEMS_TCO-2\Exercises\st_model\day\fit_vecc_day_v05_416.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
-scp "C:\Users\joonw\tco\GEMS_TCO-2\Exercises\st_model\day\fit_vecc_day_v10_416.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/full_nll_wrapper_122325.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
 
@@ -42,40 +37,42 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/full_nll_1122four
 ```    srun --cpus-per-task=3 --mem=8G --time=05:00:00 python /home/jl2815/tco/exercise_25/st_model/full_nll_wrapper_112025.py --v 0.5 --space "14, 14" --days "0,1" --mm-cond-number 8 --nheads 30  --lat-range "0,3" --lon-range "125,127" --no-keep-exact-loc ```
 
 
-
-
 ### smooth 0.5
 ```mkdir -p ./jobscript/tco/gp_exercise```     
 
 
 ```  cd ./jobscript/tco/gp_exercise  ```          
-```  nano full_nll_1125.sh  ``` 
-```  sbatch full_nll_1125.sh  ``` 
+```  nano full_nll_1223.sh  ``` 
+```  sbatch full_nll_1223.sh  ``` 
 
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=full_nll_1125                       # Job name
-#SBATCH --output=/home/jl2815/tco/exercise_output/full_nll_1125_%j.out     # Standard output file (%j = JobID)
-#SBATCH --error=/home/jl2815/tco/exercise_output/full_nll_1125_%j.err # Standard error file (%j = JobID)
-#SBATCH --time=6:00:00                                            # Time limit
-#SBATCH --ntasks=1                                                # Number of tasks
-#SBATCH --cpus-per-task=20                                        # Number of CPU cores per task
-#SBATCH --mem=248G                                              # Memory per node
-#SBATCH --partition=main                                            # Partition name
+#SBATCH --job-name=full_nll_1223                       # Job name
+#SBATCH --output=/home/jl2815/tco/exercise_output/full_nll_1223.out     # Standard output file (%j = JobID)
+#SBATCH --error=/home/jl2815/tco/exercise_output/full_nll_1223.err # Standard error file (%j = JobID)
+#SBATCH --time=48:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=120G
+#SBATCH --partition=gpu-redhat           # 💥 파티션 이름 확인 필요
+#SBATCH --gres=gpu:1
+#SBATCH --nodelist=gpu032               # 💥 확인하신 idle 노드 중 하나 입력
 
-#### Load the Anaconda module to use srun 
-module purge                                              
-module use /projects/community/modulefiles                 
-module load anaconda/2024.06-ts840 
+#### Load Modules
+module purge
+module use /projects/community/modulefiles
+module load anaconda/2024.06-ts840
+module load cuda/12.1.0
 
-#### Initialize conda for the current shell session if not already done for the current shell session.
+#### Initialize conda
 eval "$(conda shell.bash hook)"
 conda activate faiss_env
 
-echo "Current date and time: $(date)"
+echo "Running on High-End AdaLovelace Node: $(hostname)"
+nvidia-smi
 
-srun python /home/jl2815/tco/exercise_25/st_model/full_nll_wrapper_112025.py --v 0.5 --space "1, 1" --days "0,2" --mm-cond-number 8 --nheads 300 --no-keep-exact-loc 
+srun python /home/jl2815/tco/exercise_25/st_model/full_nll_wrapper_122325.py --v 0.5 --space "1, 1" --days "0,2" --mm-cond-number 16 --nheads 300 --no-keep-exact-loc --lat-range "0,3" --lon-range "128,133"  
 
 echo "Current date and time: $(date)"
 
