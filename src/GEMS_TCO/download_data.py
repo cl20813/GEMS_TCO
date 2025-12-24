@@ -13,7 +13,9 @@ class Download_file:
         self.days = days
         self.hours = [11] + list(range(0,8))
         self.base_url = 'https://nesc.nier.go.kr:38032/api/GK2/L2/O3T/data/getFileItem.do'
+
         self.api_key = 'api-14a8f20bdde3413fa75c03de34659294'
+        
         self.dates = [f'{self.year}{self.month:02d}{day:02d}{hour:02d}45' for day in self.days for hour in self.hours]
         
         # self.output_folder = f'D:\\GEMS_UNZIPPED\\{self.year}{self.month:02d}{self.days[0]:02d}{self.days[-1]:02d}' if len(self.days) > 1 else f'D:\\GEMS_UNZIPPED\\{self.year}{self.month:02d}{self.days[0]:02d}'

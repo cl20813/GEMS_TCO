@@ -69,7 +69,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vec
 #SBATCH --time=48:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=80G                      #  gpu30:80
+#SBATCH --mem=120G                      #  gpu30:80
 #SBATCH --partition=gpu                 # 'gpu' 파티션 사용
 #SBATCH --gres=gpu:1                    # GPU 1개 요청
 #SBATCH --nodelist=gpu030      # 💥 여기를 gpu030으로 변경! (idle 상태임)
@@ -89,12 +89,12 @@ nvidia-smi
 
 # Run the script
 # A100/V100급이므로 nheads 1000으로 과감하게 갑니다.
-srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_122325.py\
+srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_122325.py \
     --v 0.5 \
     --space "1, 1" \
     --days "0,31" \
     --mm-cond-number 16 \
-    --nheads 1000 \              #gpu30:1000, mm16 거뜬 4분
+    --nheads 1000 \
     --no-keep-exact-loc
 ```
 
@@ -115,7 +115,7 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_122325.py
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat           # 💥 파티션 이름 확인 필요
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:2
 #SBATCH --nodelist=gpu032               # 💥 확인하신 idle 노드 중 하나 입력
 
 #### Load Modules
@@ -131,20 +131,20 @@ conda activate faiss_env
 echo "Running on High-End AdaLovelace Node: $(hostname)"
 nvidia-smi
 
-# Run the script
 srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_122325.py \
     --v 0.5 \
     --space "1, 1" \
     --days "0,31" \
-    --mm-cond-number 16 \
+    --mm-cond-number 17 \
     --nheads 1000 \
     --no-keep-exact-loc
 
 ```
 
+#gpu30:1000, mm16 거뜬 4분
 
 
-
+22 18 20 
 
 
 
