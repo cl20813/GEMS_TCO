@@ -33,9 +33,20 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vec
 
 # real data fitted, dw and vecc estimates
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/real_fit_dw_and_vecc_122325/real_dw_18126.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/real_dw_vecc_estimates_122425/" 
+# 2024
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/real_fit_dw_and_vecc_122325/real_vecc_h1000_mm16_18126.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/real_dw_vecc_estimates_122425/" 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/real_fit_dw_and_vecc_july24/real_dw_july24.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/real_dw_vecc_july24_h1000mm16_122525/" 
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/real_fit_dw_and_vecc_july24/real_vecc_july24_h1000_mm16.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/real_dw_vecc_july24_h1000mm16_122525/" 
+
+# 2025
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/real_fit_dw_and_vecc_july25/real_dw_july25.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/real_dw_vecc_july25_h1000mm16_122525/" 
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/real_fit_dw_and_vecc_july25/real_vecc_july25_h1000_mm16.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/real_dw_vecc_july25_h1000mm16_122525/" 
+
+
+
 
 
 # simulation results

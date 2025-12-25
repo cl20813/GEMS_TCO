@@ -16,6 +16,7 @@ import pickle
 import torch
 import torch.optim as optim
 import typer
+from datetime import datetime  # <--- 이 줄을 추가하세요
 
 # --- Custom Imports ---
 sys.path.append("/cache/home/jl2815/tco") 
@@ -178,7 +179,7 @@ def cli(
             
             # alg_optimization 객체 생성
             res = alg_optimization(
-                day=f"2024-07-{day_idx+1}", 
+                day=f"{years[0]}-07-{day_idx+1}", 
                 cov_name=f"Vecc_Only_mm{mm_cond_number}", 
                 space_size=grid_res, 
                 lr=LBFGS_LR, 
@@ -187,7 +188,7 @@ def cli(
                 rmsre=0.0 # Real data
             )
             
-            date = '122525'
+            date = datetime.now().strftime("%m%d%y")
 
             # 파일명 설정 (real_vecc_summary...)
             common_filename = f"real_vecc_summary_mm{mm_cond_number}_{date}"

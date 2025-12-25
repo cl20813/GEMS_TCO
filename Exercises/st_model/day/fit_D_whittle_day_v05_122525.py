@@ -16,6 +16,7 @@ import pickle
 import torch
 import torch.optim as optim
 import typer
+from datetime import datetime  # <--- 이 줄을 추가하세요
 
 # --- Custom Imports ---
 sys.path.append("/cache/home/jl2815/tco") 
@@ -191,7 +192,7 @@ def cli(
             
             # 🟢 [저장] time 인자에 epoch_time 전달
             res = alg_optimization(
-                day=f"2024-07-{day_idx+1}", 
+                day=f"{years[0]}-07-{day_idx+1}", 
                 cov_name="DW_Real", 
                 space_size=grid_res, 
                 lr=1.0, 
@@ -200,7 +201,7 @@ def cli(
                 rmsre=0.0
             )
             
-            date = '122525'
+            date = datetime.now().strftime("%m%d%y")
 
             common_filename = f"real_dw_summary_LBFGS_{grid_res}_{date}"
             
