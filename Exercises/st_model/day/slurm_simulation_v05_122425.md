@@ -17,6 +17,8 @@ scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_regular_v
 #### 12:20 nheads 400 LOC_ERR_STD 0.02. 12:21 nheads 300 LOC_ERR_STD 0.02
 #### 12:22 nheads 300 LOC_ERR_STD 0.02 kernels_reparam_space_time_122125
 
+## 12:24 nheads 1000  LOC_ERR_STD 0.03
+
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_irregular_veccDW_day_v05_122225.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_heads_regular_vecc_testing_day_v05_122125.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
@@ -72,6 +74,46 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim
 ### simulation regular grid
 
 ``` cd ./jobscript/tco/gp_exercise ```
+```  nano sim_reg_gpu_122425.sh  ``` 
+```  sbatch sim_reg_gpu_122425.sh  ``
+
+``` 
+#!/bin/bash
+#SBATCH --job-name=sim_reg_gpu_122425       # Job name (Added GPU tag)
+#SBATCH --output=/home/jl2815/tco/exercise_output/sim_reg_gpu_122425.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/sim_reg_gpu_122425.err
+#SBATCH --time=48:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=120G
+#SBATCH --partition=gpu-redhat           # 💥 파티션 이름 확인 필요
+#SBATCH --gres=gpu:1
+#SBATCH --nodelist=gpu034               # 💥 확인하신 idle 노드 중 하나 입력
+
+#### Load Modules
+module purge
+module use /projects/community/modulefiles
+module load anaconda/2024.06-ts840
+module load cuda/12.1.0
+
+#### Initialize conda
+eval "$(conda shell.bash hook)"
+conda activate faiss_env
+
+echo "Running on High-End AdaLovelace Node: $(hostname)"
+nvidia-smi
+
+srun python /home/jl2815/tco/exercise_25/st_model/sim_regular_veccDWlbfgs_day_v05_122225.py \
+    --v 0.5 \
+    --mm-cond-number 16 \
+    --nheads 1000 \
+
+echo "Current date and time: $(date)"
+```
+
+
+
+``` cd ./jobscript/tco/gp_exercise ```
 ```  nano sim_reg_cpu_122225.sh  ``` 
 ```  sbatch sim_reg_cpu_122225.sh  ``` 
 
@@ -118,6 +160,48 @@ echo "Current date and time: $(date)"
 
 # 1220: nheads 400 LOC_ERR_STR 0.02
 # 1222: nheads 300 LOC_ERR_STR 0.02. mm:15
+# 1224: nheads 1000 0.03 mm 16
+
+``` cd ./jobscript/tco/gp_exercise ```
+```  nano sim_irr_gpu_122425.sh  ``` 
+```  sbatch sim_irr_gpu_122425.sh  ``` 
+
+``` 
+#!/bin/bash
+#SBATCH --job-name=sim_irr_gpu_122425       # Job name (Added GPU tag)
+#SBATCH --output=/home/jl2815/tco/exercise_output/sim_irr_gpu_122425.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/sim_irr_gpu_122425.err
+#SBATCH --time=48:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=120G
+#SBATCH --partition=gpu-redhat           # 💥 파티션 이름 확인 필요
+#SBATCH --gres=gpu:1
+#SBATCH --nodelist=gpu035               # 💥 확인하신 idle 노드 중 하나 입력
+
+#### Load Modules
+module purge
+module use /projects/community/modulefiles
+module load anaconda/2024.06-ts840
+module load cuda/12.1.0
+
+#### Initialize conda
+eval "$(conda shell.bash hook)"
+conda activate faiss_env
+
+echo "Running on High-End AdaLovelace Node: $(hostname)"
+nvidia-smi
+
+srun python /home/jl2815/tco/exercise_25/st_model/sim_irregular_veccDW_day_v05_122225.py \
+    --v 0.5 \
+    --mm-cond-number 16 \
+    --nheads 1000 \
+
+echo "Current date and time: $(date)"
+
+```
+
+
 
 ``` cd ./jobscript/tco/gp_exercise ```
 ```  nano sim_irr_122225.sh  ``` 
@@ -155,6 +239,9 @@ srun python /home/jl2815/tco/exercise_25/st_model/sim_irregular_veccDW_day_v05_1
 echo "Current date and time: $(date)"
 
 ```
+
+
+
 
 
 

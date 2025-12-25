@@ -57,7 +57,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/full_nll_1122four
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat           # 💥 파티션 이름 확인 필요
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu032               # 💥 확인하신 idle 노드 중 하나 입력
+#SBATCH --nodelist=gpu033               # 💥 확인하신 idle 노드 중 하나 입력
 
 #### Load Modules
 module purge
@@ -72,7 +72,15 @@ conda activate faiss_env
 echo "Running on High-End AdaLovelace Node: $(hostname)"
 nvidia-smi
 
-srun python /home/jl2815/tco/exercise_25/st_model/full_nll_wrapper_122325.py --v 0.5 --space "1, 1" --days "0,2" --mm-cond-number 16 --nheads 300 --no-keep-exact-loc --lat-range "0,3" --lon-range "128,133"  
+srun python /home/jl2815/tco/exercise_25/st_model/full_nll_wrapper_122325.py \
+    --v 0.5 \
+    --space "1, 1" \
+    --days "0,29" \
+    --mm-cond-number 16 \
+    --nheads 1000 \
+    --lat-range "0,5" \
+    --lon-range "123,133" \
+    --no-keep-exact-loc
 
 echo "Current date and time: $(date)"
 

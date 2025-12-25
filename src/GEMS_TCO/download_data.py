@@ -14,7 +14,7 @@ class Download_file:
         self.hours = [11] + list(range(0,8))
         self.base_url = 'https://nesc.nier.go.kr:38032/api/GK2/L2/O3T/data/getFileItem.do'
 
-        self.api_key = 'api-14a8f20bdde3413fa75c03de34659294'
+        self.api_key = 'api-799aa3c4e040444789658e94e54e1dd3'
         
         self.dates = [f'{self.year}{self.month:02d}{day:02d}{hour:02d}45' for day in self.days for hour in self.hours]
         

@@ -138,7 +138,10 @@ def cli(
 ) -> None:
 
     output_path = input_path = Path(config.amarel_estimates_day_path)
-    DEVICE = torch.device("cpu")
+    #DEVICE = torch.device("cpu")
+    
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     DTYPE= torch.float32 if DEVICE.type == 'mps' else torch.float64
 
     # 🟢 [상수 복구]

@@ -115,8 +115,8 @@ def cli(
             init_sigmasq   = 13.059
             init_range_lat = 0.154 
             init_range_lon = 0.195
-            init_advec_lat = 0.0218
             init_range_time = 1.0
+            init_advec_lat = 0.0218
             init_advec_lon = -0.1689
             init_nugget    = 0.247
             

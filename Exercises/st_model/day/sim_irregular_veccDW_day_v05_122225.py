@@ -149,10 +149,11 @@ def cli(
 ) -> None:
 
     output_path = input_path = Path(config.amarel_estimates_day_path)
-    DEVICE = torch.device("cpu")
+    #DEVICE = torch.device("cpu")
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     DTYPE= torch.float32 if DEVICE.type == 'mps' else torch.float64
 
-    LOC_ERR_STD = 0.02
+    LOC_ERR_STD = 0.03
     OZONE_MEAN = 260.0
     
     # 🟢 [Constants Defined]
