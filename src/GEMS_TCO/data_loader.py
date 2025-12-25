@@ -1,24 +1,20 @@
+from pathlib import Path
+from json import JSONEncoder
+
+from GEMS_TCO import configuration as config
+from GEMS_TCO import orderings as _orderings
+
 import os
 import pickle
 import sys
 import pandas as pd
 import numpy as np
 import torch
-
-from pathlib import Path
-import json
-from json import JSONEncoder
-import csv
-
 from typing import Optional, List, Dict, Tuple, Any
+
+# 사용자 경로 설정
 gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
 sys.path.append(gems_tco_path)
-
-import GEMS_TCO
-from GEMS_TCO import orderings as _orderings
-from GEMS_TCO import configuration as config
-
-    # -----------------------------------------
 
 class load_data2:
     def __init__(self, datapath: str):
@@ -31,35 +27,36 @@ class load_data2:
             months_: List[int] = [7]
         ) -> Dict[str, pd.DataFrame]:
             """
-            Loads and filters coarse data from pickle files by month and year.
-            
-            This method uses a sample file (July 2024) to determine the 
-            spatial grid for filtering.
+            Loads coarse data (Rectangular Grid) from pickle files.
+            File pattern: coarse_cen_map_rect{YY}_{MM}.pkl
             """
-            # Load the dictionary to set spatial coordinates
-            # Below is for instrument moving donward calibration
-
-            #filepath = Path(self.datapath) / "pickle_2024/coarse_cen_map24_07.pkl"
-            filepath = Path(self.datapath) / f"pickle_2024/coarse_cen_map_without_decrement_latitude{str(2024)[2:]}_{7:02d}.pkl"
-
-
-            try:
-                with open(filepath, 'rb') as pickle_file:
-                    coarse_dict_24_1 = pickle.load(pickle_file)
-            except FileNotFoundError:
-                print(f"Error: Sample file not found at {filepath}")
-                return {}
-            except Exception as e:
-                print(f"Error loading sample file {filepath}: {e}")
-                return {}
-
-            keys = list(coarse_dict_24_1.keys())
-            if not keys:
-                print("Error: Sample pickle file is empty.")
-                return {}
-
-            sample_df = coarse_dict_24_1[keys[0]]
             
+            # 1. 샘플 파일 로드 (격자 정보 확인용)
+            # 하드코딩 없이 입력된 연도/월 리스트의 첫 번째를 사용
+            sample_df = None
+            for y in years_:
+                for m in months_:
+                    # [수정됨] 파일명 포맷: rect 적용
+                    filename = f"coarse_cen_map_rect{str(y)[2:]}_{m:02d}.pkl"
+                    filepath_sample = Path(self.datapath) / f"pickle_{y}" / filename
+                    
+                    if filepath_sample.exists():
+                        try:
+                            with open(filepath_sample, 'rb') as f:
+                                temp_dict = pickle.load(f)
+                                if temp_dict:
+                                    sample_df = temp_dict[list(temp_dict.keys())[0]]
+                                    break
+                        except Exception as e:
+                            print(f"Warning: Failed to load sample {filepath_sample}: {e}")
+                if sample_df is not None:
+                    break
+            
+            if sample_df is None:
+                print("Error: Could not find any valid pickle file to determine spatial grid.")
+                return {}
+
+            # 2. Grid 정보 추출
             rho_lat = lat_lon_resolution[0]          
             rho_lon = lat_lon_resolution[1]
 
@@ -71,17 +68,19 @@ class load_data2:
             sorted_lons_descending = np.sort(unique_lons)[::-1] 
             lon_n = sorted_lons_descending[::rho_lon]
 
+            # 3. 전체 데이터 로드 및 필터링
             coarse_dicts = {}
             for year in years_:
                 for month in months_:  
-                    #filepath = Path(self.datapath) / f"pickle_{year}/coarse_cen_map{year[2:]}_{month:02d}.pkl"
-                    filepath = Path(self.datapath) / f"pickle_{year}/coarse_cen_map_without_decrement_latitude{str(year)[2:]}_{month:02d}.pkl"
+                    filename = f"coarse_cen_map_rect{str(year)[2:]}_{month:02d}.pkl"
+                    filepath = Path(self.datapath) / f"pickle_{year}" / filename
                    
                     try:
                         with open(filepath, 'rb') as pickle_file:
                             loaded_map = pickle.load(pickle_file)
                             for key in loaded_map:
                                 tmp_df = loaded_map[key]
+                                # Coarsening Filter
                                 coarse_filter = (tmp_df['Latitude'].isin(lat_n)) & (tmp_df['Longitude'].isin(lon_n))
                                 coarse_dicts[f"{year}_{month:02d}_{key}"] = tmp_df[coarse_filter].reset_index(drop=True)
                     except FileNotFoundError:
@@ -98,28 +97,16 @@ class load_data2:
             lon_range: List[float] = [123.0, 133.0]
         ) -> Dict[str, pd.DataFrame]:
             """
-            Subsets each DataFrame in a dictionary to a specific lat/lon range.
-            
-            Assumes DataFrames have 'Latitude' and 'Longitude' columns.
-            Returns a *new* dictionary with the subsetted DataFrames.
+            Subsets each DataFrame to a specific lat/lon range.
             """
             subsetted_map = {}
             for key, df in df_map.items():
-                # Create boolean masks for latitude and longitude
                 lat_mask = (df['Latitude'] >= lat_range[0]) & (df['Latitude'] <= lat_range[1])
                 lon_mask = (df['Longitude'] >= lon_range[0]) & (df['Longitude'] <= lon_range[1])
                 
-                # Apply the combined mask and store a copy to avoid SettingWithCopyWarning
                 subsetted_map[key] = df[lat_mask & lon_mask].reset_index(drop=True).copy()
                 
             return subsetted_map
-    ''' 
-    df_map_subsetted = data_load_instance.subset_df_map(
-    df_map, 
-    lat_range=[0.0, 5.0], 
-    lon_range=[123.0, 133.0]
-    )
-    '''
 
     def get_spatial_ordering(
             self, 
@@ -127,33 +114,34 @@ class load_data2:
             mm_cond_number: int = 10
         ) -> Tuple[np.ndarray, np.ndarray]:
             """
-            Computes the MaxMin ordering and nearest neighbors from a sample 
-            of the coarse data.
-            
-            Assumes all dataframes in coarse_dicts share the same spatial grid.
+            Computes MaxMin ordering based on the first available dataframe.
             """
             key_idx = sorted(coarse_dicts)
             if not key_idx:
                 print("Warning: coarse_dicts is empty, cannot compute ordering.")
                 return np.array([]), np.array([])
 
-            # Extract first hour data because all data shares the same spatial grid
             data_for_coord = coarse_dicts[key_idx[0]]
+            
+            # Safety check
+            if data_for_coord.empty:
+                return np.array([]), np.array([])
+
+            # Coordinate Extraction
             x1 = data_for_coord['Longitude'].values
             y1 = data_for_coord['Latitude'].values 
             coords1 = np.stack((x1, y1), axis=-1)
 
-            # Calculate MaxMin ordering
+            # MaxMin Ordering (C++ ext)
             ord_mm = _orderings.maxmin_cpp(coords1)
             
-            # Reorder coordinates to find nearest neighbors
+            # Reorder & Find Nearest Neighbors
             data_for_coord_reordered = data_for_coord.iloc[ord_mm].reset_index(drop=True)
             coords1_reordered = np.stack(
                 (data_for_coord_reordered['Longitude'].values, data_for_coord_reordered['Latitude'].values), 
                 axis=-1
             )
             
-            # Calculate nearest neighbors map
             nns_map = _orderings.find_nns_l2(locs=coords1_reordered, max_nn=mm_cond_number)
             
             return ord_mm, nns_map
@@ -167,16 +155,8 @@ class load_data2:
             lat_range: Optional[List[float]] = None,
             lon_range: Optional[List[float]] = None
         ) -> Tuple[Dict[str, pd.DataFrame], np.ndarray, np.ndarray]:
-            """
-            Loads, optionally subsets, and gets MaxMin ordering for data.
             
-            Flow:
-            1. load_coarse_data_dicts()
-            2. (Optional) subset_df_map()
-            3. get_spatial_ordering()
-            """
-            
-            # --- Step 1: Load the data ---
+            # 1. Load Data
             coarse_dicts = self.load_coarse_data_dicts(
                 lat_lon_resolution=lat_lon_resolution,
                 years_=years_,
@@ -184,41 +164,23 @@ class load_data2:
             )
             
             if not coarse_dicts:
-                print("Warning: Data loading returned no data. Returning empty.")
                 return {}, np.array([]), np.array([])
                 
-            # --- Step 2: (Optional) Subset the data ---
+            # 2. Subset Data (Before Ordering)
             if lat_range is not None and lon_range is not None:
-                print(f"Subsetting data to lat: {lat_range}, lon: {lon_range}")
                 coarse_dicts = self.subset_df_map(
                     coarse_dicts,
                     lat_range=lat_range,
                     lon_range=lon_range
                 )
-                # Stop if subsetting removed all data
-                if not coarse_dicts:
-                    print("Warning: Subsetting returned no data. Returning empty.")
-                    return {}, np.array([]), np.array([])
-            
-            # --- Step 3: Get spatial ordering *on the final data* ---
+                
+            # 3. Compute Ordering (on Subsetted Data)
             ord_mm, nns_map = self.get_spatial_ordering(
-                coarse_dicts=coarse_dicts, # This is now the correct (potentially subsetted) dict
+                coarse_dicts=coarse_dicts, 
                 mm_cond_number=mm_cond_number
             )
             
-            # --- Step 4: Return all results ---
             return coarse_dicts, ord_mm, nns_map
-    '''
-    df_map, ord_mm, nns_map = data_load_instance.load_maxmin_ordered_data_bymonthyear(
-    lat_lon_resolution=lat_lon_resolution, 
-    mm_cond_number=mm_cond_number,
-    years_=years, 
-    months_=month_range,
-    lat_range=[0.0, 5.0],    
-    lon_range=[123.0, 133.0]   
-    )
-    
-    '''
 
     def load_working_data(
         self, 
@@ -228,20 +190,7 @@ class load_data2:
         dtype: torch.dtype = torch.float,
         keep_ori: bool = True
     ) -> Tuple[Dict[str, torch.Tensor], torch.Tensor]:
-        """
-        Load and process working data by day, with optional MaxMin reordering.
-
-        Parameters:
-        - coarse_dicts (Dict[str, pd.DataFrame]): Dictionary of processed dataframes.
-        - idx_for_datamap (List[int]): Indices for the data map.
-        - ord_mm (Optional[np.ndarray]): If provided, applies this ordering to the data.
-        - dtype (torch.dtype): The target data type (e.g., torch.float or torch.double).
-
-        Returns:
-        - Tuple[Dict[str, torch.Tensor], torch.Tensor]: 
-            - analysis_data_map: Dictionary of tensors for analysis.
-            - aggregated_data: Aggregated tensor data.
-        """
+        
         key_idx = sorted(coarse_dicts)
         if not key_idx:
             raise ValueError("coarse_dicts is empty")
@@ -249,46 +198,43 @@ class load_data2:
         analysis_data_map = {}
         aggregated_df_list = []
         
-        # Determine the corresponding numpy dtype
         np_dtype = np.float32 if dtype == torch.float else np.float64
         
-        selected_keys = key_idx[idx_for_datamap[0]:idx_for_datamap[1]]
+        # Select keys based on index range
+        end_idx = min(idx_for_datamap[1], len(key_idx))
+        selected_keys = key_idx[idx_for_datamap[0]:end_idx]
         
         for key in selected_keys:
             tmp = coarse_dicts[key].copy()
+            # Normalize Time
             tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'] - 477700).astype(np_dtype)
             
-            # --- Conditionally apply reordering ---
+            # Apply Ordering
             if ord_mm is not None:
                 tmp_processed = tmp.iloc[ord_mm].reset_index(drop=True)
             else:
                 tmp_processed = tmp
             
-            # Slice to the first 4 columns
-            # This is more efficient than the original `load_working_data_byday`
-            # which appended the *entire* reordered df to the list.
-
+            # Column Selection
+            # Input format: [Lat, Lon, O3, Hours, Time, Src_Lat, Src_Lon]
             if keep_ori:
-                tmp_data_df = tmp_processed.iloc[:, [5,6,2,3]]
+                # Select: [Src_Lat(5), Src_Lon(6), O3(2), Hours(3)]
+                tmp_data_df = tmp_processed.iloc[:, [5,6,2,3]] 
             else:
+                # Select: [Lat(0), Lon(1), O3(2), Hours(3)]
                 tmp_data_df = tmp_processed.iloc[:, [0,1,2,3]]
         
-
-            # 1. Create data for analysis_data_map
+            # Convert to Tensor
             tmp_np = tmp_data_df.to_numpy(dtype=np_dtype)
-            analysis_data_map[key] = torch.from_numpy(tmp_np) # .to(dtype) is redundant
-            # 2. Store the df for aggregation
+            analysis_data_map[key] = torch.from_numpy(tmp_np)
+            
             aggregated_df_list.append(tmp_data_df)
 
         if not aggregated_df_list:
             return analysis_data_map, torch.empty(0, 4, dtype=dtype)
 
-        # Concat once
         aggregated_data_df = pd.concat(aggregated_df_list, axis=0, ignore_index=True)
-        aggregated_data_np = aggregated_data_df.to_numpy(dtype=np_dtype)
-        
-        # Create final tensor
-        aggregated_data = torch.from_numpy(aggregated_data_np)
+        aggregated_data = torch.from_numpy(aggregated_data_df.to_numpy(dtype=np_dtype))
         
         return analysis_data_map, aggregated_data
     

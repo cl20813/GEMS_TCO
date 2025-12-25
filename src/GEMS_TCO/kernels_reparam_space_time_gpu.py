@@ -75,6 +75,52 @@ class SpatioTemporalModel:
                 nns_map[i] = []
         self.nns_map = nns_map
 
+    # SpatioTemporalModel 클래스 내부에 추가
+    
+    def compute_theoretical_semivariogram_vectorized(self, params: torch.Tensor, lag_distances: torch.Tensor, time_lag: float, direction: str = 'lat') -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        벡터화된 이론적 Semivariogram 계산
+        direction: 'lat' 또는 'lon' (계산할 방향 지정)
+        """
+        # 파라미터 추출
+        phi1   = torch.exp(params[0])
+        phi2   = torch.exp(params[1]) 
+        phi3   = torch.exp(params[2])
+        phi4   = torch.exp(params[3])
+        nugget = torch.exp(params[6])
+        advec_lat = params[4]
+        advec_lon = params[5]
+        sigmasq = phi1 / phi2
+
+        # --- 방향에 따른 좌표 설정 ---
+        if direction == 'lat':
+            lat_dist = lag_distances
+            lon_dist = torch.zeros_like(lag_distances)
+        elif direction == 'lon':
+            lat_dist = torch.zeros_like(lag_distances)
+            lon_dist = lag_distances
+        else:
+            raise ValueError("direction must be 'lat' or 'lon'")
+
+        t_dist = torch.full_like(lag_distances, time_lag)
+
+        # Advection 적용
+        u_lat = lat_dist - advec_lat * t_dist
+        u_lon = lon_dist - advec_lon * t_dist
+        
+        # 거리 제곱 계산
+        dist_sq = (u_lat.pow(2) * phi3) + (u_lon.pow(2)) + (t_dist.pow(2) * phi4)
+        distance = torch.sqrt(dist_sq + 1e-8)
+
+        # Covariance & Semivariogram
+        cov = sigmasq * torch.exp(-distance * phi2)
+        total_sill = sigmasq + nugget
+        
+        semivariogram = total_sill - cov
+        
+        return distance, semivariogram
+    
+
     # --- SINGLE MATRIX KERNEL (For "Heads" / Exact GP) ---
     def precompute_coords_aniso_STABLE(self, dist_params: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """

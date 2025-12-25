@@ -31,77 +31,139 @@ from pathlib import Path
 # Add your custom path
 sys.path.append("/cache/home/jl2815/tco")
 
+import sys
+# Add your custom path
+gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
+sys.path.append(gems_tco_path)
+
+
 # Custom imports
 # Configure logging to a specific file path
 log_file_path = '/home/jl2815/tco/exercise_25/st_models/log/evaluate.log'
 
-from GEMS_TCO.kernels_oct25 import spatio_temporal_kernels
+from GEMS_TCO.kernels_reparam_space_time_gpu import SpatioTemporalModel  
 
-class diagnosis(spatio_temporal_kernels):
+import numpy as np
+import torch
+
+class diagnosis:
     ''' 
-    Investigate the value  (Data - conditional mean from Vecchia)/ Conditional sd from Vecchia
-    See if these are standard normal
+    Investigate the value (Data - conditional mean from Vecchia) / Conditional sd from Vecchia
+    See if these are standard normal.
+    Using composition with SpatioTemporalModel instance.
     '''
-    def __init__(self, smooth, input_map, nns_map, mm_cond_number):
-        super().__init__(smooth, input_map, nns_map, mm_cond_number)
-        # Any additional initialization for dignosis class can go here
-    
-    def diagnosis_method1(self, params, covariance_function):
-        res = np.zeros( (self.number_of_timestamps, self.size_per_hour))
-        for time_idx in range(self.number_of_timestamps):
+    def __init__(self, model_instance):
+        """
+        model_instance: SpatioTemporalModel 또는 VecchiaBatched의 인스턴스
+        (이미 데이터와 nns_map이 로드된 상태여야 함)
+        """
+        self.model = model_instance
+        self.input_map = model_instance.input_map
+        self.nns_map = model_instance.nns_map
+        self.key_list = model_instance.key_list
+        self.size_per_hour = model_instance.size_per_hour
+        self.device = model_instance.device
+
+    def diagnosis_method1(self, params):
+        # 결과 저장소 (Timestamps x Data Points)
+        res = np.zeros((len(self.key_list), self.size_per_hour))
+        
+        # 파라미터가 텐서가 아니면 변환 (모델의 Covariance 함수가 텐서를 요구함)
+        if not isinstance(params, torch.Tensor):
+            params = torch.tensor(params, device=self.device, dtype=torch.float64)
+
+        for time_idx in range(len(self.key_list)):
+            # 현재 시간대의 데이터 가져오기
             current_np = self.input_map[self.key_list[time_idx]]
             
+            # 31번째 데이터부터 시작 (Vecchia neighbor가 충분히 확보된 시점)
             for index in range(31, self.size_per_hour):
-
-                current_row = current_np[index]
-    
-                current_row = current_row.reshape(1,-1)
-                current_y = current_row[0][2]
-
+                
+                # 1. 타겟 포인트 (Current Data)
+                current_row = current_np[index].reshape(1,-1)
+                current_y = current_row[0][2] # Target Value
+                
+                # 2. 이웃 포인트 가져오기 (Conditioning Data)
                 mm_neighbors = self.nns_map[index]
                 past = list(mm_neighbors)
                 data_list = []
 
-                if past:
-                    data_list.append( current_np[past])
-            
-                if time_idx >0:
+                # 같은 시간대의 공간적 이웃
+                if past: 
+                    data_list.append(current_np[past])
+                
+                # 이전 시간대의 이웃 (시간적 상관관계)
+                if time_idx > 0:
                     last_hour_np = self.input_map[self.key_list[time_idx-1]]
+                    # 현재 포인트(index)와 이웃(past)의 과거 위치 데이터를 모두 가져옴
+                    data_list.append(last_hour_np[(past+[index]), :])
                 
-                    past_conditioning_data = last_hour_np[ (past+[index]),: ]
-                    data_list.append( past_conditioning_data)
-                
-                if data_list:
+                if data_list: 
                     conditioning_data = np.vstack(data_list)
-                else:
-                    conditioning_data = np.array([]).reshape(0, current_row.shape[1])
+                else: 
+                    conditioning_data = np.empty((0, 4)) # 데이터 구조에 맞게 shape 조정
 
-                np_arr = np.vstack( (current_row, conditioning_data) )
-                y_and_neighbors = np_arr[:,2]
-                locs = np_arr[:,:2]
-
-                cov_matrix = covariance_function(params=params, y = np_arr, x = np_arr)
-        
-                cov_xx = cov_matrix[1:,1:]
-                cov_yx = cov_matrix[0,1:]
+                # 3. 전체 데이터셋 구성 [Target; Neighbors]
+                # Kriging을 위해 (0번째 행: 타겟, 1~N번째 행: 이웃)으로 쌓음
+                np_arr = np.vstack((current_row, conditioning_data))
                 
-                tmp1 = np.dot(locs.T, np.linalg.solve(cov_matrix, locs))
-                tmp2 = np.dot(locs.T, np.linalg.solve(cov_matrix, y_and_neighbors))
-                beta = np.linalg.solve(tmp1, tmp2)
-
-                mu = np.dot(locs, beta)
-                mu_current = mu[0]
-                mu_neighbors = mu[1:]
+                # 4. 공분산 행렬 계산 (GPU Model 사용)
+                # Numpy -> Tensor
+                full_data_t = torch.tensor(np_arr, device=self.device, dtype=torch.float64)
                 
-                # mean and variance of y|x
-                sigma = cov_matrix[0][0]
-                cov_ygivenx = sigma - np.dot(cov_yx.T,np.linalg.solve(cov_xx, cov_yx))
-                sd_ygivenx = np.sqrt(cov_ygivenx)
-                # cov_ygivenx = max(cov_ygivenx, 7)
-                mean_ygivenx = mu_current + np.dot(cov_yx.T, np.linalg.solve( cov_xx, (y_and_neighbors[1:]-mu_neighbors) ))   # adjust for bias, mean_xz should be 0 which is not true but we can't do same for y1 so just use mean_z almost 0
-                # print(f'cond_mean{mean_z}')
+                # 모델의 공분산 함수 호출 (params, x, y)
+                cov_matrix = self.model.matern_cov_aniso_STABLE_log_reparam(params, full_data_t, full_data_t)
+                
+                # Tensor -> Numpy (Linear Algebra Solver는 CPU/Numpy가 안정적일 때가 많음)
+                cov_matrix_np = cov_matrix.detach().cpu().numpy()
+                
+                # 5. Kriging (Simple Kriging / GLS) 수행
+                # 데이터 분리
+                y_and_neighbors = np_arr[:, 2] # 값 컬럼
+                locs = np_arr[:, :2]           # 좌표 컬럼 (Trend 계산용)
+                
+                # 공분산 행렬 분할
+                cov_xx = cov_matrix_np[1:, 1:] # 이웃 간 공분산 (Conditioning set)
+                cov_yx = cov_matrix_np[0, 1:]  # 타겟-이웃 간 공분산
+                sigma = cov_matrix_np[0][0]    # 타겟 자체 분산
 
-                res[time_idx,index ] = (current_y - mean_ygivenx)/ sd_ygivenx
+                try:
+                    # (1) Trend (Beta) 추정 - GLS
+                    # [X' C^-1 X]^-1 [X' C^-1 y]
+                    inv_cov_locs = np.linalg.solve(cov_matrix_np, locs)
+                    inv_cov_y = np.linalg.solve(cov_matrix_np, y_and_neighbors)
+                    
+                    tmp1 = np.dot(locs.T, inv_cov_locs)
+                    tmp2 = np.dot(locs.T, inv_cov_y)
+                    beta = np.linalg.solve(tmp1, tmp2)
+                    
+                    # (2) Mean 추정
+                    mu = np.dot(locs, beta)
+                    mu_current = mu[0]
+                    mu_neighbors = mu[1:]
+
+                    # (3) Conditional Mean & Variance (Kriging Equations)
+                    # Mean = mu_0 + cov_yx * cov_xx^-1 * (y_neighbors - mu_neighbors)
+                    # Var  = sigma - cov_yx * cov_xx^-1 * cov_yx'
+                    
+                    # solve(A, b) is faster and more stable than dot(inv(A), b)
+                    term_solved = np.linalg.solve(cov_xx, cov_yx) # cov_xx^-1 * cov_yx
+                    
+                    cov_ygivenx = sigma - np.dot(cov_yx.T, term_solved)
+                    sd_ygivenx = np.sqrt(cov_ygivenx)
+                    
+                    mean_ygivenx = mu_current + np.dot(cov_yx.T, np.linalg.solve(cov_xx, (y_and_neighbors[1:] - mu_neighbors)))
+
+                    # (4) Z-score (Diagnosis Metric)
+                    if sd_ygivenx > 0:
+                        res[time_idx, index] = (current_y - mean_ygivenx) / sd_ygivenx
+                    else:
+                        res[time_idx, index] = np.nan
+                        
+                except np.linalg.LinAlgError:
+                    # 역행렬 계산 실패 시 NaN 처리
+                    res[time_idx, index] = np.nan
+                    
         return res
     
 class CrossVariogram:
@@ -110,143 +172,146 @@ class CrossVariogram:
         self.length_of_analysis = length_of_analysis
 
     def compute_directional_semivariogram(self, deltas, map_data, days, tolerance):
-            """
-            Optimized to pre-compute spatial indices once, avoiding N^2 loops per time step.
-            """
-            lon_lag_sem = {0: deltas}  # Save deltas for reference
-            num_lags = 8
-            key_list = sorted(map_data.keys())
+        """
+        Optimized to pre-compute spatial indices once.
+        Fixed to handle partial data loading safely using relative indexing.
+        """
+        lon_lag_sem = {0: deltas}  # Save deltas for reference
+        num_lags = 8
+        key_list = sorted(map_data.keys())
 
-            # --- STEP 1: Pre-compute Pair Indices (Run Once) ---
-            print("Pre-computing spatial pairs for defined lags...")
+        # --- STEP 1: Pre-compute Pair Indices (Run Once) ---
+        print("Pre-computing spatial pairs for defined lags...")
+        
+        if not key_list:
+            print("Error: No data in map_data.")
+            return {}
+
+        first_data = map_data[key_list[0]]
+        coordinates = first_data[:, :2]  # Shape (N, 2)
+
+        # Use GPU if available for faster indexing
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        coords_t = torch.tensor(coordinates, device=device, dtype=torch.float32)
+        
+        # Store valid indices for each delta: list of (row_idx, col_idx) tensors
+        delta_indices_cache = []
+
+        # Calculate difference matrices ONCE
+        # Note: If N is very large (>30k), do this in blocks to avoid OOM.
+        lat_diffs = coords_t[:, None, 0] - coords_t[None, :, 0]
+        lon_diffs = coords_t[:, None, 1] - coords_t[None, :, 1]
+
+        for (delta_lat, delta_lon) in deltas:
+            # Create boolean mask for pairs matching this specific lag
+            mask = (torch.abs(lat_diffs - delta_lat) <= tolerance) & \
+                   (torch.abs(lon_diffs - delta_lon) <= tolerance)
             
-            # Get coordinates from the first available timestamp
-            first_data = map_data[key_list[0]]
-            coordinates = first_data[:, :2]  # Shape (N, 2)
-
-            # Use GPU if available for faster indexing
-            device = 'cuda' if torch.cuda.is_available() else 'cpu'
-            coords_t = torch.tensor(coordinates, device=device, dtype=torch.float32)
+            # Extract indices of valid pairs
+            pairs = torch.nonzero(mask, as_tuple=True)
+            delta_indices_cache.append(pairs)
+        
+        # Free memory of large matrices immediately
+        del lat_diffs, lon_diffs, mask, coords_t
+        if device == 'cuda':
+            torch.cuda.empty_cache()
             
-            # Store valid indices for each delta: list of (row_idx, col_idx) tensors
-            delta_indices_cache = []
+        print("Pre-computation complete. Starting daily analysis...")
 
-            # Calculate difference matrices ONCE
-            # Note: If N is very large (>30k), do this in blocks to avoid OOM.
-            # For N=20k, this takes ~3GB VRAM/RAM which is usually fine.
-            lat_diffs = coords_t[:, None, 0] - coords_t[None, :, 0]
-            lon_diffs = coords_t[:, None, 1] - coords_t[None, :, 1]
-
-            for (delta_lat, delta_lon) in deltas:
-                # Create boolean mask for pairs matching this specific lag
-                mask = (torch.abs(lat_diffs - delta_lat) <= tolerance) & \
-                    (torch.abs(lon_diffs - delta_lon) <= tolerance)
-                
-                # Extract indices of valid pairs
-                pairs = torch.nonzero(mask, as_tuple=True)
-                delta_indices_cache.append(pairs)
+        # --- STEP 2: Fast Analysis Loop ---
+        # [FIX]: Use enumerate to get relative index (for loaded data) and day_num (for keys)
+        for relative_idx, day_num in enumerate(days):
+            # Initialize storage for this day
+            lon_lag_sem[day_num + 1] = [[np.nan] * len(deltas) for _ in range(num_lags)]
             
-            # Free memory of large matrices immediately
-            del lat_diffs, lon_diffs, mask, coords_t
-            if device == 'cuda':
-                torch.cuda.empty_cache()
+            for i in range(num_lags):
+                # Calculate global index based on RELATIVE position in the loaded list
+                list_idx = 8 * relative_idx + i
                 
-            print("Pre-computation complete. Starting daily analysis...")
+                if list_idx >= len(key_list):
+                    break
 
-            # --- STEP 2: Fast Analysis Loop ---
-            for day in days:
-                # Initialize storage for this day
-                lon_lag_sem[day + 1] = [[np.nan] * len(deltas) for _ in range(num_lags)]
+                # Load data for this specific hour
+                cur_data = map_data[key_list[list_idx]]
                 
-                for i in range(num_lags):
-                    # Calculate global index (e.g., day 0 -> indices 0-7)
-                    global_idx = 8 * day + i
-                    if global_idx >= len(key_list):
-                        break
+                # Prepare values (centered)
+                vals = torch.tensor(cur_data[:, 2], device=device, dtype=torch.float32)
+                vals = vals - torch.mean(vals)
 
-                    # Load data for this specific hour
-                    cur_data = map_data[key_list[global_idx]]
+                # Iterate through pre-computed lags
+                for j, (idx_row, idx_col) in enumerate(delta_indices_cache):
+                    if len(idx_row) == 0:
+                        continue
                     
-                    # Prepare values (centered)
-                    vals = torch.tensor(cur_data[:, 2], device=device, dtype=torch.float32)
-                    vals = vals - torch.mean(vals)
-
-                    # Iterate through pre-computed lags
-                    for j, (idx_row, idx_col) in enumerate(delta_indices_cache):
-                        if len(idx_row) == 0:
-                            # No pairs found for this lag (already set to NaN or handled here)
-                            continue
-                        
-                        # Vectorized calculation: gather values using cached indices
-                        # This is O(K) where K is number of pairs, extremely fast
-                        diffs = vals[idx_col] - vals[idx_row]
-                        semivariance = 0.5 * torch.mean(diffs ** 2)
-                        
-                        lon_lag_sem[day + 1][i][j] = round(semivariance.item(), 4)
-                        
-            return lon_lag_sem
+                    # Vectorized calculation
+                    diffs = vals[idx_col] - vals[idx_row]
+                    semivariance = 0.5 * torch.mean(diffs ** 2)
+                    
+                    lon_lag_sem[day_num + 1][i][j] = round(semivariance.item(), 4)
+                    
+        return lon_lag_sem
 
     def compute_cross_lon_lat(self, deltas, map_data, days, tolerance):
-            # 1. Initialize logic matches original
-            lon_lag_sem = {0: deltas}
-            num_lags = 7  # Matches your variable
-            key_list = sorted(map_data.keys())
+        # 1. Initialize logic matches original
+        lon_lag_sem = {0: deltas}
+        num_lags = 7  # Matches your variable
+        key_list = sorted(map_data.keys())
+        
+        # --- PRE-COMPUTATION (Optimization) ---
+        if not key_list: return {}
+        first_data = map_data[key_list[0]]
+        coordinates = first_data[:, :2]
+        
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        coords_t = torch.tensor(coordinates, device=device, dtype=torch.float32)
+        
+        lat_diffs = coords_t[:, None, 0] - coords_t[None, :, 0]
+        lon_diffs = coords_t[:, None, 1] - coords_t[None, :, 1]
+        
+        delta_indices_cache = []
+        for (delta_lat, delta_lon) in deltas:
+            mask = (torch.abs(lat_diffs - delta_lat) <= tolerance) & \
+                   (torch.abs(lon_diffs - delta_lon) <= tolerance)
+            pairs = torch.nonzero(mask, as_tuple=True)
+            delta_indices_cache.append(pairs)
             
-            # --- PRE-COMPUTATION (Optimization) ---
-            # Calculates indices ONCE. Logic remains: (row, col)
-            first_data = map_data[key_list[0]]
-            coordinates = first_data[:, :2]
-            
-            device = 'cuda' if torch.cuda.is_available() else 'cpu'
-            coords_t = torch.tensor(coordinates, device=device, dtype=torch.float32)
-            
-            lat_diffs = coords_t[:, None, 0] - coords_t[None, :, 0]
-            lon_diffs = coords_t[:, None, 1] - coords_t[None, :, 1]
-            
-            delta_indices_cache = []
-            for (delta_lat, delta_lon) in deltas:
-                mask = (torch.abs(lat_diffs - delta_lat) <= tolerance) & \
-                    (torch.abs(lon_diffs - delta_lon) <= tolerance)
-                pairs = torch.nonzero(mask, as_tuple=True)
-                delta_indices_cache.append(pairs)
-                
-            del lat_diffs, lon_diffs, mask, coords_t
-            if device == 'cuda': torch.cuda.empty_cache()
-            # --------------------------------------
+        del lat_diffs, lon_diffs, mask, coords_t
+        if device == 'cuda': torch.cuda.empty_cache()
+        # --------------------------------------
 
-            for day in days:
-                # Matches your initialization
-                lon_lag_sem[day + 1] = [[np.nan] * len(deltas) for _ in range(num_lags)]
+        # [FIX]: Use enumerate for relative indexing
+        for relative_idx, day_num in enumerate(days):
+            # Matches your initialization
+            lon_lag_sem[day_num + 1] = [[np.nan] * len(deltas) for _ in range(num_lags)]
+            
+            for i in range(num_lags): 
+                # Use relative index to find position in key_list
+                t_idx = 8 * relative_idx + i
                 
-                # Loop range matches: 8*day to 8*day + num_lags
-                for i in range(num_lags): 
-                    t_idx = 8 * day + i
-                    if t_idx + 1 >= len(key_list): break
-                    
-                    cur_data = map_data[key_list[t_idx]]
-                    next_data = map_data[key_list[t_idx + 1]]
-                    
-                    cur_vals = torch.tensor(cur_data[:, 2], device=device, dtype=torch.float32)
-                    cur_vals = cur_vals - torch.mean(cur_vals)
-                    
-                    next_vals = torch.tensor(next_data[:, 2], device=device, dtype=torch.float32)
-                    next_vals = next_vals - torch.mean(next_vals)
+                # Check bounds for t_idx AND t_idx+1
+                if t_idx + 1 >= len(key_list): break
+                
+                cur_data = map_data[key_list[t_idx]]
+                next_data = map_data[key_list[t_idx + 1]]
+                
+                cur_vals = torch.tensor(cur_data[:, 2], device=device, dtype=torch.float32)
+                cur_vals = cur_vals - torch.mean(cur_vals)
+                
+                next_vals = torch.tensor(next_data[:, 2], device=device, dtype=torch.float32)
+                next_vals = next_vals - torch.mean(next_vals)
 
-                    for j, (idx_row, idx_col) in enumerate(delta_indices_cache):
-                        if len(idx_row) == 0:
-                            continue
-                        
-                        # LOGIC CHECK: Preserved Original Indexing
-                        # Original: cur_values[valid_pairs[1]] - next_values[valid_pairs[0]]
-                        # valid_pairs[1] is col, valid_pairs[0] is row
-                        diffs = cur_vals[idx_col] - next_vals[idx_row]
-                        
-                        semivariance = 0.5 * torch.mean(diffs ** 2)
-                        
-                        # LOGIC CHECK: Rounding enabled (matches original)
-                        lon_lag_sem[day + 1][i][j] = round(semivariance.item(), 4)
-                        
-            return lon_lag_sem
+                for j, (idx_row, idx_col) in enumerate(delta_indices_cache):
+                    if len(idx_row) == 0:
+                        continue
+                    
+                    # Cross Variogram Logic: Z(u+h, t) - Z(u, t+1)
+                    diffs = cur_vals[idx_col] - next_vals[idx_row]
+                    
+                    semivariance = 0.5 * torch.mean(diffs ** 2)
+                    
+                    lon_lag_sem[day_num + 1][i][j] = round(semivariance.item(), 4)
+                    
+        return lon_lag_sem
 
     def cross_directional_sem(self, deltas, map_data, days, tolerance, direction1, direction2):
         directional_sem = {}
@@ -254,6 +319,8 @@ class CrossVariogram:
         
         # --- PRE-COMPUTATION ---
         key_list = sorted(map_data.keys())
+        if not key_list: return {}
+        
         first_data = map_data[key_list[0]]
         coordinates = first_data[:, :2]
 
@@ -271,19 +338,17 @@ class CrossVariogram:
         mid_point = len(deltas) / 2
         
         for j, distance in enumerate(deltas):
-            # Direction Logic: Matches your "j <= len/2" check
+            # Direction Logic
             target_dir = direction1 if j <= mid_point else direction2
             
-            # Mask Logic: Matches "abs(angle - dir) <= pi/8"
+            # Mask Logic
             dir_mask = torch.abs(angle_matrix - target_dir) <= (np.pi / 8)
             dist_mask = torch.abs(dist_matrix - distance) <= tolerance
             
             if distance == 0:
-                final_mask = dist_mask # Matches "if distance==0"
+                final_mask = dist_mask
             else:
                 final_mask = dir_mask & dist_mask 
-                # Note: This is SAFER than original "filtered_lat_diffs != 0" 
-                # because it doesn't accidentally drop pairs with lat_diff=0
 
             pairs = torch.nonzero(final_mask, as_tuple=True)
             delta_indices_cache.append(pairs)
@@ -292,22 +357,21 @@ class CrossVariogram:
         if device == 'cuda': torch.cuda.empty_cache()
         # -----------------------
 
-        for index, day in enumerate(days):
-            # LOGIC FIX: Initialize with NaN, not 0
-            directional_sem[day] = [[np.nan]*len(deltas) for _ in range(7)]
+        # [FIX]: Use enumerate for relative indexing
+        for relative_idx, day_num in enumerate(days):
+            directional_sem[day_num] = [[np.nan]*len(deltas) for _ in range(7)]
             
-            # Logic Check: Preserved "t = day - 1"
-            t = day - 1 
-
-            for i in range(7): # Matches "range(8*t, 8*t+7)"
-                global_idx = 8 * t + i
+            # Note: Original logic had t = day - 1. 
+            # If 'days' list implies we are processing those specific days, 
+            # we should iterate through the loaded data sequentially.
+            
+            for i in range(7): 
+                list_idx = 8 * relative_idx + i
                 
-                # Safety for negative indexing or out of bounds
-                if global_idx < 0: global_idx += len(key_list) 
-                if global_idx + 1 >= len(key_list): break
+                if list_idx + 1 >= len(key_list): break
 
-                cur_data = map_data[key_list[global_idx]]
-                next_data = map_data[key_list[global_idx + 1]]
+                cur_data = map_data[key_list[list_idx]]
+                next_data = map_data[key_list[list_idx + 1]]
 
                 cur_vals = torch.tensor(cur_data[:, 2], device=device, dtype=torch.float32)
                 cur_vals = cur_vals - torch.mean(cur_vals)
@@ -319,15 +383,10 @@ class CrossVariogram:
                     if len(idx_row) == 0:
                         continue
 
-                    # LOGIC CHECK: Preserved Original Indexing (Swapped compared to first func)
-                    # Original: cur_values[valid_pairs[0]] - next_values[valid_pairs[1]]
-                    # valid_pairs[0] is row, valid_pairs[1] is col
                     diffs = cur_vals[idx_row] - next_vals[idx_col]
-                    
                     semivariance = 0.5 * torch.mean(diffs ** 2)
                     
-                    # LOGIC CHECK: No Rounding (matches original)
-                    directional_sem[day][i][j] = semivariance.item()
+                    directional_sem[day_num][i][j] = semivariance.item()
 
         return directional_sem
 
@@ -534,7 +593,10 @@ class CrossVariogram_empirical(CrossVariogram):
                 ax.set_title(f'Semi-Variogram on 2024-07-{day:02d} ({self.length_of_analysis})', fontsize=14)
                 
                 # Use symlog as requested
-                ax.set_xscale('symlog', linthresh=0.95)
+                ax.set_xscale('symlog', linthresh=0.3)
+                
+
+                # if 0.95 needed instead, change linthresh value above
 
                 # Ticks must also be sorted (lat_lags is now sorted)
                 ax.set_xticks(lat_lags)
@@ -547,6 +609,8 @@ class CrossVariogram_empirical(CrossVariogram):
                 plt.setp(ax.get_xticklabels(), rotation=65, ha='right')
 
                 ax.axvline(x=0, color='red', linestyle='--')
+
+                ax.set_xlim(0, 1.8)
                 ax.legend()
 
             plt.tight_layout()
@@ -594,6 +658,8 @@ class CrossVariogram_empirical(CrossVariogram):
                 ax.set_xlabel('Longitude Lags', fontsize=12)
                 ax.set_ylabel('Variogram Values', fontsize=12)
                 ax.set_title(f'Semi-Variogram on 2024-07-{day:02d} ({self.length_of_analysis})', fontsize=14)
+                
+                
                 ax.set_xscale('symlog', linthresh=0.95)
                 
                 # Use the sorted lags for ticks
@@ -662,14 +728,14 @@ class CrossVariogram_empirical(CrossVariogram):
         plt.savefig(f'/Users/joonwonlee/Documents/GEMS_TCO-1/plots/directional_semivariograms/dir_sem_{direction1*(180/np.pi)}_{direction2*(180/np.pi)}_days{days[0]}_{days[-1]}.png')
         plt.show()
 
-
+# 12/25/25 modified theoretical class for cross-variogram plotting
 
 class CrossVariogram_emp_theory(CrossVariogram):
     def __init__(self, save_path, length_of_analysis, smooth):
         super().__init__(save_path, length_of_analysis)
         self.smooth = smooth
         
-    def plot_cross_lon_emp_the(self, lon_lag_sem, days, deltas,df, cov_func):
+    def plot_cross_lon_emp_the(self, lon_lag_sem, days, deltas, df, cov_func):
         fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
         # https://betterfigures.org/2015/06/23/picking-a-colour-scale-for-scientific-graphics/
@@ -682,42 +748,56 @@ class CrossVariogram_emp_theory(CrossVariogram):
             (33/255, 113/255, 181/255),
             (8/255, 69/255, 148/255)
         ]
-
-        # colors = plt.cm.autumn(np.linspace(1, 0, 8))
 
         for index, day in enumerate(days):
             ax = axs[index // 2, index % 2]
 
             x_values = [lon for lat, lon in deltas]
 
+            # 1. Plot Empirical
             for i in range(7):
                 y_values = [y**2 for y in lon_lag_sem[day][i]]
                 ax.plot(x_values, y_values, color=colors[i], label=f'Empirical CV Hour {i + 1} to {i+2}')
-
                 ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
                 
-            deltas2 = torch.linspace(-2,2, 40)
-            params = list(df.iloc[day - 1][:-1])
+            # 2. Prepare Theoretical Params (Correct Mapping)
+            deltas2 = torch.linspace(-2, 2, 40)
+            
+            # [수정] DataFrame 컬럼을 함수 인자 순서에 맞게 직접 매핑
+            row = df.iloc[day - 1]
+            params = [
+                row['sigma'],       # sigmasq
+                row['range_lat'],   # range_lat
+                row['range_lon'],   # range_lon
+                row['advec_lat'],   # advec_lat (순서 조정됨)
+                row['advec_lon'],   # advec_lon (순서 조정됨)
+                row['range_time'],  # beta (순서 조정됨)
+                row['nugget']       # nugget (누락 방지)
+            ]
+
             gamma_values = []
             d_values = []
+            
+            # 3. Plot Theoretical
             for delta in deltas2:
-            # Calculate theoretical semivariogram for this distance and time lag
+                # Longitude direction: lat_diff=small, lon_diff=delta
                 d, gamma = cov_func(params, 0.00001, delta, 1)
         
-                gamma_values.append(gamma.item()**2)  # Convert tensor to scalar for plotting
+                gamma_values.append(gamma.item()**2) 
                 d_values.append(d.item())
             
-            ax.plot(deltas2.numpy(), gamma_values, label=f"Fitted CV, time lag {1}", color= (8/255, 69/255, 0), linestyle='--', alpha=0.7)
+            ax.plot(deltas2.numpy(), gamma_values, label=f"Fitted CV, time lag {1}", color=(8/255, 69/255, 0), linestyle='--', alpha=0.7)
             ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
 
-
+            # 4. Styling & Scaling
             ax.grid(True)
             ax.set_xlabel('Longitude Lags', fontsize=12)
             ax.set_ylabel('Cross-variogram Values', fontsize=12)
             ax.set_title(f'Cross-Variogram on 2024-07-{day:02d} ({self.length_of_analysis})', fontsize=14)
-            ax.set_xscale('symlog', linthresh=0.95)
-            # ax.set_xscale('linear')
-            # ax.set_yscale('linear')
+            
+            # [수정] Latitude와 동일하게 0.3 임계값 적용
+            ax.set_xscale('symlog', linthresh=0.3)
+            
             ax.set_xticks(x_values)
             ticks = [str(round(x, 2)) for x in x_values]
             ax.set_xticklabels(ticks)
@@ -725,21 +805,21 @@ class CrossVariogram_emp_theory(CrossVariogram):
             plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
 
             # Add vertical red line at x=0
-            ax.axvline(x=0, color='red', linestyle='--') # , label='x=0'
+            ax.axvline(x=0, color='red', linestyle='--')
 
+            # [중요] xlim은 설정 맨 마지막에 (Longitude 범위에 맞춰 -1.8 ~ 1.8로 설정)
+            ax.set_xlim(-1.8, 1.8) 
             ax.legend()
 
         plt.tight_layout()
-        # plt.savefig(f'/Users/joonwonlee/Documents/GEMS_TCO-1/plots/directional_semivariograms/dir_sem_longitude_days{days[0]}_{days[-1]}.png')
         save_path = Path(self.save_path) / f'cross_emp_the_longitude_days{days[0]}_{days[-1]}.png'
         plt.savefig(save_path)
         plt.show()
 
 
-    def plot_cross_lat_emp_the(self, lon_lag_sem, days, deltas,df, cov_func):
+    def plot_cross_lat_emp_the(self, lon_lag_sem, days, deltas, df, cov_func):
         fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
-        # https://betterfigures.org/2015/06/23/picking-a-colour-scale-for-scientific-graphics/
         colors = [
             (222/255, 235/255, 247/255),
             (198/255, 219/255, 239/255),
@@ -750,70 +830,88 @@ class CrossVariogram_emp_theory(CrossVariogram):
             (8/255, 69/255, 148/255)
         ]
 
-        for index, day in enumerate(days):
-            # t = day - 1
-            # key_list = sorted(map)
+        # 1. Prepare X values (Lags)
+        raw_x_values = [lat for lat, lon in deltas]
 
-            # Create a 2x2 plot
+        # [중요] 지그재그 방지를 위한 정렬 인덱스 생성 (음수 -> 양수 순서)
+        sorted_indices = sorted(range(len(raw_x_values)), key=lambda k: raw_x_values[k])
+        
+        # 정렬된 X축 데이터
+        x_values = [raw_x_values[i] for i in sorted_indices]
+
+        for index, day in enumerate(days):
             ax = axs[index // 2, index % 2]
 
-            # Separate positive and negative lags and assign appropriate indices
-        
-            x_values = [lat for lat, lon in deltas]
-
-            # for j, (lat, lon) in enumerate(deltas):
-            #    x_values.append(lat)  # Use negative index for negative lags
-            # weight = [-0.55, -0.5, -0.25, -0.15, -0.05, 0, 0.05, 0.15, 0.25, 0.5, 0.55]
-            # weight2 = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]
-
-            # Plotting for each orbit
+            # 2. Plot Empirical (정렬 적용)
             for i in range(7):
-                y_values = [y**2 for y in lon_lag_sem[day][i]]
+                # 원본 Y값 가져오기
+                raw_y_values = [y**2 for y in lon_lag_sem[day][i]]
+                
+                # [중요] X축과 동일한 순서로 Y값 재배열
+                y_values = [raw_y_values[i] for i in sorted_indices]
 
                 ax.plot(x_values, y_values, color=colors[i], label=f'Empirical CV Hour {i + 1} to {i+2}')
-
                 ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
                 
-            deltas2 = torch.linspace(-2,2, 40)
-            params = list(df.iloc[day - 1][:-1])
+            # 3. Prepare Theoretical Params
+            # 이론적 값은 -2 ~ 2까지 이미 생성 중이므로 변경 없음
+            deltas2 = torch.linspace(-2, 2, 40)
+            
+            row = df.iloc[day - 1]
+            params = [
+                row['sigma'],
+                row['range_lat'],
+                row['range_lon'],
+                row['advec_lat'],
+                row['advec_lon'],
+                row['range_time'],
+                row['nugget']
+            ]
 
             gamma_values = []
             d_values = []
+            
+            # 4. Plot Theoretical
             for delta in deltas2:
-            # Calculate theoretical semivariogram for this distance and time lag
-                d, gamma =  cov_func(params,delta, 0.00001, 1)
-        
-                gamma_values.append(gamma.item()**2)  # Convert tensor to scalar for plotting
+                # Latitude direction
+                d, gamma = cov_func(params, delta, 0.00001, 1)
+                gamma_values.append(gamma.item()**2) 
                 d_values.append(d.item())
             
-            ax.plot(deltas2.numpy(), gamma_values, label=f"Fitted CV, time lag {1}", color= (8/255, 69/255, 0), linestyle='--', alpha=0.7)
+            ax.plot(deltas2.numpy(), gamma_values, label=f"Fitted CV, time lag {1}", color=(8/255, 69/255, 0), linestyle='--', alpha=0.7)
             ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
 
-
+            # 5. Styling & Scaling
             ax.grid(True)
             ax.set_xlabel('Latitude Lags', fontsize=12)
             ax.set_ylabel('Cross-variogram Values', fontsize=12)
             ax.set_title(f'Cross-Variogram on 2024-07-{day:02d} ({self.length_of_analysis})', fontsize=14)
-            ax.set_xscale('symlog', linthresh=0.95)
-            #ax.set_xscale('linear')
-            # ax.set_yscale('linear')
+            
+            ax.set_xscale('symlog', linthresh=0.3)
+            
             ax.set_xticks(x_values)
             ticks = [str(round(x, 2)) for x in x_values]
             ax.set_xticklabels(ticks)
             ax.set_ylim(1e-4, 670)
             plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
 
-            # Add vertical red line at x=0
-            ax.axvline(x=0, color='red', linestyle='--') # , label='x=0'
-
+            ax.axvline(x=0, color='red', linestyle='--')
+            
+            # [수정 완료] 음수부터 양수까지 보이도록 범위 확장 (-1.8 ~ 1.8)
+            ax.set_xlim(-1.8, 1.8) 
             ax.legend()
 
         plt.tight_layout()
         save_path = Path(self.save_path) / f'cross_emp_the_latitude_days{days[0]}_{days[-1]}.png'
         plt.savefig(save_path)
-        # plt.savefig(f'/Users/joonwonlee/Documents/GEMS_TCO-1/plots/directional_semivariograms/dir_sem_latitude_days{days[0]}_{days[-1]}.png')
         plt.show()
     
+
+
+    #########################
+    #########################
+
+
     def plot_two_latitude(self, days,lon_lag_sem,  deltas, df1, df2):
         fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 

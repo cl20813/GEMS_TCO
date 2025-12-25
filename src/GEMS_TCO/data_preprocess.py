@@ -302,7 +302,7 @@ class center_matching_hour():
 
         # Convert query points (lat, lon) to NumPy array
         query_points = center_points[['lat', 'lon']].to_numpy()
-        query_points_rad = np.radians(query_points)  # if using haversine
+        query_points_rad = np.radians(query_points)  # Haversine을 위해 라디안 변환
 
         num_center_points = len(center_points)
 
@@ -311,41 +311,67 @@ class center_matching_hour():
             locs = cur_data[['Latitude', 'Longitude']].to_numpy()
 
             if locs.shape[0] == 0:
+                # 데이터가 없는 경우 어쩔 수 없이 NaN (혹은 0 등 특정 값으로 채워야 한다면 수정)
                 coarse_map[key] = pd.DataFrame({
                     'Latitude': center_points['lat'],
                     'Longitude': center_points['lon'],
-                    'ColumnAmountO3': [np.nan] * num_center_points,
+                    'ColumnAmountO3': [np.nan] * num_center_points, # 필요시 0.0 등으로 변경
                     'Hours_elapsed': [np.nan] * num_center_points,
                     'Time': [pd.NaT] * num_center_points,
-                    'Source_Latitude': [np.nan] * num_center_points,
-                    'Source_Longitude': [np.nan] * num_center_points
                 })
                 continue
 
             # Use haversine
             locs_rad = np.radians(locs)
             tree = BallTree(locs_rad, metric='haversine')
-            dist, ind = tree.query(query_points_rad, k=1)
+            
+            # -------------------------------------------------------------
+            # [수정 포인트] k=1 대신 k=3 사용 (주변 3개 점 탐색)
+            # -------------------------------------------------------------
+            k_neighbors = 3
+            dist, ind = tree.query(query_points_rad, k=k_neighbors) 
+            # dist shape: (num_points, 3), ind shape: (num_points, 3)
 
-            nearest_indices = ind.flatten()
+            # -------------------------------------------------------------
+            # IDW (Inverse Distance Weighting) 계산
+            # 거리가 가까울수록 가중치를 크게 둠 (Weight = 1 / distance^2)
+            # -------------------------------------------------------------
+            epsilon = 1e-10  # 0으로 나누기 방지
+            weights = 1.0 / (dist + epsilon)**2
+            
+            # 가중치 정규화 (합이 1이 되도록)
+            weights_sum = np.sum(weights, axis=1, keepdims=True)
+            norm_weights = weights / weights_sum
 
-            # Extract values from the nearest source points
-            res_o3_values = cur_data.loc[nearest_indices, 'ColumnAmountO3'].values
-            source_lat = cur_data.loc[nearest_indices, 'Latitude'].values
-            source_lon = cur_data.loc[nearest_indices, 'Longitude'].values
-
+            # 이웃한 점들의 O3 값 가져오기
+            # ind 배열을 이용해 O3 값을 (num_points, 3) 형태로 추출
+            neighbor_o3 = cur_data['ColumnAmountO3'].values[ind]
+            
+            # 가중 평균 계산 (Row-wise sum)
+            interpolated_o3 = np.sum(norm_weights * neighbor_o3, axis=1)
+            
+            # -------------------------------------------------------------
+            # 메타 데이터 (Time, Hours_elapsed)
+            # -------------------------------------------------------------
             hours_elapsed_val = cur_data['Hours_elapsed'].iloc[0] if not cur_data.empty else np.nan
             time_val = cur_data['Time'].iloc[0] if not cur_data.empty else pd.NaT
+
+            # Source 좌표는 '가장 가까운 점(k=1)' 하나만 남기거나, 굳이 필요 없다면 생략 가능
+            # 여기서는 가장 가까운 점의 좌표를 메타데이터로 남김
+            nearest_indices = ind[:, 0] 
+            source_lat = cur_data.loc[nearest_indices, 'Latitude'].values
+            source_lon = cur_data.loc[nearest_indices, 'Longitude'].values
 
             coarse_map[key] = pd.DataFrame({
                 'Latitude': center_points['lat'].values,
                 'Longitude': center_points['lon'].values,
-                'ColumnAmountO3': res_o3_values,
+                'ColumnAmountO3': interpolated_o3,  # IDW로 부드럽게 채워진 값
                 'Hours_elapsed': [hours_elapsed_val] * num_center_points,
                 'Time': [time_val] * num_center_points,
-                'Source_Latitude': source_lat,
+                'Source_Latitude': source_lat, # 참고용 (가장 가까운 점)
                 'Source_Longitude': source_lon
             })
+            
         return coarse_map
     
 
