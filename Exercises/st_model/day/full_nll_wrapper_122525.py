@@ -46,7 +46,7 @@ def transform_raw_to_model_params(raw_params: list) -> list:
         math.log(phi4),
         advec_lat,
         advec_lon,
-        math.log(nugget)
+        math.log(max(nugget, 1e-8))
     ]
     return transformed_params
 
@@ -105,9 +105,9 @@ def cli(
     # 2. Parameters Loading & Transformation
     # =========================================================================
     # [수정] Path 객체로 감싸주어야 '/' 연산자가 작동합니다.
-    path = Path("/cache/home/jl2815/tco/exercise_output/estimates/day/real_fit_dw_and_vecc_122325")
-    vecc_path = path / 'real_vecc_h1000_mm16_18126.csv'
-    dw_path = path / 'real_dw_18126.csv'
+    path = Path("/cache/home/jl2815/tco/exercise_output/estimates/day/real_fit_dw_and_vecc_july24")
+    vecc_path = path / 'real_vecc_july24_h1000_mm16.csv'
+    dw_path = path / 'real_dw_july24.csv'
 
     print(f"Loading parameters from:\n  {vecc_path}\n  {dw_path}")
     
