@@ -16,7 +16,7 @@ scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_heads_reg
 
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_GIM_vecc_dw_irregular_122025.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_GIM_vecc_dw_regular_122025.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_GIM_vecc_dw_regular_122625.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
 

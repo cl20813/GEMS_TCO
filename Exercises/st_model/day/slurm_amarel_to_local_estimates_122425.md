@@ -47,20 +47,18 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/rea
 
 
 
-
-
 # simulation results
 
 # regular grid
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_re_and_irr_dw_vs_vecc_122325/perturb0.2_nheads300_mm16_122325/sim_reg_dW_v05_18126.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/sim_dw_vecc_100times_122425/" 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_re_and_irr_dw_vs_vecc_122425/sim_reg_dW_1222_v05.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/sim_dw_vecc_mm16_h1000_122525/" 
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_re_and_irr_dw_vs_vecc_122325/perturb0.2_nheads300_mm16_122325/sim_reg_vecc_v05_18126.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/sim_dw_vecc_100times_122425/" 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_re_and_irr_dw_vs_vecc_122425/sim_reg_vecc_1222_v05.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/sim_dw_vecc_mm16_h1000_122525/"
 
 # regular gridded irregular
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_re_and_irr_dw_vs_vecc_122325/perturb0.2_nheads300_mm16_122325/sim_irre_dW_v05_18126.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/sim_dw_vecc_100times_122425/" 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_re_and_irr_dw_vs_vecc_122425/sim_irre_dW_1222_v05.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/sim_dw_vecc_mm16_h1000_122525/"
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_re_and_irr_dw_vs_vecc_122325/perturb0.2_nheads300_mm16_122325/sim_irre_vecc_v05_18126.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/sim_dw_vecc_100times_122425/" 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_re_and_irr_dw_vs_vecc_122425/sim_irre_vecc_1222_v05.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/sim_dw_vecc_mm16_h1000_122525/"
 
 
 
