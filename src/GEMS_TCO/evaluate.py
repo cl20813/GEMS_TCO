@@ -28,6 +28,8 @@ from matplotlib.ticker import FuncFormatter
 from typing import Callable, Union, Tuple
 from pathlib import Path
 
+
+
 # Add your custom path
 sys.path.append("/cache/home/jl2815/tco")
 
@@ -392,34 +394,53 @@ class CrossVariogram:
 
     def theoretical_gamma_kv(self, params: torch.Tensor, lat_diff: torch.Tensor, lon_diff: torch.Tensor, time_diff: torch.Tensor) -> (torch.Tensor, torch.Tensor):
         """
-        Computes the covariance for anisotropic spatial-temporal data using the Matérn covariance function.
-
-        Parameters:
-        - params (torch.Tensor): Tensor containing [sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget].
-        - lat_diff (torch.Tensor): Tensor of latitude differences.
-        - lon_diff (torch.Tensor): Tensor of longitude differences.
-        - time_diff (torch.Tensor): Tensor of time differences.
-
-        Returns:
-        - torch.Tensor: Spatial-temporal differences.
-        - torch.Tensor: Covariance values.
+        Computes the Semivariogram for anisotropic space-time data.
         """
-        sigmasq, range_lat, range_lon, advec_lat, advec_lon, beta, nugget = params
+        # [수정 1] 파라미터 Unpacking 순서 및 이름 일치 (Estimates DF와 동일하게)
+        # params: [sigmasq, range_lat, range_lon, range_time, advec_lat, advec_lon, nugget]
+        sigmasq, range_lat, range_lon, range_time, advec_lat, advec_lon, nugget = params
         
+        # [수정 2] Advection 적용
         tmp1 = lat_diff - advec_lat * time_diff
         tmp2 = lon_diff - advec_lon * time_diff
-        tmp3 = beta * time_diff
         
-        d = tmp1**2/range_lat**2 + tmp2**2/range_lon**2 + tmp3**2
+        # [수정 3] 시간 거리 계산 (beta 곱하기 -> range_time 나누기)
+        # time scale은 보통 range_time으로 나누는 것이 일반적입니다.
+        tmp3 = time_diff / range_time 
         
+        # 4. 전체 시공간 거리 (Ellipsoidal Distance) 제곱
+        # d는 (distance / range)^2 형태가 됩니다.
+        d = tmp1**2 / range_lat**2 + tmp2**2 / range_lon**2 + tmp3**2
         d = d.clone().detach()
 
-         # since d is tensor, kv() returns tensor
-        tmp = kv(self.smooth, np.sqrt(d)).clone().detach()
+        # [안전 장치] kv 함수는 보통 scipy(CPU/Numpy) 기반이므로 Tensor 변환 필요
+        # d가 GPU에 있다면 CPU로 내리고 Numpy로 변환해야 안전합니다.
+        if d.is_cuda:
+            d_np = d.cpu().numpy()
+        else:
+            d_np = d.numpy()
+            
+        # Matérn Correlation 계산 (Distance > 0 가정)
+        # np.sqrt(d)는 scaled distance입니다.
+        # kv 함수의 인자가 Bessel K_v(h) 형태인지 확인 필요 (보통 GEMS_TCO는 이 형태 사용)
+        import scipy.special # 안전을 위해 명시
+        tmp_np = scipy.special.kv(self.smooth, np.sqrt(d_np))
+        
+        # 다시 Tensor로 변환
+        tmp = torch.from_numpy(tmp_np).to(d.device)
+
+        # Spatial Covariance 부분 (Nugget 제외)
         out_tmp = (sigmasq * (2**(1-self.smooth)) / gamma(self.smooth) *
                 (torch.sqrt(d))**self.smooth * tmp)
         
+        # [결론] Variogram = Total Sill - Spatial Covariance
+        # (nugget + sigmasq) - (sigmasq * rho) = nugget + sigmasq(1 - rho)
+        # 이 식은 h > 0 일 때 정확합니다.
         out = (nugget + sigmasq) - out_tmp
+        
+        # 거리 0인 지점(NaN 등) 처리 (선택사항)
+        out = torch.nan_to_num(out, nan=0.0) 
+
         return torch.sqrt(d), out
         
     def squared_formatter(self, x: float, pos: int) -> str:
@@ -730,6 +751,7 @@ class CrossVariogram_empirical(CrossVariogram):
 
 # 12/25/25 modified theoretical class for cross-variogram plotting
 
+
 class CrossVariogram_emp_theory(CrossVariogram):
     def __init__(self, save_path, length_of_analysis, smooth):
         super().__init__(save_path, length_of_analysis)
@@ -738,7 +760,7 @@ class CrossVariogram_emp_theory(CrossVariogram):
     def plot_cross_lon_emp_the(self, lon_lag_sem, days, deltas, df, cov_func):
         fig, axs = plt.subplots(2, 2, figsize=(15, 10))
 
-        # https://betterfigures.org/2015/06/23/picking-a-colour-scale-for-scientific-graphics/
+        # Color palette
         colors = [
             (222/255, 235/255, 247/255),
             (198/255, 219/255, 239/255),
@@ -760,31 +782,34 @@ class CrossVariogram_emp_theory(CrossVariogram):
                 ax.plot(x_values, y_values, color=colors[i], label=f'Empirical CV Hour {i + 1} to {i+2}')
                 ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
                 
-            # 2. Prepare Theoretical Params (Correct Mapping)
-            deltas2 = torch.linspace(-2, 2, 40)
-            
-            # [수정] DataFrame 컬럼을 함수 인자 순서에 맞게 직접 매핑
+            # 2. Prepare Theoretical Params
+            deltas2 = torch.linspace(-2, 2, 40) # 벡터 (크기 40)
             row = df.iloc[day - 1]
-            params = [
-                row['sigma'],       # sigmasq
-                row['range_lat'],   # range_lat
-                row['range_lon'],   # range_lon
-                row['advec_lat'],   # advec_lat (순서 조정됨)
-                row['advec_lon'],   # advec_lon (순서 조정됨)
-                row['range_time'],  # beta (순서 조정됨)
-                row['nugget']       # nugget (누락 방지)
-            ]
-
-            gamma_values = []
-            d_values = []
             
-            # 3. Plot Theoretical
-            for delta in deltas2:
-                # Longitude direction: lat_diff=small, lon_diff=delta
-                d, gamma = cov_func(params, 0.00001, delta, 1)
-        
-                gamma_values.append(gamma.item()**2) 
-                d_values.append(d.item())
+            # 순서: [sigmasq, range_lat, range_lon, range_time, advec_lat, advec_lon, nugget]
+            params_list = [
+                row['sigma'],       
+                row['range_lat'],
+                row['range_lon'],
+                row['range_time'],  
+                row['advec_lat'],
+                row['advec_lon'],
+                row['nugget']
+            ]
+            params = torch.tensor(params_list, dtype=torch.float64)
+
+            # 3. Plot Theoretical (Vectorized - Loop Removed)
+            # Longitude direction: lat_diff=Scalar(0), lon_diff=Vector(deltas2), time_diff=Scalar(1)
+            # 한 번에 40개 포인트를 계산하므로 결과는 배열이 되어 torch.from_numpy 오류가 사라집니다.
+            d, gamma = cov_func(
+                params, 
+                torch.tensor(0.00001),  # lat_diff (scalar)
+                deltas2,                # lon_diff (vector)
+                torch.tensor(1.0)       # time_diff (scalar)
+            )
+            
+            # gamma는 이제 Tensor입니다. .pow(2)로 제곱하고 numpy로 변환합니다.
+            gamma_values = gamma.pow(2).detach().numpy()
             
             ax.plot(deltas2.numpy(), gamma_values, label=f"Fitted CV, time lag {1}", color=(8/255, 69/255, 0), linestyle='--', alpha=0.7)
             ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
@@ -795,7 +820,6 @@ class CrossVariogram_emp_theory(CrossVariogram):
             ax.set_ylabel('Cross-variogram Values', fontsize=12)
             ax.set_title(f'Cross-Variogram on 2024-07-{day:02d} ({self.length_of_analysis})', fontsize=14)
             
-            # [수정] Latitude와 동일하게 0.3 임계값 적용
             ax.set_xscale('symlog', linthresh=0.3)
             
             ax.set_xticks(x_values)
@@ -804,10 +828,7 @@ class CrossVariogram_emp_theory(CrossVariogram):
             ax.set_ylim(1e-4, 670)
             plt.setp(ax.get_xticklabels(), rotation=60, ha='right')
 
-            # Add vertical red line at x=0
             ax.axvline(x=0, color='red', linestyle='--')
-
-            # [중요] xlim은 설정 맨 마지막에 (Longitude 범위에 맞춰 -1.8 ~ 1.8로 설정)
             ax.set_xlim(-1.8, 1.8) 
             ax.legend()
 
@@ -830,53 +851,49 @@ class CrossVariogram_emp_theory(CrossVariogram):
             (8/255, 69/255, 148/255)
         ]
 
-        # 1. Prepare X values (Lags)
+        # 1. Prepare X values (Lags) and Sort Indices
         raw_x_values = [lat for lat, lon in deltas]
-
-        # [중요] 지그재그 방지를 위한 정렬 인덱스 생성 (음수 -> 양수 순서)
-        sorted_indices = sorted(range(len(raw_x_values)), key=lambda k: raw_x_values[k])
         
-        # 정렬된 X축 데이터
+        sorted_indices = sorted(range(len(raw_x_values)), key=lambda k: raw_x_values[k])
         x_values = [raw_x_values[i] for i in sorted_indices]
 
         for index, day in enumerate(days):
             ax = axs[index // 2, index % 2]
 
-            # 2. Plot Empirical (정렬 적용)
+            # 2. Plot Empirical (Sorted)
             for i in range(7):
-                # 원본 Y값 가져오기
                 raw_y_values = [y**2 for y in lon_lag_sem[day][i]]
-                
-                # [중요] X축과 동일한 순서로 Y값 재배열
                 y_values = [raw_y_values[i] for i in sorted_indices]
 
                 ax.plot(x_values, y_values, color=colors[i], label=f'Empirical CV Hour {i + 1} to {i+2}')
                 ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
                 
             # 3. Prepare Theoretical Params
-            # 이론적 값은 -2 ~ 2까지 이미 생성 중이므로 변경 없음
-            deltas2 = torch.linspace(-2, 2, 40)
-            
+            deltas2 = torch.linspace(-2, 2, 40) # 벡터
             row = df.iloc[day - 1]
-            params = [
-                row['sigma'],
+            
+            params_list = [
+                row['sigma'],       
                 row['range_lat'],
                 row['range_lon'],
+                row['range_time'],  
                 row['advec_lat'],
                 row['advec_lon'],
-                row['range_time'],
                 row['nugget']
             ]
+            params = torch.tensor(params_list, dtype=torch.float64)
 
-            gamma_values = []
-            d_values = []
+            # 4. Plot Theoretical (Vectorized - Loop Removed)
+            # Latitude direction: lat_diff=Vector(deltas2), lon_diff=Scalar(0), time_diff=Scalar(1)
+            d, gamma = cov_func(
+                params, 
+                deltas2,                # lat_diff (vector)
+                torch.tensor(0.00001),  # lon_diff (scalar)
+                torch.tensor(1.0)       # time_diff (scalar)
+            )
             
-            # 4. Plot Theoretical
-            for delta in deltas2:
-                # Latitude direction
-                d, gamma = cov_func(params, delta, 0.00001, 1)
-                gamma_values.append(gamma.item()**2) 
-                d_values.append(d.item())
+            # gamma는 Tensor입니다.
+            gamma_values = gamma.pow(2).detach().numpy()
             
             ax.plot(deltas2.numpy(), gamma_values, label=f"Fitted CV, time lag {1}", color=(8/255, 69/255, 0), linestyle='--', alpha=0.7)
             ax.yaxis.set_major_formatter(FuncFormatter(self.squared_formatter))
@@ -897,7 +914,6 @@ class CrossVariogram_emp_theory(CrossVariogram):
 
             ax.axvline(x=0, color='red', linestyle='--')
             
-            # [수정 완료] 음수부터 양수까지 보이도록 범위 확장 (-1.8 ~ 1.8)
             ax.set_xlim(-1.8, 1.8) 
             ax.legend()
 
@@ -909,7 +925,7 @@ class CrossVariogram_emp_theory(CrossVariogram):
 
 
     #########################
-    #########################
+    ######################### 아래 사용 안함
 
 
     def plot_two_latitude(self, days,lon_lag_sem,  deltas, df1, df2):
