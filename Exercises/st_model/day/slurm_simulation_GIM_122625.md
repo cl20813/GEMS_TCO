@@ -73,7 +73,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat           # 💥 파티션 이름 확인 필요
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu038               # 💥 확인하신 idle 노드 중 하나 입력
+#SBATCH --nodelist=gpu040               # 💥 확인하신 idle 노드 중 하나 입력
 
 #### Load Modules
 module purge

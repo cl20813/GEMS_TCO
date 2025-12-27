@@ -165,7 +165,11 @@ def cli(
     print("\n[1] Initializing Data Loader...")
     # 해상도가 [1, 1]이면 데이터가 작지만, [20, 20] 등 고해상도라면 엄청 큽니다.
     lat_lon_resolution = [1, 1] 
-    years = ['2024']; month_range =[7]
+
+    #years = ['2024']; month_range =[7]
+
+    years = ['2025']; month_range =[7]
+
     data_load_instance = load_data2(config.amarel_data_load_path)
 
     # 전체 Raw Data Map은 한 번 로드해야 합니다 (이건 어쩔 수 없지만, working data보단 작음)
@@ -180,9 +184,11 @@ def cli(
     # =========================================================
     # 2. PARAMETER LOADING
     # =========================================================
-    path = Path("/cache/home/jl2815/tco/exercise_output/estimates/day/real_fit_dw_and_vecc_july24")
-    vecc_path = path / 'real_vecc_july24_h1000_mm16.csv'
-    dw_path = path / 'real_dw_july24.csv'
+
+    path = Path(f"/cache/home/jl2815/tco/exercise_output/estimates/day/real_fit_dw_and_vecc_july{int(years[0])%100:02d}/")
+    vecc_path = path / f'real_vecc_july{int(years[0])%100:02d}_h1000_mm16.csv'
+    dw_path = path / f'real_dw_july{int(years[0])%100:02d}.csv'
+
     dw_real_df = pd.read_csv(dw_path).iloc[:28, 4:(4+7)]
     vecc_real_df = pd.read_csv(vecc_path).iloc[:28, 4:(4+7)]
 
@@ -343,8 +349,9 @@ def cli(
         del real_agg_vecc, real_map_vecc, model_vc, H_inv_vc, grad_list_vc, J_mat_vc, Cov_vc
         gc.collect(); torch.cuda.empty_cache()
 
+    output_path = Path("/home/jl2815/tco/exercise_output/estimates/day/GIM/")
     df_res = pd.DataFrame(results)
-    out_file = f"se_results_days_{start_day}_to_{end_day}.csv"
+    out_file = output_path / f"GIM_{int(years[0])}_days_{start_day}_to_{end_day}.csv"
     df_res.to_csv(out_file, index=False)
     print(f"\n[Success] Saved to {out_file}")
 
