@@ -16,7 +16,7 @@ scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_heads_reg
 
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_GIM_vecc_dw_irregular_122025.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_GIM_vecc_dw_regular_122625.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_GIM_vecc_dw_regular_122725.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
 
@@ -59,21 +59,21 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim
 ### simulation regular grid + GIM
 
 ``` cd ./jobscript/tco/gp_exercise ```
-```  nano sim_GIM_122625.sh  ``` 
-```  sbatch sim_GIM_122625.sh  ``` 
+```  nano sim_GIM_122725.sh  ``` 
+```  sbatch sim_GIM_122725.sh  ``` 
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=sim_GIM_122625       # Job name (Added GPU tag)
-#SBATCH --output=/home/jl2815/tco/exercise_output/sim_GIM_122625_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/sim_GIM_122625_%j.err
-#SBATCH --time=48:00:00
+#SBATCH --job-name=sim_GIM_122725       # Job name (Added GPU tag)
+#SBATCH --output=/home/jl2815/tco/exercise_output/sim_GIM_122725_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/sim_GIM_122725_%j.err
+#SBATCH --time=72:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat           # 💥 파티션 이름 확인 필요
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu040               # 💥 확인하신 idle 노드 중 하나 입력
+#SBATCH --nodelist=gpu037               # 💥 확인하신 idle 노드 중 하나 입력
 
 #### Load Modules
 module purge
@@ -89,7 +89,7 @@ echo "Running on High-End AdaLovelace Node: $(hostname)"
 nvidia-smi
 
 # Run the script
-srun python /home/jl2815/tco/exercise_25/st_model/sim_GIM_vecc_dw_regular_122625.py --start-day 1 --end-day 28 --no-keep-exact-loc 
+srun python /home/jl2815/tco/exercise_25/st_model/sim_GIM_vecc_dw_regular_122725.py --start-day 1 --end-day 28 --no-keep-exact-loc 
 
 echo "Current date and time: $(date)"
 

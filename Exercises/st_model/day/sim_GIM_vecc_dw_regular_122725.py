@@ -143,8 +143,6 @@ def transform_model_to_physical_tensor(model_params: torch.Tensor) -> torch.Tens
 # --- MAIN CLI COMMAND ---
 app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
 
-# ... (앞부분 import 및 설정은 동일) ...
-
 @app.command()
 def cli(
     start_day: int = typer.Option(..., help="Start day (e.g., 1)"),
@@ -163,28 +161,20 @@ def cli(
     # 1. INITIAL SETUP (메타데이터만 로드)
     # =========================================================
     print("\n[1] Initializing Data Loader...")
-    # 해상도가 [1, 1]이면 데이터가 작지만, [20, 20] 등 고해상도라면 엄청 큽니다.
     lat_lon_resolution = [1, 1] 
-
-    #years = ['2024']; month_range =[7]
-
-    years = ['2025']; month_range =[7]
-
+    years = ['2024']; month_range =[7]
     data_load_instance = load_data2(config.amarel_data_load_path)
 
-    # 전체 Raw Data Map은 한 번 로드해야 합니다 (이건 어쩔 수 없지만, working data보단 작음)
     df_map, ord_mm, nns_map = data_load_instance.load_maxmin_ordered_data_bymonthyear(
         lat_lon_resolution=lat_lon_resolution, mm_cond_number=mm_cond_number,
         years_=years, months_=month_range, lat_range=[-3, 2], lon_range=[121, 131] 
     )
     
-    # [수정됨] 여기서 daily_data_list 같은 리스트를 만들지 않습니다!
     print(f"Metadata Loaded. Starting Day-by-Day Processing.")
 
     # =========================================================
     # 2. PARAMETER LOADING
     # =========================================================
-
     path = Path(f"/cache/home/jl2815/tco/exercise_output/estimates/day/real_fit_dw_and_vecc_july{int(years[0])%100:02d}/")
     vecc_path = path / f'real_vecc_july{int(years[0])%100:02d}_h1000_mm16.csv'
     dw_path = path / f'real_dw_july{int(years[0])%100:02d}.csv'
@@ -193,41 +183,47 @@ def cli(
     vecc_real_df = pd.read_csv(vecc_path).iloc[:28, 4:(4+7)]
 
     # =========================================================
-    # 3. MAIN LOOP (Load -> Process -> Delete)
+    # 3. [FILE SETUP] LOOP 시작 전에 저장 경로 설정
+    # =========================================================
+    output_path = Path("/home/jl2815/tco/exercise_output/estimates/day/GIM/")
+    output_path.mkdir(parents=True, exist_ok=True) # 폴더 없으면 생성
+    out_file = output_path / f"GIM_{int(years[0])}_days_{start_day}_to_{end_day}.csv"
+    
+    print(f"[Info] Results will be incrementally saved to: {out_file}")
+
+    # =========================================================
+    # 4. MAIN LOOP (Load -> Process -> Save Immediately)
     # =========================================================
     results = []
     target_range = range(start_day - 1, end_day)
+    
+    # [PRINT PARAMETER NAMES]
+    p_names = ["SigmaSq", "RangeLat", "RangeLon", "RangeTime", "AdvecLat", "AdvecLon", "Nugget"]
     
     for day in target_range:
         if day >= 28: 
             print(f"Day {day+1} is out of range. Stopping.")
             break
-
-        # [MEMORY] 시작 전 청소
+        
+        t0_day = time.time()
         gc.collect(); torch.cuda.empty_cache()
         print(f"\n>>> Processing Day {day+1} ...")
 
         # ---------------------------------------------------------
-        # [NEW] 여기서 데이터를 로드합니다 (Just-In-Time)
+        # [DATA LOAD] Just-In-Time
         # ---------------------------------------------------------
         hour_indices = [day * 8, (day + 1) * 8]
-        
-        # 1. Whittle 데이터 로드 & GPU 이동
-        print("   -> Loading Data for current day...")
+        print("   -> Loading Data...")
         dw_map_tmp, dw_agg_tmp = data_load_instance.load_working_data(
             df_map, hour_indices, ord_mm=None, dtype=DTYPE, keep_ori=keep_exact_loc
         )
-        real_agg_dw = dw_agg_tmp.to(DEVICE) # 바로 GPU로
-        
-        # dw_map_tmp는 Whittle에서 안쓰면 바로 삭제 (메모리 절약)
+        real_agg_dw = dw_agg_tmp.to(DEVICE)
         del dw_map_tmp, dw_agg_tmp
 
         # ---------------------------------------------------------
         # [MODEL 1] Whittle SE
         # ---------------------------------------------------------
-        print("   [1/2] Whittle SE...")
-        
-        # Grid Config 생성
+        print("   [1/2] Calculating Whittle SE...")
         grid_cfg_day = {
             'lats': torch.unique(real_agg_dw[:, 0]), 'lons': torch.unique(real_agg_dw[:, 1]),
             't_def': len(torch.unique(real_agg_dw[:, 3])), 'mean': 260.0
@@ -237,7 +233,6 @@ def cli(
         dw_params_grad = dw_params_val.clone().detach().requires_grad_(True)
         dwl = debiased_whittle.debiased_whittle_likelihood()
         
-        # Real Data Diff
         cur_df = real_agg_dw  
         time_slices_obs = []
         for t_val in torch.unique(cur_df[:, 3]):
@@ -283,22 +278,20 @@ def cli(
         SE_phys_dw = torch.sqrt(torch.diag(Jacobian_dw @ Cov_dw @ Jacobian_dw.T)).detach().cpu().numpy()
         Pt_phys_dw = transform_model_to_physical_tensor(dw_params_val).detach().cpu().numpy()
 
-        # [MEMORY] Whittle 끝났으니 데이터 삭제
         del grad_list_dw, J_mat_dw, Cov_dw, dwl, cur_df, real_agg_dw
         gc.collect(); torch.cuda.empty_cache()
 
         # ---------------------------------------------------------
         # [MODEL 2] Vecchia SE
         # ---------------------------------------------------------
-        print("   [2/2] Vecchia SE...")
+        print("   [2/2] Calculating Vecchia SE...")
         
-        # 2. Vecchia 데이터 로드 (필요할 때 로드)
         vecc_map_tmp, vecc_agg_tmp = data_load_instance.load_working_data(
             df_map, hour_indices, ord_mm=ord_mm, dtype=DTYPE, keep_ori=keep_exact_loc
         )
         real_agg_vecc = vecc_agg_tmp.to(DEVICE)
         real_map_vecc = {k: v.to(DEVICE) for k, v in vecc_map_tmp.items()}
-        del vecc_map_tmp, vecc_agg_tmp  # CPU 원본 삭제
+        del vecc_map_tmp, vecc_agg_tmp 
 
         vecc_params_val = torch.tensor(transform_raw_to_model_params(vecc_real_df.iloc[day].tolist()), device=DEVICE, dtype=DTYPE)
         vecc_params_grad = vecc_params_val.clone().detach().requires_grad_(True)
@@ -337,23 +330,48 @@ def cli(
         SE_phys_vc = torch.sqrt(torch.diag(Jacobian_vc @ Cov_vc @ Jacobian_vc.T)).detach().cpu().numpy()
         Pt_phys_vc = transform_model_to_physical_tensor(vecc_params_val).detach().cpu().numpy()
 
+        # ---------------------------------------------------------
+        # [SAVE] IMMEDIATE SAVE + ROUNDING
+        # ---------------------------------------------------------
         row = {
             "Day": day + 1,
-            "DW_Est_SigmaSq": Pt_phys_dw[0], "DW_SE_SigmaSq": SE_phys_dw[0],
-            # ... (나머지 저장 코드 동일) ...
-            "VC_Est_Nugget": Pt_phys_vc[6],   "VC_SE_Nugget": SE_phys_vc[6],
+            # Whittle
+            "DW_Est_SigmaSq":   Pt_phys_dw[0], "DW_SE_SigmaSq":   SE_phys_dw[0],
+            "DW_Est_RangeLat":  Pt_phys_dw[1], "DW_SE_RangeLat":  SE_phys_dw[1],
+            "DW_Est_RangeLon":  Pt_phys_dw[2], "DW_SE_RangeLon":  SE_phys_dw[2],
+            "DW_Est_RangeTime": Pt_phys_dw[3], "DW_SE_RangeTime": SE_phys_dw[3],
+            "DW_Est_AdvecLat":  Pt_phys_dw[4], "DW_SE_AdvecLat":  SE_phys_dw[4],
+            "DW_Est_AdvecLon":  Pt_phys_dw[5], "DW_SE_AdvecLon":  SE_phys_dw[5],
+            "DW_Est_Nugget":    Pt_phys_dw[6], "DW_SE_Nugget":    SE_phys_dw[6],
+            # Vecchia
+            "VC_Est_SigmaSq":   Pt_phys_vc[0], "VC_SE_SigmaSq":   SE_phys_vc[0],
+            "VC_Est_RangeLat":  Pt_phys_vc[1], "VC_SE_RangeLat":  SE_phys_vc[1],
+            "VC_Est_RangeLon":  Pt_phys_vc[2], "VC_SE_RangeLon":  SE_phys_vc[2],
+            "VC_Est_RangeTime": Pt_phys_vc[3], "VC_SE_RangeTime": SE_phys_vc[3],
+            "VC_Est_AdvecLat":  Pt_phys_vc[4], "VC_SE_AdvecLat":  SE_phys_vc[4],
+            "VC_Est_AdvecLon":  Pt_phys_vc[5], "VC_SE_AdvecLon":  SE_phys_vc[5],
+            "VC_Est_Nugget":    Pt_phys_vc[6], "VC_SE_Nugget":    SE_phys_vc[6],
         }
         results.append(row)
         
-        # [MEMORY] Vecchia 데이터 및 모델 삭제
+        pd.DataFrame(results).round(4).to_csv(out_file, index=False)
+
+        elapsed = time.time() - t0_day
+        print(f"   [DONE] Day {day+1} Finished in {elapsed:.1f}s")
+        print(f"   [INFO] Progress saved to {out_file}")
+        
+        # [MODIFIED] Full Parameter Display
+        print(f"   >>> Result Summary for Day {day+1} (Est | SE):")
+        print(f"       {'Param':<10} | {'DW Est':<10} | {'DW SE':<10} || {'VC Est':<10} | {'VC SE':<10}")
+        print(f"       {'-'*65}")
+        for k in range(7):
+            print(f"       {p_names[k]:<10} | {Pt_phys_dw[k]:.4f}     | {SE_phys_dw[k]:.4f}     || {Pt_phys_vc[k]:.4f}     | {SE_phys_vc[k]:.4f}")
+        print("-" * 65)
+
         del real_agg_vecc, real_map_vecc, model_vc, H_inv_vc, grad_list_vc, J_mat_vc, Cov_vc
         gc.collect(); torch.cuda.empty_cache()
 
-    output_path = Path("/home/jl2815/tco/exercise_output/estimates/day/GIM/")
-    df_res = pd.DataFrame(results)
-    out_file = output_path / f"GIM_{int(years[0])}_days_{start_day}_to_{end_day}.csv"
-    df_res.to_csv(out_file, index=False)
-    print(f"\n[Success] Saved to {out_file}")
+    print(f"\n[Success] All Done! Final file: {out_file}")
 
 if __name__ == "__main__":
     app()
