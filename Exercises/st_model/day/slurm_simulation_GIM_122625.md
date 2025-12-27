@@ -59,49 +59,37 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim
 ### simulation regular grid + GIM
 
 ``` cd ./jobscript/tco/gp_exercise ```
-```  nano sim_GIM_121925.sh  ``` 
-```  sbatch sim_GIM_121925.sh  ``` 
+```  nano sim_GIM_122625.sh  ``` 
+```  sbatch sim_GIM_122625.sh  ``` 
 
 ``` 
 #!/bin/bash
-#SBATCH --job-name=sim_GIM_121225       # Job name (Added GPU tag)
-#SBATCH --output=/home/jl2815/tco/exercise_output/sim_GIM_121225_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/sim_GIM_121225_%j.err
-#SBATCH --time=24:00:00                                 # Reduced time (GPU is faster)
+#SBATCH --job-name=sim_GIM_122625       # Job name (Added GPU tag)
+#SBATCH --output=/home/jl2815/tco/exercise_output/sim_GIM_122625_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/sim_GIM_122625_%j.err
+#SBATCH --time=48:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8                               # CHANGED: Reduced from 48 (GPU does the work now)
-#SBATCH --mem=64G                                       # CHANGED: Reduced from 400G (GPU handles the matrices)
-#SBATCH --partition=gpu                                 # 💥 CRITICAL: Change to your cluster's GPU partition name
-#SBATCH --gres=gpu:1                                    # 💥 CRITICAL: Request 1 GPU
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=120G
+#SBATCH --partition=gpu-redhat           # 💥 파티션 이름 확인 필요
+#SBATCH --gres=gpu:1
+#SBATCH --nodelist=gpu038               # 💥 확인하신 idle 노드 중 하나 입력
 
 #### Load Modules
-module purge                                              
-module use /projects/community/modulefiles                 
-module load anaconda/2024.06-ts840 
+module purge
+module use /projects/community/modulefiles
+module load anaconda/2024.06-ts840
 module load cuda/12.1.0
 
 #### Initialize conda
 eval "$(conda shell.bash hook)"
-conda activate faiss_env  # Ensure this env has PyTorch with CUDA installed!
+conda activate faiss_env
 
-echo "Current date and time: $(date)"
-echo "Running GPU Batched Vecchia Optimization"
-echo "Node: $(hostname)"
-
-# Check if GPU is actually visible
+echo "Running on High-End AdaLovelace Node: $(hostname)"
 nvidia-smi
 
 # Run the script
-srun python /home/jl2815/tco/exercise_25/st_model/sim_heads_regular_vecc_GIM_121925.py \
-    --v 0.5 \
-    --lr 0.03 \
-    --step 80 \
-    --epochs 100 \
-    --space "1, 1" \
-    --days "20,30" \
-    --mm-cond-number 8 \
-    --nheads 300 \
-    --no-keep-exact-loc 
+srun python /home/jl2815/tco/exercise_25/st_model/sim_GIM_vecc_dw_regular_122625.py --start-day 1 --end-day 28 --no-keep-exact-loc 
 
 echo "Current date and time: $(date)"
 
