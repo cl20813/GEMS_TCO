@@ -64,8 +64,10 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim
 
 ## Godembe information matrix
 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/GIM/GIM_2024_days_1_to_28.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/gim/"
+
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/GIM/GIM_2025_days_1_to_28.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/gim/"
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/GIM/GIM_2024_days_1_to_28.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/gim/"
+
 
 
