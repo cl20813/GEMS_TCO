@@ -43,7 +43,7 @@ sys.path.append(gems_tco_path)
 # Configure logging to a specific file path
 log_file_path = '/home/jl2815/tco/exercise_25/st_models/log/evaluate.log'
 
-from GEMS_TCO.kernels_reparam_space_time_gpu import SpatioTemporalModel  
+from src.GEMS_TCO.kernels_reparam_space_time_gpu_before_010126 import SpatioTemporalModel  
 
 import numpy as np
 import torch

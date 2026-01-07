@@ -14,9 +14,9 @@ scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/coarse_cen_map_rect24_07.
 
 # vecchia
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_gpu_vecc_day_v05_122525.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_gpu_vecc_day_v05_010126.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
-
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_heads_regular_vecc_testing_day_v05_010126.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
 
@@ -52,8 +52,8 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vec
 ### vecc gpu l-bfgs
 
 ``` cd ./jobscript/tco/gp_exercise ```
-```  nano fit_vecc_gpu_122525.sh  ``` 
-```  sbatch fit_vecc_gpu_122525.sh  ``` 
+```  nano fit_vecc_gpu_010126.sh  ``` 
+```  sbatch fit_vecc_gpu_010126.sh  ``` 
 
 
 ```
@@ -84,113 +84,25 @@ nvidia-smi
 
 # Run the script
 # A100/V100급이므로 nheads 1000으로 과감하게 갑니다.
-srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_122525.py \
+srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_010126.py \
     --v 0.5 \
     --space "1, 1" \
     --days "0,31" \
-    --mm-cond-number 16 \
-    --nheads 1000 \
-    --no-keep-exact-loc
-```
-
-
-
-``` cd ./jobscript/tco/gp_exercise ```
-```  nano fit_vecc_gpu2_122325.sh  ``` 
-```  sbatch fit_vecc_gpu2_122325.sh  ``` 
-
-
-```
-#!/bin/bash
-#SBATCH --job-name=fit_vecc_high
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_vecc_high_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_vecc_high_%j.err
-#SBATCH --time=48:00:00
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=120G
-#SBATCH --partition=gpu-redhat           # 💥 파티션 이름 확인 필요
-#SBATCH --gres=gpu:2
-#SBATCH --nodelist=gpu032               # 💥 확인하신 idle 노드 중 하나 입력
-
-#### Load Modules
-module purge
-module use /projects/community/modulefiles
-module load anaconda/2024.06-ts840
-module load cuda/12.1.0
-
-#### Initialize conda
-eval "$(conda shell.bash hook)"
-conda activate faiss_env
-
-echo "Running on High-End AdaLovelace Node: $(hostname)"
-nvidia-smi
-
-srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_122325.py \
-    --v 0.5 \
-    --space "1, 1" \
-    --days "0,31" \
-    --mm-cond-number 17 \
-    --nheads 1000 \
+    --mm-cond-number 8 \
+    --nheads 300 \
     --no-keep-exact-loc
 
 ```
+
 
 #gpu30:1000, mm16 거뜬 4분
 
 
-22 18 20 
 
 
-
-
-
-
-``` 
-#!/bin/bash
-#SBATCH --job-name=fit_vecc_gpu_122325.sh          # Job name (Added GPU tag)
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_vecc_gpu_122325.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_vecc_gpu_122325.err
-#SBATCH --time=48:00:00                                 # Reduced time (GPU is faster)
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8                               # CHANGED: Reduced from 48 (GPU does the work now)
-#SBATCH --mem=64G                                       # CHANGED: Reduced from 400G (GPU handles the matrices)
-#SBATCH --partition=gpu                                 # 💥 CRITICAL: Change to your cluster's GPU partition name
-#SBATCH --gres=gpu:1                                    # 💥 CRITICAL: Request 1 GPU
-
-#### Load Modules
-module purge                                              
-module use /projects/community/modulefiles                 
-module load anaconda/2024.06-ts840 
-module load cuda/12.1.0
-
-#### Initialize conda
-eval "$(conda shell.bash hook)"
-conda activate faiss_env  # Ensure this env has PyTorch with CUDA installed!
-
-echo "Current date and time: $(date)"
-echo "Running GPU Batched Vecchia Optimization"
-echo "Node: $(hostname)"
-
-# Check if GPU is actually visible
-nvidia-smi
-
-# Run the script
-srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_122325.py\
-    --v 0.5 \
-    --space "1, 1" \
-    --days "0,31" \
-    --mm-cond-number 16 \
-    --nheads 300 \
-    --no-keep-exact-loc 
-
-echo "Current date and time: $(date)"
-
-```
-
-
-
-
+``` cd ./jobscript/tco/gp_exercise ```
+```  nano fit_vecc_cpu010126.sh  ``` 
+```  sbatch fit_vecc_cpu010126.sh  ``` 
 
 ### vecc cpu
 
@@ -198,13 +110,13 @@ echo "Current date and time: $(date)"
 ``` 
 
 #!/bin/bash
-#SBATCH --job-name=fit_vecc_gpu_122325     # Job name (Added GPU tag)
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_vecc_gpu_122325.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_vecc_gpu_122325.err
+#SBATCH --job-name=fit_vecc_cpu010126     # Job name (Added GPU tag)
+#SBATCH --output=/home/jl2815/tco/exercise_output/fit_vecc_cpu010126.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/fit_vecc_cpu010126.err
 #SBATCH --time=24:00:00                                 
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=40                               
-#SBATCH --mem=250G                                       
+#SBATCH --mem=300G                                       
 #SBATCH --partition=mem                                 # 💥 
 
 #### Load Modules
@@ -223,9 +135,9 @@ echo "Node: $(hostname)"
 
 
 # Run the script
-srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_122325.py \
+srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_010126.py \
     --v 0.5 \
-    --mm-cond-number 16 \
+    --mm-cond-number 8 \
     --nheads 300 \
     --v 0.5 \
     --space "1, 1" \
@@ -236,3 +148,44 @@ echo "Current date and time: $(date)"
 
 ```
 
+
+
+# heads testing
+
+``` cd ./jobscript/tco/gp_exercise ```
+```  nano heads_testing_010126.sh  ``` 
+```  sbatch heads_testing_010126.sh  ``` 
+
+
+```
+#!/bin/bash
+#SBATCH --job-name=heads_testing_010126
+#SBATCH --output=/home/jl2815/tco/exercise_output/heads_testing_010126_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/heads_testing_010126_%j.err
+#SBATCH --time=48:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=120G
+#SBATCH --partition=gpu-redhat           # 💥 파티션 이름 확인 필요
+#SBATCH --gres=gpu:2
+#SBATCH --nodelist=gpu033               # 💥 확인하신 idle 노드 중 하나 입력
+
+#### Load Modules
+module purge
+module use /projects/community/modulefiles
+module load anaconda/2024.06-ts840
+module load cuda/12.1.0
+
+#### Initialize conda
+eval "$(conda shell.bash hook)"
+conda activate faiss_env
+
+echo "Running on High-End AdaLovelace Node: $(hostname)"
+nvidia-smi
+
+srun python /home/jl2815/tco/exercise_25/st_model/sim_heads_regular_vecc_testing_day_v05_010126.py \
+    --v 0.5 \
+    --mm-cond-number 8 \
+    --no-keep-exact-loc
+
+```

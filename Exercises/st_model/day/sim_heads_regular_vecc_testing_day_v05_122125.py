@@ -233,6 +233,8 @@ def cli(
     # --- Move these outside the loop to fix the NameError and save time ---
     lats_sim = torch.arange(0, 5.0 + 0.001, 0.044, device=DEVICE, dtype=DTYPE)
     lons_sim = torch.arange(123.0, 133.0 + 0.001, 0.063, device=DEVICE, dtype=DTYPE)
+
+
     lats_flip = torch.flip(lats_sim, dims=[0])
     lons_flip = torch.flip(lons_sim, dims=[0])
 
@@ -322,6 +324,8 @@ def cli(
         LBFGS_HISTORY_SIZE = 100   
         LBFGS_MAX_EVAL = 100       # line search from 50 to 80
         DWL_MAX_STEPS = 20         
+
+        
         LAT_COL, LON_COL, VAL_COL, TIME_COL = 0, 1, 2, 3
         #DELTA_LAT, DELTA_LON = 0.044, 0.063 
         
@@ -383,10 +387,10 @@ def cli(
         
         B = out[:-1]
 
-        heads1 = 300
-        heads2 = 400
-        heads3 = 500
-        testing_date = "1221"
+        heads1 = 0
+        heads2 = 100
+        heads3 = 200
+        testing_date = "0101"
 
 
         # For 0 heads
