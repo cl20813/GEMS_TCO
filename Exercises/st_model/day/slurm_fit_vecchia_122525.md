@@ -52,8 +52,8 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vec
 ### vecc gpu l-bfgs
 
 ``` cd ./jobscript/tco/gp_exercise ```
-```  nano fit_vecc_gpu_010126.sh  ``` 
-```  sbatch fit_vecc_gpu_010126.sh  ``` 
+```  nano fit_vecc_gpu_011026.sh  ``` 
+```  sbatch fit_vecc_gpu_011026.sh  ``` 
 
 
 ```
@@ -88,8 +88,8 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_010126.py
     --v 0.5 \
     --space "1, 1" \
     --days "0,31" \
-    --mm-cond-number 8 \
-    --nheads 300 \
+    --mm-cond-number 16 \
+    --nheads 1000 \
     --no-keep-exact-loc
 
 ```
