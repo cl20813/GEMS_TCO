@@ -52,9 +52,8 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vec
 ### vecc gpu l-bfgs
 
 ``` cd ./jobscript/tco/gp_exercise ```
-```  nano fit_vecc_gpu_011026.sh  ``` 
-```  sbatch fit_vecc_gpu_011026.sh  ``` 
-
+```  nano fit_vecc_gpu_011426.sh  ``` 
+```  sbatch fit_vecc_gpu_011426.sh  ``` 
 
 ```
 #!/bin/bash
@@ -65,9 +64,9 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vec
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=120G                      #  gpu30:80
-#SBATCH --partition=gpu-redhat                 # 'gpu' 파티션 사용
+#SBATCH --partition=gpu         # 'gpu', 'gpu-redhat'
 #SBATCH --gres=gpu:1                    # GPU 1개 요청
-#SBATCH --nodelist=gpu034      # 💥 여기를 gpu030으로 변경! (idle 상태임)
+#SBATCH --nodelist=gpu020      # 💥 여기를 gpu030으로 변경! (idle 상태임)
 
 #### Load Modules
 module purge
@@ -88,8 +87,8 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_010126.py
     --v 0.5 \
     --space "1, 1" \
     --days "0,31" \
-    --mm-cond-number 16 \
-    --nheads 1000 \
+    --mm-cond-number 8 \
+    --nheads 300 \
     --no-keep-exact-loc
 
 ```

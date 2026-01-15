@@ -174,7 +174,7 @@ class SpatioTemporalModel:
         if x.shape[0] == y.shape[0]:
             cov.diagonal().add_(nugget + 1e-8)
         return cov
-    
+    '''  3 features
     def full_likelihood_avg(self, params: torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
         input_data = input_data.to(torch.float64)
         y = y.to(torch.float64)
@@ -215,7 +215,74 @@ class SpatioTemporalModel:
 
         neg_log_lik_sum = 0.5 * (log_det + quad_form.squeeze())
         return neg_log_lik_sum / N
+    '''
 
+    ''' 6 features
+
+    def full_likelihood_avg(self, params: torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
+        input_data = input_data.to(torch.float64)
+        y = y.to(torch.float64)
+        N = input_data.shape[0]
+        if N == 0: return torch.tensor(0.0, device=self.device, dtype=torch.float64)
+        
+        cov_matrix = covariance_function(params=params, y=input_data, x=input_data)
+        
+        try:
+            jitter = torch.eye(cov_matrix.shape[0], device=self.device, dtype=torch.float64) * 1e-6
+            L = torch.linalg.cholesky(cov_matrix + jitter)
+        except torch.linalg.LinAlgError:
+            return torch.tensor(torch.inf, device=params.device, dtype=params.dtype)
+        
+        log_det = 2 * torch.sum(torch.log(torch.diag(L)))
+        
+        # --- [MODIFIED] Construct 6 Features (Same as VecchiaBatched) ---
+        # Assuming input_data columns: [Lat(0), Lon(1), Val(2), Time(3)] 
+        # based on your other methods using index 3 for time.
+        
+        lat  = input_data[:, 0]
+        lon  = input_data[:, 1]
+        time = input_data[:, 3] 
+        
+        ones = torch.ones(N, device=self.device, dtype=torch.float64)
+        
+        # Stack: [Intercept, Lat, Lon, Time, Lat*Time, Lon*Time]
+        locs = torch.stack([
+            ones,
+            lat,
+            lon,
+            time,
+            lat * time,
+            lon * time
+        ], dim=1)  # Shape becomes (N, 6)
+        # -------------------------------------------------------------
+
+        if y.dim() == 1: y_col = y.unsqueeze(-1)
+        else: y_col = y
+        
+        combined_rhs = torch.cat((locs, y_col), dim=1)
+        Z_combined = torch.linalg.solve_triangular(L, combined_rhs, upper=False)
+        
+        # Slice appropriately for 6 features
+        Z_X = Z_combined[:, :6] 
+        Z_y = Z_combined[:, 6:]
+
+        tmp1 = torch.matmul(Z_X.T, Z_X)
+        tmp2 = torch.matmul(Z_X.T, Z_y)
+        
+        try:
+            jitter_beta = torch.eye(tmp1.shape[0], device=self.device, dtype=torch.float64) * 1e-8
+            beta = torch.linalg.solve(tmp1 + jitter_beta, tmp2)
+        except torch.linalg.LinAlgError:
+            return torch.tensor(torch.inf, device=locs.device, dtype=locs.dtype)
+
+        Z_residual = Z_y - torch.matmul(Z_X, beta)
+        quad_form = torch.matmul(Z_residual.T, Z_residual)
+
+        neg_log_lik_sum = 0.5 * (log_det + quad_form.squeeze())
+        return neg_log_lik_sum / N
+    
+    
+    '''
 
 # --- BATCHED GPU CLASS (Optimized & Feature Engineered) ---
 class VecchiaBatched(SpatioTemporalModel):
@@ -400,7 +467,9 @@ class VecchiaBatched(SpatioTemporalModel):
         # -------------------------------------------------------
         # PART 2: TAILS (Vecchia Batches)
         # -------------------------------------------------------
-        chunk_size = 4000
+        chunk_size = 16000    # 8192, 16384  try
+        # maybe nvidia L40S:  18176/48gb   nvidia h100. 16896/80 
+        # red hat linux 코어는 18176 그런데 메모리는 48 기가로 에이 100 (80기가) 보다 작지만 계산은 빠름
         total_pts = self.X_batch.shape[0]
 
         for start in range(0, total_pts, chunk_size):
