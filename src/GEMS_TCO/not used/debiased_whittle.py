@@ -518,114 +518,84 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
     @staticmethod
     def cov_spatial_difference(u1, u2, t, params, delta1, delta2):
         """
-        [Optimized] Calculates Cov(Y, Y) fully vectorized.
-        Input shapes:
-          u1, u2 : (N1, N2, P, P) or (N1, N2, 1, 1)
-          t      : (1, 1, P, P)
+        Calculates covariance Cov(Y(s,t_q), Y(s+u,t_r))
+        where Y is the spatially differenced field.
+        u1, u2 are PHYSICAL lags. t is the PHYSICAL time lag.
         """
+        weights = {(0, 0): -2.0, (1, 0): 1.0, (0, 1): 1.0}
         device = params.device
-        
-        # 1. Weights & Offsets 정의 (Hardcoded for 1st order difference)
-        # Weights: {(0,0): -2, (1,0): 1, (0,1): 1}
-        # Convolution of weights results in 3x3 interaction terms (9 terms total)
-        # Combos: (-2,-2)=4, (-2,1)=-2, ... etc.
-        
-        # 미리 정의된 오프셋과 가중치 텐서
-        # (a_idx, b_idx) - (c_idx, d_idx) 조합 9개
-        # Weights product results:
-        # (-2*-2)=4, (-2*1)=-2, (-2*1)=-2
-        # (1*-2)=-2, (1*1)=1,   (1*1)=1
-        # (1*-2)=-2, (1*1)=1,   (1*1)=1
-        
-        w_flat = torch.tensor([4.0, -2.0, -2.0, -2.0, 1.0, 1.0, -2.0, 1.0, 1.0], device=device, dtype=torch.float64)
-        
-        # Offsets corresponding to the 9 combinations
-        # (da - dc), (db - dd)
-        # 0: (0,0)-(0,0)=0,0
-        # 1: (0,0)-(1,0)=-1,0
-        # 2: (0,0)-(0,1)=0,-1
-        # ... and so on for all 9 interactions
-        
-        # x_offsets = (a - c) * delta1
-        # y_offsets = (b - d) * delta2
-        
-        # Constructing manually for clarity and speed:
-        # Pairs are ((0,0), (1,0), (0,1)) x ((0,0), (1,0), (0,1))
-        # Structure: [dw_x, dw_y]
-        offsets_list = [
-            [0.0, 0.0],       # -2, -2
-            [-delta1, 0.0],   # -2,  1 (1,0)
-            [0.0, -delta2],   # -2,  1 (0,1)
-            [delta1, 0.0],    #  1, -2
-            [0.0, 0.0],       #  1,  1 (1,0)-(1,0)
-            [delta1, -delta2],#  1,  1 (1,0)-(0,1)
-            [0.0, delta2],    #  1, -2
-            [-delta1, delta2],#  1,  1 (0,1)-(1,0)
-            [0.0, 0.0]        #  1,  1 (0,1)-(0,1)
-        ]
-        offsets_tensor = torch.tensor(offsets_list, device=device, dtype=torch.float64) # (9, 2)
-        
-        # 2. Expand Inputs for Broadcasting
-        # Input u1 shape: (N1, N2, P, P) -> Output needed: (9, N1, N2, P, P)
-        # t shape: (1, 1, P, P) -> (1, 1, 1, P, P) -> effectively broadcasts
-        
-        u1_exp = u1.unsqueeze(0) # (1, N1, N2, P, P)
-        u2_exp = u2.unsqueeze(0) # (1, N1, N2, P, P)
-        
-        # Add offsets: (9, 1, 1, 1, 1) + (1, N1, N2, P, P) -> (9, N1, N2, P, P)
-        off_x = offsets_tensor[:, 0].reshape(9, 1, 1, 1, 1)
-        off_y = offsets_tensor[:, 1].reshape(9, 1, 1, 1, 1)
-        
-        u1_shifted = u1_exp + off_x
-        u2_shifted = u2_exp + off_y
-        
-        # 3. Compute Kernel for all 9 terms at once
-        # t does not change with spatial offsets
-        term_cov = debiased_whittle_likelihood.cov_x_spatiotemporal_model_kernel(
-            u1_shifted, u2_shifted, t, params
-        ) # Result: (9, N1, N2, P, P)
-        
-        # 4. Weighted Sum
-        # Multiply weights (9, 1, 1, 1, 1) and sum over dim 0
-        w_tensor = w_flat.reshape(9, 1, 1, 1, 1)
-        cov_final = torch.sum(term_cov * w_tensor, dim=0) # (N1, N2, P, P)
-        
-        return cov_final
+        out_shape = torch.broadcast_shapes(u1.shape if isinstance(u1, torch.Tensor) else (),
+                                        u2.shape if isinstance(u2, torch.Tensor) else (),
+                                        t.shape if isinstance(t, torch.Tensor) else ())
+        cov = torch.zeros(out_shape, device=device, dtype=torch.float64)
+        u1_dev = u1.to(device) if isinstance(u1, torch.Tensor) else torch.tensor(u1, device=device, dtype=torch.float64)
+        u2_dev = u2.to(device) if isinstance(u2, torch.Tensor) else torch.tensor(u2, device=device, dtype=torch.float64)
+        t_dev = t.to(device) if isinstance(t, torch.Tensor) else torch.tensor(t, device=device, dtype=torch.float64)
+
+        for (a_idx, b_idx), w_ab in weights.items():
+            offset_a1 = a_idx * delta1
+            offset_a2 = b_idx * delta2
+            for (c_idx, d_idx), w_cd in weights.items():
+                offset_c1 = c_idx * delta1
+                offset_c2 = d_idx * delta2
+                
+                lag_u1 = u1_dev + (offset_a1 - offset_c1)
+                lag_u2 = u2_dev + (offset_a2 - offset_c2)
+                
+                term_cov = debiased_whittle_likelihood.cov_x_spatiotemporal_model_kernel(lag_u1, lag_u2, t_dev, params) 
+                
+                if torch.isnan(term_cov).any():
+                    print(f"Warning: NaN in term_cov within cov_spatial_difference.")
+                    return torch.full_like(cov, float('nan'))
+                cov += w_ab * w_cd * term_cov
+
+        if torch.isnan(cov).any(): print("Warning: NaN in final cov_spatial_difference output.")
+        return cov
 
     @staticmethod
     def cn_bar_tapered(u1, u2, t, params, n1, n2, taper_autocorr_grid, delta1, delta2):
         """
-        [Optimized] Computes c_Y(u) * c_gn(u) for batched inputs.
-        u1, u2 : Grid indices (N1, N2, 1, 1)
-        t      : Physical time lag (1, 1, P, P)
+        Computes c_Y(u) * c_gn(u).
+        u1, u2 are GRID index lags (e.g., -n1..0..n1)
+        t is the PHYSICAL time lag.
         """
-        # 1. Physical Lags로 변환
-        lag_u1 = u1 * delta1
-        lag_u2 = u2 * delta2
+        device = params.device
+        u1_dev = u1.to(device) if isinstance(u1, torch.Tensor) else torch.tensor(u1, device=device, dtype=torch.float64)
+        u2_dev = u2.to(device) if isinstance(u2, torch.Tensor) else torch.tensor(u2, device=device, dtype=torch.float64)
+        t_dev = t.to(device) if isinstance(t, torch.Tensor) else torch.tensor(t, device=device, dtype=torch.float64)
+
+        # --- Convert GRID lags to PHYSICAL lags ---
+        lag_u1 = u1_dev * delta1
+        lag_u2 = u2_dev * delta2
+
+        cov_X_value = debiased_whittle_likelihood.cov_spatial_difference(lag_u1, lag_u2, t_dev, params, delta1, delta2)
+
+        # --- Get Taper Autocorrelation Value c_gn(u) from grid ---
+        u1_idx = u1_dev.long()
+        u2_idx = u2_dev.long()
+
+        idx1 = (n1 - 1 + u1_idx) # Centering index
+        idx2 = (n2 - 1 + u2_idx) # Centering index
         
-        # 2. Covariance Calculation (Vectorized)
-        cov_X_value = debiased_whittle_likelihood.cov_spatial_difference(lag_u1, lag_u2, t, params, delta1, delta2)
-        
-        # 3. Taper Value Lookup
-        # u1, u2 are indices. We need to broadcast taper_autocorr_grid (2*N1-1, 2*N2-1) to (N1, N2, P, P)
-        u1_idx = u1.long().squeeze(-1).squeeze(-1) # (N1, N2)
-        u2_idx = u2.long().squeeze(-1).squeeze(-1) # (N1, N2)
-        
-        idx1 = torch.clamp(n1 - 1 + u1_idx, 0, 2 * n1 - 2)
-        idx2 = torch.clamp(n2 - 1 + u2_idx, 0, 2 * n2 - 2)
-        
-        taper_val = taper_autocorr_grid[idx1, idx2] # (N1, N2)
-        
-        # Broadcast taper_val to (N1, N2, P, P)
-        taper_val = taper_val.unsqueeze(-1).unsqueeze(-1)
-        
-        return cov_X_value * taper_val
+        idx1 = torch.clamp(idx1, 0, 2 * n1 - 2)
+        idx2 = torch.clamp(idx2, 0, 2 * n2 - 2)
+
+        taper_autocorr_value = taper_autocorr_grid[idx1, idx2]
+
+        if torch.isnan(cov_X_value).any() or torch.isnan(taper_autocorr_value).any():
+            out_shape = torch.broadcast_shapes(cov_X_value.shape, taper_autocorr_value.shape)
+            return torch.full(out_shape, float('nan'), device=device, dtype=torch.float64)
+
+        result = cov_X_value * taper_autocorr_value
+        if torch.isnan(result).any(): print("Warning: NaN in cn_bar_tapered output.")
+        return result
 
     @staticmethod
     def expected_periodogram_fft_tapered(params, n1, n2, p_time, taper_autocorr_grid, delta1, delta2):
         """
-        [Optimized] Fully vectorized expected periodogram calculation.
-        Removes O(P^2) loops and O(9) spatial loops.
+        Calculates the expected periodogram I(omega_s) (a pxp matrix in time)
+        using the exact taper autocorrelation c_gn(u) and
+        CORRECTLY implementing the aliasing sum (Lemma 2).
         """
         device = params.device if isinstance(params, torch.Tensor) else params[0].device
         if isinstance(params, list):
@@ -633,51 +603,44 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         else:
             params_tensor = params.to(device)
 
-        # 1. Spatial Grid Setup (N1, N2, 1, 1)
         u1_lags = torch.arange(n1, dtype=torch.float64, device=device)
         u2_lags = torch.arange(n2, dtype=torch.float64, device=device)
         u1_mesh, u2_mesh = torch.meshgrid(u1_lags, u2_lags, indexing='ij')
-        
-        u1_b = u1_mesh.unsqueeze(-1).unsqueeze(-1) # (N1, N2, 1, 1)
-        u2_b = u2_mesh.unsqueeze(-1).unsqueeze(-1) # (N1, N2, 1, 1)
 
-        # 2. Time Grid Setup (1, 1, P, P) -> The "No Loop" Magic
-        t_vec = torch.arange(p_time, dtype=torch.float64, device=device)
-        t_q, t_r = torch.meshgrid(t_vec, t_vec, indexing='ij')
-        t_diff = (t_q - t_r).unsqueeze(0).unsqueeze(0) # (1, 1, P, P)
-        
-        # 3. Calculate Aliasing Terms (All at once)
-        # Each term returns (N1, N2, P, P)
-        term1 = debiased_whittle_likelihood.cn_bar_tapered(u1_b, u2_b, t_diff, 
-                                                           params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2)
-        
-        term2 = debiased_whittle_likelihood.cn_bar_tapered(u1_b - n1, u2_b, t_diff, 
-                                                           params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2)
-        
-        term3 = debiased_whittle_likelihood.cn_bar_tapered(u1_b, u2_b - n2, t_diff, 
-                                                           params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2)
-        
-        term4 = debiased_whittle_likelihood.cn_bar_tapered(u1_b - n1, u2_b - n2, t_diff,
-                                                           params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2)
-        
-        tilde_cn_tensor = term1 + term2 + term3 + term4 # (N1, N2, P, P)
-        
-        # 4. FFT (Spatial dims 0, 1 only)
-        # Input is complex? No, covariance is real. Output is complex.
-        # But for Whittle, we usually take Real part if symmetric, 
-        # but let's stick to standard FFT logic.
-        
-        # Convert to complex for FFT (optional in PyTorch but safe)
-        tilde_cn_tensor_c = tilde_cn_tensor.to(torch.complex128)
-        
-        fft_result = torch.fft.fft2(tilde_cn_tensor_c, dim=(0, 1))
-        
-        # Take Real part (Power Spectrum is real)
+        t_lags = torch.arange(p_time, dtype=torch.float64, device=device)
+        tilde_cn_tensor = torch.zeros((n1, n2, p_time, p_time), dtype=torch.complex128, device=device)
+
+        for q in range(p_time):
+            for r in range(p_time):
+                t_diff = t_lags[q] - t_lags[r]
+                
+                term1 = debiased_whittle_likelihood.cn_bar_tapered(u1_mesh, u2_mesh, t_diff, 
+                                    params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2)
+                term2 = debiased_whittle_likelihood.cn_bar_tapered(u1_mesh - n1, u2_mesh, t_diff, 
+                                    params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2)
+                term3 = debiased_whittle_likelihood.cn_bar_tapered(u1_mesh, u2_mesh - n2, t_diff, 
+                                    params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2)
+                term4 = debiased_whittle_likelihood.cn_bar_tapered(u1_mesh - n1, u2_mesh - n2, t_diff,
+                                    params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2)
+                
+                tilde_cn_grid_qr = (term1 + term2 + term3 + term4)
+                
+                if torch.isnan(tilde_cn_grid_qr).any():
+                    tilde_cn_tensor[:, :, q, r] = float('nan')
+                else:
+                    tilde_cn_tensor[:, :, q, r] = tilde_cn_grid_qr.to(torch.complex128)
+
+        if torch.isnan(tilde_cn_tensor).any():
+            print("Warning: NaN detected in tilde_cn_tensor before FFT.")
+            nan_shape = (n1, n2, p_time, p_time)
+            return torch.full(nan_shape, float('nan'), dtype=torch.complex128, device=device)
+
+        fft_result = torch.fft.fft2(tilde_cn_tensor, dim=(0, 1))
         fft_result_real = fft_result.real 
-        
         normalization_factor = 1.0 / (4.0 * cmath.pi**2)
         result = fft_result_real * normalization_factor
 
+        if torch.isnan(result).any(): print("Warning: NaN in expected_periodogram_fft_tapered output.")
         return result
 
     # =========================================================================

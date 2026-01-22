@@ -7,6 +7,8 @@
 # from scipy.spatial.distance import cdist  # For space and time distance
 # from scipy.optimize import minimize  # For optimization
 
+
+
 import sys
 gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
 sys.path.append(gems_tco_path)
@@ -174,7 +176,7 @@ class SpatioTemporalModel:
         if x.shape[0] == y.shape[0]:
             cov.diagonal().add_(nugget + 1e-8)
         return cov
-    
+    '''  3 features
     def full_likelihood_avg(self, params: torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
         input_data = input_data.to(torch.float64)
         y = y.to(torch.float64)
@@ -215,7 +217,74 @@ class SpatioTemporalModel:
 
         neg_log_lik_sum = 0.5 * (log_det + quad_form.squeeze())
         return neg_log_lik_sum / N
+    '''
 
+    ''' 6 features
+
+    def full_likelihood_avg(self, params: torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
+        input_data = input_data.to(torch.float64)
+        y = y.to(torch.float64)
+        N = input_data.shape[0]
+        if N == 0: return torch.tensor(0.0, device=self.device, dtype=torch.float64)
+        
+        cov_matrix = covariance_function(params=params, y=input_data, x=input_data)
+        
+        try:
+            jitter = torch.eye(cov_matrix.shape[0], device=self.device, dtype=torch.float64) * 1e-6
+            L = torch.linalg.cholesky(cov_matrix + jitter)
+        except torch.linalg.LinAlgError:
+            return torch.tensor(torch.inf, device=params.device, dtype=params.dtype)
+        
+        log_det = 2 * torch.sum(torch.log(torch.diag(L)))
+        
+        # --- [MODIFIED] Construct 6 Features (Same as VecchiaBatched) ---
+        # Assuming input_data columns: [Lat(0), Lon(1), Val(2), Time(3)] 
+        # based on your other methods using index 3 for time.
+        
+        lat  = input_data[:, 0]
+        lon  = input_data[:, 1]
+        time = input_data[:, 3] 
+        
+        ones = torch.ones(N, device=self.device, dtype=torch.float64)
+        
+        # Stack: [Intercept, Lat, Lon, Time, Lat*Time, Lon*Time]
+        locs = torch.stack([
+            ones,
+            lat,
+            lon,
+            time,
+            lat * time,
+            lon * time
+        ], dim=1)  # Shape becomes (N, 6)
+        # -------------------------------------------------------------
+
+        if y.dim() == 1: y_col = y.unsqueeze(-1)
+        else: y_col = y
+        
+        combined_rhs = torch.cat((locs, y_col), dim=1)
+        Z_combined = torch.linalg.solve_triangular(L, combined_rhs, upper=False)
+        
+        # Slice appropriately for 6 features
+        Z_X = Z_combined[:, :6] 
+        Z_y = Z_combined[:, 6:]
+
+        tmp1 = torch.matmul(Z_X.T, Z_X)
+        tmp2 = torch.matmul(Z_X.T, Z_y)
+        
+        try:
+            jitter_beta = torch.eye(tmp1.shape[0], device=self.device, dtype=torch.float64) * 1e-8
+            beta = torch.linalg.solve(tmp1 + jitter_beta, tmp2)
+        except torch.linalg.LinAlgError:
+            return torch.tensor(torch.inf, device=locs.device, dtype=locs.dtype)
+
+        Z_residual = Z_y - torch.matmul(Z_X, beta)
+        quad_form = torch.matmul(Z_residual.T, Z_residual)
+
+        neg_log_lik_sum = 0.5 * (log_det + quad_form.squeeze())
+        return neg_log_lik_sum / N
+    
+    
+    '''
 
 # --- BATCHED GPU CLASS (Optimized & Feature Engineered) ---
 class VecchiaBatched(SpatioTemporalModel):
@@ -235,87 +304,153 @@ class VecchiaBatched(SpatioTemporalModel):
         self.Heads_data = None 
 
     def precompute_conditioning_sets(self):
-        print("Pre-computing Batched Tensors (Optimized CPU -> GPU)...", end=" ")
-        
-        # --- 1. HEADS (Exact GP Block) ---
+        print("🚀 Pre-computing (Corrected Vectorization)...", end=" ")
+        t0 = time.time()
+
+        # -----------------------------------------------------------
+        # 1. 데이터 통합 및 Dummy Point 생성
+        # -----------------------------------------------------------
         key_list = list(self.input_map.keys())
-        cut_line = self.nheads
+        all_data_list = []
         
-        heads_list = []
+        # 날짜별 데이터 통합
         for key in key_list:
             day_data = self.input_map[key]
-            if isinstance(day_data, torch.Tensor): day_data = day_data.cpu().numpy()
-            heads_list.append(day_data[:cut_line])
+            if isinstance(day_data, np.ndarray):
+                day_data = torch.from_numpy(day_data)
+            all_data_list.append(day_data)
         
-        # Stack numpy, send to GPU once
-        self.Heads_data = torch.from_numpy(np.concatenate(heads_list, axis=0)).to(self.device, dtype=torch.float64)
-
-        # --- 2. TAILS (Vecchia Blocks) ---
-        tasks = []
+        # 실제 데이터 합치기
+        # L40S 최적화를 위해 float32 저장 -> 계산시 float64 승격 추천
+        # (원하시면 float64로 바꾸셔도 됩니다)
+        Real_Data = torch.cat(all_data_list, dim=0).to(self.device, dtype=torch.float32)
+        
+        # [핵심 수정 1] Cholesky 방지용 Dummy Point 생성 (아주 먼 곳)
+        # 좌표를 (1e8, 1e8, ...)로 설정하여 모든 점과의 거리를 무한대로 만듦 -> 공분산 0
+        dummy_point = torch.tensor([[1e8, 1e8, 0.0, 1e8]], device=self.device, dtype=torch.float32)
+        
+        # Full_Data의 맨 마지막 인덱스는 이제 "빈 칸(Padding)"을 의미함
+        Full_Data = torch.cat([Real_Data, dummy_point], dim=0)
+        dummy_idx = Full_Data.shape[0] - 1  # 패딩용 인덱스
+        
+        # -----------------------------------------------------------
+        # 2. 인덱스 매핑 (CPU에서 로직 수행)
+        # -----------------------------------------------------------
+        day_lengths = [len(d) for d in all_data_list]
+        cumulative_len = np.cumsum([0] + day_lengths)
+        
+        # Heads / Tails 인덱스 분리
+        heads_indices = []
+        batch_indices_list = []
+        
+        # 최대 차원 계산 (원래 코드 로직: (M+1)*3)
+        # 과거 2시점 + 현재 시점
+        max_dim = (self.max_neighbors + 1) * 3 
+        
         for time_idx, key in enumerate(key_list):
-            day_data = self.input_map[key]
-            indices = range(cut_line, len(day_data))
-            for idx in indices: tasks.append((time_idx, idx))
+            day_len = day_lengths[time_idx]
+            offset = cumulative_len[time_idx]
+            
+            # Heads
+            n_heads = min(day_len, self.nheads)
+            heads_indices.extend(range(offset, offset + n_heads))
+            
+            # Tails
+            start_local = self.nheads
+            if start_local >= day_len: continue
+                
+            # 이 날짜의 Tails 루프
+            for local_idx in range(start_local, day_len):
+                my_global_idx = offset + local_idx
+                
+                # 로컬 이웃 가져오기
+                nbs_local = self.nns_map[local_idx] # numpy array 가정
+                
+                # --- 원래 코드의 시간차 이웃 로직 복구 ---
+                current_indices = []
+                
+                # (1) 이웃들 + 나 자신 (현재 시점)
+                # nbs_local은 array, local_idx는 scalar -> 합침
+                targets = np.append(nbs_local, local_idx)
+                current_indices.extend(offset + targets)
+                
+                # (2) 1일 전 (time_idx > 0)
+                if time_idx > 0:
+                    prev_offset = cumulative_len[time_idx - 1]
+                    prev_len = day_lengths[time_idx - 1]
+                    # 범위 체크 (이전 날짜 데이터 길이를 넘으면 안됨)
+                    valid_targets = targets[targets < prev_len]
+                    current_indices.extend(prev_offset + valid_targets)
+                    
+                # (3) 2일 전 (time_idx > 1)
+                if time_idx > 1:
+                    prev2_offset = cumulative_len[time_idx - 2]
+                    prev2_len = day_lengths[time_idx - 2]
+                    valid_targets = targets[targets < prev2_len]
+                    current_indices.extend(prev2_offset + valid_targets)
+                
+                # --- 패딩 로직 수정 ---
+                # 원래 코드: slot = max_dim - combined.shape[0] (앞쪽을 비움)
+                # 여기서도 앞쪽을 dummy_idx로 채움
+                pad_len = max_dim - len(current_indices)
+                if pad_len > 0:
+                    # [dummy, dummy, ..., real_data] 순서
+                    padded_row = [dummy_idx] * pad_len + current_indices
+                else:
+                    # 혹시 max_dim보다 길면 자름 (보통 그럴 일 없지만)
+                    padded_row = current_indices[-max_dim:]
+                
+                batch_indices_list.append(padded_row)
 
-        total_pts = len(tasks)
-        max_dim = (self.max_neighbors + 1) * 3
+        # -----------------------------------------------------------
+        # 3. GPU Fancy Indexing & Batch 구성
+        # -----------------------------------------------------------
         
-        # Build in CPU RAM (NumPy)
-        X_cpu = np.full((total_pts, max_dim, 3), 1e6, dtype=np.float64)
-        Y_cpu = np.zeros((total_pts, max_dim, 1), dtype=np.float64)
+        # (1) Heads
+        heads_tensor = torch.tensor(heads_indices, device=self.device, dtype=torch.long)
+        self.Heads_data = Full_Data[heads_tensor].contiguous().to(torch.float64) # Heads는 작으니까 64로
         
-        # --- CHANGE 1: Increase dimension of Locs container to self.n_features (6) ---
-        L_cpu = np.zeros((total_pts, max_dim, self.n_features), dtype=np.float64)
-
-        for i, (time_idx, index) in enumerate(tasks):
-            current_np = self.input_map[key_list[time_idx]]
-            if isinstance(current_np, torch.Tensor): current_np = current_np.cpu().numpy()
-
-            current_row = current_np[index].reshape(1, -1) 
-            mm_neighbors = self.nns_map[index]
-            past = list(mm_neighbors)
+        # (2) Tails (Batch)
+        if len(batch_indices_list) > 0:
+            Indices_Tensor = torch.tensor(batch_indices_list, device=self.device, dtype=torch.long)
             
-            data_list = []
-            if past: data_list.append(current_np[past])
-            if time_idx > 0: 
-                prev = self.input_map[key_list[time_idx - 1]]
-                if isinstance(prev, torch.Tensor): prev = prev.cpu().numpy()
-                data_list.append(prev[past + [index], :])
-            if time_idx > 1: 
-                prev2 = self.input_map[key_list[time_idx - 2]]
-                if isinstance(prev2, torch.Tensor): prev2 = prev2.cpu().numpy()
-                data_list.append(prev2[past + [index], :])
-
-            neighbors_block = np.vstack(data_list) if data_list else np.empty((0, current_row.shape[1]))
-            combined = np.concatenate([neighbors_block, current_row], axis=0)
+            # [한 방에 가져오기]
+            Gathered_Data = Full_Data[Indices_Tensor] # (N_tails, max_dim, 4)
             
-            slot = max_dim - combined.shape[0]
+            # [최적화] X_batch: 좌표 정보
+            self.X_batch = Gathered_Data[..., [0, 1, 3]].contiguous() # (N, max_dim, 3)
             
-            # Neighbors for covariance
-            X_cpu[i, slot:, 0] = combined[:, 0]
-            X_cpu[i, slot:, 1] = combined[:, 1]
-            X_cpu[i, slot:, 2] = combined[:, 3]
-            Y_cpu[i, slot:, 0] = combined[:, 2]
+            # [최적화] Y_batch: 값 정보
+            self.Y_batch = Gathered_Data[..., 2].unsqueeze(-1).contiguous() # (N, max_dim, 1)
             
-            # --- CHANGE 2: Fill Extended Features for Global Beta ---
-            # Extract raw coords
-            lat_vals  = combined[:, 0]
-            lon_vals  = combined[:, 1]
-            time_vals = combined[:, 3]
+            # [핵심 수정 2] Locs_batch 차원 및 값 수정
+            # 원래 코드 L_cpu는 (N, max_dim, 6) 이었음.
+            # 그리고 dummy(빈칸)인 곳은 0이어야 하고, 실제 데이터인 곳은 1(Intercept) 등 값이 있어야 함.
+            
+            # Feature Engineering
+            g_lat  = Gathered_Data[..., 0]
+            g_lon  = Gathered_Data[..., 1]
+            g_time = Gathered_Data[..., 3]
+            
+            ones = torch.ones_like(g_lat)
+            
+            # (N, max_dim, 6) 생성
+            self.Locs_batch = torch.stack([
+                ones, g_lat, g_lon, g_time, g_lat*g_time, g_lon*g_time
+            ], dim=-1).contiguous()
+            
+            # [Masking] Dummy Point(패딩된 곳)의 Feature를 0으로 만듦
+            # Dummy point는 인덱스가 dummy_idx인 곳
+            mask = (Indices_Tensor == dummy_idx).unsqueeze(-1) # (N, max_dim, 1)
+            self.Locs_batch = self.Locs_batch.masked_fill(mask, 0.0)
+            
+        else:
+            self.X_batch = torch.empty(0, device=self.device)
+            self.Y_batch = torch.empty(0, device=self.device)
+            self.Locs_batch = torch.empty(0, device=self.device)
 
-            L_cpu[i, slot:, 0] = 1.0                # Intercept
-            L_cpu[i, slot:, 1] = lat_vals           # Lat
-            L_cpu[i, slot:, 2] = lon_vals           # Lon
-            L_cpu[i, slot:, 3] = time_vals          # Time (Global trend)
-            L_cpu[i, slot:, 4] = lat_vals * time_vals  # Lat * Time (Interaction)
-            L_cpu[i, slot:, 5] = lon_vals * time_vals  # Lon * Time (Interaction)
-
-        print("Moving to GPU...", end=" ")
-        self.X_batch = torch.from_numpy(X_cpu).to(self.device)
-        self.Y_batch = torch.from_numpy(Y_cpu).to(self.device)
-        self.Locs_batch = torch.from_numpy(L_cpu).to(self.device)
         self.is_precomputed = True
-        print(f"Done. Heads: {self.Heads_data.shape[0]}, Tails: {self.X_batch.shape[0]}")
+        print(f"✅ Done in {time.time()-t0:.4f}s. (Heads: {len(heads_indices)}, Tails: {len(batch_indices_list)})")
 
     def batched_manual_dist(self, dist_params, x_batch):
         phi3, phi4, advec_lat, advec_lon = dist_params
@@ -400,7 +535,9 @@ class VecchiaBatched(SpatioTemporalModel):
         # -------------------------------------------------------
         # PART 2: TAILS (Vecchia Batches)
         # -------------------------------------------------------
-        chunk_size = 4000
+        chunk_size = 4096    # 8192, 16384  try
+        # maybe nvidia L40S:  18176/48gb   nvidia h100. 16896/80 
+        # red hat linux 코어는 18176 그런데 메모리는 48 기가로 에이 100 (80기가) 보다 작지만 계산은 빠름
         total_pts = self.X_batch.shape[0]
 
         for start in range(0, total_pts, chunk_size):

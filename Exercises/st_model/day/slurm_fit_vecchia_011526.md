@@ -16,6 +16,7 @@ scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/coarse_cen_map_rect24_07.
 
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_gpu_vecc_day_v05_010126.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
+
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/sim_heads_regular_vecc_testing_day_v05_010126.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
@@ -64,9 +65,9 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vec
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=120G                      #  gpu30:80
-#SBATCH --partition=gpu         # 'gpu', 'gpu-redhat'
+#SBATCH --partition=gpu-redhat         # 'gpu', 'gpu-redhat'
 #SBATCH --gres=gpu:1                    # GPU 1개 요청
-#SBATCH --nodelist=gpu020      # 💥 여기를 gpu030으로 변경! (idle 상태임)
+#SBATCH --nodelist=gpu032      # 💥 여기를 gpu030으로 변경! (idle 상태임)
 
 #### Load Modules
 module purge
@@ -95,7 +96,6 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_010126.py
 
 
 #gpu30:1000, mm16 거뜬 4분
-
 
 
 

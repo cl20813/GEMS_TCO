@@ -26,7 +26,7 @@ from GEMS_TCO import orderings as _orderings
 from GEMS_TCO import alg_optimization, BaseLogger
 from GEMS_TCO import configuration as config
 from GEMS_TCO.data_loader import load_data2
-from GEMS_TCO import debiased_whittle_gpu as debiased_whittle
+from GEMS_TCO import debiased_whittle as debiased_whittle
 
 app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
 
