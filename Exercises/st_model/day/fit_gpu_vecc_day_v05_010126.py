@@ -92,9 +92,9 @@ def cli(
 
     # Global L-BFGS Settings
     LBFGS_LR = 1.0
-    LBFGS_MAX_STEPS = 10      
+    LBFGS_MAX_STEPS = 3      
     LBFGS_HISTORY_SIZE = 100   
-    LBFGS_MAX_EVAL = 100       
+    LBFGS_MAX_EVAL = 30 #100       
 
     # --- Main Loop ---
     for day_idx in days_list:
