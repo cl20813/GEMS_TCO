@@ -90,7 +90,7 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_010126.py
     --days "0,31" \
     --mm-cond-number 8 \
     --nheads 300 \
-    --no-keep-exact-loc
+    #--no-keep-exact-loc
 
 ```
 
