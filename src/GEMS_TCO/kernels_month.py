@@ -1,20 +1,17 @@
 import sys
-# gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src" # 필요시 경로 수정
+# gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
 # sys.path.append(gems_tco_path)
-# import GEMS_TCO # 필요시 주석 해제
+# import GEMS_TCO
 
-from scipy.special import gamma, kv  # Bessel function and gamma function
+from scipy.special import gamma, kv
 from collections import defaultdict
 import pandas as pd
 import numpy as np
 import torch
-from torch.func import grad, hessian, jacfwd, jacrev
-from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR, ReduceLROnPlateau
 import torch.optim as optim
 import torch.nn as nn
 from scipy.interpolate import splrep, splev
 import torch.nn.functional as F
-from torchcubicspline import natural_cubic_spline_coeffs, NaturalCubicSpline
 from typing import Dict, Any, Callable, List, Tuple
 import time
 import copy    
@@ -41,7 +38,6 @@ class SpatioTemporalModel:
         # Process NNS Map
         nns_map = list(nns_map) 
         for i in range(len(nns_map)):  
-            # mm_cond_number만큼 잘라서 -1 제거
             tmp = np.delete(nns_map[i][:self.mm_cond_number], np.where(nns_map[i][:self.mm_cond_number] == -1))
             if tmp.size > 0:
                 nns_map[i] = tmp
@@ -86,9 +82,6 @@ class SpatioTemporalModel:
 
     # --- SINGLE MATRIX KERNEL ---
     def precompute_coords_aniso_STABLE(self, dist_params: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        """
-        Calculates distance for the Head points (Exact GP).
-        """
         phi3, phi4, advec_lat, advec_lon = dist_params
         
         u_lat_adv = x[:, 0] - advec_lat * x[:, 3]
@@ -99,23 +92,19 @@ class SpatioTemporalModel:
         v_lon_adv = y[:, 1] - advec_lon * y[:, 3]
         v_t = y[:, 3]
 
-        # 1. Stack vectors [lat, lon, time] -> Shape (N, 3)
         u_vec = torch.stack([u_lat_adv, u_lon_adv, u_t], dim=1)
         v_vec = torch.stack([v_lat_adv, v_lon_adv, v_t], dim=1)
 
-        # 2. Define Anisotropy Weights (Diagonal Matrix)
         one_tensor = torch.tensor(1.0, device=x.device, dtype=phi3.dtype)
         if phi3.ndim > 0:
             one_tensor = one_tensor.view_as(phi3)
             
         weights = torch.stack([phi3, one_tensor, phi4])
-        weights = weights.view(-1) # Force to flat vector
+        weights = weights.view(-1)
 
-        # 3. Weighted Norms
         u_sq = (u_vec.pow(2) * weights).sum(dim=1, keepdim=True)
         v_sq = (v_vec.pow(2) * weights).sum(dim=1, keepdim=True)
 
-        # 4. Weighted Dot Product
         uv = (u_vec * weights) @ v_vec.T
 
         dist_sq = u_sq - 2 * uv + v_sq.T
@@ -142,20 +131,19 @@ class SpatioTemporalModel:
             cov.diagonal().add_(nugget + 1e-8)
         return cov
 
-# --- BATCHED GPU CLASS (Intercept + Centered Lat + 7 Dummies = 9 Features) ---
+# --- BATCHED GPU CLASS ---
 class VecchiaBatched(SpatioTemporalModel):
     def __init__(self, smooth:float, input_map:Dict[str,Any], aggregated_data:torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int):
+        """
+        nheads: Number of Heads points TO SELECT PER HOUR (from the start).
+        """
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
         
         self.device = aggregated_data.device 
-        self.nheads = nheads
+        self.nheads_per_hour = nheads 
         self.max_neighbors = mm_cond_number 
         self.is_precomputed = False
         
-        # Feature 개수: 9개
-        # 1. Intercept (Base Mean)
-        # 2. Latitude (Centered)
-        # 3~9. Time Dummies (D1 ~ D7)
         self.n_features = 9  
         
         self.X_batch = None    
@@ -163,7 +151,6 @@ class VecchiaBatched(SpatioTemporalModel):
         self.Locs_batch = None 
         self.Heads_data = None 
         
-        # Centering용 평균 위도
         self.lat_mean_val = 0.0
 
     def batched_manual_dist(self, dist_params, x_batch):
@@ -192,7 +179,7 @@ class VecchiaBatched(SpatioTemporalModel):
         return cov + eye * (nugget + 1e-6)
 
     def precompute_conditioning_sets(self):
-        print("🚀 Pre-computing (Daily AR1 Strategy: A(8), B(9), C(9))...", end=" ")
+        print(f"🚀 Pre-computing (Top {self.nheads_per_hour} Max-Min Ordered Heads per hour)...", end=" ")
         
         # 1. Integrate Data
         key_list = list(self.input_map.keys())
@@ -200,99 +187,83 @@ class VecchiaBatched(SpatioTemporalModel):
         
         Real_Data = torch.cat(all_data_list, dim=0).to(self.device, dtype=torch.float32)
         
-        # [Centering] Calculate Mean Latitude
+        # [Centering]
         self.lat_mean_val = Real_Data[:, 0].mean()
         print(f"[Mean Lat: {self.lat_mean_val:.4f}]", end=" ")
         
         num_cols = Real_Data.shape[1] 
         
-        # Create Dummy Point
+        # Dummy Point
         dummy_point = torch.full((1, num_cols), 1e8, device=self.device, dtype=torch.float32)
-        if num_cols > 2:
-            dummy_point[0, 2] = 0.0  # Val
-        if num_cols >= 12:
-            dummy_point[0, 11] = 0.0 
-        if num_cols >= 5:
-            dummy_point[0, 4:11] = 0.0
+        if num_cols > 2: dummy_point[0, 2] = 0.0
+        if num_cols >= 12: dummy_point[0, 11] = 0.0 
+        if num_cols >= 5: dummy_point[0, 4:11] = 0.0
         
         Full_Data = torch.cat([Real_Data, dummy_point], dim=0)
         dummy_idx = Full_Data.shape[0] - 1
         
-        # 2. Index Mapping with Daily AR(1) Strategy
+        # 2. Index Mapping
         day_lengths = [len(d) for d in all_data_list]
         cumulative_len = np.cumsum([0] + day_lengths)
         
         heads_indices = []
         batch_indices_list = []
         
-        # A, B, C 설정
-        # A: 현재 시점 (t, d) -> 이웃 8개
-        # B: 1시간 전 (t-1, d) -> 이웃 8개 + 본인 = 9개
-        # C: 하루 전 (t, d-1) -> 이웃 8개 + 본인 = 9개
-        limit_A = 8
-        limit_B = 8
-        limit_C = 8
-        
-        # 하루가 8시간으로 구성되어 있다고 가정
+        limit_A, limit_B, limit_C = 8, 8, 8
         daily_stride = 8 
-        
-        # 최대 차원 (Padding용) - 넉넉하게 잡음 (약 30~40)
         max_dim = limit_A + (limit_B + 1) + (limit_C + 1) + 5
         
         for time_idx, key in enumerate(key_list):
             day_len = day_lengths[time_idx]
             offset = cumulative_len[time_idx]
             
-            # Heads Logic (기존 유지)
-            n_heads = min(day_len, self.nheads)
-            heads_indices.extend(range(offset, offset + n_heads))
+            # --- [Heads: 앞의 n개 선택] ---
+            # Max-Min Ordering이 되어있으므로 앞의 n개가 Low Frequency를 대변함
+            n_heads_curr = min(day_len, self.nheads_per_hour)
+            heads_indices.extend(range(offset, offset + n_heads_curr))
             
-            if self.nheads >= day_len: continue
-                
-            for local_idx in range(self.nheads, day_len):
-                current_indices = []
-                
-                # [A] 현재 시점 이웃 (Spatial Only)
-                nbs_local = self.nns_map[local_idx][:limit_A]
-                current_indices.extend((offset + nbs_local).tolist())
-                
-                # [B] 1시간 전 (t-1)
-                if time_idx > 0:
-                    prev_offset = cumulative_len[time_idx - 1]
-                    prev_len = day_lengths[time_idx - 1]
+            # --- [Tails: n개 이후 나머지] ---
+            if n_heads_curr < day_len:
+                for local_idx in range(n_heads_curr, day_len):
+                    current_indices = []
                     
-                    # B-1. 본인 (Self)
-                    if local_idx < prev_len:
-                        current_indices.append(prev_offset + local_idx)
+                    # [A] 현재 시점 이웃 (Spatial)
+                    nbs_local = self.nns_map[local_idx][:limit_A]
+                    current_indices.extend((offset + nbs_local).tolist())
                     
-                    # B-2. 이웃 (Spatial)
-                    nbs_prev = self.nns_map[local_idx][:limit_B]
-                    valid_nbs = nbs_prev[nbs_prev < prev_len]
-                    current_indices.extend((prev_offset + valid_nbs).tolist())
-
-                # [C] 하루 전 같은 시간 (t - daily_stride)
-                if time_idx >= daily_stride:
-                    prev_day_idx = time_idx - daily_stride
-                    prev_day_offset = cumulative_len[prev_day_idx]
-                    prev_day_len = day_lengths[prev_day_idx]
-                    
-                    # C-1. 본인 (Self) - AR(1) 핵심
-                    if local_idx < prev_day_len:
-                        current_indices.append(prev_day_offset + local_idx)
+                    # [B] 1시간 전 (t-1)
+                    if time_idx > 0:
+                        prev_offset = cumulative_len[time_idx - 1]
+                        prev_len = day_lengths[time_idx - 1]
                         
-                    # C-2. 이웃 (Spatial)
-                    nbs_day = self.nns_map[local_idx][:limit_C]
-                    valid_nbs_day = nbs_day[nbs_day < prev_day_len]
-                    current_indices.extend((prev_day_offset + valid_nbs_day).tolist())
-                
-                # Padding
-                pad_len = max_dim - len(current_indices)
-                if pad_len > 0:
-                    padded_row = [dummy_idx] * pad_len + current_indices
-                else:
-                    padded_row = current_indices[-max_dim:] # 혹시 넘치면 뒤쪽(최신) 위주로 자름
-                
-                batch_indices_list.append(padded_row)
+                        if local_idx < prev_len:
+                            current_indices.append(prev_offset + local_idx) # Self
+                        
+                        nbs_prev = self.nns_map[local_idx][:limit_B]
+                        valid_nbs = nbs_prev[nbs_prev < prev_len]
+                        current_indices.extend((prev_offset + valid_nbs).tolist())
+
+                    # [C] 하루 전 같은 시간 (t - daily_stride)
+                    if time_idx >= daily_stride:
+                        prev_day_idx = time_idx - daily_stride
+                        prev_day_offset = cumulative_len[prev_day_idx]
+                        prev_day_len = day_lengths[prev_day_idx]
+                        
+                        if local_idx < prev_day_len:
+                            current_indices.append(prev_day_offset + local_idx) # Self (AR1)
+                            
+                        nbs_day = self.nns_map[local_idx][:limit_C]
+                        valid_nbs_day = nbs_day[nbs_day < prev_day_len]
+                        current_indices.extend((prev_day_offset + valid_nbs_day).tolist())
+                    
+                    # Padding
+                    pad_len = max_dim - len(current_indices)
+                    if pad_len > 0:
+                        padded_row = [dummy_idx] * pad_len + current_indices
+                    else:
+                        padded_row = current_indices[-max_dim:]
+                    
+                    batch_indices_list.append(padded_row)
 
         # 3. GPU Batch Construction
         # (1) Heads
@@ -304,20 +275,15 @@ class VecchiaBatched(SpatioTemporalModel):
             Indices_Tensor = torch.tensor(batch_indices_list, device=self.device, dtype=torch.long)
             Gathered_Data = Full_Data[Indices_Tensor] 
             
-            # [A] Covariance Kernel: Lat(0), Lon(1), Time(3)
             self.X_batch = Gathered_Data[..., [0, 1, 3]].contiguous().to(torch.float64)
-            
-            # [B] Observation: Just use Val (Column 2)
             self.Y_batch = Gathered_Data[..., 2].unsqueeze(-1).contiguous().to(torch.float64)
             
-            # [C] Mean Function Design Matrix (9 Features)
             g_ones = torch.ones_like(Gathered_Data[..., 0]).unsqueeze(-1)
             g_lat = (Gathered_Data[..., 0] - self.lat_mean_val).unsqueeze(-1)
             g_dummies = Gathered_Data[..., 4:11] 
             
             self.Locs_batch = torch.cat([g_ones, g_lat, g_dummies], dim=-1).contiguous().to(torch.float64)
             
-            # Masking
             mask = (Indices_Tensor == dummy_idx).unsqueeze(-1) 
             self.Locs_batch = self.Locs_batch.masked_fill(mask, 0.0)
             self.Y_batch = self.Y_batch.masked_fill(mask, 0.0)
@@ -328,7 +294,7 @@ class VecchiaBatched(SpatioTemporalModel):
             self.Locs_batch = torch.empty(0, device=self.device)
 
         self.is_precomputed = True
-        print(f"✅ Done. (Heads: {len(heads_indices)}, Tails: {len(batch_indices_list)})")
+        print(f"✅ Done. (Total Heads: {len(heads_indices)}, Total Tails: {len(batch_indices_list)})")
 
     def vecchia_batched_likelihood(self, params):
         if not self.is_precomputed: raise RuntimeError("Run precompute first!")
@@ -399,7 +365,6 @@ class VecchiaBatched(SpatioTemporalModel):
 
 # --- FITTING CLASS ---
 class fit_vecchia_lbfgs(VecchiaBatched): 
-    
     def __init__(self, smooth:float, input_map:Dict[str,Any], aggregated_data:torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number, nheads)
 
@@ -411,7 +376,6 @@ class fit_vecchia_lbfgs(VecchiaBatched):
         return optimizer
 
     def _convert_raw_params_to_interpretable(self, raw_params_list: List[float]) -> Dict[str, float]:
-        """Converts raw optimized parameters back to interpretable model parameters."""
         try:
             log_phi1 = raw_params_list[0]
             log_phi2 = raw_params_list[1]
@@ -446,8 +410,6 @@ class fit_vecchia_lbfgs(VecchiaBatched):
             return {}
 
     def fit_vecc_lbfgs(self, params_list: List[torch.Tensor], optimizer: torch.optim.LBFGS, max_steps: int = 50, grad_tol: float = 1e-7):
-        
-        # 1. Prepare GPU Data
         if not self.is_precomputed:
             self.precompute_conditioning_sets()
 
@@ -456,15 +418,12 @@ class fit_vecchia_lbfgs(VecchiaBatched):
         def closure():
             optimizer.zero_grad()
             params = torch.stack(params_list)
-            # Batched Likelihood Calculation
             loss = self.vecchia_batched_likelihood(params)
             loss.backward()
             return loss
 
         for i in range(max_steps):
             loss = optimizer.step(closure)
-            
-            # Monitoring
             max_abs_grad = 0.0
             grad_values = []
             with torch.no_grad():
@@ -488,7 +447,6 @@ class fit_vecchia_lbfgs(VecchiaBatched):
         final_raw_params_list = [p.item() for p in final_params_tensor]
         final_loss = loss.item()
         
-        # Interpretable conversion
         interpretable = self._convert_raw_params_to_interpretable(final_raw_params_list)
         print("Final Interpretable Params:", interpretable)
         
