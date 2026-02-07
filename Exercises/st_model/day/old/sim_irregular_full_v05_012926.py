@@ -8,6 +8,9 @@ from pathlib import Path
 import logging
 from typing import Optional, List, Tuple
 
+# 시나리오 2, 위치 오차 시뮬레이션을 위한 추가 라이브러리 근데 이거 다시 해야할듯
+# sim_scenario2 or 3 반영해야할듯
+
 # Data manipulation and analysis
 import pandas as pd
 import numpy as np

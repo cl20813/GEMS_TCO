@@ -15,6 +15,8 @@ import torch
 import torch.optim as optim
 import typer
 
+# location error scenario에서 좌표 섭동을 위한 난수 생성에 사용
+
 # --- Custom Imports Path (사용자 환경에 맞게 수정 필수) ---
 sys.path.append("/cache/home/jl2815/tco") 
 

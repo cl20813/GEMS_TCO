@@ -1,9 +1,9 @@
+# 사용자 경로 설정
+
 from pathlib import Path
 from json import JSONEncoder
-
 from GEMS_TCO import configuration as config
 from GEMS_TCO import orderings as _orderings
-
 import os
 import pickle
 import sys
@@ -11,8 +11,8 @@ import pandas as pd
 import numpy as np
 import torch
 from typing import Optional, List, Dict, Tuple, Any
-
-# 02/07/26 no ar, but time dummies one intercept,lat, lon 
+from collections import defaultdict
+from statsmodels.tsa.ar_model import AutoReg  # AR 모델링용
 
 # 사용자 경로 설정
 gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
@@ -30,15 +30,11 @@ class load_data2:
         ) -> Dict[str, pd.DataFrame]:
             """
             Loads coarse data (Rectangular Grid) from pickle files.
-            File pattern: coarse_cen_map_rect{YY}_{MM}.pkl
             """
-            
             # 1. 샘플 파일 로드 (격자 정보 확인용)
-            # 하드코딩 없이 입력된 연도/월 리스트의 첫 번째를 사용
             sample_df = None
             for y in years_:
                 for m in months_:
-                    # [수정됨] 파일명 포맷: rect 적용
                     filename = f"coarse_cen_map_rect{str(y)[2:]}_{m:02d}.pkl"
                     filepath_sample = Path(self.datapath) / f"pickle_{y}" / filename
                     
@@ -82,7 +78,6 @@ class load_data2:
                             loaded_map = pickle.load(pickle_file)
                             for key in loaded_map:
                                 tmp_df = loaded_map[key]
-                                # Coarsening Filter
                                 coarse_filter = (tmp_df['Latitude'].isin(lat_n)) & (tmp_df['Longitude'].isin(lon_n))
                                 coarse_dicts[f"{year}_{month:02d}_{key}"] = tmp_df[coarse_filter].reset_index(drop=True)
                     except FileNotFoundError:
@@ -98,16 +93,11 @@ class load_data2:
             lat_range: List[float] = [0.0, 5.0],
             lon_range: List[float] = [123.0, 133.0]
         ) -> Dict[str, pd.DataFrame]:
-            """
-            Subsets each DataFrame to a specific lat/lon range.
-            """
             subsetted_map = {}
             for key, df in df_map.items():
                 lat_mask = (df['Latitude'] >= lat_range[0]) & (df['Latitude'] <= lat_range[1])
                 lon_mask = (df['Longitude'] >= lon_range[0]) & (df['Longitude'] <= lon_range[1])
-                
                 subsetted_map[key] = df[lat_mask & lon_mask].reset_index(drop=True).copy()
-                
             return subsetted_map
 
     def get_spatial_ordering(
@@ -115,29 +105,18 @@ class load_data2:
             coarse_dicts: Dict[str, pd.DataFrame],
             mm_cond_number: int = 10
         ) -> Tuple[np.ndarray, np.ndarray]:
-            """
-            Computes MaxMin ordering based on the first available dataframe.
-            """
             key_idx = sorted(coarse_dicts)
-            if not key_idx:
-                print("Warning: coarse_dicts is empty, cannot compute ordering.")
-                return np.array([]), np.array([])
+            if not key_idx: return np.array([]), np.array([])
 
             data_for_coord = coarse_dicts[key_idx[0]]
-            
-            # Safety check
-            if data_for_coord.empty:
-                return np.array([]), np.array([])
+            if data_for_coord.empty: return np.array([]), np.array([])
 
-            # Coordinate Extraction
             x1 = data_for_coord['Longitude'].values
             y1 = data_for_coord['Latitude'].values 
             coords1 = np.stack((x1, y1), axis=-1)
 
-            # MaxMin Ordering (C++ ext)
             ord_mm = _orderings.maxmin_cpp(coords1)
             
-            # Reorder & Find Nearest Neighbors
             data_for_coord_reordered = data_for_coord.iloc[ord_mm].reset_index(drop=True)
             coords1_reordered = np.stack(
                 (data_for_coord_reordered['Longitude'].values, data_for_coord_reordered['Latitude'].values), 
@@ -145,111 +124,8 @@ class load_data2:
             )
             
             nns_map = _orderings.find_nns_l2(locs=coords1_reordered, max_nn=mm_cond_number)
-            
             return ord_mm, nns_map
-    '''
-    def load_maxmin_ordered_data_bymonthyear(
-            self, 
-            lat_lon_resolution: List[int] = [10, 10], 
-            mm_cond_number: int = 10, 
-            years_: List[str] = ['2024'], 
-            months_: List[int] = [7],
-            lat_range: Optional[List[float]] = None,
-            lon_range: Optional[List[float]] = None
-        ) -> Tuple[Dict[str, pd.DataFrame], np.ndarray, np.ndarray]:
-            
-            # 1. Load Data
-            coarse_dicts = self.load_coarse_data_dicts(
-                lat_lon_resolution=lat_lon_resolution,
-                years_=years_,
-                months_=months_
-            )
-            
-            if not coarse_dicts:
-                return {}, np.array([]), np.array([])
-                
-            # 2. Subset Data (Before Ordering)
-            if lat_range is not None and lon_range is not None:
-                coarse_dicts = self.subset_df_map(
-                    coarse_dicts,
-                    lat_range=lat_range,
-                    lon_range=lon_range
-                )
-                
-            # 3. Compute Ordering (on Subsetted Data)
-            ord_mm, nns_map = self.get_spatial_ordering(
-                coarse_dicts=coarse_dicts, 
-                mm_cond_number=mm_cond_number
-            )
-            
-            return coarse_dicts, ord_mm, nns_map
 
-    def load_working_data(
-        self, 
-        coarse_dicts: Dict[str, pd.DataFrame],  
-        idx_for_datamap: List[int] = [0, 8],
-        ord_mm: Optional[np.ndarray] = None,
-        dtype: torch.dtype = torch.double,
-        keep_ori: bool = True
-    ) -> Tuple[Dict[str, torch.Tensor], torch.Tensor]:
-        
-        import torch.nn.functional as F
-        
-        key_idx = sorted(coarse_dicts)
-        if not key_idx:
-            raise ValueError("coarse_dicts is empty")
-        
-        analysis_data_map = {}
-        aggregated_tensor_list = []
-        
-        np_dtype = np.float64 # 사용자 dtype 유지
-        
-        selected_keys = key_idx[idx_for_datamap[0]:idx_for_datamap[1]]
-        
-        for t_idx, key in enumerate(selected_keys):
-            tmp = coarse_dicts[key].copy()
-            
-            # --- [수정 금지] 사용자 원본 시간 로직 유지 ---
-            # 만약 477721 그대로를 원하시면 아래 줄을 주석 처리하거나, 
-            # 기존처럼 477700을 빼고 싶으시면 그대로 두시면 됩니다.
-            # 여기서는 사용자님의 기존 코드 방식을 존중하여 유지합니다.
-            tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'] - 477700).astype(np_dtype)
-            
-            # Ordering 적용
-            if ord_mm is not None:
-                tmp_processed = tmp.iloc[ord_mm].reset_index(drop=True)
-            else:
-                tmp_processed = tmp
-            
-            # 기본 4열 선택 [Lat, Lon, O3, Hours_elapsed]
-            if keep_ori:
-                # [Src_Lat(5), Src_Lon(6), O3(2), Hours_elapsed(3)]
-                tmp_data_df = tmp_processed.iloc[:, [5, 6, 2, 3]] 
-            else:
-                # [Lat(0), Lon(1), O3(2), Hours_elapsed(3)]
-                tmp_data_df = tmp_processed.iloc[:, [0, 1, 2, 3]]
-        
-            base_tensor = torch.from_numpy(tmp_data_df.to_numpy(dtype=np_dtype)).to(dtype)
-            
-            # --- [추가] 시간 더미 변수 생성 (7개) ---
-            # t_idx(0~7)를 사용하여 0시를 제외한 7개의 더미 생성
-            dummies = F.one_hot(torch.tensor([t_idx]), num_classes=8).repeat(len(base_tensor), 1)
-            dummies = dummies[:, 1:].to(dtype) # 첫 번째 열 제외 (Intercept용)
-            
-            # 최종 11열 결합
-            final_tensor = torch.cat([base_tensor, dummies], dim=1)
-            
-            analysis_data_map[key] = final_tensor
-            aggregated_tensor_list.append(final_tensor)
-
-        if not aggregated_tensor_list:
-            return analysis_data_map, torch.empty(0, 11, dtype=dtype)
-
-        aggregated_data = torch.cat(aggregated_tensor_list, dim=0)
-        
-        return analysis_data_map, aggregated_data
-    
-        ''' 
     def load_maxmin_ordered_data_bymonthyear(
         self, 
         lat_lon_resolution: List[int] = [10, 10], 
@@ -258,41 +134,81 @@ class load_data2:
         months_: List[int] = [7],
         lat_range: Optional[List[float]] = None,
         lon_range: Optional[List[float]] = None
-    ) -> Tuple[Dict[str, pd.DataFrame], np.ndarray, np.ndarray, float]:
+    ) -> Tuple[Dict[str, pd.DataFrame], np.ndarray, np.ndarray, Dict[str, float]]:
+        """
+        데이터 로드 + 공간 정렬 + [핵심] AR(1) 기반 일별 Offset 계산
+        """
         
-        from collections import defaultdict
-
-        # 1. 데이터 로드
+        # 1. 데이터 로드 및 범위 필터링
         coarse_dicts = self.load_coarse_data_dicts(lat_lon_resolution, years_, months_)
-        if not coarse_dicts: return {}, np.array([]), np.array([]), 0.0
+        if not coarse_dicts: return {}, np.array([]), np.array([]), {}
         
         if lat_range and lon_range:
             coarse_dicts = self.subset_df_map(coarse_dicts, lat_range, lon_range)
 
-        # 2. [수정됨] 월 평균(Global Monthly Mean) 계산
-        # 모든 데이터의 오존 값을 수집하여 전체 평균을 구합니다.
-        total_ozone_values = []
+        # 2. [AR(1) 분석] 일별 평균 및 잔차 계산
+        print("\n--- [AR(1) Analysis for Mean Function] ---")
+        
+        # (1) 일별 평균 수집
+        day_stats = defaultdict(list)
         for key, df in coarse_dicts.items():
-            # 인덱스 2번이 Ozone이라고 가정 (혹은 컬럼명 확인 필요)
-            total_ozone_values.append(df.iloc[:, 2].values)
+            # key: "2024_07_hm01_..." -> "2024_07_01" (날짜 추출)
+            day_str = "_".join(key.split('_')[:3]) 
+            # 2번 컬럼(Ozone) 평균
+            day_stats[day_str].append(df.iloc[:, 2].mean())
+
+        # (2) Pandas Series로 변환 (날짜순 정렬 보장)
+        daily_means = pd.Series({d: np.mean(v) for d, v in day_stats.items()}).sort_index()
+        
+        # (3) 월 평균 (a_y) 계산
+        a_y = daily_means.mean()
+        print(f"  Global Monthly Mean (a_y): {a_y:.4f}")
+        
+        # (4) 잔차 (e_{d,y}) 계산
+        residuals = daily_means - a_y
+        
+        # (5) AR(1) 피팅 및 Offset 딕셔너리 생성
+        day_offsets = {}
+        
+        try:
+            # trend='n': 이미 a_y를 뺐으므로 잔차의 평균은 0 가정 (No constant)
+            # 데이터 포인트가 너무 적으면(예: 2일치) 에러날 수 있음
+            if len(residuals) > 2:
+                model_res = AutoReg(residuals.values, lags=1, trend='n').fit()
+                phi = model_res.params[0]
+                print(f"  Fitted AR(1) Phi: {phi:.4f}")
+            else:
+                phi = 0.0
+                print("  Warning: Not enough days for AR(1). Phi set to 0.")
+
+            # (6) Offset 계산: Offset_d = a_y + (Phi * Resid_{d-1})
+            # 첫째 날(Index 0)은 어제 데이터가 없으므로 그냥 a_y (잔차 0 가정)
+            first_day = residuals.index[0]
+            day_offsets[first_day] = a_y
             
-        if total_ozone_values:
-            all_values = np.concatenate(total_ozone_values)
-            monthly_mean = np.mean(all_values)
-            print(f"--- Global Monthly Mean for {years_[0]}-{months_[0]}: {monthly_mean:.4f} ---")
-        else:
-            monthly_mean = 0.0
+            for i in range(1, len(residuals)):
+                today_date = residuals.index[i]
+                yesterday_resid = residuals.iloc[i-1] # 어제의 '관측된' 잔차
+                
+                # 예측된 오늘의 베이스라인
+                predicted_offset = a_y + (phi * yesterday_resid)
+                day_offsets[today_date] = predicted_offset
+                
+        except Exception as e:
+            print(f"  Warning: AR(1) fitting failed ({e}). Using simple Monthly Mean.")
+            for d in residuals.index:
+                day_offsets[d] = a_y
 
         # 3. 공간 Ordering 계산
         ord_mm, nns_map = self.get_spatial_ordering(coarse_dicts, mm_cond_number)
         
-        # monthly_mean을 반환값에 추가
-        return coarse_dicts, ord_mm, nns_map, monthly_mean
+        # day_offsets 딕셔너리 반환
+        return coarse_dicts, ord_mm, nns_map, day_offsets
 
     def load_working_data(
         self, 
         coarse_dicts: Dict[str, pd.DataFrame],  
-        monthly_mean: float = 0.0, # [추가] 월 평균 값을 인자로 받음
+        day_offsets: Dict[str, float], # [핵심] 위에서 만든 AR Offset 딕셔너리
         idx_for_datamap: List[int] = [0, 8],
         ord_mm: Optional[np.ndarray] = None,
         dtype: torch.dtype = torch.double,
@@ -302,81 +218,54 @@ class load_data2:
         import torch.nn.functional as F
         
         key_idx = sorted(coarse_dicts)
+        if not key_idx: raise ValueError("coarse_dicts is empty")
+        
         analysis_data_map = {}
         aggregated_tensor_list = []
         np_dtype = np.float64 
         
         selected_keys = key_idx[idx_for_datamap[0]:idx_for_datamap[1]]
         
+        # 현재 배치의 날짜 확인 및 Offset 조회
+        first_key = selected_keys[0]
+        date_str = "_".join(first_key.split('_')[:3])
+        
+        # 해당 날짜의 AR 예측값 (없으면 0.0)
+        current_offset_val = day_offsets.get(date_str, 0.0)
+
         for t_idx, key in enumerate(selected_keys):
             tmp = coarse_dicts[key].copy()
-            
-            # 시간 정규화
             tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'] - 477700).astype(np_dtype)
             
-            # [핵심] 월 평균 반영 (Centering)
-            # 오존 값에서 월 평균을 미리 뺍니다. 
-            # 이렇게 하면 Intercept는 "월 평균으로부터의 편차"를 학습하게 됩니다.
-            # 원본 데이터프레임을 건드리지 않기 위해 복사본이나 iloc 할당 주의
-            if keep_ori:
-                # 2번 컬럼이 Ozone
-                ozone_vals = tmp.iloc[:, 2].values - monthly_mean
-            else:
-                ozone_vals = tmp.iloc[:, 2].values - monthly_mean
-            
-            # Ordering 적용
             if ord_mm is not None:
                 tmp_processed = tmp.iloc[ord_mm].reset_index(drop=True)
-                ozone_vals = ozone_vals[ord_mm] # 오존 값도 순서 변경
             else:
                 tmp_processed = tmp
             
-            # 텐서 생성 준비
-            # [Lat, Lon, Val(Centered), Time]
+            # [Lat, Lon, Val, Time]
             target_cols = [5, 6, 2, 3] if keep_ori else [0, 1, 2, 3]
-            base_numpy = tmp_processed.iloc[:, target_cols].to_numpy(dtype=np_dtype)
+            base_tensor = torch.from_numpy(tmp_processed.iloc[:, target_cols].to_numpy(dtype=np_dtype)).to(dtype)
             
-            # Centered Ozone 값으로 덮어쓰기 (인덱스 2번)
-            base_numpy[:, 2] = ozone_vals
-            
-            base_tensor = torch.from_numpy(base_numpy).to(dtype)
-            
-            # [타임 더미 생성] (8개 시간대 -> 7개 더미)
-            # t_idx: 0~7
+            # [타임 더미] (7개)
             dummies = F.one_hot(torch.tensor([t_idx]), num_classes=8).repeat(len(base_tensor), 1)
-            dummies = dummies[:, 1:].to(dtype) # 첫 번째 시간대(0)를 Reference로 제외 -> 7개
+            dummies = dummies[:, 1:].to(dtype) 
             
-            # 최종 11열 결합: [Lat, Lon, Val_Centered, Time, D1 ... D7]
-            final_tensor = torch.cat([base_tensor, dummies], dim=1)
+            # [12번째 열: AR Offset 변수 추가]
+            # 이 값은 상수처럼 반복되지만, 모델에게 "오늘의 예상 베이스라인"을 알려주는 변수(Covariate) 역할
+            offset_col = torch.full((len(base_tensor), 1), current_offset_val, dtype=dtype)
+            
+            # 최종 결합: [Lat, Lon, Val, Time, D1...D7, AR_Offset] -> 12열
+            final_tensor = torch.cat([base_tensor, dummies, offset_col], dim=1)
             
             analysis_data_map[key] = final_tensor
             aggregated_tensor_list.append(final_tensor)
 
         if not aggregated_tensor_list:
-            return analysis_data_map, torch.empty(0, 11, dtype=dtype)
+            return analysis_data_map, torch.empty(0, 12, dtype=dtype)
 
         aggregated_data = torch.cat(aggregated_tensor_list, dim=0)
         
         return analysis_data_map, aggregated_data
-
-    '''
-    # To replace load_working_data_byday (with reordering, as double):
-    analysis_map_mm, agg_data_mm = self.load_working_data(
-        coarse_dicts, 
-        idx_for_datamap, 
-        ord_mm=your_ord_mm_array, 
-        dtype=torch.double
-    )
-
-    # To replace load_working_data_byday_wo_mm (no reordering, as float):
-    analysis_map_no_mm, agg_data_no_mm = self.load_working_data(
-        coarse_dicts, 
-        idx_for_datamap, 
-        ord_mm=None,  # or just omit it
-        dtype=torch.float # or just omit it
-    )
-    
-    '''
 
 class exact_location_filter: # (full_vecc_dw_likelihoods):
     

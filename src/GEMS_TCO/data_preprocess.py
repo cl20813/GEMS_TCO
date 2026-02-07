@@ -116,7 +116,8 @@ class MonthAggregatedCSV(GemsORITocsvHour):
         aggregated_df =  pd.concat(aggregated_data, ignore_index=True) if aggregated_data else pd.DataFrame()
         aggregated_df['Hours_elapsed'] = aggregated_df['Time'].astype('int64') // 10**9/3600
         
-        acceptable_flags = [0, 2, 4, 128]
+        #acceptable_flags = [0, 2, 4, 128]
+        acceptable_flags = [0, 2]
         filtered_df = aggregated_df[aggregated_df['FinalAlgorithmFlags'].isin(acceptable_flags)]
 
         # frequency_table3= gqdata['FinalAlgorithmFlags'].value_counts()

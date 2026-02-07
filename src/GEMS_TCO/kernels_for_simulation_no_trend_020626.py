@@ -7,6 +7,8 @@
 # from scipy.spatial.distance import cdist  # For space and time distance
 # from scipy.optimize import minimize  # For optimization
 
+# 02/06/26 Modified: Only Intercept Mean Function (No Time Dummies, No Offset)
+
 import sys
 gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
 sys.path.append(gems_tco_path)
@@ -48,8 +50,12 @@ log_file_path = '/home/jl2815/tco/exercise_25/st_models/log/fit_st_by_latitude_1
 
 from torch.special import gammainc, gammaln
 
+import torch
+import numpy as np
+from typing import Dict, Any, List, Tuple, Callable
+from scipy.special import gamma
 
-
+# ... [SpatioTemporalModel Class remains unchanged] ...
 class SpatioTemporalModel:
     def __init__(self, smooth:float, input_map: Dict[str, Any], aggregated_data: torch.Tensor, nns_map:Dict[str, Any], mm_cond_number: int):
         self.device = aggregated_data.device
@@ -129,7 +135,6 @@ class SpatioTemporalModel:
         v_vec = torch.stack([v_lat_adv, v_lon_adv, v_t], dim=1)
 
         # 2. Define Anisotropy Weights (Diagonal Matrix)
-        # --- FIX APPLIED HERE: Handle 0D vs 1D mismatch ---
         one_tensor = torch.tensor(1.0, device=x.device, dtype=phi3.dtype)
         if phi3.ndim > 0:
             one_tensor = one_tensor.view_as(phi3)
@@ -168,51 +173,8 @@ class SpatioTemporalModel:
         if x.shape[0] == y.shape[0]:
             cov.diagonal().add_(nugget + 1e-8)
         return cov
-    
-    def full_likelihood_avg(self, params: torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
-        input_data = input_data.to(torch.float64)
-        y = y.to(torch.float64)
-        N = input_data.shape[0]
-        if N == 0: return torch.tensor(0.0, device=self.device, dtype=torch.float64)
-        
-        cov_matrix = covariance_function(params=params, y=input_data, x=input_data)
-        
-        try:
-            jitter = torch.eye(cov_matrix.shape[0], device=self.device, dtype=torch.float64) * 1e-6
-            L = torch.linalg.cholesky(cov_matrix + jitter)
-        except torch.linalg.LinAlgError:
-            return torch.tensor(torch.inf, device=params.device, dtype=params.dtype)
-        
-        log_det = 2 * torch.sum(torch.log(torch.diag(L)))
-        
-        locs = torch.cat((torch.ones(N, 1, device=self.device, dtype=torch.float64), input_data[:,:2]), dim=1)
-        if y.dim() == 1: y_col = y.unsqueeze(-1)
-        else: y_col = y
-        
-        combined_rhs = torch.cat((locs, y_col), dim=1)
-        Z_combined = torch.linalg.solve_triangular(L, combined_rhs, upper=False)
-        
-        Z_X = Z_combined[:, :3]
-        Z_y = Z_combined[:, 3:]
 
-        tmp1 = torch.matmul(Z_X.T, Z_X)
-        tmp2 = torch.matmul(Z_X.T, Z_y)
-        
-        try:
-            jitter_beta = torch.eye(tmp1.shape[0], device=self.device, dtype=torch.float64) * 1e-8
-            beta = torch.linalg.solve(tmp1 + jitter_beta, tmp2)
-        except torch.linalg.LinAlgError:
-            return torch.tensor(torch.inf, device=locs.device, dtype=locs.dtype)
-
-        Z_residual = Z_y - torch.matmul(Z_X, beta)
-        quad_form = torch.matmul(Z_residual.T, Z_residual)
-
-        neg_log_lik_sum = 0.5 * (log_det + quad_form.squeeze())
-        return neg_log_lik_sum / N
-
-
-# --- BATCHED GPU CLASS (Bug Fixed) ---
-# --- BATCHED GPU CLASS (Optimized) ---
+# --- BATCHED GPU CLASS (Modified: Only Intercept Mean Function) ---
 class VecchiaBatched(SpatioTemporalModel):
     def __init__(self, smooth:float, input_map:Dict[str,Any], aggregated_data:torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
@@ -222,90 +184,23 @@ class VecchiaBatched(SpatioTemporalModel):
         self.max_neighbors = mm_cond_number 
         self.is_precomputed = False
         
-        # Tensors
-        self.X_batch = None
-        self.Y_batch = None
-        self.Locs_batch = None
+        # [MODIFIED] Feature 개수: 1개 (Only Intercept)
+        # No Time Dummies, No Latitude Centering in Mean Function
+        self.n_features = 1  
+        
+        self.X_batch = None    
+        self.Y_batch = None    
+        self.Locs_batch = None 
         self.Heads_data = None 
 
-    def precompute_conditioning_sets(self):
-        print("Pre-computing Batched Tensors (Optimized CPU -> GPU)...", end=" ")
-        
-        # --- 1. HEADS (Exact GP Block) ---
-        key_list = list(self.input_map.keys())
-        cut_line = self.nheads
-        
-        heads_list = []
-        for key in key_list:
-            day_data = self.input_map[key]
-            if isinstance(day_data, torch.Tensor): day_data = day_data.cpu().numpy()
-            heads_list.append(day_data[:cut_line])
-        
-        # Stack numpy, send to GPU once
-        self.Heads_data = torch.from_numpy(np.concatenate(heads_list, axis=0)).to(self.device, dtype=torch.float64)
-
-        # --- 2. TAILS (Vecchia Blocks) ---
-        tasks = []
-        for time_idx, key in enumerate(key_list):
-            day_data = self.input_map[key]
-            indices = range(cut_line, len(day_data))
-            for idx in indices: tasks.append((time_idx, idx))
-
-        total_pts = len(tasks)
-        max_dim = (self.max_neighbors + 1) * 3
-        
-        # Build in CPU RAM (NumPy)
-        X_cpu = np.full((total_pts, max_dim, 3), 1e6, dtype=np.float64)
-        Y_cpu = np.zeros((total_pts, max_dim, 1), dtype=np.float64)
-        L_cpu = np.zeros((total_pts, max_dim, 3), dtype=np.float64)
-
-        for i, (time_idx, index) in enumerate(tasks):
-            current_np = self.input_map[key_list[time_idx]]
-            if isinstance(current_np, torch.Tensor): current_np = current_np.cpu().numpy()
-
-            current_row = current_np[index].reshape(1, -1) 
-            mm_neighbors = self.nns_map[index]
-            past = list(mm_neighbors)
-            
-            data_list = []
-            if past: data_list.append(current_np[past])
-            if time_idx > 0: 
-                prev = self.input_map[key_list[time_idx - 1]]
-                if isinstance(prev, torch.Tensor): prev = prev.cpu().numpy()
-                data_list.append(prev[past + [index], :])
-            if time_idx > 1: 
-                prev2 = self.input_map[key_list[time_idx - 2]]
-                if isinstance(prev2, torch.Tensor): prev2 = prev2.cpu().numpy()
-                data_list.append(prev2[past + [index], :])
-
-            neighbors_block = np.vstack(data_list) if data_list else np.empty((0, current_row.shape[1]))
-            combined = np.concatenate([neighbors_block, current_row], axis=0)
-            
-            slot = max_dim - combined.shape[0]
-            
-            X_cpu[i, slot:, 0] = combined[:, 0]
-            X_cpu[i, slot:, 1] = combined[:, 1]
-            X_cpu[i, slot:, 2] = combined[:, 3]
-            Y_cpu[i, slot:, 0] = combined[:, 2]
-            L_cpu[i, slot:, 0] = 1.0 
-            L_cpu[i, slot:, 1] = combined[:, 0] 
-            L_cpu[i, slot:, 2] = combined[:, 1] 
-
-        print("Moving to GPU...", end=" ")
-        self.X_batch = torch.from_numpy(X_cpu).to(self.device)
-        self.Y_batch = torch.from_numpy(Y_cpu).to(self.device)
-        self.Locs_batch = torch.from_numpy(L_cpu).to(self.device)
-        self.is_precomputed = True
-        print(f"Done. Heads: {self.Heads_data.shape[0]}, Tails: {self.X_batch.shape[0]}")
-
     def batched_manual_dist(self, dist_params, x_batch):
+        # 기존과 동일 (거리 계산은 좌표만 있으면 됨)
         phi3, phi4, advec_lat, advec_lon = dist_params
         x_lat, x_lon, x_time = x_batch[:, :, 0], x_batch[:, :, 1], x_batch[:, :, 2]
         
         u_lat = x_lat - advec_lat * x_time
         u_lon = x_lon - advec_lon * x_time
         
-        # Broadcasting (Batch, N, N)
         d_lat = u_lat.unsqueeze(2) - u_lat.unsqueeze(1)
         d_lon = u_lon.unsqueeze(2) - u_lon.unsqueeze(1)
         d_t   = x_time.unsqueeze(2) - x_time.unsqueeze(1)
@@ -314,6 +209,7 @@ class VecchiaBatched(SpatioTemporalModel):
         return torch.sqrt(dist_sq + 1e-8)
 
     def matern_cov_batched(self, params, x_batch):
+        # 기존과 동일
         phi1, phi2, phi3, phi4 = torch.exp(params[0:4])
         nugget = torch.exp(params[6])
         dist_params = torch.stack([phi3, phi4, params[4], params[5]])
@@ -324,114 +220,167 @@ class VecchiaBatched(SpatioTemporalModel):
         eye = torch.eye(N, device=self.device, dtype=torch.float64).unsqueeze(0).expand(B, N, N)
         return cov + eye * (nugget + 1e-6)
 
+    def precompute_conditioning_sets(self):
+        print("🚀 Pre-computing (Only Intercept Mean Function)...", end=" ")
+        
+        # 1. Integrate Data
+        key_list = list(self.input_map.keys())
+        all_data_list = [torch.from_numpy(d) if isinstance(d, np.ndarray) else d for d in self.input_map.values()]
+        
+        # Input Data: [Lat(0), Lon(1), Val(2), Time(3)] -> 4 Columns expected
+        Real_Data = torch.cat(all_data_list, dim=0).to(self.device, dtype=torch.float32)
+        
+        # [MODIFIED] No Latitude Mean Calculation needed for Mean Function
+        # But we create Dummy Point with correct size (4 columns)
+        num_cols = Real_Data.shape[1] 
+        dummy_point = torch.full((1, num_cols), 1e8, device=self.device, dtype=torch.float32)
+        if num_cols > 2: dummy_point[0, 2] = 0.0  # Val
+        
+        Full_Data = torch.cat([Real_Data, dummy_point], dim=0)
+        dummy_idx = Full_Data.shape[0] - 1
+        
+        # 2. Index Mapping (Same as before)
+        day_lengths = [len(d) for d in all_data_list]
+        cumulative_len = np.cumsum([0] + day_lengths)
+        
+        heads_indices = []
+        batch_indices_list = []
+        max_dim = (self.max_neighbors + 1) * 3 
+        
+        for time_idx, key in enumerate(key_list):
+            day_len = day_lengths[time_idx]
+            offset = cumulative_len[time_idx]
+            
+            n_heads = min(day_len, self.nheads)
+            heads_indices.extend(range(offset, offset + n_heads))
+            
+            if self.nheads >= day_len: continue
+                
+            for local_idx in range(self.nheads, day_len):
+                nbs_local = self.nns_map[local_idx]
+                current_indices = []
+                targets = np.append(nbs_local, local_idx)
+                current_indices.extend(offset + targets)
+                
+                if time_idx > 0:
+                    prev_offset = cumulative_len[time_idx - 1]
+                    prev_len = day_lengths[time_idx - 1]
+                    valid_targets = targets[targets < prev_len]
+                    current_indices.extend(prev_offset + valid_targets)
+                if time_idx > 1:
+                    prev2_offset = cumulative_len[time_idx - 2]
+                    prev2_len = day_lengths[time_idx - 2]
+                    valid_targets = targets[targets < prev2_len]
+                    current_indices.extend(prev2_offset + valid_targets)
+                
+                pad_len = max_dim - len(current_indices)
+                if pad_len > 0:
+                    padded_row = [dummy_idx] * pad_len + current_indices
+                else:
+                    padded_row = current_indices[-max_dim:]
+                
+                batch_indices_list.append(padded_row)
+
+        # 3. GPU Batch Construction
+        # (1) Heads
+        heads_tensor = torch.tensor(heads_indices, device=self.device, dtype=torch.long)
+        self.Heads_data = Full_Data[heads_tensor].contiguous().to(torch.float64)
+        
+        # (2) Tails
+        if len(batch_indices_list) > 0:
+            Indices_Tensor = torch.tensor(batch_indices_list, device=self.device, dtype=torch.long)
+            Gathered_Data = Full_Data[Indices_Tensor] 
+            
+            # [A] Covariance Kernel: Lat(0), Lon(1), Time(3)
+            self.X_batch = Gathered_Data[..., [0, 1, 3]].contiguous().to(torch.float64)
+            
+            # [B] Observation: Val (Column 2)
+            self.Y_batch = Gathered_Data[..., 2].unsqueeze(-1).contiguous().to(torch.float64)
+            
+            # [C] Mean Function Design Matrix (Only 1 Feature: Intercept)
+            # [MODIFIED] No Lat, No Dummies. Just Ones.
+            g_ones = torch.ones_like(Gathered_Data[..., 0]).unsqueeze(-1)
+            self.Locs_batch = g_ones.contiguous().to(torch.float64)
+            
+            # Masking
+            mask = (Indices_Tensor == dummy_idx).unsqueeze(-1) 
+            self.Locs_batch = self.Locs_batch.masked_fill(mask, 0.0)
+            self.Y_batch = self.Y_batch.masked_fill(mask, 0.0)
+            
+        else:
+            self.X_batch = torch.empty(0, device=self.device)
+            self.Y_batch = torch.empty(0, device=self.device)
+            self.Locs_batch = torch.empty(0, device=self.device)
+
+        self.is_precomputed = True
+        print(f"✅ Done. (Heads: {len(heads_indices)}, Tails: {len(batch_indices_list)})")
+
     def vecchia_batched_likelihood(self, params):
         if not self.is_precomputed: raise RuntimeError("Run precompute first!")
 
-        # --- GLOBAL ACCUMULATORS ---
-        # We will sum X'S^-1X and X'S^-1y across ALL chunks (Heads + Tails)
-        # Then solve beta ONCE at the end.
-        
-        XT_Sinv_X_glob = torch.zeros((3, 3), device=self.device, dtype=torch.float64)
-        XT_Sinv_y_glob = torch.zeros((3, 1), device=self.device, dtype=torch.float64)
+        # Global storage for (XT * S^-1 * X) and (XT * S^-1 * y)
+        XT_Sinv_X_glob = torch.zeros((self.n_features, self.n_features), device=self.device, dtype=torch.float64)
+        XT_Sinv_y_glob = torch.zeros((self.n_features, 1), device=self.device, dtype=torch.float64)
         yT_Sinv_y_glob = torch.tensor(0.0, device=self.device, dtype=torch.float64)
         log_det_glob   = torch.tensor(0.0, device=self.device, dtype=torch.float64)
 
         # -------------------------------------------------------
-        # PART 1: HEADS (Exact GP Block)
+        # PART 1: HEADS
         # -------------------------------------------------------
         if self.Heads_data.shape[0] > 0:
-            # Re-implementing likelihood internals to access matrices
-            X_head = torch.cat((torch.ones(self.Heads_data.shape[0], 1, device=self.device, dtype=torch.float64), 
-                                self.Heads_data[:, :2]), dim=1) # [1, lat, lon]
-            y_head = self.Heads_data[:, 2].unsqueeze(-1)
+            # [MODIFIED] Only Intercept
+            h_ones = torch.ones((self.Heads_data.shape[0], 1), device=self.device, dtype=torch.float64)
+            X_head = h_ones.to(torch.float64)
             
-            # Compute Covariance
-            cov_func = self.matern_cov_aniso_STABLE_log_reparam
-            cov = cov_func(params, self.Heads_data, self.Heads_data)
+            y_head = self.Heads_data[:, 2].unsqueeze(-1).to(torch.float64)
             
+            cov = self.matern_cov_aniso_STABLE_log_reparam(params, self.Heads_data, self.Heads_data)
             try:
                 L = torch.linalg.cholesky(cov)
-            except torch.linalg.LinAlgError:
-                return torch.tensor(float('inf'), device=self.device)
+            except torch.linalg.LinAlgError: return torch.tensor(float('inf'), device=self.device)
 
             log_det_glob += 2 * torch.sum(torch.log(torch.diag(L)))
-            
-            # Whitening: Z = L^-1 * Data
             Z_X = torch.linalg.solve_triangular(L, X_head, upper=False)
             Z_y = torch.linalg.solve_triangular(L, y_head, upper=False)
             
-            # Accumulate
             XT_Sinv_X_glob += Z_X.T @ Z_X
             XT_Sinv_y_glob += Z_X.T @ Z_y
             yT_Sinv_y_glob += (Z_y.T @ Z_y).squeeze()
 
         # -------------------------------------------------------
-        # PART 2: TAILS (Vecchia Batches)
+        # PART 2: TAILS
         # -------------------------------------------------------
-        chunk_size = 4000
-        total_pts = self.X_batch.shape[0]
-
-        for start in range(0, total_pts, chunk_size):
-            end = min(start + chunk_size, total_pts)
-            
-            X_chunk = self.X_batch[start:end]
-            Y_chunk = self.Y_batch[start:end]
-            Locs_chunk = self.Locs_batch[start:end]
-            
-            cov_chunk = self.matern_cov_batched(params, X_chunk)
+        chunk_size = 4096
+        for start in range(0, self.X_batch.shape[0], chunk_size):
+            end = min(start + chunk_size, self.X_batch.shape[0])
+            cov_chunk = self.matern_cov_batched(params, self.X_batch[start:end])
             
             try:
-                L_chunk = torch.linalg.cholesky(cov_chunk) # (Batch, N, N)
-            except torch.linalg.LinAlgError:
-                return torch.tensor(float('inf'), device=self.device)
+                L_chunk = torch.linalg.cholesky(cov_chunk)
+            except torch.linalg.LinAlgError: return torch.tensor(float('inf'), device=self.device)
 
-            # Whitening (Forward Solve)
-            Z_locs = torch.linalg.solve_triangular(L_chunk, Locs_chunk, upper=False)
-            Z_y    = torch.linalg.solve_triangular(L_chunk, Y_chunk, upper=False)
+            Z_locs = torch.linalg.solve_triangular(L_chunk, self.Locs_batch[start:end], upper=False)
+            Z_y    = torch.linalg.solve_triangular(L_chunk, self.Y_batch[start:end], upper=False)
             
-            # --- VECCHIA MAGIC ---
-            # We only care about the LAST row of the whitened vectors (The conditional residual)
-            # Z[:, -1, :] is the whitened innovation for the target point.
-            
-            u_X = Z_locs[:, -1, :] # Shape (Batch, 3)
-            u_y = Z_y[:, -1, :]    # Shape (Batch, 1)
-            
-            # Log Det (Only the last conditional variance matters for Vecchia)
-            sigma_cond = L_chunk[:, -1, -1]
-            log_det_glob += 2 * torch.sum(torch.log(sigma_cond))
-
-            # Accumulate Global Stats using simple matrix mult
+            u_X, u_y = Z_locs[:, -1, :], Z_y[:, -1, :]    
+            log_det_glob += 2 * torch.sum(torch.log(L_chunk[:, -1, -1])) 
+        
             XT_Sinv_X_glob += u_X.T @ u_X
             XT_Sinv_y_glob += u_X.T @ u_y
             yT_Sinv_y_glob += (u_y.T @ u_y).squeeze()
 
         # -------------------------------------------------------
-        # PART 3: SOLVE GLOBAL BETA & FINALIZE NLL
+        # PART 3: SOLVE BETA (Scalar Intercept)
         # -------------------------------------------------------
-        
-        # 1. Solve Beta (Generalized Least Squares)
-        jitter = torch.eye(3, device=self.device, dtype=torch.float64) * 1e-8
+        jitter = torch.eye(self.n_features, device=self.device, dtype=torch.float64) * 1e-6
         try:
             beta_global = torch.linalg.solve(XT_Sinv_X_glob + jitter, XT_Sinv_y_glob)
-        except torch.linalg.LinAlgError:
-            return torch.tensor(float('inf'), device=self.device)
+        except torch.linalg.LinAlgError: return torch.tensor(float('inf'), device=self.device)
 
-        # 2. Compute Quadratic Form using the "GLS Error" identity
-        # RSS = y'S^-1y - beta' (X'S^-1y) - (y'S^-1X) beta + beta' (X'S^-1X) beta
-        # Simplifies to: y'S^-1y - beta' (X'S^-1 X) beta  (if beta is optimal)
+        quad_form = yT_Sinv_y_glob - 2 * (beta_global.T @ XT_Sinv_y_glob) + (beta_global.T @ XT_Sinv_X_glob @ beta_global)
+        total_N = self.Heads_data.shape[0] + self.X_batch.shape[0]
         
-        # Safe computation:
-        term1 = yT_Sinv_y_glob
-        term2 = 2 * (beta_global.T @ XT_Sinv_y_glob)
-        term3 = beta_global.T @ XT_Sinv_X_glob @ beta_global
-        quad_form = term1 - term2 + term3
-
-        # 3. Final NLL
-        total_N = self.Heads_data.shape[0] + total_pts
-        nll = 0.5 * (log_det_glob + quad_form.squeeze())
-        
-        return nll / total_N
-
+        return 0.5 * (log_det_glob + quad_form.squeeze()) / total_N
 
 # --- FITTING CLASS ---
 class fit_vecchia_lbfgs(VecchiaBatched): 

@@ -1,5 +1,3 @@
-
-
 # Standard libraries
 # import logging
 # import math
@@ -8,8 +6,6 @@
 # Special functions and optimizations
 # from scipy.spatial.distance import cdist  # For space and time distance
 # from scipy.optimize import minimize  # For optimization
-
-# 02/06/26 latitude centering + time dummies + NO OFFSET (Modified)
 
 
 
@@ -180,6 +176,115 @@ class SpatioTemporalModel:
         if x.shape[0] == y.shape[0]:
             cov.diagonal().add_(nugget + 1e-8)
         return cov
+    '''  3 features
+    def full_likelihood_avg(self, params: torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
+        input_data = input_data.to(torch.float64)
+        y = y.to(torch.float64)
+        N = input_data.shape[0]
+        if N == 0: return torch.tensor(0.0, device=self.device, dtype=torch.float64)
+        
+        cov_matrix = covariance_function(params=params, y=input_data, x=input_data)
+        
+        try:
+            jitter = torch.eye(cov_matrix.shape[0], device=self.device, dtype=torch.float64) * 1e-6
+            L = torch.linalg.cholesky(cov_matrix + jitter)
+        except torch.linalg.LinAlgError:
+            return torch.tensor(torch.inf, device=params.device, dtype=params.dtype)
+        
+        log_det = 2 * torch.sum(torch.log(torch.diag(L)))
+        
+        locs = torch.cat((torch.ones(N, 1, device=self.device, dtype=torch.float64), input_data[:,:2]), dim=1)
+        if y.dim() == 1: y_col = y.unsqueeze(-1)
+        else: y_col = y
+        
+        combined_rhs = torch.cat((locs, y_col), dim=1)
+        Z_combined = torch.linalg.solve_triangular(L, combined_rhs, upper=False)
+        
+        Z_X = Z_combined[:, :3]
+        Z_y = Z_combined[:, 3:]
+
+        tmp1 = torch.matmul(Z_X.T, Z_X)
+        tmp2 = torch.matmul(Z_X.T, Z_y)
+        
+        try:
+            jitter_beta = torch.eye(tmp1.shape[0], device=self.device, dtype=torch.float64) * 1e-8
+            beta = torch.linalg.solve(tmp1 + jitter_beta, tmp2)
+        except torch.linalg.LinAlgError:
+            return torch.tensor(torch.inf, device=locs.device, dtype=locs.dtype)
+
+        Z_residual = Z_y - torch.matmul(Z_X, beta)
+        quad_form = torch.matmul(Z_residual.T, Z_residual)
+
+        neg_log_lik_sum = 0.5 * (log_det + quad_form.squeeze())
+        return neg_log_lik_sum / N
+    '''
+
+    ''' 6 features
+
+    def full_likelihood_avg(self, params: torch.Tensor, input_data: torch.Tensor, y: torch.Tensor, covariance_function: Callable) -> torch.Tensor:
+        input_data = input_data.to(torch.float64)
+        y = y.to(torch.float64)
+        N = input_data.shape[0]
+        if N == 0: return torch.tensor(0.0, device=self.device, dtype=torch.float64)
+        
+        cov_matrix = covariance_function(params=params, y=input_data, x=input_data)
+        
+        try:
+            jitter = torch.eye(cov_matrix.shape[0], device=self.device, dtype=torch.float64) * 1e-6
+            L = torch.linalg.cholesky(cov_matrix + jitter)
+        except torch.linalg.LinAlgError:
+            return torch.tensor(torch.inf, device=params.device, dtype=params.dtype)
+        
+        log_det = 2 * torch.sum(torch.log(torch.diag(L)))
+        
+        # --- [MODIFIED] Construct 6 Features (Same as VecchiaBatched) ---
+        # Assuming input_data columns: [Lat(0), Lon(1), Val(2), Time(3)] 
+        # based on your other methods using index 3 for time.
+        
+        lat  = input_data[:, 0]
+        lon  = input_data[:, 1]
+        time = input_data[:, 3] 
+        
+        ones = torch.ones(N, device=self.device, dtype=torch.float64)
+        
+        # Stack: [Intercept, Lat, Lon, Time, Lat*Time, Lon*Time]
+        locs = torch.stack([
+            ones,
+            lat,
+            lon,
+            time,
+            lat * time,
+            lon * time
+        ], dim=1)  # Shape becomes (N, 6)
+        # -------------------------------------------------------------
+
+        if y.dim() == 1: y_col = y.unsqueeze(-1)
+        else: y_col = y
+        
+        combined_rhs = torch.cat((locs, y_col), dim=1)
+        Z_combined = torch.linalg.solve_triangular(L, combined_rhs, upper=False)
+        
+        # Slice appropriately for 6 features
+        Z_X = Z_combined[:, :6] 
+        Z_y = Z_combined[:, 6:]
+
+        tmp1 = torch.matmul(Z_X.T, Z_X)
+        tmp2 = torch.matmul(Z_X.T, Z_y)
+        
+        try:
+            jitter_beta = torch.eye(tmp1.shape[0], device=self.device, dtype=torch.float64) * 1e-8
+            beta = torch.linalg.solve(tmp1 + jitter_beta, tmp2)
+        except torch.linalg.LinAlgError:
+            return torch.tensor(torch.inf, device=locs.device, dtype=locs.dtype)
+
+        Z_residual = Z_y - torch.matmul(Z_X, beta)
+        quad_form = torch.matmul(Z_residual.T, Z_residual)
+
+        neg_log_lik_sum = 0.5 * (log_det + quad_form.squeeze())
+        return neg_log_lik_sum / N
+    
+    
+    '''
 
 # --- BATCHED GPU CLASS (Intercept + Centered Lat + 7 Dummies = 9 Features) ---
 class VecchiaBatched(SpatioTemporalModel):
@@ -233,7 +338,7 @@ class VecchiaBatched(SpatioTemporalModel):
         return cov + eye * (nugget + 1e-6)
 
     def precompute_conditioning_sets(self):
-        print("🚀 Pre-computing (Time Dummies & Latitude Centering, NO Offset)...", end=" ")
+        print("🚀 Pre-computing (Time Dummies & Latitude Centering)...", end=" ")
         
         # 1. Integrate Data
         key_list = list(self.input_map.keys())
@@ -241,7 +346,7 @@ class VecchiaBatched(SpatioTemporalModel):
         
         Real_Data = torch.cat(all_data_list, dim=0).to(self.device, dtype=torch.float32)
         
-        # [Centering] Calculate Mean Latitude (KEEPING THIS)
+        # [Centering] Calculate Mean Latitude
         self.lat_mean_val = Real_Data[:, 0].mean()
         print(f"[Mean Lat: {self.lat_mean_val:.4f}]", end=" ")
         
@@ -255,12 +360,12 @@ class VecchiaBatched(SpatioTemporalModel):
         if num_cols > 2:
             dummy_point[0, 2] = 0.0  # Val
             
-        # [MODIFIED] We ignore Offset logic for initialization, 
-        # but keep dimension matching if data has 12 columns
+        # [Crucial Fix] Only access index 11 if it exists
         if num_cols >= 12:
-            dummy_point[0, 11] = 0.0 
+            dummy_point[0, 11] = 0.0 # Offset
             
         # Zero out Time Dummies (Indices 4 to 10) if they exist
+        # This slice 4:11 is safe even if size is 11 (it just stops at end)
         if num_cols >= 5:
             dummy_point[0, 4:11] = 0.0
         
@@ -322,17 +427,22 @@ class VecchiaBatched(SpatioTemporalModel):
             # [A] Covariance Kernel: Lat(0), Lon(1), Time(3)
             self.X_batch = Gathered_Data[..., [0, 1, 3]].contiguous().to(torch.float64)
             
-            # [B] Observation: Just use Val (Column 2). 
-            # [MODIFIED] Removed " - Gathered_Data[..., 11]" logic
-            self.Y_batch = Gathered_Data[..., 2].unsqueeze(-1).contiguous().to(torch.float64)
+            # [B] Observation Correction: Y - Offset(11) if exists
+            if Gathered_Data.shape[-1] >= 12:
+                adjusted_y = Gathered_Data[..., 2] - Gathered_Data[..., 11]
+            else:
+                adjusted_y = Gathered_Data[..., 2]
+            
+            self.Y_batch = adjusted_y.unsqueeze(-1).contiguous().to(torch.float64)
             
             # [C] Mean Function Design Matrix (9 Features)
             g_ones = torch.ones_like(Gathered_Data[..., 0]).unsqueeze(-1)
             
-            # [Centering] Use stored mean (KEEPING THIS)
+            # [Centering] Use stored mean
             g_lat = (Gathered_Data[..., 0] - self.lat_mean_val).unsqueeze(-1)
             
-            # Time Dummies (4:11) (KEEPING THIS)
+            # Time Dummies (4:11)
+            # Safe slice: if data has 11 cols, 4:11 gets 4,5,6,7,8,9,10 (7 cols)
             g_dummies = Gathered_Data[..., 4:11] 
             
             self.Locs_batch = torch.cat([g_ones, g_lat, g_dummies], dim=-1).contiguous().to(torch.float64)
@@ -364,16 +474,19 @@ class VecchiaBatched(SpatioTemporalModel):
         if self.Heads_data.shape[0] > 0:
             h_ones = torch.ones((self.Heads_data.shape[0], 1), device=self.device, dtype=torch.float64)
             
-            # [수정] Heads Centering (KEEPING THIS)
+            # [수정] Heads Centering
             h_lat = (self.Heads_data[:, 0] - self.lat_mean_val).unsqueeze(-1)
             
-            # [복구] Heads Dummies (KEEPING THIS)
+            # [복구] Heads Dummies
             h_dummies = self.Heads_data[:, 4:11]
             
             X_head = torch.cat([h_ones, h_lat, h_dummies], dim=1).to(torch.float64)
             
-            # [MODIFIED] Offset 보정 제거. Just use Column 2.
-            y_head = self.Heads_data[:, 2].unsqueeze(-1).to(torch.float64)
+            # Offset 보정
+            if self.Heads_data.shape[-1] >= 12:
+                y_head = (self.Heads_data[:, 2] - self.Heads_data[:, 11]).unsqueeze(-1).to(torch.float64)
+            else:
+                y_head = self.Heads_data[:, 2].unsqueeze(-1).to(torch.float64)
             
             cov = self.matern_cov_aniso_STABLE_log_reparam(params, self.Heads_data, self.Heads_data)
             try:
