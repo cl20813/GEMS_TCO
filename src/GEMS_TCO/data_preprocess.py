@@ -375,7 +375,85 @@ class center_matching_hour():
             
         return coarse_map
     
+    def match_bounded_nn_for_whittle(self, orbit_map: dict, center_points: pd.DataFrame) -> dict:
+        assert isinstance(orbit_map, dict), "orbit_map must be a dict"
+        assert isinstance(center_points, pd.DataFrame), "center_points must be a pd.DataFrame"
 
+        coarse_map = {}
+        key_list = sorted(orbit_map)
+
+        # 1. Query points 라디안 변환
+        query_points = center_points[['lat', 'lon']].to_numpy()
+        query_points_rad = np.radians(query_points) 
+
+        num_center_points = len(center_points)
+
+        # 2. 임계값(Threshold) 설정 및 라디안 변환
+        step_lat = 0.044
+        step_lon = 0.063
+        # 격자 대각선 길이의 2배 (Degree)
+        max_dist_deg = np.sqrt(step_lon**2 + step_lat**2) * 2.0 
+        # Haversine 비교를 위해 Radian으로 변환
+        max_dist_rad = np.radians(max_dist_deg) 
+
+        for key in key_list:
+            cur_data = orbit_map[key].reset_index(drop=True)
+            locs = cur_data[['Latitude', 'Longitude']].to_numpy()
+
+            if locs.shape[0] == 0:
+                coarse_map[key] = pd.DataFrame({
+                    'Latitude': center_points['lat'],
+                    'Longitude': center_points['lon'],
+                    'ColumnAmountO3': [np.nan] * num_center_points,
+                    'Hours_elapsed': [np.nan] * num_center_points,
+                    'Time': [pd.NaT] * num_center_points,
+                    'Source_Latitude': [np.nan] * num_center_points,
+                    'Source_Longitude': [np.nan] * num_center_points
+                })
+                continue
+
+            # 3. BallTree 구성 (라디안 기준)
+            locs_rad = np.radians(locs)
+            tree = BallTree(locs_rad, metric='haversine')
+            
+            # 4. 가장 가까운 1개 점만 탐색 (k=1)
+            dist, ind = tree.query(query_points_rad, k=1) 
+            
+            # 배열 차원 축소 (num_points, 1) -> (num_points,)
+            dist = dist.flatten()
+            ind = ind.flatten()
+
+            # 5. 거리 임계값 마스킹 (Thresholding)
+            # max_dist_rad 이내인 경우 True, 밖인 경우 False
+            valid_mask = dist <= max_dist_rad
+
+            # O3 및 위치 데이터 가져오기 (가장 가까운 값)
+            matched_o3 = cur_data['ColumnAmountO3'].values[ind]
+            source_lat = cur_data['Latitude'].values[ind]
+            source_lon = cur_data['Longitude'].values[ind]
+
+            # 임계값을 벗어난 곳은 NaN 처리 (혹은 0.0으로 덮어쓰기)
+            # Debiased Whittle 연산 전 Masking 처리를 위해 NaN으로 마킹해두는 것이 유리합니다.
+            matched_o3[~valid_mask] = np.nan
+            source_lat[~valid_mask] = np.nan
+            source_lon[~valid_mask] = np.nan
+
+            # 메타 데이터
+            hours_elapsed_val = cur_data['Hours_elapsed'].iloc[0] if not cur_data.empty else np.nan
+            time_val = cur_data['Time'].iloc[0] if not cur_data.empty else pd.NaT
+
+            # 6. 결과 저장
+            coarse_map[key] = pd.DataFrame({
+                'Latitude': center_points['lat'].values,
+                'Longitude': center_points['lon'].values,
+                'ColumnAmountO3': matched_o3,  
+                'Hours_elapsed': [hours_elapsed_val] * num_center_points,
+                'Time': [time_val] * num_center_points,
+                'Source_Latitude': source_lat, 
+                'Source_Longitude': source_lon
+            })
+            
+        return coarse_map
 
 
 

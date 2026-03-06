@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 import torch
 from typing import Optional, List, Dict, Tuple, Any
+from scipy.spatial import KDTree
 
 # 02/07/26 no ar, but time dummies one intercept,lat, lon 
 
@@ -91,7 +92,77 @@ class load_data2:
                         print(f"Error reading file {filepath}: {e}")
             
             return coarse_dicts
-    
+
+    def load_whittle_data_dicts(
+            self,
+            lat_lon_resolution: List[int] = [10, 10], 
+            years_: List[str] = ['2024'], 
+            months_: List[int] = [7]
+        ) -> Dict[str, pd.DataFrame]:
+            """
+            Loads coarse data explicitly for Debiased Whittle from pickle files.
+            File pattern: coarse_cen_map_rect_whittle_{YY}_{MM}.pkl
+            """
+            
+            # 1. 샘플 파일 로드 (격자 정보 확인용)
+            sample_df = None
+            for y in years_:
+                for m in months_:
+                    # [수정됨] 파일명 포맷: rect_whittle_ 적용
+                    filename = f"coarse_cen_map_rect_whittle_{str(y)[2:]}_{m:02d}.pkl"
+                    filepath_sample = Path(self.datapath) / f"pickle_{y}" / filename
+                    
+                    if filepath_sample.exists():
+                        try:
+                            with open(filepath_sample, 'rb') as f:
+                                temp_dict = pickle.load(f)
+                                if temp_dict:
+                                    sample_df = temp_dict[list(temp_dict.keys())[0]]
+                                    break
+                        except Exception as e:
+                            print(f"Warning: Failed to load sample {filepath_sample}: {e}")
+                if sample_df is not None:
+                    break
+            
+            if sample_df is None:
+                print("Error: Could not find any valid pickle file to determine spatial grid.")
+                return {}
+
+            # 2. Grid 정보 추출
+            rho_lat = lat_lon_resolution[0]          
+            rho_lon = lat_lon_resolution[1]
+
+            unique_lats = sample_df['Latitude'].unique()
+            sorted_lats_descending = np.sort(unique_lats)[::-1] 
+            lat_n = sorted_lats_descending[::rho_lat]
+            
+            unique_lons = sample_df['Longitude'].unique()
+            sorted_lons_descending = np.sort(unique_lons)[::-1] 
+            lon_n = sorted_lons_descending[::rho_lon]
+
+            # 3. 전체 데이터 로드 및 필터링
+            coarse_dicts = {}
+            for year in years_:
+                for month in months_:  
+                    # [수정됨] 전체 데이터 로드 시에도 파일명 변경
+                    filename = f"coarse_cen_map_rect_whittle_{str(year)[2:]}_{month:02d}.pkl"
+                    filepath = Path(self.datapath) / f"pickle_{year}" / filename
+                   
+                    try:
+                        with open(filepath, 'rb') as pickle_file:
+                            loaded_map = pickle.load(pickle_file)
+                            for key in loaded_map:
+                                tmp_df = loaded_map[key]
+                                # Coarsening Filter
+                                coarse_filter = (tmp_df['Latitude'].isin(lat_n)) & (tmp_df['Longitude'].isin(lon_n))
+                                coarse_dicts[f"{year}_{month:02d}_{key}"] = tmp_df[coarse_filter].reset_index(drop=True)
+                    except FileNotFoundError:
+                        print(f"Warning: File not found, skipping. {filepath}")
+                    except Exception as e:
+                        print(f"Error reading file {filepath}: {e}")
+            
+            return coarse_dicts
+
     def subset_df_map(
             self, 
             df_map: Dict[str, pd.DataFrame],
@@ -257,20 +328,26 @@ class load_data2:
         years_: List[str] = ['2024'], 
         months_: List[int] = [7],
         lat_range: Optional[List[float]] = None,
-        lon_range: Optional[List[float]] = None
+        lon_range: Optional[List[float]] = None,
+        is_whittle: bool = True  # [추가됨] Whittle용 데이터를 불러올지 선택하는 스위치
     ) -> Tuple[Dict[str, pd.DataFrame], np.ndarray, np.ndarray, float]:
         
         from collections import defaultdict
 
-        # 1. 데이터 로드
-        coarse_dicts = self.load_coarse_data_dicts(lat_lon_resolution, years_, months_)
+        # 1. 데이터 로드 (스위치에 따라 분기)
+        if is_whittle:
+            print("Loading Strict Whittle Data...")
+            coarse_dicts = self.load_whittle_data_dicts(lat_lon_resolution, years_, months_)
+        else:
+            print("Loading Standard Coarse Data...")
+            coarse_dicts = self.load_coarse_data_dicts(lat_lon_resolution, years_, months_)
+            
         if not coarse_dicts: return {}, np.array([]), np.array([]), 0.0
         
         if lat_range and lon_range:
             coarse_dicts = self.subset_df_map(coarse_dicts, lat_range, lon_range)
 
         # 2. [수정됨] 월 평균(Global Monthly Mean) 계산
-        # 모든 데이터의 오존 값을 수집하여 전체 평균을 구합니다.
         total_ozone_values = []
         for key, df in coarse_dicts.items():
             # 인덱스 2번이 Ozone이라고 가정 (혹은 컬럼명 확인 필요)
@@ -278,7 +355,10 @@ class load_data2:
             
         if total_ozone_values:
             all_values = np.concatenate(total_ozone_values)
-            monthly_mean = np.mean(all_values)
+            
+            # [매우 중요] NaN 값을 무시하고 평균을 구해야 함!
+            monthly_mean = np.nanmean(all_values) 
+            
             print(f"--- Global Monthly Mean for {years_[0]}-{months_[0]}: {monthly_mean:.4f} ---")
         else:
             monthly_mean = 0.0
@@ -377,6 +457,256 @@ class load_data2:
     )
     
     '''
+
+
+### 2026 03 03
+# Missing 자동 차단 (Rule 1): lat_diffs와 lon_diffs를 각각 계산하여,
+#  격자 크기의 절반(0.022, 0.0315)을 넘어가는 데이터는 남의 방 데이터를 훔쳐 온 것으로 간주하고 가차 없이 NaN으로 만듦.
+# 네가 말한 대로 8시간 내내 공간 구조(상대적 거리)가 같기 때문에, ord_mm을 매시간 새로 구하는 연산 낭비 없이 한 번 구해서 끝까지 돌려써.
+
+
+import numpy as np
+import pandas as pd
+import torch
+import pickle
+from pathlib import Path
+from scipy.spatial import KDTree
+import torch.nn.functional as F
+from typing import Tuple, Dict, List, Optional
+
+class load_data_dynamic_grid:
+    def __init__(self, 
+                 datapath: str = None,         
+                 master_lat: float = 1.982,       
+                 master_lon: float = 130.986,     
+                 lat_bounds: List[float] = [-3.0, 2.0], 
+                 lon_bounds: List[float] = [121.0, 131.0],
+                 v_drift_lat: float = 0.0,        
+                 v_drift_lon: float = -0.0048):   
+        
+        self.datapath = datapath
+        self.lat_step = 0.044
+        self.lon_step = 0.063
+        
+        self.master_lat = master_lat
+        self.master_lon = master_lon
+        self.v_drift_lat = v_drift_lat
+        self.v_drift_lon = v_drift_lon
+        self.lat_bounds = lat_bounds
+        self.lon_bounds = lon_bounds
+        
+        # Missing 처리 기준 (격자 크기의 절반)
+        self.lat_threshold = self.lat_step / 2.0
+        self.lon_threshold = self.lon_step / 2.0
+
+        self.generate_base_grid()
+
+    # ==========================================================
+    # 1. Dynamic Grid 생성
+    # ==========================================================
+    def generate_base_grid(self):
+        n_south = int(np.ceil((self.master_lat - self.lat_bounds[0]) / self.lat_step))
+        n_north = int(np.ceil((self.lat_bounds[1] - self.master_lat) / self.lat_step))
+        n_west = int(np.ceil((self.master_lon - self.lon_bounds[0]) / self.lon_step))
+        n_east = int(np.ceil((self.lon_bounds[1] - self.master_lon) / self.lon_step))
+        
+        base_lats = self.master_lat + np.arange(-n_south, n_north + 1) * self.lat_step
+        base_lons = self.master_lon + np.arange(-n_west, n_east + 1) * self.lon_step
+        
+        base_lats = base_lats[(base_lats >= self.lat_bounds[0]) & (base_lats <= self.lat_bounds[1])]
+        base_lons = base_lons[(base_lons >= self.lon_bounds[0]) & (base_lons <= self.lon_bounds[1])]
+        
+        xv, yv = np.meshgrid(base_lats, base_lons, indexing='ij')
+        self.base_grid_coords = np.stack((xv.flatten(), yv.flatten()), axis=-1)
+        return self.base_grid_coords
+
+    def get_dynamic_grid_for_hour(self, t_idx: int):
+        shift_lat = t_idx * self.v_drift_lat
+        shift_lon = t_idx * self.v_drift_lon
+        shifted_coords = self.base_grid_coords + np.array([shift_lat, shift_lon])
+        return shifted_coords
+
+    def get_spatial_ordering(self, coords: np.ndarray, mm_cond_number: int = 10) -> Tuple[np.ndarray, np.ndarray]:
+        try:
+            ord_mm = _orderings.maxmin_cpp(coords)
+            coords_reordered = coords[ord_mm]
+            nns_map = _orderings.find_nns_l2(locs=coords_reordered, max_nn=mm_cond_number)
+            return ord_mm, nns_map
+        except NameError:
+            print("Warning: _orderings module is not defined. Returning linear order.")
+            return np.arange(len(coords)), np.array([])
+
+    def load_raw_data_dicts(self, years_: List[str], months_: List[int], is_whittle: bool) -> Dict[str, pd.DataFrame]:
+        raw_dicts = {}
+        for year in years_:
+            for month in months_:  
+                prefix = "rect_whittle_" if is_whittle else "rect"
+                filename = f"coarse_cen_map_{prefix}{str(year)[2:]}_{month:02d}.pkl"
+                filepath = Path(self.datapath) / f"pickle_{year}" / filename
+                try:
+                    with open(filepath, 'rb') as pickle_file:
+                        loaded_map = pickle.load(pickle_file)
+                        for key in loaded_map:
+                            tmp_df = loaded_map[key]
+                            lat_mask = (tmp_df['Latitude'] >= self.lat_bounds[0]) & (tmp_df['Latitude'] <= self.lat_bounds[1])
+                            lon_mask = (tmp_df['Longitude'] >= self.lon_bounds[0]) & (tmp_df['Longitude'] <= self.lon_bounds[1])
+                            raw_dicts[f"{year}_{month:02d}_{key}"] = tmp_df[lat_mask & lon_mask].reset_index(drop=True)
+                except FileNotFoundError:
+                    pass
+        return raw_dicts
+
+    # ==========================================================
+    # 2. 데이터 로드 및 격자 매핑 (사용자 기존 인풋 형식 완벽 호환)
+    # ==========================================================
+    def load_maxmin_ordered_data_bymonthyear(
+        self, 
+        lat_lon_resolution: List[int] = [10, 10], # 호환성을 위해 남겨둠
+        mm_cond_number: int = 10, 
+        years_: List[str] = ['2024'], 
+        months_: List[int] = [7],
+        lat_range: Optional[List[float]] = None,
+        lon_range: Optional[List[float]] = None,
+        is_whittle: bool = True  
+    ) -> Tuple[Dict[str, pd.DataFrame], np.ndarray, np.ndarray, float]:
+        
+        # Bounding box 업데이트
+        if lat_range: self.lat_bounds = lat_range
+        if lon_range: self.lon_bounds = lon_range
+        self.generate_base_grid()
+
+        print(f"Loading Raw Data (Whittle={is_whittle})...")
+        raw_dicts = self.load_raw_data_dicts(years_, months_, is_whittle)
+        
+        if not raw_dicts:
+            return {}, np.array([]), np.array([]), 0.0
+
+        # 월 평균(Global Monthly Mean) 계산
+        total_ozone_values = []
+        for df in raw_dicts.values():
+            ozone_col = 'Ozone' if 'Ozone' in df.columns else df.columns[2]
+            total_ozone_values.append(df[ozone_col].values)
+            
+        monthly_mean = np.nanmean(np.concatenate(total_ozone_values)) if total_ozone_values else 0.0
+        print(f"--- Global Monthly Mean for {years_[0]}-{months_[0]}: {monthly_mean:.4f} ---")
+
+        # 공간 Ordering 계산 (Base Grid 기준 1회만)
+        ord_mm, nns_map = None, None
+        if not is_whittle:
+            ord_mm, nns_map = self.get_spatial_ordering(self.base_grid_coords, mm_cond_number)
+
+        # Dynamic Grid 매칭 (df_map 생성)
+        df_map = {}
+        sorted_keys = sorted(raw_dicts.keys())
+
+        for i, key in enumerate(sorted_keys):
+            t_idx = i % 8 # 0~7 시간대 인덱스
+            df_raw = raw_dicts[key]
+            
+            if len(df_raw) == 0: continue
+            
+            grid_coords_h = self.get_dynamic_grid_for_hour(t_idx)
+            raw_coords = df_raw[['Latitude', 'Longitude']].values
+            
+            ozone_col = 'Ozone' if 'Ozone' in df_raw.columns else df_raw.columns[2]
+            raw_vals = df_raw[ozone_col].values
+            hours_elapsed = df_raw['Hours_elapsed'].values
+            
+            # KDTree 매칭
+            tree = KDTree(raw_coords)
+            distances, indices = tree.query(grid_coords_h)
+            
+            matched_vals = raw_vals[indices]
+            matched_raw_coords = raw_coords[indices]
+            matched_hours = hours_elapsed[indices]
+            
+            # Missing 차단 (탈선 마스킹)
+            lat_diffs = np.abs(grid_coords_h[:, 0] - matched_raw_coords[:, 0])
+            lon_diffs = np.abs(grid_coords_h[:, 1] - matched_raw_coords[:, 1])
+            invalid_mask = (lat_diffs > self.lat_threshold) | (lon_diffs > self.lon_threshold)
+            
+            matched_vals[invalid_mask] = np.nan
+            matched_raw_coords[invalid_mask] = np.nan
+            
+            # 디버깅하기 좋은 포맷으로 DataFrame 조립
+
+            df_matched = pd.DataFrame({
+                'Latitude': self.base_grid_coords[:, 0],        # 무조건 고정된 Base Grid 좌표 부여!
+                'Longitude': self.base_grid_coords[:, 1],       # 무조건 고정된 Base Grid 좌표 부여!
+                ozone_col: matched_vals,                        
+                'Hours_elapsed': matched_hours,
+                'Source_Latitude': matched_raw_coords[:, 0],    
+                'Source_Longitude': matched_raw_coords[:, 1]
+            })
+            
+            df_map[key] = df_matched
+
+        return df_map, ord_mm, nns_map, monthly_mean
+
+    # ==========================================================
+    # 3. 텐서 변환 및 Time Dummies 생성 (사용자 기존 함수 완벽 이식)
+    # ==========================================================
+    def load_working_data(
+        self, 
+        coarse_dicts: Dict[str, pd.DataFrame],  
+        monthly_mean: float = 0.0, 
+        idx_for_datamap: List[int] = [0, 8],
+        ord_mm: Optional[np.ndarray] = None,
+        dtype: torch.dtype = torch.double,
+        keep_ori: bool = True
+    ) -> Tuple[Dict[str, torch.Tensor], torch.Tensor]:
+        
+        key_idx = sorted(coarse_dicts)
+        analysis_data_map = {}
+        aggregated_tensor_list = []
+        np_dtype = np.float64 
+        
+        selected_keys = key_idx[idx_for_datamap[0]:idx_for_datamap[1]]
+        
+        for t_idx, key in enumerate(selected_keys):
+            tmp = coarse_dicts[key].copy()
+            
+            tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'] - 477700).astype(np_dtype)
+            
+            ozone_col = 'Ozone' if 'Ozone' in tmp.columns else tmp.columns[2]
+            ozone_vals = tmp[ozone_col].values - monthly_mean
+            
+            if ord_mm is not None:
+                tmp = tmp.iloc[ord_mm].reset_index(drop=True)
+                ozone_vals = ozone_vals[ord_mm] 
+            
+            if keep_ori:
+                target_data = tmp[['Source_Latitude', 'Source_Longitude', ozone_col, 'Hours_elapsed']].copy()
+            else:
+                target_data = tmp[['Latitude', 'Longitude', ozone_col, 'Hours_elapsed']].copy()
+            
+            base_numpy = target_data.to_numpy(dtype=np_dtype)
+            base_numpy[:, 2] = ozone_vals 
+            
+            base_tensor = torch.from_numpy(base_numpy).to(dtype)
+            
+            dummies = F.one_hot(torch.tensor([t_idx]), num_classes=8).repeat(len(base_tensor), 1)
+            dummies = dummies[:, 1:].to(dtype) 
+            
+            final_tensor = torch.cat([base_tensor, dummies], dim=1)
+            
+            analysis_data_map[key] = final_tensor
+            aggregated_tensor_list.append(final_tensor)
+
+        if not aggregated_tensor_list:
+            return analysis_data_map, torch.empty(0, 11, dtype=dtype)
+
+        aggregated_data = torch.cat(aggregated_tensor_list, dim=0)
+        
+        return analysis_data_map, aggregated_data
+    
+
+
+
+
+
+### 아래는  test_regular_grid_seemissings_122225.ipynb에서 쓰인건데
+### 실제 격자가 0.044, 0.063 이 맞는지 확인하는데 쓰였어
+    
 
 class exact_location_filter: # (full_vecc_dw_likelihoods):
     
