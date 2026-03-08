@@ -9,6 +9,10 @@ scp -r "C:\Users\joonw\TCO\GEMS_TCO-1\GEMS_TCO" jl2815@amarel.rutgers.edu:/home/
 
 scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/coarse_cen_map_without_decrement_latitude24_07.pkl" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_2024
 
+scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/coarse_cen_map_rect_whittle_24_07.pkl" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_2024
+
+
+
 
 ### Copy run file from ```local``` to ```Amarel HPC```
 # mac
@@ -16,6 +20,8 @@ scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/coarse_cen_map_without_de
 # debiased whittle
 
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_D_whittle_day_v05_011526.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/fit_D_whittle_day_v05_dynamic_grid_030726.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 
 
@@ -87,6 +93,55 @@ nvidia-smi
 
 # Run the script
 srun python /home/jl2815/tco/exercise_25/st_model/fit_D_whittle_day_v05_011526.py \
+    --v 0.5 \
+    --mm-cond-number 8 \
+    --nheads 300 \
+    --v 0.5 \
+    --space "1, 1" \
+    --days "0,31" \
+    --no-keep-exact-loc 
+
+echo "Current date and time: $(date)"
+
+```
+
+### debiased_whittle l-bfgs dynamic grid
+
+``` cd ./jobscript/tco/gp_exercise ```
+```  nano fit_dw_030726.sh  ``` 
+```  sbatch fit_dw_030726.sh  ``` 
+
+``` 
+
+#!/bin/bash
+#SBATCH --job-name=fit_dw_03726     # Job name (Added GPU tag)
+#SBATCH --output=/home/jl2815/tco/exercise_output/fit_dw_03726.out 
+#SBATCH --error=/home/jl2815/tco/exercise_output/fit_dw_03726.err
+#SBATCH --time=48:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=120G                      #  gpu30:80
+#SBATCH --partition=gpu-redhat         # 'gpu', 'gpu-redhat'
+#SBATCH --gres=gpu:1                    # GPU 1개 요청
+#SBATCH --nodelist=gpu033      # 💥 여기를 gpu030으로 변경! (idle 상태임)
+
+
+#### Load Modules
+module purge
+module use /projects/community/modulefiles
+module load anaconda/2024.06-ts840
+module load cuda/12.1.0
+
+#### Initialize conda
+eval "$(conda shell.bash hook)"
+conda activate faiss_env
+
+echo "Running on High-End Node: $(hostname)"
+nvidia-smi
+
+
+# Run the script
+srun python /home/jl2815/tco/exercise_25/st_model/fit_D_whittle_day_v05_dynamic_grid_030726.py  \
     --v 0.5 \
     --mm-cond-number 8 \
     --nheads 300 \
