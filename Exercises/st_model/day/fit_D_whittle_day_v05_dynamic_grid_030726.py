@@ -28,7 +28,7 @@ from GEMS_TCO import configuration as config
 
 from GEMS_TCO import debiased_whittle as debiased_whittle
 
-from GEMS_TCO.data_loader import load_data2, exact_location_filter, load_data_dynamic_grid
+from GEMS_TCO.data_loader import load_data2, exact_location_filter, load_data_dynamic_processed # 새 클래스 임포트
 app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
 
 @app.command()
@@ -63,7 +63,7 @@ def cli(
     output_path = Path(config.amarel_estimates_day_path)
     output_path.mkdir(parents=True, exist_ok=True) 
     
-    data_load_instance = load_data_dynamic_grid(config.amarel_data_load_path)
+    data_load_instance = load_data_dynamic_processed(config.amarel_data_load_path)
 
     print("\nLoading MaxMin Ordered Data (Metadata)...")
 
@@ -154,10 +154,11 @@ def cli(
 
             db = debiased_whittle.debiased_whittle_preprocess(
                 daily_aggregated_tensors_dw, daily_hourly_maps_dw, day_idx=day_idx, 
-                params_list=raw_init_floats, lat_range=[0,5], lon_range=[123.0, 133.0]
+                params_list=raw_init_floats, lat_range=[-3, 2], lon_range=[121.0, 131.0] # ✅ 수정 완료
             )
 
-            cur_df = db.generate_spatially_filtered_days(0, 5, 123, 133).to(DEVICE_DW)
+            cur_df = db.generate_spatially_filtered_days(-3, 2, 121, 131).to(DEVICE_DW) # ✅ 수정 완료
+            
             unique_times = torch.unique(cur_df[:, TIME_COL])
             time_slices_list = [cur_df[cur_df[:, TIME_COL] == t_val] for t_val in unique_times]
 

@@ -123,7 +123,7 @@ echo "Current date and time: $(date)"
 #SBATCH --mem=120G                      #  gpu30:80
 #SBATCH --partition=gpu-redhat         # 'gpu', 'gpu-redhat'
 #SBATCH --gres=gpu:1                    # GPU 1개 요청
-#SBATCH --nodelist=gpu033      # 💥 여기를 gpu030으로 변경! (idle 상태임)
+#SBATCH --nodelist=gpu034      # 💥 여기를 gpu030으로 변경! (idle 상태임)
 
 
 #### Load Modules
