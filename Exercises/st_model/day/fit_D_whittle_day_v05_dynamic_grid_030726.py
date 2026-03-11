@@ -57,7 +57,7 @@ def cli(
     print(f" - Target Days: {days_list}")
 
     # 2. 경로 및 데이터 로더 설정
-    years = ['2024']
+    years = ['2025']
     month_range =[7]
 
     output_path = Path(config.amarel_estimates_day_path)

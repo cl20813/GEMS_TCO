@@ -11,6 +11,8 @@ scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/coarse_cen_map_without_de
 
 scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/coarse_cen_map_rect_whittle_24_07.pkl" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_2024
 
+scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2025/coarse_cen_map_rect_whittle_25_07.pkl" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_2025
+
 
 
 

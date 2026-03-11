@@ -474,6 +474,9 @@ from pathlib import Path
 import torch.nn.functional as F
 from typing import Tuple, Dict, List, Optional
 
+# 💥 C++ Extension 임포트 필수!
+from GEMS_TCO import orderings as _orderings 
+
 class load_data_dynamic_processed:
     def __init__(self, datapath: str):
         self.datapath = datapath
@@ -494,6 +497,44 @@ class load_data_dynamic_processed:
                     print(f"Warning: File not found {filepath}")
         return coarse_dicts
 
+    # 💥 C++ 기반 Ordering 함수 이식 (이전 코드에서 가져옴)
+    def get_spatial_ordering(
+            self, 
+            coarse_dicts: Dict[str, pd.DataFrame],
+            mm_cond_number: int = 10
+        ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Computes MaxMin ordering based on the first available dataframe using C++ extension.
+        """
+        key_idx = sorted(coarse_dicts)
+        if not key_idx:
+            print("Warning: coarse_dicts is empty, cannot compute ordering.")
+            return np.array([]), np.array([])
+
+        data_for_coord = coarse_dicts[key_idx[0]]
+        
+        if data_for_coord.empty:
+            return np.array([]), np.array([])
+
+        # Coordinate Extraction
+        x1 = data_for_coord['Longitude'].values
+        y1 = data_for_coord['Latitude'].values 
+        coords1 = np.stack((x1, y1), axis=-1)
+
+        # MaxMin Ordering (C++ ext)
+        ord_mm = _orderings.maxmin_cpp(coords1)
+        
+        # Reorder & Find Nearest Neighbors
+        data_for_coord_reordered = data_for_coord.iloc[ord_mm].reset_index(drop=True)
+        coords1_reordered = np.stack(
+            (data_for_coord_reordered['Longitude'].values, data_for_coord_reordered['Latitude'].values), 
+            axis=-1
+        )
+        
+        nns_map = _orderings.find_nns_l2(locs=coords1_reordered, max_nn=mm_cond_number)
+        
+        return ord_mm, nns_map
+
     def load_maxmin_ordered_data_bymonthyear(
         self, 
         lat_lon_resolution: List[int] = [10, 10], 
@@ -505,11 +546,11 @@ class load_data_dynamic_processed:
         is_whittle: bool = True
     ) -> Tuple[Dict[str, pd.DataFrame], Optional[np.ndarray], Optional[np.ndarray], float]:
         
-        # 1. 데이터 로드 (이미 다이내믹 매칭이 완료된 데이터)
+        # 1. 데이터 로드
         coarse_dicts = self.load_whittle_data_dicts(years_, months_)
         if not coarse_dicts: return {}, None, None, 0.0
 
-        # 2. Bounding Box 필터링 (필요 시 한 번 더 깎아냄)
+        # 2. Bounding Box 필터링
         if lat_range is not None and lon_range is not None:
             filtered_dicts = {}
             for key, df in coarse_dicts.items():
@@ -518,7 +559,7 @@ class load_data_dynamic_processed:
                 filtered_dicts[key] = df[lat_mask & lon_mask].reset_index(drop=True)
             coarse_dicts = filtered_dicts
 
-        # 3. 월평균 계산 (에러 방지: 문자가 섞여 있어도 무조건 숫자로 강제 변환)
+        # 3. 월평균 계산
         total_ozone_values = []
         for df in coarse_dicts.values():
             if 'ColumnAmountO3' in df.columns: ozone_col = 'ColumnAmountO3'
@@ -531,8 +572,13 @@ class load_data_dynamic_processed:
         monthly_mean = np.nanmean(np.concatenate(total_ozone_values)) if total_ozone_values else 0.0
         print(f"--- Global Monthly Mean for {years_[0]}-{months_[0]}: {monthly_mean:.4f} ---")
         
-        # Whittle 모델용이므로 ord_mm, nns_map은 None 반환 (연산 패스)
-        return coarse_dicts, None, None, monthly_mean
+        # 4. 💥 스위치: 베키아일 때만 C++ 모듈로 NNS Map 생성
+        if is_whittle:
+            return coarse_dicts, None, None, monthly_mean
+        else:
+            print("--- Generating NNS Map for Vecchia (C++ Accelerated) ---")
+            ord_mm, nns_map = self.get_spatial_ordering(coarse_dicts, mm_cond_number)
+            return coarse_dicts, ord_mm, nns_map, monthly_mean
 
     def load_working_data(
         self, 
@@ -553,16 +599,17 @@ class load_data_dynamic_processed:
         for t_idx, key in enumerate(selected_keys):
             tmp = coarse_dicts[key].copy()
             
-            # 💥 [추가할 코드] 전처리에서 NaN으로 날아가버린 시간을 복구!
+            # [결측치 픽스] 전처리에서 NaN으로 날아가버린 시간 복구
             if not tmp['Hours_elapsed'].dropna().empty:
                 valid_time = tmp['Hours_elapsed'].dropna().median()
                 tmp['Hours_elapsed'] = tmp['Hours_elapsed'].fillna(valid_time)
             
             # 시간 정규화 (- 477700)
             tmp['Hours_elapsed'] = np.round(tmp['Hours_elapsed'] - 477700).astype(np_dtype)
-            
-            # ... (아래는 기존 코드 그대로) ...
-            # 시간 정규화 (- 477700)
+
+            # 💥 베키아용 C++ Ordering 적용 (순서 뒤섞기)
+            if ord_mm is not None:
+                tmp = tmp.iloc[ord_mm].reset_index(drop=True)
    
             # 오존 컬럼 추출 및 Centering (평균 빼기)
             if 'ColumnAmountO3' in tmp.columns: ozone_col = 'ColumnAmountO3'
@@ -571,7 +618,7 @@ class load_data_dynamic_processed:
                 
             ozone_vals = pd.to_numeric(tmp[ozone_col], errors='coerce').values - monthly_mean
             
-            # 추출할 컬럼 결정 (keep_ori 옵션에 따라 가짜 좌표 vs 진짜 좌표 선택)
+            # 추출할 컬럼 결정 (가짜 좌표 vs 진짜 좌표)
             if keep_ori:
                 target_data = tmp[['Source_Latitude', 'Source_Longitude', ozone_col, 'Hours_elapsed']].copy()
             else:
@@ -593,9 +640,6 @@ class load_data_dynamic_processed:
         aggregated_data = torch.cat(aggregated_tensor_list, dim=0) if aggregated_tensor_list else torch.empty(0, 11, dtype=dtype)
         
         return analysis_data_map, aggregated_data
-
-### 아래는  test_regular_grid_seemissings_122225.ipynb에서 쓰인건데
-### 실제 격자가 0.044, 0.063 이 맞는지 확인하는데 쓰였어
     
 
 class exact_location_filter: # (full_vecc_dw_likelihoods):
