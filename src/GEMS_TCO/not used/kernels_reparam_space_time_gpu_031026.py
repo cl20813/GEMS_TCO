@@ -39,14 +39,12 @@ class SpatioTemporalModel:
         self.mm_cond_number = mm_cond_number
 
         # Process NNS Map
-        nns_map = list(nns_map) 
-        for i in range(len(nns_map)):  
-            # mm_cond_number만큼 잘라서 -1 제거
-            tmp = np.delete(nns_map[i][:self.mm_cond_number], np.where(nns_map[i][:self.mm_cond_number] == -1))
-            if tmp.size > 0:
-                nns_map[i] = tmp
-            else:
-                nns_map[i] = []
+        # mm_cond_number로 truncate하지 않음 → 저장된 이웃 전체를 유지
+        # precompute_conditioning_sets()에서 cap(limit_A/B/C)으로 실제 사용 수를 제한
+        nns_map = list(nns_map)
+        for i in range(len(nns_map)):
+            tmp = np.delete(nns_map[i], np.where(nns_map[i] == -1))
+            nns_map[i] = tmp if tmp.size > 0 else np.array([], dtype=np.int64)
         self.nns_map = nns_map
     
     def compute_theoretical_semivariogram_vectorized(self, params: torch.Tensor, lag_distances: torch.Tensor, time_lag: float, direction: str = 'lat') -> Tuple[torch.Tensor, torch.Tensor]:
@@ -144,25 +142,32 @@ class SpatioTemporalModel:
 
 # --- BATCHED GPU CLASS (Intercept + Centered Lat + 7 Dummies = 9 Features) ---
 class VecchiaBatched(SpatioTemporalModel):
-    def __init__(self, smooth:float, input_map:Dict[str,Any], aggregated_data:torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int):
+    def __init__(self, smooth:float, input_map:Dict[str,Any], aggregated_data:torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int,
+                 limit_A:int=8, limit_B:int=8, limit_C:int=8, daily_stride:int=8):
         super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number)
-        
-        self.device = aggregated_data.device 
+
+        self.device = aggregated_data.device
         self.nheads = nheads
-        self.max_neighbors = mm_cond_number 
+        self.max_neighbors = mm_cond_number
         self.is_precomputed = False
-        
+
+        # Conditioning set sizes (A: current t spatial, B: t-1, C: t-daily_stride)
+        self.limit_A = limit_A
+        self.limit_B = limit_B
+        self.limit_C = limit_C
+        self.daily_stride = daily_stride
+
         # Feature 개수: 9개
         # 1. Intercept (Base Mean)
         # 2. Latitude (Centered)
         # 3~9. Time Dummies (D1 ~ D7)
-        self.n_features = 9  
-        
-        self.X_batch = None    
-        self.Y_batch = None    
-        self.Locs_batch = None 
-        self.Heads_data = None 
-        
+        self.n_features = 9
+
+        self.X_batch = None
+        self.Y_batch = None
+        self.Locs_batch = None
+        self.Heads_data = None
+
         # Centering용 평균 위도
         self.lat_mean_val = 0.0
 
@@ -192,141 +197,166 @@ class VecchiaBatched(SpatioTemporalModel):
         return cov + eye * (nugget + 1e-6)
 
     def precompute_conditioning_sets(self):
-        print("🚀 Pre-computing (Daily AR1 Strategy: A(8), B(9), C(9)) with NaN Filtering...", end=" ")
-        
-        # 1. Integrate Data
-        key_list = list(self.input_map.keys())
-        all_data_list = [torch.from_numpy(d) if isinstance(d, np.ndarray) else d for d in self.input_map.values()]
-        
-        Real_Data = torch.cat(all_data_list, dim=0).to(self.device, dtype=torch.float32)
-        
-        # [NaN 마스킹 생성] 오존 값(Column 2)이 NaN인지 확인하는 빠른 마스크
-        is_nan_mask = torch.isnan(Real_Data[:, 2])
-        
-        # [Centering] NaN을 제외하고 평균 위도 계산
-        valid_lats = Real_Data[~is_nan_mask, 0]
+        limit_A, limit_B, limit_C = self.limit_A, self.limit_B, self.limit_C
+        daily_stride  = self.daily_stride
+
+        # 3개 그룹별 고정 행렬 크기 (dummy 없이 over-fetch로 채움)
+        # Group A  : time_idx=0              → Set A only
+        # Group AB : 0 < time_idx < stride   → Set A + B
+        # Group ABC: time_idx >= stride       → Set A + B + C
+        max_dim_A   = limit_A
+        max_dim_AB  = limit_A + (limit_B + 1)
+        max_dim_ABC = limit_A + (limit_B + 1) + (limit_C + 1)
+
+        n_stored = next((len(m) for m in self.nns_map if len(m) > 0), 0)
+        print(f"🚀 Pre-computing 3-group Vecchia "
+              f"[A={max_dim_A}, AB={max_dim_AB}, ABC={max_dim_ABC}, stored={n_stored}]...", end=" ")
+
+        # 1. 데이터 통합
+        key_list      = list(self.input_map.keys())
+        all_data_list = [torch.from_numpy(d) if isinstance(d, np.ndarray) else d
+                         for d in self.input_map.values()]
+        Real_Data  = torch.cat(all_data_list, dim=0).to(self.device, dtype=torch.float32)
+        n_real     = Real_Data.shape[0]
+        num_cols   = Real_Data.shape[1]
+
+        # NaN 마스크 (Python 루프용 numpy)
+        is_nan_real   = torch.isnan(Real_Data[:, 2])
+        valid_lats    = Real_Data[~is_nan_real, 0]
         self.lat_mean_val = valid_lats.mean() if valid_lats.numel() > 0 else Real_Data[:, 0].mean()
         print(f"[Mean Lat: {self.lat_mean_val:.4f}]", end=" ")
-        
-        num_cols = Real_Data.shape[1] 
-        
-        # Create Dummy Point
-        dummy_point = torch.full((1, num_cols), 1e8, device=self.device, dtype=torch.float32)
-        if num_cols > 2: dummy_point[0, 2] = 0.0  
-        if num_cols >= 12: dummy_point[0, 11] = 0.0 
-        if num_cols >= 5: dummy_point[0, 4:11] = 0.0
-        
-        Full_Data = torch.cat([Real_Data, dummy_point], dim=0)
-        dummy_idx = Full_Data.shape[0] - 1
-        
-        # 업데이트된 NaN 마스크 (Dummy Point는 NaN이 아님)
-        is_nan_mask = torch.isnan(Full_Data[:, 2])
+        is_nan_mask_np = is_nan_real.cpu().numpy()
 
-        # 2. Index Mapping with Daily AR(1) Strategy
-        day_lengths = [len(d) for d in all_data_list]
+        # over-fetch로 거의 항상 cap까지 채우지만, 극단적 NaN 지역 안전망으로
+        # 슬롯별 고유 dummy 생성 (서로 좌표가 달라 C[d_i,d_j]≈0 → near-singular 없음)
+        n_dummies   = max_dim_ABC
+        dummy_block = torch.zeros((n_dummies, num_cols), device=self.device, dtype=torch.float32)
+        for k in range(n_dummies):
+            dummy_block[k, 0] = (k + 1) * 1e8   # 고유 lat
+            dummy_block[k, 1] = (k + 1) * 1e8   # 고유 lon
+            dummy_block[k, 3] = (k + 1) * 1e8   # 고유 time
+        Full_Data      = torch.cat([Real_Data, dummy_block], dim=0)
+        dummy_start    = n_real
+        is_nan_mask_np = np.append(is_nan_mask_np, np.zeros(n_dummies, dtype=bool))
+
+        # 2. 배치 인덱스 구성
+        day_lengths    = [len(d) for d in all_data_list]
         cumulative_len = np.cumsum([0] + day_lengths)
-        
-        heads_indices = []
-        batch_indices_list = []
-        
-        limit_A, limit_B, limit_C = 8, 8, 8
-        daily_stride = 8 
-        max_dim = limit_A + (limit_B + 1) + (limit_C + 1) + 5
-        
+        n_time_steps   = len(key_list)
+        use_set_C      = daily_stride < n_time_steps
+
+        heads_indices  = []
+        batch_list_A   = []   # (N_A,   max_dim_A)
+        batch_list_AB  = []   # (N_AB,  max_dim_AB)
+        batch_list_ABC = []   # (N_ABC, max_dim_ABC)
+
         for time_idx, key in enumerate(key_list):
             day_len = day_lengths[time_idx]
-            offset = cumulative_len[time_idx]
-            
-            # [수정] Heads Logic: 본인이 NaN이면 Likelihood 계산 제외
+            offset  = cumulative_len[time_idx]
+
+            # Heads
             n_heads = min(day_len, self.nheads)
             for local_idx in range(n_heads):
                 idx = offset + local_idx
-                if not is_nan_mask[idx]:
+                if not is_nan_mask_np[idx]:
                     heads_indices.append(idx)
-            
-            if self.nheads >= day_len: continue
-                
+            if self.nheads >= day_len:
+                continue
+
             for local_idx in range(self.nheads, day_len):
                 target_idx = offset + local_idx
-                
-                # 💥 1. 본인(Target)이 NaN이면 이번 Batch 생성 자체를 건너뜀 (Likelihood 계산 X)
-                if is_nan_mask[target_idx]:
+                if is_nan_mask_np[target_idx]:
                     continue
-                    
+
                 current_indices = []
-                
-                # 💥 2. 이웃(Neighbors) 중 NaN을 걸러내는 헬퍼 함수
-                def add_valid_neighbors(indices_to_check):
+
+                def add_valid_neighbors(indices_to_check, cap):
+                    count = 0
                     for idx in indices_to_check:
-                        if not is_nan_mask[idx]:
+                        if count >= cap:
+                            break
+                        if not is_nan_mask_np[idx]:
                             current_indices.append(idx)
+                            count += 1
 
-                # [A] 현재 시점 이웃
-                nbs_local = self.nns_map[local_idx][:limit_A]
-                add_valid_neighbors((offset + nbs_local).tolist())
-                
-                # [B] 1시간 전 (t-1)
-                if time_idx > 0:
-                    prev_offset = cumulative_len[time_idx - 1]
+                # Set A: 현재 시점 t 공간 이웃 (over-fetch & NaN filter)
+                add_valid_neighbors(
+                    (offset + self.nns_map[local_idx]).tolist(), cap=limit_A)
+
+                has_B = time_idx > 0
+                has_C = time_idx >= daily_stride
+
+                # Set B: t-1, independent filtering
+                # x 자신 + nns_map 이웃을 t-1에서 독립적으로 NaN 필터링
+                if has_B:
+                    prev_off = cumulative_len[time_idx - 1]
                     prev_len = day_lengths[time_idx - 1]
-                    
                     if local_idx < prev_len:
-                        add_valid_neighbors([prev_offset + local_idx])
-                    
-                    nbs_prev = self.nns_map[local_idx][:limit_B]
-                    valid_nbs = nbs_prev[nbs_prev < prev_len]
-                    add_valid_neighbors((prev_offset + valid_nbs).tolist())
+                        add_valid_neighbors([prev_off + local_idx], cap=1)
+                    nbs = self.nns_map[local_idx]
+                    add_valid_neighbors(
+                        (prev_off + nbs[nbs < prev_len]).tolist(), cap=limit_B)
 
-                # [C] 하루 전 (t - daily_stride)
-                if time_idx >= daily_stride:
-                    prev_day_idx = time_idx - daily_stride
-                    prev_day_offset = cumulative_len[prev_day_idx]
-                    prev_day_len = day_lengths[prev_day_idx]
-                    
-                    if local_idx < prev_day_len:
-                        add_valid_neighbors([prev_day_offset + local_idx])
-                        
-                    nbs_day = self.nns_map[local_idx][:limit_C]
-                    valid_nbs_day = nbs_day[nbs_day < prev_day_len]
-                    add_valid_neighbors((prev_day_offset + valid_nbs_day).tolist())
-                
-                # Padding: NaN으로 빠진 자리만큼 Dummy Index가 채워짐
-                pad_len = max_dim - len(current_indices)
-                if pad_len > 0:
-                    padded_row = [dummy_idx] * pad_len + current_indices
+                # Set C: t-daily_stride, independent filtering
+                # x 자신 + nns_map 이웃을 t-2에서 독립적으로 NaN 필터링
+                if has_C:
+                    pd_idx = time_idx - daily_stride
+                    pd_off = cumulative_len[pd_idx]
+                    pd_len = day_lengths[pd_idx]
+                    if local_idx < pd_len:
+                        add_valid_neighbors([pd_off + local_idx], cap=1)
+                    nbs = self.nns_map[local_idx]
+                    add_valid_neighbors(
+                        (pd_off + nbs[nbs < pd_len]).tolist(), cap=limit_C)
+
+                # 그룹 결정
+                if has_C:
+                    max_d = max_dim_ABC; target_list = batch_list_ABC
+                elif has_B:
+                    max_d = max_dim_AB;  target_list = batch_list_AB
                 else:
-                    padded_row = current_indices[-max_dim:]
-                
-                batch_indices_list.append(padded_row)
+                    max_d = max_dim_A;   target_list = batch_list_A
 
-        # 3. GPU Batch Construction
-        heads_tensor = torch.tensor(heads_indices, device=self.device, dtype=torch.long)
-        self.Heads_data = Full_Data[heads_tensor].contiguous().to(torch.float64) if len(heads_indices) > 0 else torch.empty(0, num_cols, device=self.device, dtype=torch.float64)
-        
-        if len(batch_indices_list) > 0:
-            Indices_Tensor = torch.tensor(batch_indices_list, device=self.device, dtype=torch.long)
-            Gathered_Data = Full_Data[Indices_Tensor] 
-            
-            self.X_batch = Gathered_Data[..., [0, 1, 3]].contiguous().to(torch.float64)
-            self.Y_batch = Gathered_Data[..., 2].unsqueeze(-1).contiguous().to(torch.float64)
-            
-            g_ones = torch.ones_like(Gathered_Data[..., 0]).unsqueeze(-1)
-            g_lat = (Gathered_Data[..., 0] - self.lat_mean_val).unsqueeze(-1)
-            g_dummies = Gathered_Data[..., 4:11] 
-            
-            self.Locs_batch = torch.cat([g_ones, g_lat, g_dummies], dim=-1).contiguous().to(torch.float64)
-            
-            mask = (Indices_Tensor == dummy_idx).unsqueeze(-1) 
-            self.Locs_batch = self.Locs_batch.masked_fill(mask, 0.0)
-            self.Y_batch = self.Y_batch.masked_fill(mask, 0.0)
-            
-        else:
-            self.X_batch = torch.empty(0, device=self.device)
-            self.Y_batch = torch.empty(0, device=self.device)
-            self.Locs_batch = torch.empty(0, device=self.device)
+                # 슬롯별 고유 dummy로 패딩 (over-fetch로 거의 불필요)
+                n_valid = len(current_indices)
+                if n_valid < max_d:
+                    pad = [dummy_start + k for k in range(max_d - n_valid)]
+                    row = pad + current_indices
+                else:
+                    row = current_indices[-max_d:]
+                target_list.append(row)
 
+        # 3. 그룹별 GPU 텐서 빌드
+        heads_tensor   = torch.tensor(heads_indices, device=self.device, dtype=torch.long)
+        self.Heads_data = (Full_Data[heads_tensor].contiguous().to(torch.float64)
+                           if len(heads_indices) > 0
+                           else torch.empty(0, num_cols, device=self.device, dtype=torch.float64))
+
+        def build_tensors(idx_list, max_d):
+            if not idx_list:
+                return None, None, None
+            T = torch.tensor(idx_list, device=self.device, dtype=torch.long)  # (N, max_d)
+            G = Full_Data[T]                                                   # (N, max_d, num_cols)
+            X    = G[..., [0, 1, 3]].contiguous().to(torch.float64)
+            Y    = G[..., 2].unsqueeze(-1).contiguous().to(torch.float64)
+            ones = torch.ones_like(G[..., 0]).unsqueeze(-1)
+            lat  = (G[..., 0] - self.lat_mean_val).unsqueeze(-1)
+            dums = G[..., 4:11]
+            Locs = torch.cat([ones, lat, dums], dim=-1).contiguous().to(torch.float64)
+            is_dummy = (T >= dummy_start).unsqueeze(-1)
+            Locs = Locs.masked_fill(is_dummy, 0.0)
+            Y    = Y.masked_fill(is_dummy, 0.0)
+            return X, Y, Locs
+
+        self.X_A,   self.Y_A,   self.Locs_A   = build_tensors(batch_list_A,   max_dim_A)
+        self.X_AB,  self.Y_AB,  self.Locs_AB  = build_tensors(batch_list_AB,  max_dim_AB)
+        self.X_ABC, self.Y_ABC, self.Locs_ABC = build_tensors(batch_list_ABC, max_dim_ABC)
+
+        self.n_tails = len(batch_list_A) + len(batch_list_AB) + len(batch_list_ABC)
         self.is_precomputed = True
-        print(f"✅ Done. (Heads: {len(heads_indices)}, Tails: {len(batch_indices_list)})")
+        print(f"[Set C: {use_set_C}] ✅ Done. "
+              f"(Heads: {len(heads_indices)}, "
+              f"Tails A/AB/ABC: {len(batch_list_A)}/{len(batch_list_AB)}/{len(batch_list_ABC)})")
 
     def vecchia_batched_likelihood(self, params):
         if not self.is_precomputed: raise RuntimeError("Run precompute first!")
@@ -361,26 +391,34 @@ class VecchiaBatched(SpatioTemporalModel):
             yT_Sinv_y_glob += (Z_y.T @ Z_y).squeeze()
 
         # -------------------------------------------------------
-        # PART 2: TAILS
+        # PART 2: TAILS (3개 그룹: A / AB / ABC)
+        # 각 그룹은 서로 다른 max_dim을 가지며 독립적으로 Cholesky 처리
         # -------------------------------------------------------
-        chunk_size = 4096
-        for start in range(0, self.X_batch.shape[0], chunk_size):
-            end = min(start + chunk_size, self.X_batch.shape[0])
-            cov_chunk = self.matern_cov_batched(params, self.X_batch[start:end])
-            
-            try:
-                L_chunk = torch.linalg.cholesky(cov_chunk)
-            except torch.linalg.LinAlgError: return torch.tensor(float('inf'), device=self.device)
+        chunk_size   = 4096
+        batch_groups = [
+            (self.X_A,   self.Y_A,   self.Locs_A),
+            (self.X_AB,  self.Y_AB,  self.Locs_AB),
+            (self.X_ABC, self.Y_ABC, self.Locs_ABC),
+        ]
+        for X_b, Y_b, Locs_b in batch_groups:
+            if X_b is None or X_b.shape[0] == 0:
+                continue
+            for start in range(0, X_b.shape[0], chunk_size):
+                end       = min(start + chunk_size, X_b.shape[0])
+                cov_chunk = self.matern_cov_batched(params, X_b[start:end])
+                try:
+                    L_chunk = torch.linalg.cholesky(cov_chunk)
+                except torch.linalg.LinAlgError:
+                    return torch.tensor(float('inf'), device=self.device)
 
-            Z_locs = torch.linalg.solve_triangular(L_chunk, self.Locs_batch[start:end], upper=False)
-            Z_y    = torch.linalg.solve_triangular(L_chunk, self.Y_batch[start:end], upper=False)
-            
-            u_X, u_y = Z_locs[:, -1, :], Z_y[:, -1, :]    
-            log_det_glob += 2 * torch.sum(torch.log(L_chunk[:, -1, -1])) 
-        
-            XT_Sinv_X_glob += u_X.T @ u_X
-            XT_Sinv_y_glob += u_X.T @ u_y
-            yT_Sinv_y_glob += (u_y.T @ u_y).squeeze()
+                Z_locs = torch.linalg.solve_triangular(L_chunk, Locs_b[start:end], upper=False)
+                Z_y    = torch.linalg.solve_triangular(L_chunk, Y_b[start:end],    upper=False)
+
+                u_X, u_y = Z_locs[:, -1, :], Z_y[:, -1, :]
+                log_det_glob   += 2 * torch.sum(torch.log(L_chunk[:, -1, -1]))
+                XT_Sinv_X_glob += u_X.T @ u_X
+                XT_Sinv_y_glob += u_X.T @ u_y
+                yT_Sinv_y_glob += (u_y.T @ u_y).squeeze()
 
         # -------------------------------------------------------
         # PART 3: SOLVE BETA
@@ -388,18 +426,23 @@ class VecchiaBatched(SpatioTemporalModel):
         jitter = torch.eye(self.n_features, device=self.device, dtype=torch.float64) * 1e-6
         try:
             beta_global = torch.linalg.solve(XT_Sinv_X_glob + jitter, XT_Sinv_y_glob)
-        except torch.linalg.LinAlgError: return torch.tensor(float('inf'), device=self.device)
+        except torch.linalg.LinAlgError:
+            return torch.tensor(float('inf'), device=self.device)
 
-        quad_form = yT_Sinv_y_glob - 2 * (beta_global.T @ XT_Sinv_y_glob) + (beta_global.T @ XT_Sinv_X_glob @ beta_global)
-        total_N = self.Heads_data.shape[0] + self.X_batch.shape[0]
-        
+        quad_form = (yT_Sinv_y_glob
+                     - 2 * (beta_global.T @ XT_Sinv_y_glob)
+                     + (beta_global.T @ XT_Sinv_X_glob @ beta_global))
+        total_N = self.Heads_data.shape[0] + self.n_tails
+
         return 0.5 * (log_det_glob + quad_form.squeeze()) / total_N
 
 # --- FITTING CLASS ---
-class fit_vecchia_lbfgs(VecchiaBatched): 
-    
-    def __init__(self, smooth:float, input_map:Dict[str,Any], aggregated_data:torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int):
-        super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number, nheads)
+class fit_vecchia_lbfgs(VecchiaBatched):
+
+    def __init__(self, smooth:float, input_map:Dict[str,Any], aggregated_data:torch.Tensor, nns_map:Dict[str,Any], mm_cond_number:int, nheads:int,
+                 limit_A:int=8, limit_B:int=8, limit_C:int=8, daily_stride:int=8):
+        super().__init__(smooth, input_map, aggregated_data, nns_map, mm_cond_number, nheads,
+                         limit_A=limit_A, limit_B=limit_B, limit_C=limit_C, daily_stride=daily_stride)
 
     def set_optimizer(self, param_groups, lr=1.0, max_iter=20, max_eval=None, tolerance_grad=1e-7, tolerance_change=1e-9, history_size=100):
         optimizer = torch.optim.LBFGS(

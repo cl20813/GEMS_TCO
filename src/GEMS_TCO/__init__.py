@@ -19,7 +19,7 @@ from GEMS_TCO import orderings as _orderings
 from GEMS_TCO import configuration as config
 
 # This line makes the class available directly from the package
-from .data_loader import load_data2
+from .data_loader import load_data_dynamic_processed, exact_location_filter
 
 import math  # Tensor 없이 가볍게 연산하기 위해 사용
 class BaseLogger:

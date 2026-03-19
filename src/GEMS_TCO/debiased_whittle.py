@@ -1,212 +1,21 @@
 # Configuration
 gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
 
-# --- Standard Libraries ---
 import sys
-import os
-import json
-import time
-import copy
 import cmath
-import pickle
-import logging
-import argparse
 
-# Path configuration (only run once)
 sys.path.append(gems_tco_path)
 
-# --- Third-Party Libraries ---
-from pathlib import Path
-from typing import Optional, List, Tuple, Dict, Any, Callable
-from json import JSONEncoder
-
-# Data manipulation and analysis
-import pandas as pd
 import numpy as np
-from sklearn.neighbors import BallTree
-import typer
-
-# Torch and Numerical Libraries
 import torch
-import torch.optim as optim
 import torch.fft
 import torch.nn.functional as F
-from torch.nn import Parameter
-from torch.optim.lr_scheduler import CosineAnnealingLR, ReduceLROnPlateau
-import matplotlib.pyplot as plt 
-
-# --- Custom (GEMS_TCO) Imports ---
-from GEMS_TCO import kernels_reparam_space_time_gpu as kernels_reparam_space_time
-from GEMS_TCO import data_preprocess, data_preprocess as dmbh
-from GEMS_TCO import orderings as _orderings 
-from GEMS_TCO import alg_optimization
-from GEMS_TCO import configuration as config
-from GEMS_TCO.data_loader import load_data2
 
 
-class full_vecc_dw_likelihoods:
+class debiased_whittle_preprocess:
     def __init__(self, daily_aggregated_tensors, daily_hourly_maps, day_idx, params_list, lat_range, lon_range):
         self.day_idx = day_idx
-        self.lat_range = lat_range
-        self.lon_range = lon_range
-        self.daily_aggregated_tensors = daily_aggregated_tensors
-        self.daily_hourly_maps = daily_hourly_maps
-        self.daily_aggregated_tensor = daily_aggregated_tensors[day_idx]
         self.daily_hourly_map = daily_hourly_maps[day_idx]
-        
-        self.params_list = [
-            torch.tensor([val], dtype=torch.float64, device='cpu') for val in params_list
-        ]
-        self.params_tensor = torch.cat(self.params_list)
-        self.dw_cache = None 
-
-    def initiate_model_instance_vecchia(self, v, nns_map, mm_cond_number, nheads):
-        # [수정] 라이브러리에서 'VecchiaBatched' 클래스를 불러옵니다.
-        # 주의: 기존 파일에 이 클래스가 존재한다고 가정합니다. 
-        # 만약 라이브러리 파일이 이전 버전(fit_vecchia_lbfgs만 존재)이라면, 
-        # 사용자 라이브러리 파일도 업데이트해야 합니다. 
-        # 하지만 여기서는 라이브러리를 건들지 말라고 하셨으므로 import해서 사용합니다.
-        
-        try:
-            self.model_instance = kernels_reparam_space_time.VecchiaBatched(
-                    smooth = v,
-                    input_map = self.daily_hourly_map,
-                    aggregated_data = self.daily_aggregated_tensor,
-                    nns_map = nns_map,
-                    mm_cond_number = mm_cond_number,
-                    nheads = nheads
-                )
-        except AttributeError:
-            print("Error: kernels_reparam_space_time module does not have 'VecchiaBatched'.")
-            print("Trying fallback to 'fit_vecchia_lbfgs' assuming it has batched methods...")
-            self.model_instance = kernels_reparam_space_time.fit_vecchia_lbfgs(
-                    smooth = v,
-                    input_map = self.daily_hourly_map,
-                    aggregated_data = self.daily_aggregated_tensor,
-                    nns_map = nns_map,
-                    mm_cond_number = mm_cond_number,
-                    nheads = nheads
-                )
-
-    def compute_full_likelihoods(self, params):
-        # 라이브러리 메서드 호출
-        nll_avg = self.model_instance.full_likelihood_avg(
-            params = params, 
-            input_data = self.daily_aggregated_tensor, 
-            y = self.daily_aggregated_tensor[:,2], 
-            covariance_function = self.model_instance.matern_cov_aniso_STABLE_log_reparam
-        )
-        N = self.daily_aggregated_tensor.shape[0]
-        return nll_avg * N
-
-    def compute_vecchia_nll(self, params, covariance_function):
-        # [수정] cov_structure_saver 제거, vecchia_batched_likelihood 사용
-        if not self.model_instance.is_precomputed:
-            self.model_instance.precompute_conditioning_sets()
-
-        # vecchia_batched_likelihood는 Average NLL을 반환함
-        vecc_nll_avg = self.model_instance.vecchia_batched_likelihood(params)
-        
-        # Sum Likelihood 변환을 위해 전체 포인트 개수 계산
-        # Heads + Tails
-        head_count = self.model_instance.Heads_data.shape[0] if self.model_instance.Heads_data is not None else 0
-        tail_count = self.model_instance.X_batch.shape[0] if self.model_instance.X_batch is not None else 0
-        total_count = head_count + tail_count
-
-        return vecc_nll_avg * total_count
-    
-    def likelihood_wrapper(self, params, cov_fun, daily_aggregated_tensors_dw, daily_hourly_maps_dw):
-        with torch.no_grad():
-            
-            # 1. Full Likelihood
-            full_nll_sum = self.compute_full_likelihoods(params)
-
-            # 2. Vecchia Likelihood
-            vecc_nll = self.compute_vecchia_nll(params, cov_fun)
-
-            # 3. Debiased Whittle Likelihood (Sanitization & Caching)
-            if self.dw_cache is None:
-                dwl = debiased_whittle_likelihood()
-                DEVICE = params.device 
-                
-                # --- [데이터 정제] lat_mask 에러 방지 ---
-                # 문제가 되는(비어있거나 차원이 없는) 텐서를 미리 제거하고 넘깁니다.
-                raw_map = daily_hourly_maps_dw[self.day_idx]
-                sanitized_map = {}
-                iterable = raw_map.items() if isinstance(raw_map, dict) else enumerate(raw_map)
-
-                for key, tensor in iterable:
-                    # 1) 빈 텐서 제거
-                    if tensor.numel() == 0: continue
-                    # 2) 1차원 -> 2차원
-                    if tensor.dim() == 1: tensor = tensor.unsqueeze(0)
-                    # 3) 컬럼 부족 제거
-                    if tensor.shape[1] < 2: continue
-                    sanitized_map[key] = tensor
-
-                # 정제된 맵을 사용하여 Preprocess 초기화
-                # temp_maps_list의 0번째 요소로 sanitized_map을 넣어줌
-                temp_maps_list = [sanitized_map] 
-                
-                db = debiased_whittle_preprocess(
-                    daily_aggregated_tensors_dw, 
-                    temp_maps_list, # 정제된 맵 전달
-                    day_idx=0,      # 무조건 0번째 인덱스 사용
-                    params_list=self.params_list, 
-                    lat_range=self.lat_range, lon_range=self.lon_range
-                )
-                
-                subsetted_aggregated_day = db.generate_spatially_filtered_days(
-                    self.lat_range[0], self.lat_range[1], self.lon_range[0], self.lon_range[1]
-                )
-
-                if subsetted_aggregated_day.shape[0] == 0:
-                    self.dw_cache = {'is_empty': True, 'n1':0, 'n2':0}
-                else:
-                    cur_df = subsetted_aggregated_day
-                    unique_times = torch.unique(cur_df[:, 3])
-                    time_slices_list = [cur_df[cur_df[:, 3] == t_val] for t_val in unique_times]
-
-                    J_vec, n1, n2, p, taper_grid = dwl.generate_Jvector_tapered( 
-                        time_slices_list, dwl.cgn_hamming, 0, 1, 2, device=DEVICE
-                    )
-                    I_sample = dwl.calculate_sample_periodogram_vectorized(J_vec)
-                    taper_autocorr_grid = dwl.calculate_taper_autocorrelation_fft(taper_grid, n1, n2, DEVICE)
-
-                    self.dw_cache = {
-                        'is_empty': False, 'dwl_instance': dwl, 'I_sample': I_sample,
-                        'taper_autocorr_grid': taper_autocorr_grid, 'n1': n1, 'n2': n2, 'p': p,
-                        'deltas': (0.044, 0.063)
-                    }
-            
-            # --- Whittle Calculation: Avg Loss * Grid Size ---
-            if self.dw_cache.get('is_empty'):
-                dwnll_final = torch.tensor(0.0, device=params.device, dtype=torch.float64)
-                n1, n2 = 0, 0
-            else:
-                cache = self.dw_cache
-                dwl = cache['dwl_instance']
-                
-                # [수정] Sum 버전이 아닌 Average 버전을 호출
-                dwnll_avg = dwl.whittle_likelihood_loss_tapered(
-                    params=params, 
-                    I_sample=cache['I_sample'], n1=cache['n1'], n2=cache['n2'], p_time=cache['p'],
-                    taper_autocorr_grid=cache['taper_autocorr_grid'],
-                    delta1=cache['deltas'][0], delta2=cache['deltas'][1]
-                )
-                
-                # [수정] Avg * (n1 * n2)
-                # n1, n2는 cache에서 가져옴
-                n1 = cache['n1']
-                n2 = cache['n2']
-                
-                dwnll_final = dwnll_avg * (n1 * n2)
-
-            return [full_nll_sum, vecc_nll, dwnll_final, n1, n2]
-
-class debiased_whittle_preprocess(full_vecc_dw_likelihoods):
-    def __init__(self, daily_aggregated_tensors, daily_hourly_maps, day_idx, params_list, lat_range, lon_range):
-        super().__init__(daily_aggregated_tensors, daily_hourly_maps, day_idx, params_list, lat_range, lon_range)
 
     def subset_tensor(self,df_tensor: torch.Tensor, lat_s: float, lat_e: float, lon_s: float,lon_e: float) -> torch.Tensor:
         """Subsets a tensor to a specific lat/lon range."""
@@ -762,75 +571,6 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
 
         return avg_loss
 
-    @staticmethod
-    def whittle_likelihood_loss_tapered_sum(params, I_sample, n1, n2, p_time, taper_autocorr_grid, delta1, delta2):
-        """
-        ✅ Whittle Likelihood Loss (AVERAGED) using data tapering.
-        """
-        device = I_sample.device
-        params_tensor = params.to(device)
-
-        if torch.isnan(params_tensor).any() or torch.isinf(params_tensor).any():
-            print("Warning: NaN/Inf detected in input parameters to likelihood.")
-            return torch.tensor(float('nan'), device=device, dtype=torch.float64)
-
-        I_expected = debiased_whittle_likelihood.expected_periodogram_fft_tapered(
-            params_tensor, n1, n2, p_time, taper_autocorr_grid, 
-            delta1, delta2
-        )
-
-        if torch.isnan(I_expected).any() or torch.isinf(I_expected).any():
-            print("Warning: NaN/Inf returned from expected_periodogram calculation.")
-            return torch.tensor(float('nan'), device=device)
-
-        eye_matrix = torch.eye(p_time, dtype=torch.complex128, device=device)
-        diag_vals = torch.abs(I_expected.diagonal(dim1=-2, dim2=-1))
-        mean_diag_abs = diag_vals.mean().item() if diag_vals.numel() > 0 and not torch.isnan(diag_vals).all() else 1.0
-        diag_load = max(mean_diag_abs * 1e-8, 1e-9)
-        I_expected_stable = I_expected + eye_matrix * diag_load
-
-        sign, logabsdet = torch.linalg.slogdet(I_expected_stable)
-        if torch.any(sign.real <= 1e-9):
-            print("Warning: Non-positive determinant encountered. Applying penalty.")
-            log_det_term = torch.where(sign.real > 1e-9, logabsdet, torch.tensor(1e10, device=device, dtype=torch.float64))
-        else:
-            log_det_term = logabsdet
-
-        if torch.isnan(I_sample).any() or torch.isinf(I_sample).any():
-            print("Warning: NaN/Inf detected in I_sample input to likelihood.")
-            return torch.tensor(float('nan'), device=device, dtype=torch.float64)
-
-        try:
-            solved_term = torch.linalg.solve(I_expected_stable, I_sample)
-            trace_term = torch.einsum('...ii->...', solved_term).real
-        except torch.linalg.LinAlgError as e:
-            print(f"Warning: LinAlgError during solve: {e}. Applying high loss penalty.")
-            return torch.tensor(float('inf'), device=device, dtype=torch.float64)
-
-        if torch.isnan(trace_term).any() or torch.isinf(trace_term).any():
-            print("Warning: NaN/Inf detected in trace_term. Returning NaN loss.")
-            return torch.tensor(float('nan'), device=device, dtype=torch.float64)
-        likelihood_terms = log_det_term + trace_term
-
-        if torch.isnan(likelihood_terms).any():
-            print("Warning: NaN detected in likelihood_terms before summation. Returning NaN loss.")
-            return torch.tensor(float('nan'), device=device, dtype=torch.float64)
-
-        total_sum = torch.sum(likelihood_terms)
-        dc_term = likelihood_terms[0, 0] if n1 > 0 and n2 > 0 else torch.tensor(0.0, device=device)
-        if torch.isnan(dc_term).any() or torch.isinf(dc_term).any():
-            print("Warning: NaN/Inf detected in DC term. Setting to 0.")
-            dc_term = torch.tensor(0.0, device=device, dtype=torch.float64)
-
-        # This is the sum of non-zero frequency likelihood terms
-        sum_loss = total_sum - dc_term if (n1 > 1 or n2 > 1) else total_sum
-
-        if torch.isnan(sum_loss) or torch.isinf(sum_loss):
-            print("Warning: NaN/Inf detected in final loss. Returning Inf penalty.")
-            return torch.tensor(float('inf'), device=device, dtype=torch.float64)
-
-        return sum_loss, n1, n2 #total_sum to sum_loss
-    
 
     # =========================================================================
     # 5. Training Loop & Helpers (💥 NEWLY ADDED 💥)
