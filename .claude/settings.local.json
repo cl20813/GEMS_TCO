@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -lh /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/*.py)"
+    ]
+  }
+}
