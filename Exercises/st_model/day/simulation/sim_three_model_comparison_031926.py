@@ -34,6 +34,7 @@ python sim_three_model_comparison_031926.py --num-iters 1 --lat-factor 10 --lon-
 """
 import sys
 import time
+from datetime import datetime
 import json
 import numpy as np
 import torch
@@ -354,17 +355,66 @@ def cli(
 
     output_path = Path(config.amarel_estimates_day_path)
     output_path.mkdir(parents=True, exist_ok=True)
+    date_tag = datetime.now().strftime("%m%d%y")   # e.g. 032026
+    csv_raw     = f"sim_three_model_comparison_{date_tag}.csv"
+    csv_summary = f"sim_three_model_summary_{date_tag}.csv"
 
     # ── True parameters ────────────────────────────────────────────────────────
+    # Scenario A — original real-data fitted parameters
+    # true_dict = {
+    #     'sigmasq':    13.059,
+    #     'range_lat':  0.154,
+    #     'range_lon':  0.195,
+    #     'range_time': 1.0,
+    #     'advec_lat':  0.0218,
+    #     'advec_lon':  -0.1689,
+    #     'nugget':     0.247,
+    # }
+
+    # Scenario B — lower variance, wide range (smooth field), high nugget ratio, weak advection
+    # true_dict = {
+    #     'sigmasq':    5.5,
+    #     'range_lat':  0.30,
+    #     'range_lon':  0.38,
+    #     'range_time': 2.5,
+    #     'advec_lat':  -0.045,
+    #     'advec_lon':  -0.055,
+    #     'nugget':     0.82,
+    # }
+
+    # Scenario B (revised)
+    # true_dict = {
+    #     'sigmasq':    5.5,
+    #     'range_lat':  0.30,
+    #     'range_lon':  0.38,
+    #     'range_time': 2.5,
+    #     'advec_lat':  -0.12,
+    #     'advec_lon':  -0.20,
+    #     'nugget':     0.82,
+    # }
+
+    # Scenario C (active) — wider range, higher nugget, weak lat / strong lon advection
     true_dict = {
-        'sigmasq':    13.059,
-        'range_lat':  0.154,
-        'range_lon':  0.195,
-        'range_time': 1.0,
-        'advec_lat':  0.0218,
-        'advec_lon':  -0.1689,
-        'nugget':     0.247,
+        'sigmasq':    10.0,
+        'range_lat':  0.5,
+        'range_lon':  0.6,
+        'range_time': 2.5,
+        'advec_lat':  0.05,
+        'advec_lon':  -0.25,
+        'nugget':     1.2,
     }
+
+    # Scenario D — strong lat advection, moderate lon advection
+    # true_dict = {
+    #     'sigmasq':    10.0,
+    #     'range_lat':  0.5,
+    #     'range_lon':  0.6,
+    #     'range_time': 2.5,
+    #     'advec_lat':  0.25,
+    #     'advec_lon':  -0.16,
+    #     'nugget':     1.2,
+    # }
+
     phi2 = 1.0 / true_dict['range_lon']
     phi1 = true_dict['sigmasq'] * phi2
     phi3 = (true_dict['range_lon'] / true_dict['range_lat'])  ** 2
@@ -501,9 +551,10 @@ def cli(
     # ─────────────────────────────────────────────────────────────────────────
     # SIMULATION LOOP
     # ─────────────────────────────────────────────────────────────────────────
+    skipped = 0
     for it in range(num_iters):
         print(f"\n{'='*60}")
-        print(f"  Iteration {it+1}/{num_iters}")
+        print(f"  Iteration {it+1}/{num_iters}  (skipped so far: {skipped})")
         print(f"{'='*60}")
 
         # ── Randomly sample obs pattern (year + day) ──────────────────────────
@@ -518,102 +569,133 @@ def cli(
               f"range_lon={init_orig['range_lon']:.3f}  "
               f"nugget={init_orig['nugget']:.3f}")
 
-        # Generate new FFT field
-        field = generate_field_values(lats_hr, lons_hr, 8, true_params, dlat_hr, dlon_hr)
+        try:
+            # Generate new FFT field
+            field = generate_field_values(lats_hr, lons_hr, 8, true_params, dlat_hr, dlon_hr)
 
-        # Assemble irregular and regular datasets from the same field
-        (irr_map, irr_agg), (reg_map, reg_agg) = assemble_datasets(
-            field, step3_assignment_per_t, hr_idx_per_t, src_locs_per_t,
-            DUMMY_KEYS, grid_coords, true_params)
-        del field
+            # Assemble irregular and regular datasets from the same field
+            (irr_map, irr_agg), (reg_map, reg_agg) = assemble_datasets(
+                field, step3_assignment_per_t, hr_idx_per_t, src_locs_per_t,
+                DUMMY_KEYS, grid_coords, true_params)
+            del field
 
-        # Apply grid-based maxmin ordering to BOTH models
-        irr_map_ord = {k: v[ord_grid] for k, v in irr_map.items()}
-        reg_map_ord = {k: v[ord_grid] for k, v in reg_map.items()}
+            # Apply grid-based maxmin ordering to BOTH models
+            irr_map_ord = {k: v[ord_grid] for k, v in irr_map.items()}
+            reg_map_ord = {k: v[ord_grid] for k, v in reg_map.items()}
 
-        # ──────────────────────────────────────────────────────────────────────
-        # Model 1: Vecchia-Irregular
-        # actual GEMS source obs locations (NaN rows excluded internally)
-        # ──────────────────────────────────────────────────────────────────────
-        print("--- Model 1: Vecchia-Irregular ---")
-        p_irr = [torch.tensor([val], device=DEVICE, dtype=DTYPE, requires_grad=True)
-                 for val in initial_vals]
-        model_irr = kernels_vecchia.fit_vecchia_lbfgs(
-            smooth=v, input_map=irr_map_ord,
-            nns_map=nns_grid, mm_cond_number=mm_cond_number, nheads=nheads,
-            limit_A=limit_a, limit_B=limit_b, limit_C=limit_c, daily_stride=daily_stride
-        )
-        model_irr.precompute_conditioning_sets()
-        opt_irr = model_irr.set_optimizer(p_irr, lr=LBFGS_LR, max_iter=LBFGS_EVAL,
-                                          history_size=LBFGS_HIST)
-        t0 = time.time()
-        out_irr, _ = model_irr.fit_vecc_lbfgs(p_irr, opt_irr,
-                                               max_steps=LBFGS_STEPS, grad_tol=1e-7)
-        t_irr          = time.time() - t0
-        rmsre_irr, est_irr = calculate_rmsre(out_irr, true_dict)
-        print(f"  RMSRE = {rmsre_irr:.4f}  ({t_irr:.1f}s)")
+            # ──────────────────────────────────────────────────────────────────────
+            # Model 1: Vecchia-Irregular
+            # actual GEMS source obs locations (NaN rows excluded internally)
+            # ──────────────────────────────────────────────────────────────────────
+            print("--- Model 1: Vecchia-Irregular ---")
+            p_irr = [torch.tensor([val], device=DEVICE, dtype=DTYPE, requires_grad=True)
+                     for val in initial_vals]
+            model_irr = kernels_vecchia.fit_vecchia_lbfgs(
+                smooth=v, input_map=irr_map_ord,
+                nns_map=nns_grid, mm_cond_number=mm_cond_number, nheads=nheads,
+                limit_A=limit_a, limit_B=limit_b, limit_C=limit_c, daily_stride=daily_stride
+            )
+            model_irr.precompute_conditioning_sets()
+            opt_irr = model_irr.set_optimizer(p_irr, lr=LBFGS_LR, max_iter=LBFGS_EVAL,
+                                              history_size=LBFGS_HIST)
+            t0 = time.time()
+            out_irr, _ = model_irr.fit_vecc_lbfgs(p_irr, opt_irr,
+                                                   max_steps=LBFGS_STEPS, grad_tol=1e-7)
+            t_irr          = time.time() - t0
+            rmsre_irr, est_irr = calculate_rmsre(out_irr, true_dict)
+            print(f"  RMSRE = {rmsre_irr:.4f}  ({t_irr:.1f}s)")
 
-        # ──────────────────────────────────────────────────────────────────────
-        # Model 2: Vecchia-Regular
-        # regular grid locations (step3, 1:1); NaN rows excluded internally
-        # ──────────────────────────────────────────────────────────────────────
-        print("--- Model 2: Vecchia-Regular ---")
-        p_reg = [torch.tensor([val], device=DEVICE, dtype=DTYPE, requires_grad=True)
-                 for val in initial_vals]
-        model_reg = kernels_vecchia.fit_vecchia_lbfgs(
-            smooth=v, input_map=reg_map_ord,
-            nns_map=nns_grid, mm_cond_number=mm_cond_number, nheads=nheads,
-            limit_A=limit_a, limit_B=limit_b, limit_C=limit_c, daily_stride=daily_stride
-        )
-        model_reg.precompute_conditioning_sets()
-        opt_reg = model_reg.set_optimizer(p_reg, lr=LBFGS_LR, max_iter=LBFGS_EVAL,
-                                          history_size=LBFGS_HIST)
-        t0 = time.time()
-        out_reg, _ = model_reg.fit_vecc_lbfgs(p_reg, opt_reg,
-                                               max_steps=LBFGS_STEPS, grad_tol=1e-7)
-        t_reg          = time.time() - t0
-        rmsre_reg, est_reg = calculate_rmsre(out_reg, true_dict)
-        print(f"  RMSRE = {rmsre_reg:.4f}  ({t_reg:.1f}s)")
+            # ──────────────────────────────────────────────────────────────────────
+            # Model 2: Vecchia-Regular
+            # regular grid locations (step3, 1:1); NaN rows excluded internally
+            # ──────────────────────────────────────────────────────────────────────
+            print("--- Model 2: Vecchia-Regular ---")
+            p_reg = [torch.tensor([val], device=DEVICE, dtype=DTYPE, requires_grad=True)
+                     for val in initial_vals]
+            model_reg = kernels_vecchia.fit_vecchia_lbfgs(
+                smooth=v, input_map=reg_map_ord,
+                nns_map=nns_grid, mm_cond_number=mm_cond_number, nheads=nheads,
+                limit_A=limit_a, limit_B=limit_b, limit_C=limit_c, daily_stride=daily_stride
+            )
+            model_reg.precompute_conditioning_sets()
+            opt_reg = model_reg.set_optimizer(p_reg, lr=LBFGS_LR, max_iter=LBFGS_EVAL,
+                                              history_size=LBFGS_HIST)
+            t0 = time.time()
+            out_reg, _ = model_reg.fit_vecc_lbfgs(p_reg, opt_reg,
+                                                   max_steps=LBFGS_STEPS, grad_tol=1e-7)
+            t_reg          = time.time() - t0
+            rmsre_reg, est_reg = calculate_rmsre(out_reg, true_dict)
+            print(f"  RMSRE = {rmsre_reg:.4f}  ({t_reg:.1f}s)")
 
-        # ──────────────────────────────────────────────────────────────────────
-        # Model 3: Debiased Whittle
-        # ──────────────────────────────────────────────────────────────────────
-        print("--- Model 3: Debiased Whittle ---")
-        p_dw = [torch.tensor([val], device=DEVICE, dtype=DTYPE, requires_grad=True)
-                for val in initial_vals]
-        dwl = debiased_whittle.debiased_whittle_likelihood()
+            # ──────────────────────────────────────────────────────────────────────
+            # Model 3: Debiased Whittle
+            # ──────────────────────────────────────────────────────────────────────
+            print("--- Model 3: Debiased Whittle ---")
+            p_dw = [torch.tensor([val], device=DEVICE, dtype=DTYPE, requires_grad=True)
+                    for val in initial_vals]
+            dwl = debiased_whittle.debiased_whittle_likelihood()
 
-        db = debiased_whittle.debiased_whittle_preprocess(
-            [reg_agg], [reg_map], day_idx=0,
-            params_list=[
-                true_dict['sigmasq'], true_dict['range_lat'], true_dict['range_lon'],
-                true_dict['range_time'], true_dict['advec_lat'], true_dict['advec_lon'],
-                true_dict['nugget']
-            ],
-            lat_range=lat_r, lon_range=lon_r
-        )
-        cur_df      = db.generate_spatially_filtered_days(
-            lat_r[0], lat_r[1], lon_r[0], lon_r[1]).to(DEVICE)
-        unique_t    = torch.unique(cur_df[:, TIME_COL])
-        time_slices = [cur_df[cur_df[:, TIME_COL] == t] for t in unique_t]
+            db = debiased_whittle.debiased_whittle_preprocess(
+                [reg_agg], [reg_map], day_idx=0,
+                params_list=[
+                    true_dict['sigmasq'], true_dict['range_lat'], true_dict['range_lon'],
+                    true_dict['range_time'], true_dict['advec_lat'], true_dict['advec_lon'],
+                    true_dict['nugget']
+                ],
+                lat_range=lat_r, lon_range=lon_r
+            )
+            cur_df      = db.generate_spatially_filtered_days(
+                lat_r[0], lat_r[1], lon_r[0], lon_r[1]).to(DEVICE)
+            unique_t    = torch.unique(cur_df[:, TIME_COL])
+            time_slices = [cur_df[cur_df[:, TIME_COL] == t] for t in unique_t]
 
-        J_vec, n1, n2, p_time, taper = dwl.generate_Jvector_tapered(
-            time_slices, dwl.cgn_hamming, LAT_COL, LON_COL, VAL_COL, DEVICE)
-        I_samp = dwl.calculate_sample_periodogram_vectorized(J_vec)
-        t_auto = dwl.calculate_taper_autocorrelation_fft(taper, n1, n2, DEVICE)
+            J_vec, n1, n2, p_time, taper = dwl.generate_Jvector_tapered(
+                time_slices, dwl.cgn_hamming, LAT_COL, LON_COL, VAL_COL, DEVICE)
+            I_samp = dwl.calculate_sample_periodogram_vectorized(J_vec)
+            t_auto = dwl.calculate_taper_autocorrelation_fft(taper, n1, n2, DEVICE)
 
-        opt_dw = torch.optim.LBFGS(
-            p_dw, lr=1.0, max_iter=20, history_size=100,
-            line_search_fn="strong_wolfe", tolerance_grad=1e-5)
-        t0 = time.time()
-        _, _, _, loss_dw, _ = dwl.run_lbfgs_tapered(
-            params_list=p_dw, optimizer=opt_dw, I_sample=I_samp,
-            n1=n1, n2=n2, p_time=p_time, taper_autocorr_grid=t_auto,
-            max_steps=DWL_STEPS, device=DEVICE)
-        t_dw               = time.time() - t0
-        out_dw             = [p.item() for p in p_dw]
-        rmsre_dw, est_dw   = calculate_rmsre(out_dw, true_dict)
-        print(f"  RMSRE = {rmsre_dw:.4f}  ({t_dw:.1f}s)")
+            opt_dw = torch.optim.LBFGS(
+                p_dw, lr=1.0, max_iter=20, history_size=100,
+                line_search_fn="strong_wolfe", tolerance_grad=1e-5)
+            t0 = time.time()
+            _, _, _, loss_dw, _ = dwl.run_lbfgs_tapered(
+                params_list=p_dw, optimizer=opt_dw, I_sample=I_samp,
+                n1=n1, n2=n2, p_time=p_time, taper_autocorr_grid=t_auto,
+                max_steps=DWL_STEPS, device=DEVICE)
+            t_dw               = time.time() - t0
+            out_dw             = [p.item() for p in p_dw]
+            rmsre_dw, est_dw   = calculate_rmsre(out_dw, true_dict)
+            print(f"  RMSRE = {rmsre_dw:.4f}  ({t_dw:.1f}s)")
+
+        except Exception as e:
+            skipped += 1
+            print(f"  [SKIP] Iteration {it+1} failed: {type(e).__name__}: {e}")
+            print(f"  Skipping to next iteration. (total skipped: {skipped})")
+            continue
+
+        # ── Outlier check (non-convergence filter) ────────────────────────────
+        # If ANY model produces extreme estimates, skip entire iteration for all.
+        # Threshold: 50× true value in original space (clearly non-converged).
+        OUTLIER_THRESH = 50.0
+        def _is_outlier(est_d):
+            checks = [
+                abs(est_d['sigmasq'])    > abs(true_dict['sigmasq'])    * OUTLIER_THRESH,
+                abs(est_d['range_lat'])  > abs(true_dict['range_lat'])  * OUTLIER_THRESH,
+                abs(est_d['range_lon'])  > abs(true_dict['range_lon'])  * OUTLIER_THRESH,
+                abs(est_d['range_time']) > abs(true_dict['range_time']) * OUTLIER_THRESH,
+                abs(est_d['advec_lat'])  > abs(true_dict['advec_lat'])  * OUTLIER_THRESH,
+                abs(est_d['advec_lon'])  > abs(true_dict['advec_lon'])  * OUTLIER_THRESH,
+                abs(est_d['nugget'])     > abs(true_dict['nugget'])     * OUTLIER_THRESH,
+            ]
+            return any(checks)
+
+        outlier_models = [m for m, e in [('Vecc_Irr', est_irr), ('Vecc_Reg', est_reg), ('DW', est_dw)]
+                          if _is_outlier(e)]
+        if outlier_models:
+            skipped += 1
+            print(f"  [SKIP] Iteration {it+1} — extreme estimate in {outlier_models} "
+                  f"(threshold: {OUTLIER_THRESH}× true). Skipping all models. (total skipped: {skipped})")
+            continue
 
         # ── Record & save ─────────────────────────────────────────────────────
         for model_name, est_d, rmsre_val, elapsed in [
@@ -640,14 +722,49 @@ def cli(
             })
 
         df_now = pd.DataFrame(records)
-        df_now.to_csv(output_path / "sim_three_model_comparison_031926.csv", index=False)
+        df_now.to_csv(output_path / csv_raw, index=False)
 
-        def avg_rmsre(name):
-            return np.mean([r['rmsre'] for r in records if r['model'] == name])
-        print(f"\n  Running avg RMSRE  (iter {it+1}/{num_iters}):")
-        print(f"    Vecc_Irr = {avg_rmsre('Vecc_Irr'):.4f}")
-        print(f"    Vecc_Reg = {avg_rmsre('Vecc_Reg'):.4f}")
-        print(f"    DW       = {avg_rmsre('DW'):.4f}")
+        # ── Running summary table ──────────────────────────────────────────────
+        MODELS_     = ['Vecc_Irr', 'Vecc_Reg', 'DW']
+        p_cols_     = ['sigmasq_est', 'range_lat_est', 'range_lon_est',
+                       'range_t_est', 'advec_lat_est', 'advec_lon_est', 'nugget_est']
+        p_labels_   = ['sigmasq', 'range_lat', 'range_lon', 'range_t',
+                       'advec_lat', 'advec_lon', 'nugget']
+        true_vals_  = [true_dict['sigmasq'],    true_dict['range_lat'], true_dict['range_lon'],
+                       true_dict['range_time'], true_dict['advec_lat'], true_dict['advec_lon'],
+                       true_dict['nugget']]
+
+        n_done = len([r for r in records if r['model'] == 'Vecc_Irr'])
+        print(f"\n  ── Running summary ({n_done} completed / {it+1} attempted) ──")
+        cw = 10
+        hdr = f"  {'param':<11} {'true':>{cw}}" + "".join(f"  {m:>{cw}}" for m in MODELS_)
+        print(hdr)
+        print(f"  {'-'*55}")
+        for lbl, col, tv in zip(p_labels_, p_cols_, true_vals_):
+            row = f"  {lbl:<11} {tv:>{cw}.4f}"
+            for m in MODELS_:
+                vals = [r[col] for r in records if r['model'] == m]
+                row += f"  {np.mean(vals):>{cw}.4f}"
+            print(row)
+        print(f"  {'-'*55}")
+        # Per-parameter RMSRE rows
+        per_param_by_model = {}
+        for m in MODELS_:
+            sub_recs = [r for r in records if r['model'] == m]
+            per_param_by_model[m] = [
+                float(np.sqrt(np.mean([((r[col] - tv) / abs(tv)) ** 2 for r in sub_recs])))
+                for col, tv in zip(p_cols_, true_vals_)
+            ]
+        for lbl, idx in zip(p_labels_, range(len(p_labels_))):
+            rmsre_p = f"  {'RMSRE_'+lbl:<11} {'':>{cw}}"
+            for m in MODELS_:
+                rmsre_p += f"  {per_param_by_model[m][idx]:>{cw}.4f}"
+            print(rmsre_p)
+        print(f"  {'-'*55}")
+        rmsre_row = f"  {'RMSRE':<11} {'':>{cw}}"
+        for m in MODELS_:
+            rmsre_row += f"  {np.mean(per_param_by_model[m]):>{cw}.4f}"
+        print(rmsre_row)
 
     # ── Final summary ─────────────────────────────────────────────────────────
     df_final   = pd.DataFrame(records)
@@ -684,7 +801,8 @@ def cli(
     overall_str = f"  {'Overall RMSRE':<14} {'':>10}"
     for m in MODELS:
         sub = df_final[df_final['model'] == m]
-        overall_str += f"  {sub['rmsre'].mean():>{col_w}.4f}"
+        per_param_rmsres = [param_rmsre(sub, col, tv) for col, tv in zip(param_cols, true_vals)]
+        overall_str += f"  {np.mean(per_param_rmsres):>{col_w}.4f}"
     print(overall_str)
 
     # ── Per-parameter mean & SD table (printed) ───────────────────────────────
@@ -713,15 +831,15 @@ def cli(
     overall_row = {'parameter': 'Overall_RMSRE', 'true': float('nan')}
     for m in MODELS:
         sub = df_final[df_final['model'] == m]
-        overall_row[f'{m}_rmsre'] = round(sub['rmsre'].mean(), 6)
+        per_param_rmsres = [param_rmsre(sub, col, tv) for col, tv in zip(param_cols, true_vals)]
+        overall_row[f'{m}_rmsre'] = round(np.mean(per_param_rmsres), 6)
         overall_row[f'{m}_mean']  = float('nan')
         overall_row[f'{m}_sd']    = float('nan')
     summary_rows.append(overall_row)
 
-    pd.DataFrame(summary_rows).to_csv(
-        output_path / "sim_three_model_summary_031926.csv", index=False)
-    print(f"\n  Saved: sim_three_model_comparison_031926.csv  (all {num_iters} iterations, raw)")
-    print(f"  Saved: sim_three_model_summary_031926.csv     (per-parameter RMSRE table)")
+    pd.DataFrame(summary_rows).to_csv(output_path / csv_summary, index=False)
+    print(f"\n  Saved: {csv_raw}  (all {num_iters} iterations, raw)")
+    print(f"  Saved: {csv_summary}     (per-parameter RMSRE table)")
 
 
 if __name__ == "__main__":

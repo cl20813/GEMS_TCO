@@ -12,7 +12,7 @@ scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/coarse_cen_map_without_de
 
 ### Copy run file from ```local``` to ```Amarel HPC```
 # mac
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/full_nll_wrapper_122525.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/real_data/full_nll_wrapper_122525.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
 ### Copy estimate file from ```Amarel HPC``` to ```local computer```
 

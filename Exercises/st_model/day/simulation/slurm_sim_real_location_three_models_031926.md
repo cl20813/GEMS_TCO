@@ -5,14 +5,14 @@ scp -r "/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO" jl2815@amarel.rutge
 
 ### Transfer run file (mac → Amarel)
 ```
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/sim_three_model_comparison_031926.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_three_model_comparison_031926.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 ```
 
 ### Transfer results (Amarel → mac)
 ```
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_three_model_comparison_031926.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/estimates/"
+scp "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_three_model_comparison_*.csv" "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/estimates/"
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_three_model_summary_031926.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/estimates/"
+scp "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/sim_three_model_summary_*.csv" "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/estimates/"
 ```
 
 ---
@@ -48,7 +48,7 @@ sbatch sim_three_models_031926.sh
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu034
+#SBATCH --nodelist=gpu035
 
 #### Load Modules
 module purge

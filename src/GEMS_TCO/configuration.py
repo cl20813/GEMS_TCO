@@ -1,5 +1,6 @@
 # load_gems_data
 mac_data_load_path = "/Users/joonwonlee/Documents/GEMS_DATA/"
+portable_disk_path = "/Volumes/Backup Plus/GEMS_DATA/"
 amarel_data_load_path = "/home/jl2815/tco/data/"
 window_data_load_path = "C:\\Users\\joonw\\tco\\Extracted_data/"
 aws_data_load_path = "/home/ec2-user/gems_tco/data/"
