@@ -10,8 +10,6 @@ scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2022/tco_grid_22_07.pkl" jl281
 scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/tco_grid_24_07.pkl" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_2024
 
 scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2025/tco_grid_25_07.pkl" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_2025
-
-
 ```
 
 ### Transfer run file (mac → Amarel)
@@ -52,7 +50,8 @@ nano fit_vecc_gpu_031826.sh
 sbatch fit_vecc_gpu_031826.sh
 ```
 
-```
+```bash
+
 #!/bin/bash
 #SBATCH --job-name=fit_vecc_h300m30
 #SBATCH --output=/home/jl2815/tco/exercise_output/fit_vecc_h300m30.out
@@ -81,13 +80,18 @@ nvidia-smi
 srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_031826.py \
     --v 0.5 \
     --space "1,1" \
-    --days "0,31" \
+    --days "0,28" \
+    --month 7 \
+    --years "2022,2024,2025" \
     --mm-cond-number 52 \
     --nheads 1000 \
     --limit-a 16 \
     --limit-b 16 \
     --limit-c 16 \
-    --daily-stride 2
+    --daily-stride 2 \
+    --keep-exact-loc
+
+echo "Current date and time: $(date)"
 
 ```
 
