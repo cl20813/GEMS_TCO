@@ -48,7 +48,7 @@ sbatch sim_three_models_031926.sh
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu035
+#SBATCH --nodelist=gpu034
 
 #### Load Modules
 module purge
@@ -65,11 +65,11 @@ nvidia-smi
 
 srun python /home/jl2815/tco/exercise_25/st_model/sim_three_model_comparison_031926.py \
     --v 0.5 \
-    --mm-cond-number 16 \
-    --nheads 300 \
-    --limit-a 8 \
-    --limit-b 8 \
-    --limit-c 8 \
+    --mm-cond-number 52 \
+    --nheads 800 \
+    --limit-a 16 \
+    --limit-b 16 \
+    --limit-c 16 \
     --daily-stride 2 \
     --num-iters 200 \
     --years "2022,2024,2025" \

@@ -85,9 +85,20 @@ def generate_irr_bootstrap(params_tensor, ref_irr_map, monthly_mean):
     t_keys = sorted(ref_irr_map.keys())
     Nt = len(t_keys)
 
-    all_rows = torch.cat([ref_irr_map[k] for k in t_keys], dim=0)
-    lat_min = float(all_rows[:, 0].min()); lat_max = float(all_rows[:, 0].max())
-    lon_min = float(all_rows[:, 1].min()); lon_max = float(all_rows[:, 1].max())
+    # Grid bounds from valid (non-NaN) rows only.
+    # ord_mm is computed on all N_grid regular-grid positions, so output must
+    # preserve all N_grid rows per time step — NaN rows pass through unchanged,
+    # and kernels_vecchia handles them via is_nan_mask internally.
+    valid_lats, valid_lons = [], []
+    for k in t_keys:
+        rows = ref_irr_map[k]
+        valid = ~torch.isnan(rows[:, 0])
+        valid_lats.append(rows[valid, 0])
+        valid_lons.append(rows[valid, 1])
+    all_valid_lats = torch.cat(valid_lats)
+    all_valid_lons = torch.cat(valid_lons)
+    lat_min = float(all_valid_lats.min()); lat_max = float(all_valid_lats.max())
+    lon_min = float(all_valid_lons.min()); lon_max = float(all_valid_lons.max())
 
     lats_g = torch.arange(lat_min, lat_max + DELTA_LAT, DELTA_LAT, device=DEVICE, dtype=DTYPE)
     lons_g = torch.arange(lon_min, lon_max + DELTA_LON, DELTA_LON, device=DEVICE, dtype=DTYPE)
@@ -108,24 +119,27 @@ def generate_irr_bootstrap(params_tensor, ref_irr_map, monthly_mean):
 
     out_map = {}
     for ti, tkey in enumerate(t_keys):
-        rows = ref_irr_map[tkey]
-        irr_lats = rows[:, 0]; irr_lons = rows[:, 1]
+        rows = ref_irr_map[tkey]               # keep all N_grid rows (same shape as input)
+        out_rows = rows.clone()                 # NaN rows stay NaN → Vecchia is_nan_mask handles them
+        valid = ~torch.isnan(rows[:, 0])
 
-        fi = (irr_lats - lat_min) / DELTA_LAT
-        fj = (irr_lons - lon_min) / DELTA_LON
-        i0 = fi.long().clamp(0, Nx - 2); i1 = i0 + 1
-        j0 = fj.long().clamp(0, Ny - 2); j1 = j0 + 1
-        wa = (fi - fi.floor()).clamp(0.0, 1.0)
-        wb = (fj - fj.floor()).clamp(0.0, 1.0)
+        if valid.any():
+            irr_lats = rows[valid, 0]; irr_lons = rows[valid, 1]
+            fi = (irr_lats - lat_min) / DELTA_LAT
+            fj = (irr_lons - lon_min) / DELTA_LON
+            i0 = fi.long().clamp(0, Nx - 2); i1 = i0 + 1
+            j0 = fj.long().clamp(0, Ny - 2); j1 = j0 + 1
+            wa = (fi - fi.floor()).clamp(0.0, 1.0)
+            wb = (fj - fj.floor()).clamp(0.0, 1.0)
+            sim_vals = (
+                (1 - wa) * (1 - wb) * field[i0, j0, ti] +
+                wa        * (1 - wb) * field[i1, j0, ti] +
+                (1 - wa) * wb        * field[i0, j1, ti] +
+                wa        * wb        * field[i1, j1, ti]
+            ) + torch.randn_like(irr_lats) * nugget_std + monthly_mean
+            out_rows[valid, 2] = sim_vals       # only replace value column for valid rows
 
-        sim_vals = (
-            (1 - wa) * (1 - wb) * field[i0, j0, ti] +
-            wa        * (1 - wb) * field[i1, j0, ti] +
-            (1 - wa) * wb        * field[i0, j1, ti] +
-            wa        * wb        * field[i1, j1, ti]
-        ) + torch.randn_like(irr_lats) * nugget_std + monthly_mean
-
-        out_map[tkey] = torch.stack([irr_lats, irr_lons, sim_vals, rows[:, 3]], dim=1).detach()
+        out_map[tkey] = out_rows.detach()
 
     return out_map
 
@@ -250,6 +264,12 @@ def cli(
         't_def': int(torch.unique(real_agg_dw[:, 3]).shape[0]),
         'mean': float(monthly_mean)
     }
+    # NaN mask from real DW data — bootstrap J must use same missingness as real data
+    # so that J and H are computed on the same effective number of observations.
+    # real_agg_dw is ordered [t0_spatial..., t1_spatial..., ...] matching generate_regular_data.
+    nan_mask_dw = torch.isnan(real_agg_dw[:, 2])  # True where obs is missing
+    obs_rate = 1.0 - nan_mask_dw.float().mean().item()
+    print(f"  DW data obs rate: {obs_rate:.3f} ({int(obs_rate * nan_mask_dw.shape[0])} / {nan_mask_dw.shape[0]} cells)")
 
     dw_log_phi = torch.tensor(
         transform_raw_to_log_phi(dw_by_day[day_str]),
@@ -276,12 +296,18 @@ def cli(
         return loss[0] if isinstance(loss, tuple) else loss
 
     H_dw     = finite_diff_hessian(nll_dw, dw_log_phi)
+    eigvals_dw = torch.linalg.eigvalsh(H_dw)
+    print(f"  H_dw eigenvalues: {eigvals_dw.detach().cpu().numpy().round(4)}")
+    print(f"  H_dw condition number: {(eigvals_dw.max()/eigvals_dw.abs().min()).item():.2e}")
     H_inv_dw = torch.linalg.inv(H_dw + torch.eye(7, device=DEVICE) * 1e-5)
 
     grads_dw = []
     for i in range(num_sims):
         with torch.no_grad():
             _, b_agg = generate_regular_data(dw_log_phi, grid_cfg)
+        # Apply same missingness as real data so J and H share the same effective n
+        b_agg = b_agg.clone()
+        b_agg[nan_mask_dw, 2] = float('nan')
         b_slices = [b_agg[b_agg[:, 3] == t] for t in unique_times]
         J_b, bn1, bn2, _, bt = dwl.generate_Jvector_tapered(
             b_slices, dwl.cgn_hamming, 0, 1, 2, DEVICE)
@@ -298,6 +324,10 @@ def cli(
             print(f"  DW bootstrap {i+1}/{num_sims}")
 
     J_dw    = torch.stack(grads_dw).T @ torch.stack(grads_dw) / num_sims
+    grad_norms_dw = [g.norm().item() for g in grads_dw]
+    print(f"  DW grad norm — mean: {np.mean(grad_norms_dw):.4e}  std: {np.std(grad_norms_dw):.4e}")
+    print(f"  J_dw diag:  {torch.diag(J_dw).detach().cpu().numpy().round(4)}")
+    print(f"  H_dw diag:  {torch.diag(H_dw).detach().cpu().numpy().round(4)}")
     GIM_dw  = H_inv_dw @ J_dw @ H_inv_dw
     Jac_dw  = torch.autograd.functional.jacobian(transform_log_phi_to_physical, dw_log_phi)
     SE_dw   = torch.sqrt(torch.diag(Jac_dw @ GIM_dw @ Jac_dw.T)).detach().cpu().numpy()
@@ -330,6 +360,9 @@ def cli(
     def nll_vc(p): return model_vc.vecchia_batched_likelihood(p)
 
     H_vc     = finite_diff_hessian(nll_vc, vc_log_phi)
+    eigvals_vc = torch.linalg.eigvalsh(H_vc)
+    print(f"  H_vc eigenvalues: {eigvals_vc.detach().cpu().numpy().round(4)}")
+    print(f"  H_vc condition number: {(eigvals_vc.max()/eigvals_vc.abs().min()).item():.2e}")
     H_inv_vc = torch.linalg.inv(H_vc + torch.eye(7, device=DEVICE) * 1e-5)
     torch.cuda.empty_cache()
 
@@ -348,6 +381,10 @@ def cli(
             print(f"  Vecchia bootstrap {i+1}/{num_sims}")
 
     J_vc    = torch.stack(grads_vc).T @ torch.stack(grads_vc) / num_sims
+    grad_norms_vc = [g.norm().item() for g in grads_vc]
+    print(f"  VC grad norm  — mean: {np.mean(grad_norms_vc):.4e}  std: {np.std(grad_norms_vc):.4e}")
+    print(f"  J_vc diag:  {torch.diag(J_vc).detach().cpu().numpy().round(6)}")
+    print(f"  H_vc diag:  {torch.diag(H_vc).detach().cpu().numpy().round(6)}")
     GIM_vc  = H_inv_vc @ J_vc @ H_inv_vc
     Jac_vc  = torch.autograd.functional.jacobian(transform_log_phi_to_physical, vc_log_phi)
     SE_vc   = torch.sqrt(torch.diag(Jac_vc @ GIM_vc @ Jac_vc.T)).detach().cpu().numpy()

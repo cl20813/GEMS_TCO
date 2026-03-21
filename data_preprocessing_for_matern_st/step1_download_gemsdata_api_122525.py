@@ -12,6 +12,7 @@ Usage:
 
 Run with caffeinate to prevent sleep:
 cd /Users/joonwonlee/Documents/GEMS_TCO-1/data_preprocessing_for_matern_st 
+conda activate faiss_env
 
 chmod +x run_download.sh                                                
 caffeinate -i bash run_download.sh   

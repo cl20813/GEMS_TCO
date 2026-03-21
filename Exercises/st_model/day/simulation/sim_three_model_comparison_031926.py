@@ -79,7 +79,7 @@ def build_high_res_grid(lat_range, lon_range, lat_factor=100, lon_factor=20):
     dlat = DELTA_LAT_BASE / lat_factor
     dlon = DELTA_LON_BASE / lon_factor
     lat_max, lat_min = max(lat_range), min(lat_range)
-    lats = torch.arange(lat_max + 0.1, lat_min - 0.1, -dlat, device=DEVICE, dtype=DTYPE)
+    lats = torch.arange(lat_min - 0.1, lat_max + 0.1, dlat, device=DEVICE, dtype=DTYPE)
     lons = torch.arange(lon_range[0] - 0.1, lon_range[1] + 0.1, dlon, device=DEVICE, dtype=DTYPE)
     return lats, lons, dlat, dlon
 

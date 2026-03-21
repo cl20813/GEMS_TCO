@@ -1,5 +1,6 @@
 import requests
 import os
+import time
 from tqdm import tqdm  # Progress bar
 
 
@@ -23,16 +24,37 @@ class Download_file:
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder)
 
-    def download_file(self, url:str, file_name:str):
-        response = requests.get(url, stream=True)
-        if response.status_code == 200:
-            file_path = os.path.join(self.output_folder, file_name)
-            with open(file_path, 'wb') as f:
-                for chunk in tqdm(response.iter_content(1024), desc=f"Downloading {file_name}"):
-                    f.write(chunk)
-            print(f"Downloaded {file_name}")
-        else:
-            print(f"Failed to download {file_name}, status code: {response.status_code}")
+    def download_file(self, url:str, file_name:str, max_retries:int=5):
+        file_path = os.path.join(self.output_folder, file_name)
+
+        # Check expected size from HEAD request and skip if already complete
+        try:
+            head = requests.head(url, timeout=30)
+            expected = int(head.headers.get('Content-Length', 0))
+            if expected > 0 and os.path.exists(file_path) and os.path.getsize(file_path) == expected:
+                print(f"Already complete, skipping: {file_name}")
+                return
+        except Exception:
+            pass
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = requests.get(url, stream=True, timeout=120)
+                if response.status_code != 200:
+                    print(f"Failed {file_name}: status {response.status_code}")
+                    return
+                with open(file_path, 'wb') as f:
+                    for chunk in tqdm(response.iter_content(1024), desc=f"Downloading {file_name}"):
+                        f.write(chunk)
+                print(f"Downloaded {file_name}")
+                return
+            except Exception as e:
+                print(f"  Attempt {attempt}/{max_retries} failed for {file_name}: {e}")
+                if os.path.exists(file_path):
+                    os.remove(file_path)   # remove incomplete file before retry
+                if attempt < max_retries:
+                    time.sleep(2 ** attempt)  # exponential backoff: 2, 4, 8, 16s
+        print(f"Giving up on {file_name} after {max_retries} attempts")
     
     def run(self):
         for date in self.dates:

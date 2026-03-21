@@ -35,7 +35,7 @@ nheads = [0, 100, 200, 400, 800] × same field/obs pattern per iteration
 ```
 cd ./jobscript/tco/gp_exercise
 nano sim_heads_effect_031926.sh
-sbatch sim_heads_effect_031926.sh
+
 ```
 
 ```bash
