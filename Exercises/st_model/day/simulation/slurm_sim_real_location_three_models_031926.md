@@ -6,6 +6,7 @@ scp -r "/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO" jl2815@amarel.rutge
 ### Transfer run file (mac → Amarel)
 ```
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_three_model_comparison_031926.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+
 ```
 
 ### Transfer results (Amarel → mac)
@@ -38,6 +39,7 @@ sbatch sim_three_models_031926.sh
 ```
 
 ```bash
+
 #!/bin/bash
 #SBATCH --job-name=sim_three_031926
 #SBATCH --output=/home/jl2815/tco/exercise_output/sim_three_031926_%j.out
@@ -48,7 +50,7 @@ sbatch sim_three_models_031926.sh
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu034
+#SBATCH --nodelist=gpu045
 
 #### Load Modules
 module purge
@@ -65,11 +67,11 @@ nvidia-smi
 
 srun python /home/jl2815/tco/exercise_25/st_model/sim_three_model_comparison_031926.py \
     --v 0.5 \
-    --mm-cond-number 52 \
-    --nheads 800 \
-    --limit-a 16 \
-    --limit-b 16 \
-    --limit-c 16 \
+    --mm-cond-number 100 \
+    --nheads 200 \
+    --limit-a 8 \
+    --limit-b 8 \
+    --limit-c 8 \
     --daily-stride 2 \
     --num-iters 200 \
     --years "2022,2024,2025" \
@@ -80,6 +82,7 @@ srun python /home/jl2815/tco/exercise_25/st_model/sim_three_model_comparison_031
     --seed 42
 
 echo "Current date and time: $(date)"
+
 
 ```
 

@@ -67,7 +67,7 @@ def generate_regular_data(params_tensor, grid_config):
 
     input_map, agg_list = {}, []
     for t in range(t_def):
-        obs = field[:, :, t].flatten() + torch.randn_like(flat_lats) * nugget_std + grid_config['mean']
+        obs = field[:, :, t].flatten() + torch.randn_like(flat_lats) * nugget_std
         row = torch.stack([flat_lats, flat_lons, obs,
                            torch.full_like(flat_lats, 21.0 + t)], dim=1).detach()
         input_map[f't_{t:02d}'] = row
@@ -192,7 +192,7 @@ def cli(
     sample_day:  int = typer.Option(1,      help="Day of month (1-based) for representative day"),
     month:       int = typer.Option(7,      help="Month"),
     v:           float = typer.Option(0.5,  help="Matern smoothness"),
-    mm_cond_number: int = typer.Option(30,  help="Vecchia neighbors"),
+    mm_cond_number: int = typer.Option(100, help="Vecchia neighbors"),
     nheads:      int = typer.Option(1000,   help="Head points"),
     limit_a:     int = typer.Option(16,     help="Set A neighbors"),
     limit_b:     int = typer.Option(16,     help="Set B neighbors"),
@@ -372,7 +372,10 @@ def cli(
     for i in range(num_sims):
         with torch.no_grad():
             b_irr = generate_irr_bootstrap(vc_log_phi, real_map_vecc, float(monthly_mean))
-        model_vc.input_map = {k: b_irr[k][ord_mm] for k in b_irr}
+        # b_irr is already in maxmin order (cloned from real_map_vecc which is maxmin-ordered).
+        # Do NOT apply [ord_mm] again — that would double-permute the data.
+        model_vc.input_map = b_irr
+        model_vc.refresh_y_from_input_map()   # fast Y-only update, reuses cached index structure
         if vc_log_phi.grad is not None: vc_log_phi.grad.zero_()
         model_vc.vecchia_batched_likelihood(vc_log_phi).backward()
         grads_vc.append(vc_log_phi.grad.detach().clone())

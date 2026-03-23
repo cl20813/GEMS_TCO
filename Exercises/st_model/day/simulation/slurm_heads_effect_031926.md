@@ -6,6 +6,7 @@ scp -r "/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO" jl2815@amarel.rutge
 ### Transfer run file (mac → Amarel)
 ```
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_heads_effect_031926.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+
 ```
 
 ### Transfer results (Amarel → mac)
@@ -30,15 +31,18 @@ conda activate faiss_env
 
 ### Heads effect simulation — Vecchia-Irregular (sbatch)
 nheads = [0, 100, 200, 400, 800] × same field/obs pattern per iteration
+mm_cond_number = 60 (matches cond_effect; 3× max limit=20 convention)
 → per-parameter RMSRE + mean estimates + wall-clock time per heads config
 
 ```
 cd ./jobscript/tco/gp_exercise
 nano sim_heads_effect_031926.sh
+sbatch sim_heads_effect_031926.sh
 
 ```
 
 ```bash
+
 #!/bin/bash
 #SBATCH --job-name=sim_heads_031926
 #SBATCH --output=/home/jl2815/tco/exercise_output/sim_heads_031926_%j.out
@@ -66,10 +70,11 @@ nvidia-smi
 
 srun python /home/jl2815/tco/exercise_25/st_model/sim_heads_effect_031926.py \
     --v 0.5 \
-    --mm-cond-number 16 \
-    --limit-a 8 \
-    --limit-b 8 \
-    --limit-c 8 \
+    --heads-list "0,200,400,800" \
+    --mm-cond-number 100 \
+    --limit-a 6 \
+    --limit-b 6 \
+    --limit-c 6 \
     --daily-stride 2 \
     --num-iters 200 \
     --years "2022,2024,2025" \
@@ -80,4 +85,5 @@ srun python /home/jl2815/tco/exercise_25/st_model/sim_heads_effect_031926.py \
     --seed 42
 
 echo "Current date and time: $(date)"
+
 ```

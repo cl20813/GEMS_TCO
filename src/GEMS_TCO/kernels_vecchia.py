@@ -234,7 +234,7 @@ class VecchiaBatched(SpatioTemporalModel):
 
         def build_tensors(idx_list, max_d):
             if not idx_list:
-                return None, None, None
+                return None, None, None, None, None
             T    = torch.tensor(idx_list, device=self.device, dtype=torch.long)
             G    = Full_Data[T]
             X    = G[..., [0, 1, 3]].contiguous().to(torch.float64)
@@ -246,17 +246,55 @@ class VecchiaBatched(SpatioTemporalModel):
             is_dummy = (T >= dummy_start).unsqueeze(-1)
             Locs = Locs.masked_fill(is_dummy, 0.0)
             Y    = Y.masked_fill(is_dummy, 0.0)
-            return X, Y, Locs
+            return X, Y, Locs, T, is_dummy
 
-        self.X_A,   self.Y_A,   self.Locs_A   = build_tensors(batch_list_A,   max_dim_A)
-        self.X_AB,  self.Y_AB,  self.Locs_AB  = build_tensors(batch_list_AB,  max_dim_AB)
-        self.X_ABC, self.Y_ABC, self.Locs_ABC = build_tensors(batch_list_ABC, max_dim_ABC)
+        self.X_A,   self.Y_A,   self.Locs_A,   self._T_A,   self._is_dummy_A   = build_tensors(batch_list_A,   max_dim_A)
+        self.X_AB,  self.Y_AB,  self.Locs_AB,  self._T_AB,  self._is_dummy_AB  = build_tensors(batch_list_AB,  max_dim_AB)
+        self.X_ABC, self.Y_ABC, self.Locs_ABC, self._T_ABC, self._is_dummy_ABC = build_tensors(batch_list_ABC, max_dim_ABC)
+
+        # Store metadata for fast Y-only refresh (refresh_y_from_input_map)
+        self._heads_tensor_stored = heads_tensor if len(heads_indices) > 0 else None
+        self._dummy_start_stored  = dummy_start
+        self._n_real_stored       = n_real
+        self._n_dummies_stored    = n_dummies
 
         self.n_tails = len(batch_list_A) + len(batch_list_AB) + len(batch_list_ABC)
         self.is_precomputed = True
         print(f"[Set C: {use_set_C}] ✅ Done. "
               f"(Heads: {len(heads_indices)}, "
               f"Tails A/AB/ABC: {len(batch_list_A)}/{len(batch_list_AB)}/{len(batch_list_ABC)})")
+
+    def refresh_y_from_input_map(self):
+        """Update only Y tensors using current input_map values.
+
+        Call this after updating self.input_map when the spatial structure
+        (locations, conditioning sets) is unchanged but observation values differ
+        — e.g. in GIM bootstrap loops. Much faster than full re-precompute.
+        """
+        if not self.is_precomputed:
+            raise RuntimeError("Run precompute_conditioning_sets() first!")
+        all_data = torch.cat(
+            [torch.from_numpy(d) if isinstance(d, np.ndarray) else d
+             for d in self.input_map.values()], dim=0
+        ).to(self.device, dtype=torch.float32)
+        # Append zeros for dummy rows
+        y_full = torch.cat([
+            all_data[:, 2],
+            torch.zeros(self._n_dummies_stored, device=self.device, dtype=torch.float32)
+        ])  # shape [n_real + n_dummies]
+        # Refresh Heads
+        if self._heads_tensor_stored is not None and self._heads_tensor_stored.numel() > 0:
+            self.Heads_data[:, 2] = y_full[self._heads_tensor_stored].to(torch.float64)
+        # Refresh tail Y tensors
+        for T, is_dummy, attr in [
+            (self._T_A,   self._is_dummy_A,   'Y_A'),
+            (self._T_AB,  self._is_dummy_AB,  'Y_AB'),
+            (self._T_ABC, self._is_dummy_ABC, 'Y_ABC'),
+        ]:
+            if T is not None:
+                Y = y_full[T].unsqueeze(-1).to(torch.float64)
+                Y = Y.masked_fill(is_dummy, 0.0)
+                setattr(self, attr, Y.contiguous())
 
     def vecchia_batched_likelihood(self, params):
         if not self.is_precomputed:

@@ -323,7 +323,7 @@ def calculate_rmsre(out_params, true_dict):
 @app.command()
 def cli(
     v: float = typer.Option(0.5,    help="Matern smoothness"),
-    mm_cond_number: int = typer.Option(8,    help="Vecchia neighbors"),
+    mm_cond_number: int = typer.Option(100,  help="Vecchia neighbors"),
     nheads: int = typer.Option(300,  help="Vecchia head points per time step"),
     limit_a: int = typer.Option(8,   help="Set A neighbors"),
     limit_b: int = typer.Option(8,   help="Set B neighbors"),
@@ -361,15 +361,15 @@ def cli(
 
     # ── True parameters ────────────────────────────────────────────────────────
     # Scenario A — original real-data fitted parameters
-    # true_dict = {
-    #     'sigmasq':    13.059,
-    #     'range_lat':  0.154,
-    #     'range_lon':  0.195,
-    #     'range_time': 1.0,
-    #     'advec_lat':  0.0218,
-    #     'advec_lon':  -0.1689,
-    #     'nugget':     0.247,
-    # }
+    true_dict = {
+        'sigmasq':    13.059,
+        'range_lat':  0.154,
+        'range_lon':  0.195,
+        'range_time': 1.0,
+        'advec_lat':  0.0218,
+        'advec_lon':  -0.1689,
+        'nugget':     0.247,
+    }
 
     # Scenario B — lower variance, wide range (smooth field), high nugget ratio, weak advection
     # true_dict = {
@@ -394,15 +394,15 @@ def cli(
     # }
 
     # Scenario C (active) — wider range, higher nugget, weak lat / strong lon advection
-    true_dict = {
-        'sigmasq':    10.0,
-        'range_lat':  0.5,
-        'range_lon':  0.6,
-        'range_time': 2.5,
-        'advec_lat':  0.05,
-        'advec_lon':  -0.25,
-        'nugget':     1.2,
-    }
+    #true_dict = {
+    #    'sigmasq':    10.0,
+    #    'range_lat':  0.5,
+    #    'range_lon':  0.6,
+    #    'range_time': 2.5,
+    #    'advec_lat':  0.05,
+    #    'advec_lon':  -0.25,
+    #    'nugget':     1.2,
+    #}
 
     # Scenario D — strong lat advection, moderate lon advection
     # true_dict = {
@@ -749,10 +749,15 @@ def cli(
         print(f"  {'-'*55}")
         # Per-parameter RMSRE rows
         per_param_by_model = {}
+        per_param_med_by_model = {}
         for m in MODELS_:
             sub_recs = [r for r in records if r['model'] == m]
             per_param_by_model[m] = [
                 float(np.sqrt(np.mean([((r[col] - tv) / abs(tv)) ** 2 for r in sub_recs])))
+                for col, tv in zip(p_cols_, true_vals_)
+            ]
+            per_param_med_by_model[m] = [
+                float(np.sqrt(np.median([((r[col] - tv) / abs(tv)) ** 2 for r in sub_recs])))
                 for col, tv in zip(p_cols_, true_vals_)
             ]
         for lbl, idx in zip(p_labels_, range(len(p_labels_))):
@@ -765,6 +770,10 @@ def cli(
         for m in MODELS_:
             rmsre_row += f"  {np.mean(per_param_by_model[m]):>{cw}.4f}"
         print(rmsre_row)
+        med_rmsre_row = f"  {'MedRMSRE':<11} {'':>{cw}}"
+        for m in MODELS_:
+            med_rmsre_row += f"  {np.mean(per_param_med_by_model[m]):>{cw}.4f}"
+        print(med_rmsre_row)
 
     # ── Final summary ─────────────────────────────────────────────────────────
     df_final   = pd.DataFrame(records)
@@ -780,6 +789,9 @@ def cli(
     # Per-parameter RMSRE: sqrt(mean(((est_k - true_k)/|true_k|)^2)) over iterations
     def param_rmsre(sub, col, tv):
         return float(np.sqrt(np.mean(((sub[col].values - tv) / abs(tv)) ** 2)))
+
+    def param_med_rmsre(sub, col, tv):
+        return float(np.sqrt(np.median(((sub[col].values - tv) / abs(tv)) ** 2)))
 
     # ── Per-parameter RMSRE table (printed) ───────────────────────────────────
     print(f"\n{'='*75}")
@@ -804,6 +816,12 @@ def cli(
         per_param_rmsres = [param_rmsre(sub, col, tv) for col, tv in zip(param_cols, true_vals)]
         overall_str += f"  {np.mean(per_param_rmsres):>{col_w}.4f}"
     print(overall_str)
+    overall_med_str = f"  {'Overall Med':<14} {'':>10}"
+    for m in MODELS:
+        sub = df_final[df_final['model'] == m]
+        per_param_med = [param_med_rmsre(sub, col, tv) for col, tv in zip(param_cols, true_vals)]
+        overall_med_str += f"  {np.mean(per_param_med):>{col_w}.4f}"
+    print(overall_med_str)
 
     # ── Per-parameter mean & SD table (printed) ───────────────────────────────
     print(f"\n  Mean estimate (SD) across {num_iters} iterations")
@@ -823,18 +841,21 @@ def cli(
         row = {'parameter': lbl, 'true': tv}
         for m in MODELS:
             sub = df_final[df_final['model'] == m]
-            row[f'{m}_rmsre'] = round(param_rmsre(sub, col, tv), 6)
-            row[f'{m}_mean']  = round(sub[col].mean(), 6)
-            row[f'{m}_sd']    = round(sub[col].std(),  6)
+            row[f'{m}_rmsre']     = round(param_rmsre(sub, col, tv),     6)
+            row[f'{m}_med_rmsre'] = round(param_med_rmsre(sub, col, tv), 6)
+            row[f'{m}_mean']      = round(sub[col].mean(), 6)
+            row[f'{m}_sd']        = round(sub[col].std(),  6)
         summary_rows.append(row)
     # Overall row
     overall_row = {'parameter': 'Overall_RMSRE', 'true': float('nan')}
     for m in MODELS:
         sub = df_final[df_final['model'] == m]
-        per_param_rmsres = [param_rmsre(sub, col, tv) for col, tv in zip(param_cols, true_vals)]
-        overall_row[f'{m}_rmsre'] = round(np.mean(per_param_rmsres), 6)
-        overall_row[f'{m}_mean']  = float('nan')
-        overall_row[f'{m}_sd']    = float('nan')
+        per_param_rmsres = [param_rmsre(sub, col, tv)     for col, tv in zip(param_cols, true_vals)]
+        per_param_med    = [param_med_rmsre(sub, col, tv) for col, tv in zip(param_cols, true_vals)]
+        overall_row[f'{m}_rmsre']     = round(np.mean(per_param_rmsres), 6)
+        overall_row[f'{m}_med_rmsre'] = round(np.mean(per_param_med),    6)
+        overall_row[f'{m}_mean']      = float('nan')
+        overall_row[f'{m}_sd']        = float('nan')
     summary_rows.append(overall_row)
 
     pd.DataFrame(summary_rows).to_csv(output_path / csv_summary, index=False)

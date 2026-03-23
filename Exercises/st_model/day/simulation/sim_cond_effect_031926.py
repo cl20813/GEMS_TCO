@@ -1,18 +1,17 @@
 """
-sim_heads_effect_031926.py
+sim_cond_effect_031926.py
 
-Simulation study: effect of nheads on Vecchia-Irregular estimation quality.
+Simulation study: effect of conditioning number (n_cond) on Vecchia-Irregular
+estimation quality, with nheads=0 FIXED.
 
-nheads adds long-range temporal conditioning points to the Vecchia approximation.
-Hypothesis: more heads → better identification of range_time and advection params
-            (which are low-frequency / temporal signals that local conditioning misses).
-
-Tests HEADS_LIST = [0, 100, 200, 400, 800] on the same field + obs pattern per iteration.
-Records RMSRE, per-parameter estimates, and wall-clock time per heads config.
+Goal: Show that simply increasing the Vecchia conditioning set (more "local data")
+does NOT substitute for long-range temporal heads.
+COND_LIST = [4, 6, 8, 12, 16] applied uniformly to limit_A, limit_B, limit_C.
+nheads = 0 throughout.
 
 conda activate faiss_env
 cd /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer
-python sim_heads_effect_031926.py --num-iters 1 --lat-factor 10 --lon-factor 4
+python sim_cond_effect_031926.py --num-iters 1 --lat-factor 10 --lon-factor 4
 """
 import sys
 import time
@@ -37,6 +36,8 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DTYPE  = torch.float64
 DELTA_LAT_BASE = 0.044
 DELTA_LON_BASE = 0.063
+
+MM_COND_DATA = 16   # mm for data loading (fixed)
 
 app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
 
@@ -200,13 +201,11 @@ def calculate_rmsre(out_params, true_dict):
 @app.command()
 def cli(
     v: float = typer.Option(0.5,   help="Matern smoothness"),
-    heads_list: str = typer.Option("0,100,200,400,800", help="Comma-separated nheads values to test"),
-    mm_cond_number: int = typer.Option(100, help="Vecchia neighbors"),
-    limit_a: int = typer.Option(8,  help="Set A neighbors"),
-    limit_b: int = typer.Option(8,  help="Set B neighbors"),
-    limit_c: int = typer.Option(8,  help="Set C neighbors"),
+    cond_list: str = typer.Option("6,8,12,20", help="Comma-separated nc values to test"),
+    nheads: int = typer.Option(0, help="Fixed nheads for all nc configs"),
+    mm_cond_max: int = typer.Option(100, help="Max neighbors stored in NNS map"),
     daily_stride: int = typer.Option(2, help="Daily stride for Set C"),
-    num_iters: int = typer.Option(50, help="Simulation iterations"),
+    num_iters: int = typer.Option(200, help="Simulation iterations"),
     years: str = typer.Option("2022,2024,2025", help="Years to sample obs patterns from"),
     month: int = typer.Option(7,   help="Reference month"),
     lat_range: str = typer.Option("-3,2",    help="lat_min,lat_max"),
@@ -221,39 +220,31 @@ def cli(
     rng = np.random.default_rng(seed)
     _random.seed(seed)
 
-    HEADS_LIST = [int(x) for x in heads_list.split(',')]
+    COND_LIST    = [int(x) for x in cond_list.split(',')]
+    NHEADS_FIXED = nheads
+    MM_COND_MAX  = mm_cond_max
     lat_r = [float(x) for x in lat_range.split(',')]
     lon_r = [float(x) for x in lon_range.split(',')]
     years_list = [y.strip() for y in years.split(',')]
 
-    print(f"Device : {DEVICE}")
-    print(f"Heads  : {HEADS_LIST}")
-    print(f"Region : lat {lat_r}, lon {lon_r}")
+    print(f"Device     : {DEVICE}")
+    print(f"COND_LIST  : {COND_LIST}  (nheads={NHEADS_FIXED} fixed)")
+    print(f"MM_COND_MAX: {MM_COND_MAX}")
+    print(f"Region     : lat {lat_r}, lon {lon_r}")
 
     output_path = Path(config.amarel_estimates_day_path)
     output_path.mkdir(parents=True, exist_ok=True)
     date_tag    = datetime.now().strftime("%m%d%y")
-    csv_raw     = f"sim_heads_effect_{date_tag}.csv"
-    csv_summary = f"sim_heads_summary_{date_tag}.csv"
+    csv_raw     = f"sim_cond_effect_{date_tag}.csv"
+    csv_summary = f"sim_cond_summary_{date_tag}.csv"
 
     # ── True parameters ────────────────────────────────────────────────────────
-    # Scenario D
-    # true_dict = {
-    #     'sigmasq':    10.0,
-    #     'range_lat':  0.5,
-    #     'range_lon':  0.6,
-    #     'range_time': 2.5,
-    #     'advec_lat':  0.25,
-    #     'advec_lon':  -0.16,
-    #     'nugget':     1.2,
-    # }
-
-    # Scenario A (active) — original GEMS-fitted parameters
+    # Scenario A — original GEMS-fitted parameters
     true_dict = {
         'sigmasq':    13.059,
         'range_lat':  0.154,
         'range_lon':  0.195,
-        'range_time': 3.3,
+        'range_time': 1.0,
         'advec_lat':  0.0218,
         'advec_lon':  -0.1689,
         'nugget':     0.247,
@@ -285,7 +276,7 @@ def cli(
     year_dfmaps, year_means = {}, {}
     for yr in years_list:
         df_map_yr, _, _, monthly_mean_yr = data_loader.load_maxmin_ordered_data_bymonthyear(
-            lat_lon_resolution=[1, 1], mm_cond_number=mm_cond_number,
+            lat_lon_resolution=[1, 1], mm_cond_number=MM_COND_DATA,
             years_=[yr], months_=[month], lat_range=lat_r, lon_range=lon_r, is_whittle=False)
         year_dfmaps[yr] = df_map_yr
         year_means[yr]  = monthly_mean_yr
@@ -321,8 +312,8 @@ def cli(
             all_day_mappings.append((yr, d_idx, s3, hr_idx, src))
     print(f"  Total day-patterns: {len(all_day_mappings)}")
 
-    print("[Setup 4/5] Computing grid ordering...")
-    ord_grid, nns_grid = compute_grid_ordering(grid_coords, mm_cond_number)
+    print("[Setup 4/5] Computing grid ordering (mm_cond_number={MM_COND_MAX})...")
+    ord_grid, nns_grid = compute_grid_ordering(grid_coords, MM_COND_MAX)
 
     LBFGS_LR = 1.0; LBFGS_STEPS = 3; LBFGS_HIST = 100; LBFGS_EVAL = 100
     OUTLIER_THRESH = 50.0
@@ -362,16 +353,16 @@ def cli(
             del field
             irr_map_ord = {k: v[ord_grid] for k, v in irr_map.items()}
 
-            iter_results = {}   # heads → (est, rmsre, elapsed)
+            iter_results = {}   # n_cond → (est, rmsre, elapsed)
 
-            for nh in HEADS_LIST:
-                print(f"  -- heads={nh} --")
+            for nc in COND_LIST:
+                print(f"  -- n_cond={nc}  (nheads={NHEADS_FIXED}) --")
                 p = [torch.tensor([val], device=DEVICE, dtype=DTYPE, requires_grad=True)
                      for val in initial_vals]
                 model = kernels_vecchia.fit_vecchia_lbfgs(
                     smooth=v, input_map=irr_map_ord,
-                    nns_map=nns_grid, mm_cond_number=mm_cond_number, nheads=nh,
-                    limit_A=limit_a, limit_B=limit_b, limit_C=limit_c, daily_stride=daily_stride
+                    nns_map=nns_grid, mm_cond_number=MM_COND_MAX, nheads=NHEADS_FIXED,
+                    limit_A=nc, limit_B=nc, limit_C=nc, daily_stride=daily_stride
                 )
                 model.precompute_conditioning_sets()
                 opt = model.set_optimizer(p, lr=LBFGS_LR, max_iter=LBFGS_EVAL,
@@ -380,7 +371,7 @@ def cli(
                 out, _ = model.fit_vecc_lbfgs(p, opt, max_steps=LBFGS_STEPS, grad_tol=1e-7)
                 elapsed = time.time() - t0
                 rmsre, est = calculate_rmsre(out, true_dict)
-                iter_results[nh] = (est, rmsre, elapsed)
+                iter_results[nc] = (est, rmsre, elapsed)
                 print(f"     RMSRE={rmsre:.4f}  ({elapsed:.1f}s)")
 
         except Exception as e:
@@ -400,20 +391,21 @@ def cli(
                 abs(est_d['nugget'])     > abs(true_dict['nugget'])     * OUTLIER_THRESH,
             ])
 
-        outlier_heads = [nh for nh, (est, _, _) in iter_results.items() if _is_outlier(est)]
-        if outlier_heads:
+        outlier_conds = [nc for nc, (est, _, _) in iter_results.items() if _is_outlier(est)]
+        if outlier_conds:
             skipped += 1
-            print(f"  [SKIP] Extreme estimate in heads={outlier_heads}. "
+            print(f"  [SKIP] Extreme estimate in n_cond={outlier_conds}. "
                   f"Skipping all. (total skipped: {skipped})")
             continue
 
         # ── Record ────────────────────────────────────────────────────────────
-        for nh, (est_d, rmsre_val, elapsed) in iter_results.items():
+        for nc, (est_d, rmsre_val, elapsed) in iter_results.items():
             records.append({
                 'iter':          it + 1,
                 'obs_year':      yr_it,
                 'obs_day':       d_it,
-                'nheads':        nh,
+                'n_cond':        nc,
+                'nheads':        NHEADS_FIXED,
                 'rmsre':         round(rmsre_val, 6),
                 'time_s':        round(elapsed,   2),
                 'sigmasq_est':   round(est_d['sigmasq'],    6),
@@ -430,55 +422,53 @@ def cli(
         pd.DataFrame(records).to_csv(output_path / csv_raw, index=False)
 
         # ── Running summary table ─────────────────────────────────────────────
-        n_done = len([r for r in records if r['nheads'] == HEADS_LIST[0]])
+        n_done = len([r for r in records if r['n_cond'] == COND_LIST[0]])
         print(f"\n  ── Running summary ({n_done} completed / {it+1} attempted) ──")
         cw = 9
-        hdr = f"  {'param':<11} {'true':>{cw}}" + "".join(f"  {'h='+str(h):>{cw}}" for h in HEADS_LIST)
+        hdr = f"  {'param':<11} {'true':>{cw}}" + "".join(f"  {'nc='+str(c):>{cw}}" for c in COND_LIST)
         print(hdr)
-        print(f"  {'-'*60}")
+        print(f"  {'-'*65}")
         for lbl, col, tv in zip(p_labels, p_cols, true_vals):
             row = f"  {lbl:<11} {tv:>{cw}.4f}"
-            for nh in HEADS_LIST:
-                vals = [r[col] for r in records if r['nheads'] == nh]
+            for nc in COND_LIST:
+                vals = [r[col] for r in records if r['n_cond'] == nc]
                 row += f"  {np.mean(vals):>{cw}.4f}"
             print(row)
-        print(f"  {'-'*60}")
-        # Per-parameter RMSRE rows
-        per_param_by_heads = {}
-        per_param_med_by_heads = {}
-        for nh in HEADS_LIST:
-            sub_recs = [r for r in records if r['nheads'] == nh]
-            per_param_by_heads[nh] = [
+        print(f"  {'-'*65}")
+        per_param_by_cond = {}
+        per_param_med_by_cond = {}
+        for nc in COND_LIST:
+            sub_recs = [r for r in records if r['n_cond'] == nc]
+            per_param_by_cond[nc] = [
                 float(np.sqrt(np.mean([((r[col] - tv) / abs(tv)) ** 2 for r in sub_recs])))
                 for col, tv in zip(p_cols, true_vals)
             ]
-            per_param_med_by_heads[nh] = [
+            per_param_med_by_cond[nc] = [
                 float(np.sqrt(np.median([((r[col] - tv) / abs(tv)) ** 2 for r in sub_recs])))
                 for col, tv in zip(p_cols, true_vals)
             ]
         for lbl, idx in zip(p_labels, range(len(p_labels))):
             rmsre_p = f"  {'RMSRE_'+lbl:<11} {'':>{cw}}"
-            for nh in HEADS_LIST:
-                rmsre_p += f"  {per_param_by_heads[nh][idx]:>{cw}.4f}"
+            for nc in COND_LIST:
+                rmsre_p += f"  {per_param_by_cond[nc][idx]:>{cw}.4f}"
             print(rmsre_p)
-        print(f"  {'-'*60}")
+        print(f"  {'-'*65}")
         rmsre_row = f"  {'RMSRE':<11} {'':>{cw}}"
-        for nh in HEADS_LIST:
-            rmsre_row += f"  {np.mean(per_param_by_heads[nh]):>{cw}.4f}"
+        for nc in COND_LIST:
+            rmsre_row += f"  {np.mean(per_param_by_cond[nc]):>{cw}.4f}"
         print(rmsre_row)
         med_rmsre_row = f"  {'MedRMSRE':<11} {'':>{cw}}"
-        for nh in HEADS_LIST:
-            med_rmsre_row += f"  {np.mean(per_param_med_by_heads[nh]):>{cw}.4f}"
+        for nc in COND_LIST:
+            med_rmsre_row += f"  {np.mean(per_param_med_by_cond[nc]):>{cw}.4f}"
         print(med_rmsre_row)
-        # Timing row
         time_row = f"  {'time(s)':<11} {'':>{cw}}"
-        for nh in HEADS_LIST:
-            time_row += f"  {np.mean([r['time_s'] for r in records if r['nheads'] == nh]):>{cw}.1f}"
+        for nc in COND_LIST:
+            time_row += f"  {np.mean([r['time_s'] for r in records if r['n_cond'] == nc]):>{cw}.1f}"
         print(time_row)
 
     # ── Final summary ─────────────────────────────────────────────────────────
     df_final = pd.DataFrame(records)
-    n_valid  = len(df_final[df_final['nheads'] == HEADS_LIST[0]])
+    n_valid  = len(df_final[df_final['n_cond'] == COND_LIST[0]])
 
     def param_rmsre(sub, col, tv):
         return float(np.sqrt(np.mean(((sub[col].values - tv) / abs(tv)) ** 2)))
@@ -488,44 +478,45 @@ def cli(
 
     print(f"\n{'='*75}")
     print(f"  FINAL SUMMARY — Per-parameter RMSRE  ({n_valid} valid iterations)")
+    print(f"  nheads={NHEADS_FIXED} fixed; varying n_cond (limit_A=limit_B=limit_C=n_cond)")
     print(f"{'='*75}")
     cw2 = 10
-    print(f"  {'Parameter':<14} {'True':>8}" + "".join(f"  {'h='+str(h):>{cw2}}" for h in HEADS_LIST))
+    print(f"  {'Parameter':<14} {'True':>8}" + "".join(f"  {'nc='+str(c):>{cw2}}" for c in COND_LIST))
     print(f"  {'-'*73}")
     for lbl, col, tv in zip(p_labels, p_cols, true_vals):
         row = f"  {lbl:<14} {tv:>8.4f}"
-        for nh in HEADS_LIST:
-            sub = df_final[df_final['nheads'] == nh]
+        for nc in COND_LIST:
+            sub = df_final[df_final['n_cond'] == nc]
             row += f"  {param_rmsre(sub, col, tv):>{cw2}.4f}"
         print(row)
     print(f"  {'-'*73}")
     overall_row = f"  {'Overall RMSRE':<14} {'':>8}"
-    for nh in HEADS_LIST:
-        sub = df_final[df_final['nheads'] == nh]
+    for nc in COND_LIST:
+        sub = df_final[df_final['n_cond'] == nc]
         per_param_rmsres = [param_rmsre(sub, col, tv) for col, tv in zip(p_cols, true_vals)]
         overall_row += f"  {np.mean(per_param_rmsres):>{cw2}.4f}"
     print(overall_row)
     overall_med_row = f"  {'Overall Med':<14} {'':>8}"
-    for nh in HEADS_LIST:
-        sub = df_final[df_final['nheads'] == nh]
+    for nc in COND_LIST:
+        sub = df_final[df_final['n_cond'] == nc]
         per_param_med = [param_med_rmsre(sub, col, tv) for col, tv in zip(p_cols, true_vals)]
         overall_med_row += f"  {np.mean(per_param_med):>{cw2}.4f}"
     print(overall_med_row)
 
     print(f"\n  Mean estimate (SD) — {n_valid} iterations")
-    print(f"  {'Parameter':<14} {'True':>8}" + "".join(f"  {'h='+str(h):>{cw2}}" for h in HEADS_LIST))
+    print(f"  {'Parameter':<14} {'True':>8}" + "".join(f"  {'nc='+str(c):>{cw2}}" for c in COND_LIST))
     print(f"  {'-'*73}")
     for lbl, col, tv in zip(p_labels, p_cols, true_vals):
         row = f"  {lbl:<14} {tv:>8.4f}"
-        for nh in HEADS_LIST:
-            sub = df_final[df_final['nheads'] == nh]
+        for nc in COND_LIST:
+            sub = df_final[df_final['n_cond'] == nc]
             row += f"  {sub[col].mean():>5.3f}({sub[col].std():.3f})"
         print(row)
 
-    print(f"\n  Mean wall-clock time (s) per heads config:")
+    print(f"\n  Mean wall-clock time (s) per n_cond config:")
     time_row = f"  {'time_s':<14} {'':>8}"
-    for nh in HEADS_LIST:
-        sub = df_final[df_final['nheads'] == nh]
+    for nc in COND_LIST:
+        sub = df_final[df_final['n_cond'] == nc]
         time_row += f"  {sub['time_s'].mean():>{cw2}.2f}"
     print(time_row)
 
@@ -533,31 +524,30 @@ def cli(
     summary_rows = []
     for lbl, col, tv in zip(p_labels, p_cols, true_vals):
         row = {'parameter': lbl, 'true': tv}
-        for nh in HEADS_LIST:
-            sub = df_final[df_final['nheads'] == nh]
-            row[f'h{nh}_rmsre']     = round(param_rmsre(sub, col, tv),     6)
-            row[f'h{nh}_med_rmsre'] = round(param_med_rmsre(sub, col, tv), 6)
-            row[f'h{nh}_mean']      = round(sub[col].mean(), 6)
-            row[f'h{nh}_sd']        = round(sub[col].std(),  6)
+        for nc in COND_LIST:
+            sub = df_final[df_final['n_cond'] == nc]
+            row[f'nc{nc}_rmsre']     = round(param_rmsre(sub, col, tv),     6)
+            row[f'nc{nc}_med_rmsre'] = round(param_med_rmsre(sub, col, tv), 6)
+            row[f'nc{nc}_mean']      = round(sub[col].mean(), 6)
+            row[f'nc{nc}_sd']        = round(sub[col].std(),  6)
         summary_rows.append(row)
     overall = {'parameter': 'Overall_RMSRE', 'true': float('nan')}
-    for nh in HEADS_LIST:
-        sub = df_final[df_final['nheads'] == nh]
+    for nc in COND_LIST:
+        sub = df_final[df_final['n_cond'] == nc]
         per_param_rmsres = [param_rmsre(sub, col, tv)     for col, tv in zip(p_cols, true_vals)]
         per_param_med    = [param_med_rmsre(sub, col, tv) for col, tv in zip(p_cols, true_vals)]
-        overall[f'h{nh}_rmsre']     = round(np.mean(per_param_rmsres), 6)
-        overall[f'h{nh}_med_rmsre'] = round(np.mean(per_param_med),    6)
-        overall[f'h{nh}_mean']      = float('nan')
-        overall[f'h{nh}_sd']        = float('nan')
+        overall[f'nc{nc}_rmsre']     = round(np.mean(per_param_rmsres), 6)
+        overall[f'nc{nc}_med_rmsre'] = round(np.mean(per_param_med),    6)
+        overall[f'nc{nc}_mean']      = float('nan')
+        overall[f'nc{nc}_sd']        = float('nan')
     summary_rows.append(overall)
 
-    # Timing summary row
     timing = {'parameter': 'mean_time_s', 'true': float('nan')}
-    for nh in HEADS_LIST:
-        sub = df_final[df_final['nheads'] == nh]
-        timing[f'h{nh}_rmsre'] = float('nan')
-        timing[f'h{nh}_mean']  = round(sub['time_s'].mean(), 2)
-        timing[f'h{nh}_sd']    = round(sub['time_s'].std(),  2)
+    for nc in COND_LIST:
+        sub = df_final[df_final['n_cond'] == nc]
+        timing[f'nc{nc}_rmsre'] = float('nan')
+        timing[f'nc{nc}_mean']  = round(sub['time_s'].mean(), 2)
+        timing[f'nc{nc}_sd']    = round(sub['time_s'].std(),  2)
     summary_rows.append(timing)
 
     pd.DataFrame(summary_rows).to_csv(output_path / csv_summary, index=False)

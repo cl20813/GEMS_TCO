@@ -62,7 +62,7 @@ sbatch fit_vecc_gpu_031826.sh
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu033
+#SBATCH --nodelist=gpu035
 
 #### Load Modules
 module purge
@@ -83,11 +83,11 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_031826.py
     --days "0,28" \
     --month 7 \
     --years "2022,2024,2025" \
-    --mm-cond-number 52 \
-    --nheads 1000 \
-    --limit-a 16 \
-    --limit-b 16 \
-    --limit-c 16 \
+    --mm-cond-number 100 \
+    --nheads 0 \
+    --limit-a 24 \
+    --limit-b 24 \
+    --limit-c 24 \
     --daily-stride 2 \
     --keep-exact-loc
 

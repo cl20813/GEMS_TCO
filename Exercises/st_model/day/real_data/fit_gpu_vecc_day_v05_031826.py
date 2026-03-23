@@ -27,7 +27,7 @@ def cli(
     lr: float = typer.Option(1.0, help="L-BFGS learning rate"),
     space: List[str] = typer.Option(['20', '20'], help="spatial resolution"),
     days: List[str] = typer.Option(['0', '31'], help="Start and End day index (0-based, e.g. '0,31')"),
-    mm_cond_number: int = typer.Option(30, help="Max neighbors stored in NNS map"),
+    mm_cond_number: int = typer.Option(100, help="Max neighbors stored in NNS map"),
     nheads: int = typer.Option(300, help="Number of head points (exact GP)"),
     limit_a: int = typer.Option(8, help="Set A: spatial neighbors at current time step"),
     limit_b: int = typer.Option(8, help="Set B: spatial neighbors at t-1 (actual size = limit_b+1)"),

@@ -18,6 +18,7 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/GIM
 ---
 
 ### Connect & setup
+
 ```
 ssh jl2815@amarel.rutgers.edu
 module use /projects/community/modulefiles
@@ -48,7 +49,7 @@ sbatch sim_GIM_real_031926.sh
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu037
+#SBATCH --nodelist=gpu035
 
 #### Load Modules
 module purge
@@ -68,7 +69,7 @@ srun python /home/jl2815/tco/exercise_25/st_model/sim_GIM_vecc_irr_dw_031926.py 
     --sample-day 1 \
     --month 7 \
     --v 0.5 \
-    --mm-cond-number 30 \
+    --mm-cond-number 100 \
     --nheads 1000 \
     --limit-a 16 \
     --limit-b 16 \
@@ -120,7 +121,7 @@ nvidia-smi
 srun python /home/jl2815/tco/exercise_25/st_model/sim_heads_regular_vecc_GIM_031926.py \
     --v 0.5 \
     --lr 1.0 \
-    --mm-cond-number 10 \
+    --mm-cond-number 100 \
     --epochs 20 \
     --head-configs "300,500,1000" \
     --limit-a 8 \
