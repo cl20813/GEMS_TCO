@@ -9,6 +9,7 @@ import torch
 import typer
 from pathlib import Path
 from typing import List
+from sklearn.neighbors import BallTree
 
 sys.path.append("/cache/home/jl2815/tco")
 
@@ -44,104 +45,143 @@ def get_model_covariance_on_grid(lags_x, lags_y, lags_t, params):
     return (phi1 / phi2) * torch.exp(-dist * phi2)
 
 
-def generate_regular_data(params_tensor, grid_config):
-    lats, lons, t_def = grid_config['lats'], grid_config['lons'], grid_config['t_def']
-    Nx, Ny, Nt = len(lats), len(lons), t_def
-    dlat = float(lats[1] - lats[0]) if Nx > 1 else DELTA_LAT
-    dlon = float(lons[1] - lons[0]) if Ny > 1 else DELTA_LON
+def build_high_res_grid(lat_range, lon_range, lat_factor, lon_factor):
+    """Build high-resolution FFT grid at lat_factor × lon_factor finer spacing."""
+    dlat = DELTA_LAT / lat_factor
+    dlon = DELTA_LON / lon_factor
+    lats = torch.arange(lat_range[0] - 0.1, lat_range[1] + 0.1, dlat, device=DEVICE, dtype=DTYPE)
+    lons = torch.arange(lon_range[0] - 0.1, lon_range[1] + 0.1, dlon, device=DEVICE, dtype=DTYPE)
+    return lats, lons, dlat, dlon
+
+
+def generate_field_values(lats_hr, lons_hr, t_steps, params, dlat, dlon):
+    """FFT circulant-embedding realization on high-res grid. CPU float32 to save memory."""
+    CPU = torch.device("cpu"); F32 = torch.float32
+    Nx, Ny, Nt = len(lats_hr), len(lons_hr), t_steps
     Px, Py, Pt = 2*Nx, 2*Ny, 2*Nt
 
-    lx = torch.arange(Px, device=DEVICE, dtype=DTYPE) * dlat; lx[Px//2:] -= Px*dlat
-    ly = torch.arange(Py, device=DEVICE, dtype=DTYPE) * dlon; ly[Py//2:] -= Py*dlon
-    lt = torch.arange(Pt, device=DEVICE, dtype=DTYPE);        lt[Pt//2:] -= Pt
+    lx = torch.arange(Px, device=CPU, dtype=F32) * dlat; lx[Px//2:] -= Px * dlat
+    ly = torch.arange(Py, device=CPU, dtype=F32) * dlon; ly[Py//2:] -= Py * dlon
+    lt = torch.arange(Pt, device=CPU, dtype=F32);        lt[Pt//2:] -= Pt
 
-    L_x, L_y, L_t = torch.meshgrid(lx, ly, lt, indexing='ij')
-    C = get_model_covariance_on_grid(L_x, L_y, L_t, params_tensor)
+    params_cpu = params.detach().cpu().float()
+    Lx, Ly, Lt = torch.meshgrid(lx, ly, lt, indexing='ij')
+    C = get_model_covariance_on_grid(Lx, Ly, Lt, params_cpu)
     S = torch.fft.fftn(C); S.real = torch.clamp(S.real, min=0)
-    field = torch.fft.ifftn(torch.sqrt(S.real) * torch.fft.fftn(
-        torch.randn(Px, Py, Pt, device=DEVICE, dtype=DTYPE))).real[:Nx, :Ny, :Nt]
-
-    nugget_std = torch.sqrt(torch.exp(params_tensor[6]))
-    grid_lat, grid_lon = torch.meshgrid(lats, lons, indexing='ij')
-    flat_lats, flat_lons = grid_lat.flatten(), grid_lon.flatten()
-
-    input_map, agg_list = {}, []
-    for t in range(t_def):
-        obs = field[:, :, t].flatten() + torch.randn_like(flat_lats) * nugget_std
-        row = torch.stack([flat_lats, flat_lons, obs,
-                           torch.full_like(flat_lats, 21.0 + t)], dim=1).detach()
-        input_map[f't_{t:02d}'] = row
-        agg_list.append(row)
-    return input_map, torch.cat(agg_list, dim=0)
+    field = torch.fft.ifftn(torch.sqrt(S.real) *
+                             torch.fft.fftn(torch.randn(Px, Py, Pt, device=CPU, dtype=F32))
+                             ).real[:Nx, :Ny, :Nt]
+    return field.to(dtype=DTYPE, device=DEVICE)
 
 
-def generate_irr_bootstrap(params_tensor, ref_irr_map, monthly_mean):
-    """Bootstrap sample at actual irregular observation locations via FFT + bilinear interpolation.
+def apply_step3_1to1(src_np_valid, grid_coords_np, grid_tree):
+    """Step3: obs→cell direction, 1:1, nearest wins. Returns assignment[N_grid] (obs_i or -1)."""
+    N_grid = len(grid_coords_np)
+    if len(src_np_valid) == 0:
+        return np.full(N_grid, -1, dtype=np.int64)
+    dist_to_cell, cell_for_obs = grid_tree.query(np.radians(src_np_valid), k=1)
+    dist_to_cell = dist_to_cell.flatten()
+    cell_for_obs = cell_for_obs.flatten()
+    assignment = np.full(N_grid, -1, dtype=np.int64)
+    best_dist   = np.full(N_grid, np.inf)
+    for obs_i, (cell_j, d) in enumerate(zip(cell_for_obs, dist_to_cell)):
+        if d < best_dist[cell_j]:
+            assignment[cell_j] = obs_i
+            best_dist[cell_j]  = d
+    return assignment
 
-    For Vecchia-Irr GIM: H is computed on actual irregular GEMS locations.
-    J must also be estimated at the same locations so that H and J share the same
-    spatial configuration and the Vecchia conditioning structure stays consistent.
+
+def precompute_mapping_indices(ref_irr_map, grid_coords, lats_hr, lons_hr, sorted_keys):
+    """Precompute BallTree queries once; shared across all bootstrap iterations.
+
+    Returns:
+      step3_per_t  : list of [N_grid] int64 arrays  (obs_i or -1 per grid cell)
+      hr_idx_per_t : list of [N_valid] long tensors (high-res cell index per valid obs)
+      src_locs_per_t: list of [N_valid, 2] tensors  (lat/lon of valid obs)
+      valid_rows_per_t: list of [N_grid] bool tensors (which rows are valid per time step)
     """
-    t_keys = sorted(ref_irr_map.keys())
-    Nt = len(t_keys)
+    hr_lat_g, hr_lon_g = torch.meshgrid(lats_hr, lons_hr, indexing='ij')
+    hr_coords_np = torch.stack([hr_lat_g.flatten(), hr_lon_g.flatten()], dim=1).cpu().numpy()
+    hr_tree = BallTree(np.radians(hr_coords_np), metric='haversine')
 
-    # Grid bounds from valid (non-NaN) rows only.
-    # ord_mm is computed on all N_grid regular-grid positions, so output must
-    # preserve all N_grid rows per time step — NaN rows pass through unchanged,
-    # and kernels_vecchia handles them via is_nan_mask internally.
-    valid_lats, valid_lons = [], []
-    for k in t_keys:
-        rows = ref_irr_map[k]
-        valid = ~torch.isnan(rows[:, 0])
-        valid_lats.append(rows[valid, 0])
-        valid_lons.append(rows[valid, 1])
-    all_valid_lats = torch.cat(valid_lats)
-    all_valid_lons = torch.cat(valid_lons)
-    lat_min = float(all_valid_lats.min()); lat_max = float(all_valid_lats.max())
-    lon_min = float(all_valid_lons.min()); lon_max = float(all_valid_lons.max())
+    grid_coords_np = grid_coords.cpu().numpy()
+    grid_tree = BallTree(np.radians(grid_coords_np), metric='haversine')
 
-    lats_g = torch.arange(lat_min, lat_max + DELTA_LAT, DELTA_LAT, device=DEVICE, dtype=DTYPE)
-    lons_g = torch.arange(lon_min, lon_max + DELTA_LON, DELTA_LON, device=DEVICE, dtype=DTYPE)
-    Nx, Ny = len(lats_g), len(lons_g)
+    step3_per_t, hr_idx_per_t, src_locs_per_t, valid_rows_per_t = [], [], [], []
+    for key in sorted_keys:
+        ref_t    = ref_irr_map[key].to(DEVICE)
+        src_np   = ref_t[:, :2].cpu().numpy()
+        valid_mask = ~np.isnan(src_np).any(axis=1)
 
-    Px, Py, Pt = 2*Nx, 2*Ny, 2*Nt
-    lx = torch.arange(Px, device=DEVICE, dtype=DTYPE) * DELTA_LAT; lx[Px//2:] -= Px*DELTA_LAT
-    ly = torch.arange(Py, device=DEVICE, dtype=DTYPE) * DELTA_LON; ly[Py//2:] -= Py*DELTA_LON
-    lt = torch.arange(Pt, device=DEVICE, dtype=DTYPE);              lt[Pt//2:] -= Pt
+        step3_per_t.append(apply_step3_1to1(src_np[valid_mask], grid_coords_np, grid_tree))
+        valid_rows_per_t.append(torch.tensor(valid_mask, device=DEVICE))
 
-    L_x, L_y, L_t = torch.meshgrid(lx, ly, lt, indexing='ij')
-    C = get_model_covariance_on_grid(L_x, L_y, L_t, params_tensor)
-    S = torch.fft.fftn(C); S.real = torch.clamp(S.real, min=0)
-    field = torch.fft.ifftn(torch.sqrt(S.real) * torch.fft.fftn(
-        torch.randn(Px, Py, Pt, device=DEVICE, dtype=DTYPE))).real[:Nx, :Ny, :Nt]
+        if valid_mask.sum() > 0:
+            _, hr_idx = hr_tree.query(np.radians(src_np[valid_mask]), k=1)
+            hr_idx_per_t.append(torch.tensor(hr_idx.flatten(), device=DEVICE))
+        else:
+            hr_idx_per_t.append(torch.zeros(0, dtype=torch.long, device=DEVICE))
 
-    nugget_std = torch.sqrt(torch.exp(params_tensor[6]))
+        src_locs_per_t.append(ref_t[valid_mask, :2])
 
-    out_map = {}
-    for ti, tkey in enumerate(t_keys):
-        rows = ref_irr_map[tkey]               # keep all N_grid rows (same shape as input)
-        out_rows = rows.clone()                 # NaN rows stay NaN → Vecchia is_nan_mask handles them
-        valid = ~torch.isnan(rows[:, 0])
+    return step3_per_t, hr_idx_per_t, src_locs_per_t, valid_rows_per_t
 
-        if valid.any():
-            irr_lats = rows[valid, 0]; irr_lons = rows[valid, 1]
-            fi = (irr_lats - lat_min) / DELTA_LAT
-            fj = (irr_lons - lon_min) / DELTA_LON
-            i0 = fi.long().clamp(0, Nx - 2); i1 = i0 + 1
-            j0 = fj.long().clamp(0, Ny - 2); j1 = j0 + 1
-            wa = (fi - fi.floor()).clamp(0.0, 1.0)
-            wb = (fj - fj.floor()).clamp(0.0, 1.0)
-            sim_vals = (
-                (1 - wa) * (1 - wb) * field[i0, j0, ti] +
-                wa        * (1 - wb) * field[i1, j0, ti] +
-                (1 - wa) * wb        * field[i0, j1, ti] +
-                wa        * wb        * field[i1, j1, ti]
-            ) + torch.randn_like(irr_lats) * nugget_std + monthly_mean
-            out_rows[valid, 2] = sim_vals       # only replace value column for valid rows
 
-        out_map[tkey] = out_rows.detach()
+def generate_bootstrap_pair(params, ref_irr_map, grid_coords, lats_hr, lons_hr, dlat_hr, dlon_hr,
+                             step3_per_t, hr_idx_per_t, src_locs_per_t, valid_rows_per_t,
+                             sorted_keys, time_vals):
+    """Generate one bootstrap sample via high-res FFT → nearest-point sampling → step3 re-grid.
 
-    return out_map
+    Returns:
+      irr_map : dict  — same structure as ref_irr_map, value column replaced (for Vecchia)
+      reg_agg : tensor [N_grid * T, 4]  — [lat, lon, val, time] with NaN for unassigned (for DW)
+    """
+    t_def = len(sorted_keys)
+    Nx_hr, Ny_hr = len(lats_hr), len(lons_hr)
+
+    field = generate_field_values(lats_hr, lons_hr, t_def, params, dlat_hr, dlon_hr)
+    field_flat = field.reshape(Nx_hr * Ny_hr, t_def)
+
+    nugget_std = torch.sqrt(torch.exp(params[6]))
+    N_grid = grid_coords.shape[0]
+    NaN    = float('nan')
+
+    irr_map  = {}
+    reg_list = []
+
+    for t_idx, key in enumerate(sorted_keys):
+        t_val      = time_vals[t_idx]
+        assign     = step3_per_t[t_idx]       # [N_grid] int64 numpy
+        hr_idx     = hr_idx_per_t[t_idx]      # [N_valid] long tensor
+        valid_rows = valid_rows_per_t[t_idx]  # [N_grid] bool tensor
+        N_valid    = hr_idx.shape[0]
+
+        if N_valid > 0:
+            gp_vals  = field_flat[hr_idx, t_idx]
+            sim_vals = gp_vals + torch.randn(N_valid, device=DEVICE, dtype=DTYPE) * nugget_std
+        else:
+            sim_vals = torch.zeros(0, device=DEVICE, dtype=DTYPE)
+
+        # ── irr_map: clone real structure, replace value column only ─────────
+        irr_rows = ref_irr_map[key].clone()
+        irr_rows[:, 2] = NaN
+        if N_valid > 0:
+            valid_indices = torch.where(valid_rows)[0]
+            irr_rows[valid_indices, 2] = sim_vals
+        irr_map[key] = irr_rows.detach()
+
+        # ── reg_agg: step3 re-gridded [lat, lon, val, time] for DW ──────────
+        reg_rows = torch.full((N_grid, 4), NaN, device=DEVICE, dtype=DTYPE)
+        reg_rows[:, :2] = grid_coords
+        reg_rows[:, 3]  = t_val
+        if N_valid > 0:
+            assign_t = torch.tensor(assign, device=DEVICE, dtype=torch.long)
+            filled   = assign_t >= 0
+            win_obs  = assign_t[filled]
+            reg_rows[filled, 2] = sim_vals[win_obs]
+        reg_list.append(reg_rows.detach())
+
+    return irr_map, torch.cat(reg_list, dim=0)
 
 
 # ── Utilities ────────────────────────────────────────────────────────────────
@@ -199,6 +239,8 @@ def cli(
     limit_c:     int = typer.Option(16,     help="Set C neighbors"),
     daily_stride: int = typer.Option(2,     help="Set C stride"),
     num_sims:    int = typer.Option(100,    help="GIM bootstrap samples"),
+    lat_factor:  int = typer.Option(10,     help="High-res FFT lat upsampling factor"),
+    lon_factor:  int = typer.Option(4,      help="High-res FFT lon upsampling factor"),
 ) -> None:
 
     set_seed(2025)
@@ -250,27 +292,42 @@ def cli(
     dwl = debiased_whittle.debiased_whittle_likelihood()
     t0  = time.time()
 
-    # ── DW GIM ────────────────────────────────────────────────────────────────
-    print(f"\n[1/2] DW GIM  ({day_str})...")
+    # ── Load both DW and Vecchia data ─────────────────────────────────────────
     dw_map, dw_agg = data_load_instance.load_working_data(
         df_map, monthly_mean, hour_indices,
         ord_mm=None, dtype=DTYPE, keep_ori=False
     )
     real_agg_dw = dw_agg.to(DEVICE)
 
-    grid_cfg = {
-        'lats': torch.unique(real_agg_dw[:, 0]),
-        'lons': torch.unique(real_agg_dw[:, 1]),
-        't_def': int(torch.unique(real_agg_dw[:, 3]).shape[0]),
-        'mean': float(monthly_mean)
-    }
-    # NaN mask from real DW data — bootstrap J must use same missingness as real data
-    # so that J and H are computed on the same effective number of observations.
-    # real_agg_dw is ordered [t0_spatial..., t1_spatial..., ...] matching generate_regular_data.
-    nan_mask_dw = torch.isnan(real_agg_dw[:, 2])  # True where obs is missing
-    obs_rate = 1.0 - nan_mask_dw.float().mean().item()
-    print(f"  DW data obs rate: {obs_rate:.3f} ({int(obs_rate * nan_mask_dw.shape[0])} / {nan_mask_dw.shape[0]} cells)")
+    vecc_map, _ = data_load_instance.load_working_data(
+        df_map, monthly_mean, hour_indices,
+        ord_mm=ord_mm, dtype=DTYPE, keep_ori=True
+    )
+    real_map_vecc = {k: v.to(DEVICE) for k, v in vecc_map.items()}
 
+    # ── Precompute mapping indices once (shared by both bootstrap loops) ──────
+    sorted_keys = sorted(real_map_vecc.keys())
+    time_vals   = [float(real_map_vecc[k][0, 3]) for k in sorted_keys]
+    t_def       = len(sorted_keys)
+
+    grid_lats   = torch.unique(real_agg_dw[:, 0])
+    grid_lons   = torch.unique(real_agg_dw[:, 1])
+    glat_g, glon_g = torch.meshgrid(grid_lats, grid_lons, indexing='ij')
+    grid_coords = torch.stack([glat_g.flatten(), glon_g.flatten()], dim=1)
+
+    lat_range = [float(grid_lats.min()), float(grid_lats.max())]
+    lon_range = [float(grid_lons.min()), float(grid_lons.max())]
+    lats_hr, lons_hr, dlat_hr, dlon_hr = build_high_res_grid(lat_range, lon_range, lat_factor, lon_factor)
+    print(f"  High-res grid: {len(lats_hr)} × {len(lons_hr)}  (factor {lat_factor}×{lon_factor})")
+
+    step3_per_t, hr_idx_per_t, src_locs_per_t, valid_rows_per_t = precompute_mapping_indices(
+        real_map_vecc, grid_coords, lats_hr, lons_hr, sorted_keys)
+
+    obs_rate = sum(v.float().mean().item() for v in valid_rows_per_t) / t_def
+    print(f"  Obs rate: {obs_rate:.3f}  |  grid: {grid_coords.shape[0]} cells  |  T={t_def}")
+
+    # ── DW GIM ────────────────────────────────────────────────────────────────
+    print(f"\n[1/2] DW GIM  ({day_str})...")
     dw_log_phi = torch.tensor(
         transform_raw_to_log_phi(dw_by_day[day_str]),
         device=DEVICE, dtype=DTYPE, requires_grad=True
@@ -295,7 +352,7 @@ def cli(
             p, I_obs, n1, n2, p_time, t_auto, DELTA_LAT, DELTA_LON)
         return loss[0] if isinstance(loss, tuple) else loss
 
-    H_dw     = finite_diff_hessian(nll_dw, dw_log_phi)
+    H_dw       = finite_diff_hessian(nll_dw, dw_log_phi)
     eigvals_dw = torch.linalg.eigvalsh(H_dw)
     print(f"  H_dw eigenvalues: {eigvals_dw.detach().cpu().numpy().round(4)}")
     print(f"  H_dw condition number: {(eigvals_dw.max()/eigvals_dw.abs().min()).item():.2e}")
@@ -304,10 +361,12 @@ def cli(
     grads_dw = []
     for i in range(num_sims):
         with torch.no_grad():
-            _, b_agg = generate_regular_data(dw_log_phi, grid_cfg)
-        # Apply same missingness as real data so J and H share the same effective n
-        b_agg = b_agg.clone()
-        b_agg[nan_mask_dw, 2] = float('nan')
+            # high-res FFT → nearest-point sampling → step3 re-grid
+            _, b_agg = generate_bootstrap_pair(
+                dw_log_phi, real_map_vecc, grid_coords,
+                lats_hr, lons_hr, dlat_hr, dlon_hr,
+                step3_per_t, hr_idx_per_t, src_locs_per_t, valid_rows_per_t,
+                sorted_keys, time_vals)
         b_slices = [b_agg[b_agg[:, 3] == t] for t in unique_times]
         J_b, bn1, bn2, _, bt = dwl.generate_Jvector_tapered(
             b_slices, dwl.cgn_hamming, 0, 1, 2, DEVICE)
@@ -323,27 +382,28 @@ def cli(
         if (i + 1) % 20 == 0:
             print(f"  DW bootstrap {i+1}/{num_sims}")
 
-    J_dw    = torch.stack(grads_dw).T @ torch.stack(grads_dw) / num_sims
+    # CENTER before forming outer product: DW is a quasi-likelihood so
+    # E[s(θ_hat)] ≠ 0 in general; correct estimator is Var[s] = E[(s-s_bar)(s-s_bar)^T].
+    grads_stack  = torch.stack(grads_dw)           # [num_sims, 7]
+    mean_grad_dw = grads_stack.mean(dim=0)          # [7]
+    centered_dw  = grads_stack - mean_grad_dw
+    J_dw         = centered_dw.T @ centered_dw / num_sims
+
     grad_norms_dw = [g.norm().item() for g in grads_dw]
     print(f"  DW grad norm — mean: {np.mean(grad_norms_dw):.4e}  std: {np.std(grad_norms_dw):.4e}")
+    print(f"  DW mean_grad (sanity, should be ~0): {mean_grad_dw.cpu().numpy().round(6)}")
     print(f"  J_dw diag:  {torch.diag(J_dw).detach().cpu().numpy().round(4)}")
     print(f"  H_dw diag:  {torch.diag(H_dw).detach().cpu().numpy().round(4)}")
-    GIM_dw  = H_inv_dw @ J_dw @ H_inv_dw
-    Jac_dw  = torch.autograd.functional.jacobian(transform_log_phi_to_physical, dw_log_phi)
-    SE_dw   = torch.sqrt(torch.diag(Jac_dw @ GIM_dw @ Jac_dw.T)).detach().cpu().numpy()
-    Pt_dw   = transform_log_phi_to_physical(dw_log_phi).detach().cpu().numpy()
+    GIM_dw = H_inv_dw @ J_dw @ H_inv_dw
+    Jac_dw = torch.autograd.functional.jacobian(transform_log_phi_to_physical, dw_log_phi)
+    SE_dw  = torch.sqrt(torch.diag(Jac_dw @ GIM_dw @ Jac_dw.T)).detach().cpu().numpy()
+    Pt_dw  = transform_log_phi_to_physical(dw_log_phi).detach().cpu().numpy()
 
     del real_agg_dw, dw_map, H_dw, J_dw, GIM_dw, grads_dw
     gc.collect(); torch.cuda.empty_cache()
 
     # ── Vecchia-Irr GIM ───────────────────────────────────────────────────────
     print(f"\n[2/2] Vecchia-Irr GIM  ({day_str})...")
-    vecc_map, _ = data_load_instance.load_working_data(
-        df_map, monthly_mean, hour_indices,
-        ord_mm=ord_mm, dtype=DTYPE, keep_ori=True
-    )
-    real_map_vecc = {k: v.to(DEVICE) for k, v in vecc_map.items()}
-
     vc_log_phi = torch.tensor(
         transform_raw_to_log_phi(vecc_by_day[day_str]),
         device=DEVICE, dtype=DTYPE, requires_grad=True
@@ -359,7 +419,7 @@ def cli(
 
     def nll_vc(p): return model_vc.vecchia_batched_likelihood(p)
 
-    H_vc     = finite_diff_hessian(nll_vc, vc_log_phi)
+    H_vc       = finite_diff_hessian(nll_vc, vc_log_phi)
     eigvals_vc = torch.linalg.eigvalsh(H_vc)
     print(f"  H_vc eigenvalues: {eigvals_vc.detach().cpu().numpy().round(4)}")
     print(f"  H_vc condition number: {(eigvals_vc.max()/eigvals_vc.abs().min()).item():.2e}")
@@ -371,11 +431,15 @@ def cli(
     grads_vc = []
     for i in range(num_sims):
         with torch.no_grad():
-            b_irr = generate_irr_bootstrap(vc_log_phi, real_map_vecc, float(monthly_mean))
-        # b_irr is already in maxmin order (cloned from real_map_vecc which is maxmin-ordered).
-        # Do NOT apply [ord_mm] again — that would double-permute the data.
+            # high-res FFT → nearest-point sampling (same pipeline as DW)
+            b_irr, _ = generate_bootstrap_pair(
+                vc_log_phi, real_map_vecc, grid_coords,
+                lats_hr, lons_hr, dlat_hr, dlon_hr,
+                step3_per_t, hr_idx_per_t, src_locs_per_t, valid_rows_per_t,
+                sorted_keys, time_vals)
+        # b_irr cloned from real_map_vecc → already in maxmin order, do NOT re-permute
         model_vc.input_map = b_irr
-        model_vc.refresh_y_from_input_map()   # fast Y-only update, reuses cached index structure
+        model_vc.refresh_y_from_input_map()
         if vc_log_phi.grad is not None: vc_log_phi.grad.zero_()
         model_vc.vecchia_batched_likelihood(vc_log_phi).backward()
         grads_vc.append(vc_log_phi.grad.detach().clone())
@@ -383,15 +447,15 @@ def cli(
         if (i + 1) % 20 == 0:
             print(f"  Vecchia bootstrap {i+1}/{num_sims}")
 
-    J_vc    = torch.stack(grads_vc).T @ torch.stack(grads_vc) / num_sims
+    J_vc          = torch.stack(grads_vc).T @ torch.stack(grads_vc) / num_sims
     grad_norms_vc = [g.norm().item() for g in grads_vc]
     print(f"  VC grad norm  — mean: {np.mean(grad_norms_vc):.4e}  std: {np.std(grad_norms_vc):.4e}")
     print(f"  J_vc diag:  {torch.diag(J_vc).detach().cpu().numpy().round(6)}")
     print(f"  H_vc diag:  {torch.diag(H_vc).detach().cpu().numpy().round(6)}")
-    GIM_vc  = H_inv_vc @ J_vc @ H_inv_vc
-    Jac_vc  = torch.autograd.functional.jacobian(transform_log_phi_to_physical, vc_log_phi)
-    SE_vc   = torch.sqrt(torch.diag(Jac_vc @ GIM_vc @ Jac_vc.T)).detach().cpu().numpy()
-    Pt_vc   = transform_log_phi_to_physical(vc_log_phi).detach().cpu().numpy()
+    GIM_vc = H_inv_vc @ J_vc @ H_inv_vc
+    Jac_vc = torch.autograd.functional.jacobian(transform_log_phi_to_physical, vc_log_phi)
+    SE_vc  = torch.sqrt(torch.diag(Jac_vc @ GIM_vc @ Jac_vc.T)).detach().cpu().numpy()
+    Pt_vc  = transform_log_phi_to_physical(vc_log_phi).detach().cpu().numpy()
 
     # ── Save & print ──────────────────────────────────────────────────────────
     row = {"day": day_str, "num_sims": num_sims}

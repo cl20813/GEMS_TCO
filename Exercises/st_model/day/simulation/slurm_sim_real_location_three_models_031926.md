@@ -7,6 +7,7 @@ scp -r "/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO" jl2815@amarel.rutge
 ```
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_three_model_comparison_031926.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
+
 ```
 
 ### Transfer results (Amarel → mac)
@@ -50,7 +51,7 @@ sbatch sim_three_models_031926.sh
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu045
+#SBATCH --nodelist=gpu034
 
 #### Load Modules
 module purge
@@ -73,7 +74,7 @@ srun python /home/jl2815/tco/exercise_25/st_model/sim_three_model_comparison_031
     --limit-b 8 \
     --limit-c 8 \
     --daily-stride 2 \
-    --num-iters 200 \
+    --num-iters 1000 \
     --years "2022,2024,2025" \
     --month 7 \
     --lat-factor 100 \
@@ -88,3 +89,9 @@ echo "Current date and time: $(date)"
 
 ## 참고로 init noise 0.7dms exp(0.7)  exp(1) = 2.7배
 0.7 정도면 13 -> 6.5에서 26 사이  advec lat 0.022 +- 0.044
+
+
+
+
+
+

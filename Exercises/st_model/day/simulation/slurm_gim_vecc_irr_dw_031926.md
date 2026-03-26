@@ -10,6 +10,28 @@ scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/si
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_heads_regular_vecc_GIM_031926.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 ```
 
+---
+
+### Bootstrap pipeline (updated)
+
+```
+high-res FFT field (lat×lat_factor, lon×lon_factor)
+    │
+    ├─► nearest high-res point per valid obs  (+nugget)
+    │         │
+    │         ├─► irr_map  (src lat/lon preserved, value replaced) → Vecchia-Irr
+    │         │
+    │         └─► step3 re-grid (obs→cell, 1:1, no duplicates)    → DW [lat,lon,val,t]
+    │
+    └─► Both models see the same spatial missingness pattern from real data
+```
+
+Key improvements over previous version:
+- DW: no longer uses perfect grid — goes through same irr → step3 pipeline as real data
+- Vecchia: nearest-point sampling replaces bilinear interpolation (no artificial smoothing)
+- `precompute_mapping_indices` runs once; BallTree queries shared across all bootstrap iters
+- `--lat-factor` / `--lon-factor` control FFT resolution (default 10×4)
+
 ### Transfer results (Amarel → mac)
 ```
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/GIM/*.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/estimates/"
@@ -75,7 +97,9 @@ srun python /home/jl2815/tco/exercise_25/st_model/sim_GIM_vecc_irr_dw_031926.py 
     --limit-b 16 \
     --limit-c 16 \
     --daily-stride 2 \
-    --num-sims 100
+    --num-sims 100 \
+    --lat-factor 10 \
+    --lon-factor 4
 
 echo "Current date and time: $(date)"
 ```

@@ -361,26 +361,15 @@ def cli(
 
     # ── True parameters ────────────────────────────────────────────────────────
     # Scenario A — original real-data fitted parameters
-    true_dict = {
-        'sigmasq':    13.059,
-        'range_lat':  0.154,
-        'range_lon':  0.195,
-        'range_time': 1.0,
-        'advec_lat':  0.0218,
-        'advec_lon':  -0.1689,
-        'nugget':     0.247,
-    }
-
-    # Scenario B — lower variance, wide range (smooth field), high nugget ratio, weak advection
-    # true_dict = {
-    #     'sigmasq':    5.5,
-    #     'range_lat':  0.30,
-    #     'range_lon':  0.38,
-    #     'range_time': 2.5,
-    #     'advec_lat':  -0.045,
-    #     'advec_lon':  -0.055,
-    #     'nugget':     0.82,
-    # }
+    #true_dict = {
+    #    'sigmasq':    13.059,
+    #    'range_lat':  0.154,
+    #    'range_lon':  0.195,
+    #    'range_time': 1.0,
+    #    'advec_lat':  0.0218,
+    #    'advec_lon':  -0.1689,
+    #    'nugget':     0.247,
+    #}
 
     # Scenario B (revised)
     # true_dict = {
@@ -393,16 +382,16 @@ def cli(
     #     'nugget':     0.82,
     # }
 
-    # Scenario C (active) — wider range, higher nugget, weak lat / strong lon advection
-    #true_dict = {
-    #    'sigmasq':    10.0,
-    #    'range_lat':  0.5,
-    #    'range_lon':  0.6,
-    #    'range_time': 2.5,
-    #    'advec_lat':  0.05,
-    #    'advec_lon':  -0.25,
-    #    'nugget':     1.2,
-    #}
+    # Scenario C (active) — wider range, higher nugget, moderate lat / strong lon advection
+    true_dict = {
+        'sigmasq':    10.0,
+        'range_lat':  0.5,
+        'range_lon':  0.6,
+        'range_time': 2.5,
+        'advec_lat':  0.15,
+        'advec_lon':  -0.25,
+        'nugget':     1.2,
+    }
 
     # Scenario D — strong lat advection, moderate lon advection
     # true_dict = {
@@ -673,30 +662,6 @@ def cli(
             print(f"  Skipping to next iteration. (total skipped: {skipped})")
             continue
 
-        # ── Outlier check (non-convergence filter) ────────────────────────────
-        # If ANY model produces extreme estimates, skip entire iteration for all.
-        # Threshold: 50× true value in original space (clearly non-converged).
-        OUTLIER_THRESH = 50.0
-        def _is_outlier(est_d):
-            checks = [
-                abs(est_d['sigmasq'])    > abs(true_dict['sigmasq'])    * OUTLIER_THRESH,
-                abs(est_d['range_lat'])  > abs(true_dict['range_lat'])  * OUTLIER_THRESH,
-                abs(est_d['range_lon'])  > abs(true_dict['range_lon'])  * OUTLIER_THRESH,
-                abs(est_d['range_time']) > abs(true_dict['range_time']) * OUTLIER_THRESH,
-                abs(est_d['advec_lat'])  > abs(true_dict['advec_lat'])  * OUTLIER_THRESH,
-                abs(est_d['advec_lon'])  > abs(true_dict['advec_lon'])  * OUTLIER_THRESH,
-                abs(est_d['nugget'])     > abs(true_dict['nugget'])     * OUTLIER_THRESH,
-            ]
-            return any(checks)
-
-        outlier_models = [m for m, e in [('Vecc_Irr', est_irr), ('Vecc_Reg', est_reg), ('DW', est_dw)]
-                          if _is_outlier(e)]
-        if outlier_models:
-            skipped += 1
-            print(f"  [SKIP] Iteration {it+1} — extreme estimate in {outlier_models} "
-                  f"(threshold: {OUTLIER_THRESH}× true). Skipping all models. (total skipped: {skipped})")
-            continue
-
         # ── Record & save ─────────────────────────────────────────────────────
         for model_name, est_d, rmsre_val, elapsed in [
             ('Vecc_Irr', est_irr, rmsre_irr, t_irr),
@@ -749,6 +714,7 @@ def cli(
         print(f"  {'-'*55}")
         # Per-parameter RMSRE rows
         per_param_by_model = {}
+        per_param_mdare_by_model = {}
         per_param_med_by_model = {}
         for m in MODELS_:
             sub_recs = [r for r in records if r['model'] == m]
@@ -756,24 +722,30 @@ def cli(
                 float(np.sqrt(np.mean([((r[col] - tv) / abs(tv)) ** 2 for r in sub_recs])))
                 for col, tv in zip(p_cols_, true_vals_)
             ]
-            per_param_med_by_model[m] = [
-                float(np.sqrt(np.median([((r[col] - tv) / abs(tv)) ** 2 for r in sub_recs])))
+            per_param_mdare_by_model[m] = [
+                float(np.median([abs((r[col] - tv) / abs(tv)) for r in sub_recs]))
                 for col, tv in zip(p_cols_, true_vals_)
             ]
-        for lbl, idx in zip(p_labels_, range(len(p_labels_))):
-            rmsre_p = f"  {'RMSRE_'+lbl:<11} {'':>{cw}}"
+            per_param_med_by_model[m] = [
+                float(np.sqrt(np.percentile([((r[col] - tv) / abs(tv)) ** 2 for r in sub_recs], 90))
+                      - np.sqrt(np.percentile([((r[col] - tv) / abs(tv)) ** 2 for r in sub_recs], 10)))
+                for col, tv in zip(p_cols_, true_vals_)
+            ]
+        for metric_lbl, model_dict in [
+            ('RMSRE',   per_param_by_model),
+            ('MdARE',   per_param_mdare_by_model),
+            ('P90-P10', per_param_med_by_model),
+        ]:
+            print(f"\n  [{metric_lbl} per param]")
+            for lbl, idx in zip(p_labels_, range(len(p_labels_))):
+                row = f"  {lbl:<11} {'':>{cw}}"
+                for m in MODELS_:
+                    row += f"  {model_dict[m][idx]:>{cw}.4f}"
+                print(row)
+            overall_row = f"  {'Overall':<11} {'':>{cw}}"
             for m in MODELS_:
-                rmsre_p += f"  {per_param_by_model[m][idx]:>{cw}.4f}"
-            print(rmsre_p)
-        print(f"  {'-'*55}")
-        rmsre_row = f"  {'RMSRE':<11} {'':>{cw}}"
-        for m in MODELS_:
-            rmsre_row += f"  {np.mean(per_param_by_model[m]):>{cw}.4f}"
-        print(rmsre_row)
-        med_rmsre_row = f"  {'MedRMSRE':<11} {'':>{cw}}"
-        for m in MODELS_:
-            med_rmsre_row += f"  {np.mean(per_param_med_by_model[m]):>{cw}.4f}"
-        print(med_rmsre_row)
+                overall_row += f"  {np.mean(model_dict[m]):>{cw}.4f}"
+            print(overall_row)
 
     # ── Final summary ─────────────────────────────────────────────────────────
     df_final   = pd.DataFrame(records)
@@ -790,8 +762,12 @@ def cli(
     def param_rmsre(sub, col, tv):
         return float(np.sqrt(np.mean(((sub[col].values - tv) / abs(tv)) ** 2)))
 
+    def param_mdare(sub, col, tv):
+        return float(np.median(np.abs((sub[col].values - tv) / abs(tv))))
+
     def param_med_rmsre(sub, col, tv):
-        return float(np.sqrt(np.median(((sub[col].values - tv) / abs(tv)) ** 2)))
+        sq_rel_err = ((sub[col].values - tv) / abs(tv)) ** 2
+        return float(np.sqrt(np.percentile(sq_rel_err, 90)) - np.sqrt(np.percentile(sq_rel_err, 10)))
 
     # ── Per-parameter RMSRE table (printed) ───────────────────────────────────
     print(f"\n{'='*75}")
@@ -816,7 +792,13 @@ def cli(
         per_param_rmsres = [param_rmsre(sub, col, tv) for col, tv in zip(param_cols, true_vals)]
         overall_str += f"  {np.mean(per_param_rmsres):>{col_w}.4f}"
     print(overall_str)
-    overall_med_str = f"  {'Overall Med':<14} {'':>10}"
+    overall_mdare_str = f"  {'Overall MdARE':<14} {'':>10}"
+    for m in MODELS:
+        sub = df_final[df_final['model'] == m]
+        per_param_mdare = [param_mdare(sub, col, tv) for col, tv in zip(param_cols, true_vals)]
+        overall_mdare_str += f"  {np.mean(per_param_mdare):>{col_w}.4f}"
+    print(overall_mdare_str)
+    overall_med_str = f"  {'Overall P90-P10':<14} {'':>10}"
     for m in MODELS:
         sub = df_final[df_final['model'] == m]
         per_param_med = [param_med_rmsre(sub, col, tv) for col, tv in zip(param_cols, true_vals)]
