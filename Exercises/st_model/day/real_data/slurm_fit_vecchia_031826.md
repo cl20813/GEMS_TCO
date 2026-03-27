@@ -7,6 +7,8 @@ scp -r "/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO" jl2815@amarel.rutge
 ```
 scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2022/tco_grid_22_07.pkl" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_2022
 
+scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2023/tco_grid_23_07.pkl" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_2023
+
 scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/tco_grid_24_07.pkl" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_2024
 
 scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2025/tco_grid_25_07.pkl" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_2025
@@ -62,7 +64,7 @@ sbatch fit_vecc_gpu_031826.sh
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu035
+#SBATCH --nodelist=gpu044
 
 #### Load Modules
 module purge
@@ -82,7 +84,7 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_031826.py
     --space "1,1" \
     --days "0,28" \
     --month 7 \
-    --years "2022,2024,2025" \
+    --years "2022,2023,2024,2025" \
     --mm-cond-number 100 \
     --nheads 0 \
     --limit-a 24 \

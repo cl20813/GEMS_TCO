@@ -11,6 +11,8 @@ scp -r "C:\Users\joonw\TCO\GEMS_TCO-1\GEMS_TCO" jl2815@amarel.rutgers.edu:/home/
 ```
 scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2022/tco_grid_22_07.pkl" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_2022
 
+scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2023/tco_grid_23_07.pkl" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_2023
+
 scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/tco_grid_24_07.pkl" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_2024
 
 scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2025/tco_grid_25_07.pkl" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_2025
@@ -78,7 +80,7 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_D_whittle_day_v05_dynamic_
     --space "1,1" \
     --days "0,28" \
     --month 7 \
-    --years "2022,2024,2025" \
+    --years "2022,2023,2024,2025" \
     --no-keep-exact-loc
 
 echo "Current date and time: $(date)"

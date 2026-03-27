@@ -435,32 +435,33 @@ def cli(
                 row += f"  {np.mean(vals):>{cw}.4f}"
             print(row)
         print(f"  {'-'*65}")
-        per_param_by_cond = {}
-        per_param_med_by_cond = {}
+        per_param_rmsre_by_cond  = {}
+        per_param_mdare_by_cond  = {}
+        per_param_p90p10_by_cond = {}
         for nc in COND_LIST:
             sub_recs = [r for r in records if r['n_cond'] == nc]
-            per_param_by_cond[nc] = [
-                float(np.sqrt(np.mean([((r[col] - tv) / abs(tv)) ** 2 for r in sub_recs])))
-                for col, tv in zip(p_cols, true_vals)
-            ]
-            per_param_med_by_cond[nc] = [
-                float(np.sqrt(np.median([((r[col] - tv) / abs(tv)) ** 2 for r in sub_recs])))
-                for col, tv in zip(p_cols, true_vals)
-            ]
-        for lbl, idx in zip(p_labels, range(len(p_labels))):
-            rmsre_p = f"  {'RMSRE_'+lbl:<11} {'':>{cw}}"
+            ares = [[abs((r[col] - tv) / tv) for r in sub_recs]
+                    for col, tv in zip(p_cols, true_vals)]
+            per_param_rmsre_by_cond[nc]  = [float(np.sqrt(np.mean(np.array(a)**2))) for a in ares]
+            per_param_mdare_by_cond[nc]  = [float(np.median(a))                     for a in ares]
+            per_param_p90p10_by_cond[nc] = [float(np.percentile(a, 90) - np.percentile(a, 10))
+                                             for a in ares]
+        for metric_lbl, metric_dict in [
+            ('RMSRE',   per_param_rmsre_by_cond),
+            ('MdARE',   per_param_mdare_by_cond),
+            ('P90-P10', per_param_p90p10_by_cond),
+        ]:
+            print(f"\n  [{metric_lbl} per param]")
+            for lbl, idx in zip(p_labels, range(len(p_labels))):
+                row = f"  {lbl:<11} {'':>{cw}}"
+                for nc in COND_LIST:
+                    row += f"  {metric_dict[nc][idx]:>{cw}.4f}"
+                print(row)
+            overall = f"  {'Overall':<11} {'':>{cw}}"
             for nc in COND_LIST:
-                rmsre_p += f"  {per_param_by_cond[nc][idx]:>{cw}.4f}"
-            print(rmsre_p)
-        print(f"  {'-'*65}")
-        rmsre_row = f"  {'RMSRE':<11} {'':>{cw}}"
-        for nc in COND_LIST:
-            rmsre_row += f"  {np.mean(per_param_by_cond[nc]):>{cw}.4f}"
-        print(rmsre_row)
-        med_rmsre_row = f"  {'MedRMSRE':<11} {'':>{cw}}"
-        for nc in COND_LIST:
-            med_rmsre_row += f"  {np.mean(per_param_med_by_cond[nc]):>{cw}.4f}"
-        print(med_rmsre_row)
+                overall += f"  {np.mean(metric_dict[nc]):>{cw}.4f}"
+            print(overall)
+        print()
         time_row = f"  {'time(s)':<11} {'':>{cw}}"
         for nc in COND_LIST:
             time_row += f"  {np.mean([r['time_s'] for r in records if r['n_cond'] == nc]):>{cw}.1f}"
@@ -473,38 +474,41 @@ def cli(
     def param_rmsre(sub, col, tv):
         return float(np.sqrt(np.mean(((sub[col].values - tv) / abs(tv)) ** 2)))
 
-    def param_med_rmsre(sub, col, tv):
-        return float(np.sqrt(np.median(((sub[col].values - tv) / abs(tv)) ** 2)))
+    def param_mdare(sub, col, tv):
+        return float(np.median(np.abs((sub[col].values - tv) / abs(tv))))
+
+    def param_p90p10(sub, col, tv):
+        are = np.abs((sub[col].values - tv) / abs(tv))
+        return float(np.percentile(are, 90) - np.percentile(are, 10))
 
     print(f"\n{'='*75}")
-    print(f"  FINAL SUMMARY — Per-parameter RMSRE  ({n_valid} valid iterations)")
+    print(f"  FINAL SUMMARY  ({n_valid} valid iterations)")
     print(f"  nheads={NHEADS_FIXED} fixed; varying n_cond (limit_A=limit_B=limit_C=n_cond)")
     print(f"{'='*75}")
     cw2 = 10
-    print(f"  {'Parameter':<14} {'True':>8}" + "".join(f"  {'nc='+str(c):>{cw2}}" for c in COND_LIST))
-    print(f"  {'-'*73}")
-    for lbl, col, tv in zip(p_labels, p_cols, true_vals):
-        row = f"  {lbl:<14} {tv:>8.4f}"
+    col_hdr = "".join(f"  {'nc='+str(c):>{cw2}}" for c in COND_LIST)
+
+    for metric_lbl, metric_fn in [('RMSRE', param_rmsre), ('MdARE', param_mdare), ('P90-P10', param_p90p10)]:
+        print(f"\n  [{metric_lbl} per param]")
+        print(f"  {'Parameter':<14} {'True':>8}{col_hdr}")
+        print(f"  {'-'*73}")
+        per_nc = {}
         for nc in COND_LIST:
             sub = df_final[df_final['n_cond'] == nc]
-            row += f"  {param_rmsre(sub, col, tv):>{cw2}.4f}"
-        print(row)
-    print(f"  {'-'*73}")
-    overall_row = f"  {'Overall RMSRE':<14} {'':>8}"
-    for nc in COND_LIST:
-        sub = df_final[df_final['n_cond'] == nc]
-        per_param_rmsres = [param_rmsre(sub, col, tv) for col, tv in zip(p_cols, true_vals)]
-        overall_row += f"  {np.mean(per_param_rmsres):>{cw2}.4f}"
-    print(overall_row)
-    overall_med_row = f"  {'Overall Med':<14} {'':>8}"
-    for nc in COND_LIST:
-        sub = df_final[df_final['n_cond'] == nc]
-        per_param_med = [param_med_rmsre(sub, col, tv) for col, tv in zip(p_cols, true_vals)]
-        overall_med_row += f"  {np.mean(per_param_med):>{cw2}.4f}"
-    print(overall_med_row)
+            per_nc[nc] = [metric_fn(sub, col, tv) for col, tv in zip(p_cols, true_vals)]
+        for lbl, idx in zip(p_labels, range(len(p_labels))):
+            row = f"  {lbl:<14} {true_vals[idx]:>8.4f}"
+            for nc in COND_LIST:
+                row += f"  {per_nc[nc][idx]:>{cw2}.4f}"
+            print(row)
+        print(f"  {'-'*73}")
+        overall_row = f"  {'Overall':<14} {'':>8}"
+        for nc in COND_LIST:
+            overall_row += f"  {np.mean(per_nc[nc]):>{cw2}.4f}"
+        print(overall_row)
 
     print(f"\n  Mean estimate (SD) — {n_valid} iterations")
-    print(f"  {'Parameter':<14} {'True':>8}" + "".join(f"  {'nc='+str(c):>{cw2}}" for c in COND_LIST))
+    print(f"  {'Parameter':<14} {'True':>8}{col_hdr}")
     print(f"  {'-'*73}")
     for lbl, col, tv in zip(p_labels, p_cols, true_vals):
         row = f"  {lbl:<14} {tv:>8.4f}"
@@ -526,28 +530,33 @@ def cli(
         row = {'parameter': lbl, 'true': tv}
         for nc in COND_LIST:
             sub = df_final[df_final['n_cond'] == nc]
-            row[f'nc{nc}_rmsre']     = round(param_rmsre(sub, col, tv),     6)
-            row[f'nc{nc}_med_rmsre'] = round(param_med_rmsre(sub, col, tv), 6)
-            row[f'nc{nc}_mean']      = round(sub[col].mean(), 6)
-            row[f'nc{nc}_sd']        = round(sub[col].std(),  6)
+            row[f'nc{nc}_rmsre']   = round(param_rmsre(sub, col, tv),   6)
+            row[f'nc{nc}_mare']    = round(param_mdare(sub, col, tv),    6)
+            row[f'nc{nc}_p90p10']  = round(param_p90p10(sub, col, tv),  6)
+            row[f'nc{nc}_mean']    = round(sub[col].mean(), 6)
+            row[f'nc{nc}_sd']      = round(sub[col].std(),  6)
         summary_rows.append(row)
-    overall = {'parameter': 'Overall_RMSRE', 'true': float('nan')}
+    overall = {'parameter': 'Overall', 'true': float('nan')}
     for nc in COND_LIST:
         sub = df_final[df_final['n_cond'] == nc]
-        per_param_rmsres = [param_rmsre(sub, col, tv)     for col, tv in zip(p_cols, true_vals)]
-        per_param_med    = [param_med_rmsre(sub, col, tv) for col, tv in zip(p_cols, true_vals)]
-        overall[f'nc{nc}_rmsre']     = round(np.mean(per_param_rmsres), 6)
-        overall[f'nc{nc}_med_rmsre'] = round(np.mean(per_param_med),    6)
-        overall[f'nc{nc}_mean']      = float('nan')
-        overall[f'nc{nc}_sd']        = float('nan')
+        per_rmsre  = [param_rmsre(sub, col, tv)  for col, tv in zip(p_cols, true_vals)]
+        per_mare   = [param_mdare(sub, col, tv)   for col, tv in zip(p_cols, true_vals)]
+        per_p90p10 = [param_p90p10(sub, col, tv) for col, tv in zip(p_cols, true_vals)]
+        overall[f'nc{nc}_rmsre']  = round(np.mean(per_rmsre),  6)
+        overall[f'nc{nc}_mare']   = round(np.mean(per_mare),   6)
+        overall[f'nc{nc}_p90p10'] = round(np.mean(per_p90p10), 6)
+        overall[f'nc{nc}_mean']   = float('nan')
+        overall[f'nc{nc}_sd']     = float('nan')
     summary_rows.append(overall)
 
     timing = {'parameter': 'mean_time_s', 'true': float('nan')}
     for nc in COND_LIST:
         sub = df_final[df_final['n_cond'] == nc]
-        timing[f'nc{nc}_rmsre'] = float('nan')
-        timing[f'nc{nc}_mean']  = round(sub['time_s'].mean(), 2)
-        timing[f'nc{nc}_sd']    = round(sub['time_s'].std(),  2)
+        timing[f'nc{nc}_rmsre']  = float('nan')
+        timing[f'nc{nc}_mare']   = float('nan')
+        timing[f'nc{nc}_p90p10'] = float('nan')
+        timing[f'nc{nc}_mean']   = round(sub['time_s'].mean(), 2)
+        timing[f'nc{nc}_sd']     = round(sub['time_s'].std(),  2)
     summary_rows.append(timing)
 
     pd.DataFrame(summary_rows).to_csv(output_path / csv_summary, index=False)

@@ -10,42 +10,31 @@ cd /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer
 | 항목 | 경로 |
 |------|------|
 | GEMS raw data | `/Users/joonwonlee/Documents/GEMS_DATA/` |
-| Fitted estimates (DW) | `outputs/day/july_22_24_25/real_dw_july_22_24_25.csv` |
-| Fitted estimates (Vecc) | `outputs/day/july_22_24_25/real_vecc_july_22_24_25_h1000_mm16.csv` |
-| GIM output | `outputs/day/GIM/GIM_{day}_nsims{n}_local.csv` |
+| Fitted estimates (DW) | `outputs/day/july_22_23_24_25/real_dw_july_22_23_24_25.csv` |
+| Fitted estimates (Vecc) | `outputs/day/july_22_23_24_25/real_vecc_july_22_23_24_25_h1000_mm16.csv` |
+| GIM output | `outputs/day/GIM/GIM_{day}_obsJ_local.csv` |
 
 ---
 
-## Bootstrap pipeline (updated)
+## Observed J (no bootstrap)
 
-```
-high-res FFT field  (lat × lat_factor,  lon × lon_factor)
-        │
-        │  nearest high-res grid point per valid obs  (+nugget)
-        │
-        ├──► irr_map  (src lat/lon 유지, value만 교체)   →  Vecchia-Irr loss
-        │
-        └──► step3 re-grid  (obs→cell, 1:1, nearest wins)  →  DW loss  [lat, lon, val, t]
-```
+J is computed from the real data directly (Varin, Reid & Firth 2011):
+- **DW**: per-frequency Jacobian — `jac.T @ jac / n_freq²`  (n1×n2 − 1 terms, DC excluded)
+- **Vecchia**: per-unit Jacobian — `jac.T @ jac / N_units²`  (N_heads + N_tails terms, beta fixed at MLE)
 
-- **공정성**: DW도 동일한 irr→step3 파이프라인을 통과 (실제 데이터와 동일한 missingness)
-- **Vecchia**: bilinear interpolation 대신 nearest-point 샘플링 → smoothing 편향 제거
-- `precompute_mapping_indices` 1회 실행, 양 모델 bootstrap에 공유
+No `--num-sims`, `--lat-factor`, `--lon-factor` args needed.
 
 ---
 
-## Quick test (day 1, 20 sims, low-res)
+## Quick test (day 1)
 ```bash
 python sim_GIM_vecc_irr_dw_local_031926.py \
     --sample-year 2024 \
     --sample-day 1 \
-    --month 7 \
-    --num-sims 20 \
-    --lat-factor 4 \
-    --lon-factor 2
+    --month 7
 ```
 
-## Full run (100 sims, higher-res — takes longer on CPU)
+## Full run
 ```bash
 python sim_GIM_vecc_irr_dw_local_031926.py \
     --sample-year 2025 \
@@ -57,10 +46,7 @@ python sim_GIM_vecc_irr_dw_local_031926.py \
     --limit-a 6 \
     --limit-b 6 \
     --limit-c 6 \
-    --daily-stride 2 \
-    --num-sims 100 \
-    --lat-factor 10 \
-    --lon-factor 4
+    --daily-stride 2
 ```
 
 ---

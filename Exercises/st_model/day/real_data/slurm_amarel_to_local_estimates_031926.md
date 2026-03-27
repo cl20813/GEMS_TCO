@@ -8,11 +8,11 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vec
 
 # real data fitted, dw and vecc estimates
 
-# 2022,2024,2025 together
+# 2022,2023,2024,2025 together
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/july_22_24_25/real_dw_july_22_24_25.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/july_22_24_25/" 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/july_22_23_24_25/real_dw_july_22_23_24_25.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/july_22_23_24_25/" 
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/july_22_24_25/real_vecc_july_22_24_25_h1000_mm16.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/july_22_24_25/" 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/july_22_23_24_25/real_vecc_july_22_23_24_25_h1000_mm16.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/july_22_23_24_25/" 
 
 
 

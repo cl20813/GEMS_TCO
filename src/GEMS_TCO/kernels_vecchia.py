@@ -363,6 +363,104 @@ class VecchiaBatched(SpatioTemporalModel):
 
         return 0.5 * (log_det + quad.squeeze()) / total_N
 
+    def get_gls_beta(self, params):
+        """Run the GLS forward pass and return the beta estimate.
+
+        Performs the same Cholesky accumulation as vecchia_batched_likelihood but
+        returns beta = (X' Σ⁻¹ X)⁻¹ X' Σ⁻¹ y instead of the scalar likelihood.
+        Used to fix beta before computing per-unit observed-J contributions.
+        """
+        if not self.is_precomputed:
+            raise RuntimeError("Run precompute_conditioning_sets() first!")
+
+        XT_Sinv_X = torch.zeros((self.n_features, self.n_features), device=self.device, dtype=torch.float64)
+        XT_Sinv_y = torch.zeros((self.n_features, 1),               device=self.device, dtype=torch.float64)
+
+        if self.Heads_data.shape[0] > 0:
+            ones = torch.ones((self.Heads_data.shape[0], 1), device=self.device, dtype=torch.float64)
+            lat  = (self.Heads_data[:, 0] - self.lat_mean_val).unsqueeze(-1)
+            dums = self.Heads_data[:, 4:11]
+            X_h  = torch.cat([ones, lat, dums], dim=1)
+            y_h  = self.Heads_data[:, 2].unsqueeze(-1)
+            cov  = self.matern_cov_aniso_STABLE_log_reparam(params, self.Heads_data, self.Heads_data)
+            L    = torch.linalg.cholesky(cov)
+            Z_X  = torch.linalg.solve_triangular(L, X_h, upper=False)
+            Z_y  = torch.linalg.solve_triangular(L, y_h, upper=False)
+            XT_Sinv_X += Z_X.T @ Z_X
+            XT_Sinv_y += Z_X.T @ Z_y
+
+        chunk_size = 4096
+        for X_b, Y_b, Locs_b in [(self.X_A,   self.Y_A,   self.Locs_A),
+                                   (self.X_AB,  self.Y_AB,  self.Locs_AB),
+                                   (self.X_ABC, self.Y_ABC, self.Locs_ABC)]:
+            if X_b is None or X_b.shape[0] == 0:
+                continue
+            for start in range(0, X_b.shape[0], chunk_size):
+                end = min(start + chunk_size, X_b.shape[0])
+                cov_chunk = self.matern_cov_batched(params, X_b[start:end])
+                L_chunk   = torch.linalg.cholesky(cov_chunk)
+                Z_locs    = torch.linalg.solve_triangular(L_chunk, Locs_b[start:end], upper=False)
+                Z_y       = torch.linalg.solve_triangular(L_chunk, Y_b[start:end],    upper=False)
+                XT_Sinv_X += Z_locs[:, -1, :].T @ Z_locs[:, -1, :]
+                XT_Sinv_y += Z_locs[:, -1, :].T @ Z_y[:, -1, :]
+
+        jitter = torch.eye(self.n_features, device=self.device, dtype=torch.float64) * 1e-6
+        return torch.linalg.solve(XT_Sinv_X + jitter, XT_Sinv_y)  # (n_features, 1)
+
+    def vecchia_per_unit_nll_terms(self, params, beta):
+        """Return per-unit NLL contributions with beta fixed.
+
+        Each term: LL_i = log(σ_i) + 0.5 * r_i²
+        where σ_i is the conditional standard deviation and r_i is the
+        conditional normalized residual (both in the whitened Cholesky space).
+
+        Summing over all units: Σ LL_i = 0.5 * (log_det + quad)
+        so  nll = (1/N) Σ LL_i  matches vecchia_batched_likelihood.
+
+        Returns: 1-D tensor of shape (total_N,). Differentiable w.r.t. params.
+        """
+        if not self.is_precomputed:
+            raise RuntimeError("Run precompute_conditioning_sets() first!")
+
+        terms = []
+
+        # --- Heads (exact GP block) ---
+        if self.Heads_data.shape[0] > 0:
+            ones = torch.ones((self.Heads_data.shape[0], 1), device=self.device, dtype=torch.float64)
+            lat  = (self.Heads_data[:, 0] - self.lat_mean_val).unsqueeze(-1)
+            dums = self.Heads_data[:, 4:11]
+            X_h  = torch.cat([ones, lat, dums], dim=1)
+            y_h  = self.Heads_data[:, 2].unsqueeze(-1)
+            cov  = self.matern_cov_aniso_STABLE_log_reparam(params, self.Heads_data, self.Heads_data)
+            L    = torch.linalg.cholesky(cov)
+            Z_X  = torch.linalg.solve_triangular(L, X_h, upper=False)
+            Z_y  = torch.linalg.solve_triangular(L, y_h, upper=False)
+            # residual in whitened space: L⁻¹(y - Xβ), one entry per head unit
+            resid = (Z_y - Z_X @ beta)[:, 0]          # (N_heads,)
+            log_L = torch.log(torch.diag(L))           # (N_heads,)
+            terms.append(log_L + 0.5 * resid ** 2)
+
+        # --- Tails (A / AB / ABC groups) ---
+        chunk_size = 4096
+        for X_b, Y_b, Locs_b in [(self.X_A,   self.Y_A,   self.Locs_A),
+                                   (self.X_AB,  self.Y_AB,  self.Locs_AB),
+                                   (self.X_ABC, self.Y_ABC, self.Locs_ABC)]:
+            if X_b is None or X_b.shape[0] == 0:
+                continue
+            for start in range(0, X_b.shape[0], chunk_size):
+                end       = min(start + chunk_size, X_b.shape[0])
+                cov_chunk = self.matern_cov_batched(params, X_b[start:end])
+                L_chunk   = torch.linalg.cholesky(cov_chunk)
+                Z_locs    = torch.linalg.solve_triangular(L_chunk, Locs_b[start:end], upper=False)
+                Z_y_chunk = torch.linalg.solve_triangular(L_chunk, Y_b[start:end],    upper=False)
+                u_X       = Z_locs[:, -1, :]            # (B, n_feat)
+                u_y       = Z_y_chunk[:, -1, 0]         # (B,)
+                log_sigma = torch.log(L_chunk[:, -1, -1])  # (B,)
+                resid     = u_y - (u_X @ beta)[:, 0]    # (B,)
+                terms.append(log_sigma + 0.5 * resid ** 2)
+
+        return torch.cat(terms)  # (total_N,)
+
 
 # --- Fitting Class ---
 class fit_vecchia_lbfgs(VecchiaBatched):

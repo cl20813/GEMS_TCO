@@ -7,34 +7,25 @@ scp -r "/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO" jl2815@amarel.rutge
 ```
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_GIM_vecc_irr_dw_031926.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 
+
+
+
 scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_heads_regular_vecc_GIM_031926.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 ```
 
 ---
 
-### Bootstrap pipeline (updated)
+### Observed J (no bootstrap)
 
-```
-high-res FFT field (lat×lat_factor, lon×lon_factor)
-    │
-    ├─► nearest high-res point per valid obs  (+nugget)
-    │         │
-    │         ├─► irr_map  (src lat/lon preserved, value replaced) → Vecchia-Irr
-    │         │
-    │         └─► step3 re-grid (obs→cell, 1:1, no duplicates)    → DW [lat,lon,val,t]
-    │
-    └─► Both models see the same spatial missingness pattern from real data
-```
+J is computed from the observed data directly (Varin, Reid & Firth 2011):
+- DW:     per-frequency score outer products — `jac.T @ jac / n_freq²`
+- Vecchia: per-unit score outer products     — `jac.T @ jac / N_units²`
 
-Key improvements over previous version:
-- DW: no longer uses perfect grid — goes through same irr → step3 pipeline as real data
-- Vecchia: nearest-point sampling replaces bilinear interpolation (no artificial smoothing)
-- `precompute_mapping_indices` runs once; BallTree queries shared across all bootstrap iters
-- `--lat-factor` / `--lon-factor` control FFT resolution (default 10×4)
+This replaces parametric bootstrap. No `--num-sims`, `--lat-factor`, `--lon-factor` args.
 
-### Transfer results (Amarel → mac)
+### Transfer results (Amarel → mac)  [see also updated section below]
 ```
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/GIM/*.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/estimates/"
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/GIM/*.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/july_22_23_24_25/"
 ```
 
 ---
@@ -51,8 +42,13 @@ conda activate faiss_env
 
 ---
 
-### Real data GIM (sbatch)
-Fitted parameters from JSON → H from real data + J from FFT bootstrap → GIM SE per day
+### Real data GIM — all days 2022–2025 (sbatch)
+Loops over all July days (1–28) for years 2022, 2023, 2024, 2025.
+Outputs:
+  - `GIM_all_july_22_23_24_25_obsJ.csv`  — one row per day
+  - `GIM_summary_july_22_23_24_25_obsJ.csv` — RMSRE/MdARE/P90-P10 + mean GIM SE per param
+
+~112 day-jobs × ~15 min/day ≈ 28 h; set time=72h for safety.
 
 ```
 cd ./jobscript/tco/gp_exercise
@@ -71,7 +67,7 @@ sbatch sim_GIM_real_031926.sh
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu035
+#SBATCH --nodelist=gpu037
 
 #### Load Modules
 module purge
@@ -87,8 +83,8 @@ echo "Running on: $(hostname)"
 nvidia-smi
 
 srun python /home/jl2815/tco/exercise_25/st_model/sim_GIM_vecc_irr_dw_031926.py \
-    --sample-year 2024 \
-    --sample-day 1 \
+    --years "2022,2023, 2024,2025" \
+    --days "1,28" \
     --month 7 \
     --v 0.5 \
     --mm-cond-number 100 \
@@ -96,12 +92,18 @@ srun python /home/jl2815/tco/exercise_25/st_model/sim_GIM_vecc_irr_dw_031926.py 
     --limit-a 16 \
     --limit-b 16 \
     --limit-c 16 \
-    --daily-stride 2 \
-    --num-sims 100 \
-    --lat-factor 10 \
-    --lon-factor 4
+    --daily-stride 2
 
 echo "Current date and time: $(date)"
+
+
+```
+
+### Transfer results (Amarel → mac)
+```
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/GIM/GIM_all_july_22_23_24_25_obsJ.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/july_22_23_24_25/"
+
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/GIM/GIM_summary_july_22_23_24_25_obsJ.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/july_22_23_24_25/"
 ```
 
 ---
