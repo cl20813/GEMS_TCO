@@ -7,15 +7,14 @@ Fits the Generalized Cauchy Vecchia model to all GEMS TCO days
 Identical pipeline to fit_gpu_vecc_day_v05_031826.py except:
   - Kernel: C(d) = σ²/(1 + d·φ₂)^β  (Generalized Cauchy)
   - β controlled by --gc-beta (default 1.0)
-  - Saves final Vecchia NLL alongside estimates for direct
-    likelihood comparison with the Matérn fit
+  - Saves final Vecchia NLL (as 'loss') for direct comparison with Matérn fit
 
-Output CSV columns:
-  day, sigma, range_lat, range_lon, range_time,
-  advec_lat, advec_lon, nugget, gc_beta,
-  vecchia_nll, elapsed, cov_name
+Output columns (JSON + CSV), matching fit_gpu_vecc_day_v05 format + gc_beta:
+  day, cov_name, space_size, lr, sigma, range_lat, range_lon, range_time,
+  advec_lat, advec_lon, nugget, gc_beta, loss, time, rmsre
 """
 import sys
+import json
 import time
 import traceback
 import numpy as np
@@ -30,7 +29,7 @@ sys.path.append("/cache/home/jl2815/tco")
 
 from GEMS_TCO import kernels_vecchia_cauchy
 from GEMS_TCO import orderings as _orderings
-from GEMS_TCO import configuration as config
+from GEMS_TCO import BaseLogger, configuration as config
 from GEMS_TCO.data_loader import load_data_dynamic_processed
 
 app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
@@ -74,19 +73,20 @@ def cli(
     output_path.mkdir(parents=True, exist_ok=True)
 
     beta_tag    = f"b{int(gc_beta * 10):02d}"   # 0.5→b05, 1.0→b10, 2.0→b20
-    date_tag    = datetime.now().strftime("%m%d%y")
-    csv_file    = output_path / f"real_cauchy_{beta_tag}_july_22_23_24_25_h{nheads}_mm{mm_cond_number}.csv"
+    stem        = f"real_cauchy_{beta_tag}_july_22_23_24_25_h{nheads}_mm{mm_cond_number}"
+    csv_file    = output_path / f"{stem}.csv"
+    json_file   = output_path / f"{stem}.json"
     cov_name    = f"Cauchy_b{beta_tag}_mm{mm_cond_number}_A{limit_a}B{limit_b}C{limit_c}"
 
     data_loader = load_data_dynamic_processed(config.amarel_data_load_path)
-    records     = []
 
-    # Load existing CSV to resume if interrupted
+    # Load existing records to resume if interrupted
     if csv_file.exists():
         records = pd.read_csv(csv_file).to_dict('records')
         done_days = {r['day'] for r in records}
         print(f"Resuming — {len(done_days)} days already done.")
     else:
+        records   = []
         done_days = set()
 
     for year in years_list:
@@ -171,37 +171,44 @@ def cli(
                                               max_steps=LBFGS_MAX_STEPS, grad_tol=1e-7)
                 elapsed = time.time() - t0
 
-                # out = [log_phi1, ..., log_phi7_params (7), final_nll]
+                # out = [log_phi1, ..., log_phi7 (7 params), final_nll]
                 raw_params  = out[:-1]   # 7 log-space params
-                vecchia_nll = out[-1]    # minimized negative log-likelihood
+                nll_val     = out[-1]    # minimized negative log-likelihood
                 est = model._convert_params(raw_params)
+                space_size = len(next(iter(day_map.values())))
 
                 record = {
-                    'day':          day_str,
-                    'sigma':        round(est['sigma_sq'],   6),
-                    'range_lat':    round(est['range_lat'],  6),
-                    'range_lon':    round(est['range_lon'],  6),
-                    'range_time':   round(est['range_time'], 6),
-                    'advec_lat':    round(est['advec_lat'],  6),
-                    'advec_lon':    round(est['advec_lon'],  6),
-                    'nugget':       round(est['nugget'],     6),
-                    'gc_beta':      gc_beta,
-                    'vecchia_nll':  round(float(vecchia_nll), 6),
-                    'elapsed':      round(elapsed, 2),
-                    'cov_name':     cov_name,
+                    'day':        day_str,
+                    'cov_name':   cov_name,
+                    'space_size': space_size,
+                    'lr':         round(LBFGS_LR, 4),
+                    'sigma':      round(est['sigma_sq'],   4),
+                    'range_lat':  round(est['range_lat'],  4),
+                    'range_lon':  round(est['range_lon'],  4),
+                    'range_time': round(est['range_time'], 4),
+                    'advec_lat':  round(est['advec_lat'],  4),
+                    'advec_lon':  round(est['advec_lon'],  4),
+                    'nugget':     round(est['nugget'],     4),
+                    'gc_beta':    gc_beta,
+                    'loss':       round(float(nll_val),    4),
+                    'time':       round(elapsed,            4),
+                    'rmsre':      0.0,
                 }
                 records.append(record)
                 done_days.add(day_str)
 
+                # Save JSON + CSV (same pattern as fit_gpu_vecc_day_v05)
+                with json_file.open('w', encoding='utf-8') as f:
+                    json.dump(records, f, separators=(",", ":"), indent=4)
                 pd.DataFrame(records).to_csv(csv_file, index=False)
-                print(f"  Saved {day_str}  NLL={vecchia_nll:.4f}  ({elapsed:.1f}s)")
+                print(f"  Saved {day_str}  NLL={nll_val:.4f}  ({elapsed:.1f}s)")
 
             except Exception as e:
                 print(f"  [FAIL] {day_str}: {type(e).__name__}: {e}")
                 traceback.print_exc()
                 continue
 
-    print(f"\nDone. {len(records)} days saved to {csv_file.name}")
+    print(f"\nDone. {len(records)} days saved to {stem}.[json/csv]")
 
 
 if __name__ == "__main__":

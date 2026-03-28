@@ -87,6 +87,7 @@ echo "Current date and time: $(date)"
 
 ---
 
+
 ### β=1.0  (sbatch)
 
 ```
@@ -95,6 +96,7 @@ sbatch fit_cauchy_b10_032726.sh
 ```
 
 ```bash
+
 #!/bin/bash
 #SBATCH --job-name=cauchy_b10_032726
 #SBATCH --output=/home/jl2815/tco/exercise_output/cauchy_b10_032726_%j.out
@@ -105,7 +107,7 @@ sbatch fit_cauchy_b10_032726.sh
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu037
+#SBATCH --nodelist=gpu031
 
 module purge
 module use /projects/community/modulefiles
@@ -124,14 +126,15 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_cauchy_vecc_day_032726
     --month 7 \
     --years "2022,2023,2024,2025" \
     --mm-cond-number 100 \
-    --nheads 300 \
-    --limit-a 8 \
-    --limit-b 8 \
-    --limit-c 8 \
+    --nheads 1000 \
+    --limit-a 16 \
+    --limit-b 16 \
+    --limit-c 16 \
     --daily-stride 2 \
     --keep-exact-loc
 
 echo "Current date and time: $(date)"
+
 ```
 
 ---
