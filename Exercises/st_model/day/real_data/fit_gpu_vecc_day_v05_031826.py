@@ -53,13 +53,13 @@ def cli(
     limit_C = limit_c
 
     LBFGS_LR = lr
-    LBFGS_MAX_STEPS = 3
-    LBFGS_HISTORY_SIZE = 100
-    LBFGS_MAX_EVAL = 30
+    LBFGS_MAX_STEPS = 5
+    LBFGS_HISTORY_SIZE = 10
+    LBFGS_MAX_EVAL = 20
 
     month_range = [month]
 
-    output_path = Path(config.amarel_estimates_day_path)
+    output_path = Path(config.amarel_estimates_day_path) / "july_22_23_24_25"
     output_path.mkdir(parents=True, exist_ok=True)
 
     data_load_instance = load_data_dynamic_processed(config.amarel_data_load_path)
@@ -145,6 +145,7 @@ def cli(
                     params_list_vecc,
                     lr=LBFGS_LR,
                     max_iter=LBFGS_MAX_EVAL,
+                    max_eval=LBFGS_MAX_EVAL,
                     history_size=LBFGS_HISTORY_SIZE
                 )
 
@@ -155,7 +156,7 @@ def cli(
                     params_list_vecc,
                     optimizer_vecc,
                     max_steps=LBFGS_MAX_STEPS,
-                    grad_tol=1e-7
+                    grad_tol=1e-5
                 )
 
                 epoch_time = time.time() - start_time
@@ -173,8 +174,7 @@ def cli(
                     rmsre=0.0
                 )
 
-                date = datetime.now().strftime("%m%d%y")
-                common_filename = f"real_vecc_{DEVICE}_heads{nheads}_mm{mm_cond_number}_{date}"
+                common_filename = f"real_vecc_july_22_23_24_25_h{nheads}_mm{mm_cond_number}"
 
                 json_filepath = output_path / f"{common_filename}.json"
                 current_data = BaseLogger.load_list(json_filepath)

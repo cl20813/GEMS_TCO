@@ -242,7 +242,7 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
                             if not np.isnan(val_num) and not np.isinf(val_num):
                                 data_grid[i, j] = val_num
 
-            data_grid_tapered = data_grid * taper_grid 
+            data_grid_tapered = data_grid * taper_grid
 
             if torch.isnan(data_grid_tapered).any() or torch.isinf(data_grid_tapered).any():
                 print("Warning: NaN/Inf detected in data_grid_tapered before FFT. Replacing with zeros.")

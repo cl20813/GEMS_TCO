@@ -163,13 +163,14 @@ def cli(
             time_slices_list = [cur_df[cur_df[:, TIME_COL] == t_val] for t_val in unique_times]
 
             print("Pre-computing J-vector...")
-            J_vec, n1, n2, p_time, taper_grid = dwl.generate_Jvector_tapered( 
-                time_slices_list, tapering_func=TAPERING_FUNC, 
+            J_vec, n1, n2, p_time, taper_grid, obs_masks = dwl.generate_Jvector_tapered_mv(
+                time_slices_list, tapering_func=TAPERING_FUNC,
                 lat_col=LAT_COL, lon_col=LON_COL, val_col=VAL_COL, device=DEVICE_DW
             )
-            
+
             I_sample = dwl.calculate_sample_periodogram_vectorized(J_vec)
-            taper_autocorr_grid = dwl.calculate_taper_autocorrelation_fft(taper_grid, n1, n2, DEVICE_DW)
+            taper_autocorr_grid = dwl.calculate_taper_autocorrelation_multivariate(taper_grid, obs_masks, n1, n2, DEVICE_DW)
+            del obs_masks
 
             optimizer_dw = torch.optim.LBFGS(
                 params_list, lr=1.0, max_iter=20, history_size=100, 

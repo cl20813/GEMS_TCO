@@ -137,11 +137,11 @@ class fit_cauchy_vecchia_lbfgs(VecchiaBatchedCauchy):
         )
 
     def set_optimizer(self, param_groups, lr=1.0, max_iter=20, max_eval=None,
-                      tolerance_grad=1e-7, tolerance_change=1e-9, history_size=100):
+                      tolerance_grad=1e-5, tolerance_change=1e-9, history_size=10):
         return torch.optim.LBFGS(
             param_groups, lr=lr, max_iter=max_iter, max_eval=max_eval,
             tolerance_grad=tolerance_grad, tolerance_change=tolerance_change,
-            history_size=history_size,
+            history_size=history_size, line_search_fn="strong_wolfe"
         )
 
     def _convert_params(self, raw: List[float]) -> Dict[str, float]:
@@ -159,7 +159,7 @@ class fit_cauchy_vecchia_lbfgs(VecchiaBatchedCauchy):
 
     def fit_vecc_lbfgs(self, params_list: List[torch.Tensor],
                        optimizer: torch.optim.LBFGS,
-                       max_steps: int = 50, grad_tol: float = 1e-7):
+                       max_steps: int = 5, grad_tol: float = 1e-5):
         if not self.is_precomputed:
             self.precompute_conditioning_sets()
 

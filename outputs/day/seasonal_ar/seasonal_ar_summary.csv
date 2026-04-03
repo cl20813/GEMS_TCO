@@ -1,0 +1,4 @@
+scale,n_obs,n_specs,best_model,best_AIC,ΔAIC_2nd
+hourly,5808,116,W1+W2+W3+W4+W5+W6,156.77,38.3
+daily,726,244,L1+L8+L28,1223.1,1.26
+monthly,24,68,Baseline,-1506.32,65.81

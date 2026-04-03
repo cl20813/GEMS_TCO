@@ -317,6 +317,17 @@ class VecchiaBatched(SpatioTemporalModel):
             try:
                 L = torch.linalg.cholesky(cov)
             except torch.linalg.LinAlgError:
+                with torch.no_grad():
+                    phi2      = torch.exp(params[1])
+                    range_lon = 1.0 / phi2
+                    range_lat = range_lon / torch.exp(params[2]).sqrt()
+                    range_t   = range_lon / torch.exp(params[3]).sqrt()
+                    nugget    = torch.exp(params[6])
+                    sigmasq   = torch.exp(params[0]) / phi2
+                    print(f"[Cholesky FAIL | Heads] "
+                          f"sigmasq={sigmasq.item():.4f}  "
+                          f"range_lon={range_lon.item():.4f}  range_lat={range_lat.item():.4f}  "
+                          f"range_t={range_t.item():.4f}  nugget={nugget.item():.4e}")
                 return torch.tensor(float('inf'), device=self.device)
 
             log_det   += 2 * torch.sum(torch.log(torch.diag(L)))
@@ -339,6 +350,17 @@ class VecchiaBatched(SpatioTemporalModel):
                 try:
                     L_chunk = torch.linalg.cholesky(cov_chunk)
                 except torch.linalg.LinAlgError:
+                    with torch.no_grad():
+                        phi2      = torch.exp(params[1])
+                        range_lon = 1.0 / phi2
+                        range_lat = range_lon / torch.exp(params[2]).sqrt()
+                        range_t   = range_lon / torch.exp(params[3]).sqrt()
+                        nugget    = torch.exp(params[6])
+                        sigmasq   = torch.exp(params[0]) / phi2
+                        print(f"[Cholesky FAIL | Tails] "
+                              f"sigmasq={sigmasq.item():.4f}  "
+                              f"range_lon={range_lon.item():.4f}  range_lat={range_lat.item():.4f}  "
+                              f"range_t={range_t.item():.4f}  nugget={nugget.item():.4e}")
                     return torch.tensor(float('inf'), device=self.device)
 
                 Z_locs = torch.linalg.solve_triangular(L_chunk, Locs_b[start:end], upper=False)
@@ -356,6 +378,17 @@ class VecchiaBatched(SpatioTemporalModel):
         try:
             beta = torch.linalg.solve(XT_Sinv_X + jitter, XT_Sinv_y)
         except torch.linalg.LinAlgError:
+            with torch.no_grad():
+                phi2      = torch.exp(params[1])
+                range_lon = 1.0 / phi2
+                range_lat = range_lon / torch.exp(params[2]).sqrt()
+                range_t   = range_lon / torch.exp(params[3]).sqrt()
+                nugget    = torch.exp(params[6])
+                sigmasq   = torch.exp(params[0]) / phi2
+                print(f"[Cholesky FAIL | GLS beta] "
+                      f"sigmasq={sigmasq.item():.4f}  "
+                      f"range_lon={range_lon.item():.4f}  range_lat={range_lat.item():.4f}  "
+                      f"range_t={range_t.item():.4f}  nugget={nugget.item():.4e}")
             return torch.tensor(float('inf'), device=self.device)
 
         quad = yT_Sinv_y - 2 * (beta.T @ XT_Sinv_y) + (beta.T @ XT_Sinv_X @ beta)
@@ -472,11 +505,11 @@ class fit_vecchia_lbfgs(VecchiaBatched):
                          limit_A=limit_A, limit_B=limit_B, limit_C=limit_C, daily_stride=daily_stride)
 
     def set_optimizer(self, param_groups, lr=1.0, max_iter=20, max_eval=None,
-                      tolerance_grad=1e-7, tolerance_change=1e-9, history_size=100):
+                      tolerance_grad=1e-5, tolerance_change=1e-9, history_size=10):
         return torch.optim.LBFGS(
             param_groups, lr=lr, max_iter=max_iter, max_eval=max_eval,
             tolerance_grad=tolerance_grad, tolerance_change=tolerance_change,
-            history_size=history_size
+            history_size=history_size, line_search_fn="strong_wolfe"
         )
 
     def _convert_params(self, raw: List[float]) -> Dict[str, float]:
@@ -492,7 +525,7 @@ class fit_vecchia_lbfgs(VecchiaBatched):
         }
 
     def fit_vecc_lbfgs(self, params_list: List[torch.Tensor], optimizer: torch.optim.LBFGS,
-                       max_steps: int = 50, grad_tol: float = 1e-7):
+                       max_steps: int = 50, grad_tol: float = 1e-5):
         if not self.is_precomputed:
             self.precompute_conditioning_sets()
 

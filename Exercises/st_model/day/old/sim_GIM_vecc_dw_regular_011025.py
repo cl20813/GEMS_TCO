@@ -239,9 +239,10 @@ def cli(
             day_slice_diff = apply_spatial_difference(cur_df[cur_df[:, 3] == t_val]) 
             time_slices_obs.append(day_slice_diff)
 
-        J_vec_obs, n1, n2, p_time, taper_grid = dwl.generate_Jvector_tapered(time_slices_obs, dwl.cgn_hamming, 0, 1, 2, DEVICE)
+        J_vec_obs, n1, n2, p_time, taper_grid, obs_masks = dwl.generate_Jvector_tapered_mv(time_slices_obs, dwl.cgn_hamming, 0, 1, 2, DEVICE)
         I_sample_obs = dwl.calculate_sample_periodogram_vectorized(J_vec_obs)
-        taper_auto = dwl.calculate_taper_autocorrelation_fft(taper_grid, n1, n2, DEVICE)
+        taper_auto = dwl.calculate_taper_autocorrelation_multivariate(taper_grid, obs_masks, n1, n2, DEVICE)
+        del obs_masks
 
         def nll_dw_fn(p):
             loss = dwl.whittle_likelihood_loss_tapered(p, I_sample_obs, n1, n2, p_time, taper_auto, DELTA_LAT, DELTA_LON)
@@ -261,9 +262,10 @@ def cli(
         for i in range(NUM_SIMS):
             with torch.no_grad(): _, boot_agg = generate_regular_data_compatible(dw_params_grad, grid_cfg_day)
             boot_slices = [apply_spatial_difference(boot_agg[boot_agg[:, 3] == t]) for t in torch.unique(boot_agg[:, 3])]
-            J_b, bn1, bn2, _, btaper = dwl.generate_Jvector_tapered(boot_slices, dwl.cgn_hamming, 0, 1, 2, DEVICE)
+            J_b, bn1, bn2, _, btaper, boot_obs_masks = dwl.generate_Jvector_tapered_mv(boot_slices, dwl.cgn_hamming, 0, 1, 2, DEVICE)
             I_b = dwl.calculate_sample_periodogram_vectorized(J_b)
-            c_auto = taper_auto if (bn1==n1 and bn2==n2) else dwl.calculate_taper_autocorrelation_fft(btaper, bn1, bn2, DEVICE)
+            c_auto = taper_auto if (bn1==n1 and bn2==n2) else dwl.calculate_taper_autocorrelation_multivariate(btaper, boot_obs_masks, bn1, bn2, DEVICE)
+            del boot_obs_masks
             
             if dw_params_grad.grad is not None: dw_params_grad.grad.zero_()
             loss = dwl.whittle_likelihood_loss_tapered(dw_params_grad, I_b, bn1, bn2, p_time, c_auto, DELTA_LAT, DELTA_LON)

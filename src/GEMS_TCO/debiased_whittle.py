@@ -379,7 +379,7 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
                             if not np.isnan(val_num) and not np.isinf(val_num):
                                 data_grid[i, j] = val_num
 
-            data_grid_tapered = data_grid * taper_grid 
+            data_grid_tapered = data_grid * taper_grid
 
             if torch.isnan(data_grid_tapered).any() or torch.isinf(data_grid_tapered).any():
                 print("Warning: NaN/Inf detected in data_grid_tapered before FFT. Replacing with zeros.")
@@ -403,6 +403,123 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         result = J_vector_tensor * norm_factor
         if torch.isnan(result).any(): print("Warning: NaN in J_vector output.")
         return result, n1, n2, p_time, taper_grid # <-- Return p_time
+
+    @staticmethod
+    def generate_Jvector_tapered_mv(tensor_list, tapering_func, lat_col, lon_col, val_col, device):
+        """
+        Same as generate_Jvector_tapered but also returns obs_masks (p_time, n1, n2).
+        obs_masks[q, i, j] = True if cell (i,j) was observed at time q.
+        Used for the multivariate-corrected c_{g,n}^{(qr)} computation.
+        """
+        p_time = len(tensor_list)
+        if p_time == 0:
+            return torch.empty(0,0,0,device=device,dtype=torch.complex128), 0, 0, 0, None, None
+
+        valid_tensors = [t for t in tensor_list if t.numel() > 0 and t.shape[1] > max(lat_col, lon_col, val_col)]
+        if not valid_tensors:
+            return torch.empty(0,0,0,device=device,dtype=torch.complex128), 0, 0, 0, None, None
+
+        try:
+            all_lats_cpu = torch.cat([t[:, lat_col] for t in valid_tensors])
+            all_lons_cpu = torch.cat([t[:, lon_col] for t in valid_tensors])
+        except IndexError:
+            return torch.empty(0,0,0,device=device,dtype=torch.complex128), 0, 0, 0, None, None
+
+        all_lats_cpu = all_lats_cpu[~torch.isnan(all_lats_cpu) & ~torch.isinf(all_lats_cpu)]
+        all_lons_cpu = all_lons_cpu[~torch.isnan(all_lons_cpu) & ~torch.isinf(all_lons_cpu)]
+        if all_lats_cpu.numel() == 0 or all_lons_cpu.numel() == 0:
+            return torch.empty(0,0,0,device=device,dtype=torch.complex128), 0, 0, 0, None, None
+
+        unique_lats_cpu, unique_lons_cpu = torch.unique(all_lats_cpu), torch.unique(all_lons_cpu)
+        n1, n2 = len(unique_lats_cpu), len(unique_lons_cpu)
+        lat_map = {lat.item(): i for i, lat in enumerate(unique_lats_cpu)}
+        lon_map = {lon.item(): i for i, lon in enumerate(unique_lons_cpu)}
+
+        u1_mesh_cpu, u2_mesh_cpu = torch.meshgrid(
+            torch.arange(n1, dtype=torch.float64),
+            torch.arange(n2, dtype=torch.float64), indexing='ij')
+        taper_grid = tapering_func((u1_mesh_cpu, u2_mesh_cpu), n1, n2).to(device)
+
+        fft_results = []
+        obs_masks_list = []
+        for tensor in tensor_list:
+            data_grid = torch.zeros((n1, n2), dtype=torch.float64, device=device)
+            obs_mask  = torch.zeros((n1, n2), dtype=torch.bool,    device=device)
+            if tensor.numel() > 0 and tensor.shape[1] > max(lat_col, lon_col, val_col):
+                for row in tensor:
+                    lat_item, lon_item = row[lat_col].item(), row[lon_col].item()
+                    if not (np.isnan(lat_item) or np.isnan(lon_item)):
+                        i = lat_map.get(lat_item)
+                        j = lon_map.get(lon_item)
+                        if i is not None and j is not None:
+                            val = row[val_col]
+                            val_num = val.item() if isinstance(val, torch.Tensor) else val
+                            if not np.isnan(val_num) and not np.isinf(val_num):
+                                data_grid[i, j] = val_num
+                                obs_mask[i, j]  = True
+
+            data_grid_tapered = data_grid * taper_grid
+            if torch.isnan(data_grid_tapered).any() or torch.isinf(data_grid_tapered).any():
+                data_grid_tapered = torch.nan_to_num(data_grid_tapered, nan=0.0, posinf=0.0, neginf=0.0)
+            fft_results.append(torch.fft.fft2(data_grid_tapered))
+            obs_masks_list.append(obs_mask)
+
+        if not fft_results:
+            return torch.empty(0,0,0,device=device,dtype=torch.complex128), n1, n2, 0, taper_grid, None
+
+        obs_masks = torch.stack(obs_masks_list, dim=0)  # (p_time, n1, n2)
+
+        # Per-variate normalization: J^{(q)} uses H_q = Σ_s(taper_s * obs_s^{(q)})²
+        # This is consistent with c_{g,n}^{(qr)} / sqrt(H_q * H_r) in the multivariate
+        # expected periodogram (Guillaumin et al. 2022, Sec. 4.3.4).
+        normed = []
+        for q_idx, (fft_q, obs_q) in enumerate(zip(fft_results, obs_masks_list)):
+            H_q = (taper_grid * obs_q.to(taper_grid.dtype)).pow(2).sum()
+            norm_q = (torch.sqrt(1.0 / H_q) / (2.0 * cmath.pi)).to(device) if H_q >= 1e-12 \
+                     else torch.tensor(0.0, device=device, dtype=torch.float64)
+            normed.append(fft_q * norm_q)
+        result = torch.stack(normed, dim=2).to(device)
+        return result, n1, n2, p_time, taper_grid, obs_masks
+
+    @staticmethod
+    def calculate_taper_autocorrelation_multivariate(taper_grid, obs_masks, n1, n2, device):
+        """
+        Computes c_{g,n}^{(qr)} for every pair (q, r) per Section 4.3.4 of
+        Guillaumin et al. (2022, JRSS-B).
+
+        g_s^{(q)} = taper_s * obs_s^{(q)}   (paper Eq. incorporating missing data)
+
+        Args:
+            taper_grid : (n1, n2) float64 taper weights
+            obs_masks  : (p, n1, n2) bool — True = observed at time q
+            n1, n2     : grid dimensions
+            device     : torch device
+
+        Returns:
+            (p, p, 2*n1-1, 2*n2-1) float64 tensor — c_{g,n}^{(qr)} for each pair
+        """
+        taper_grid = taper_grid.to(device)
+        obs_masks  = obs_masks.to(device)
+        p   = obs_masks.shape[0]
+        N1, N2 = 2 * n1 - 1, 2 * n2 - 1
+
+        # g^{(q)} = taper * obs_mask^{(q)},  shape (p, n1, n2)
+        g_all = taper_grid.unsqueeze(0) * obs_masks.to(taper_grid.dtype)
+        H_all = (g_all ** 2).sum(dim=(1, 2))  # (p,)
+
+        # FFT of each g^{(q)} padded to (N1, N2)
+        g_ffts = torch.fft.fft2(g_all, s=(N1, N2))  # (p, N1, N2) complex
+
+        result = torch.zeros((p, p, N1, N2), device=device, dtype=taper_grid.dtype)
+        for q in range(p):
+            for r in range(p):
+                # Cross-correlation via FFT: IFFT(G^{(q)} * conj(G^{(r)}))
+                cross = torch.fft.ifft2(g_ffts[q] * g_ffts[r].conj()).real
+                cross_shifted = torch.fft.fftshift(cross)
+                denom = torch.sqrt(H_all[q] * H_all[r]) + 1e-12
+                result[q, r] = cross_shifted / denom
+
+        return result  # (p, p, 2n1-1, 2n2-1)
 
     @staticmethod
     def calculate_sample_periodogram_vectorized(J_vector_tensor):
@@ -511,11 +628,16 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         return cov
 
     @staticmethod
-    def cn_bar_tapered(u1, u2, t, params, n1, n2, taper_autocorr_grid, delta1, delta2):
+    def cn_bar_tapered(u1, u2, t, params, n1, n2, taper_autocorr_grid, delta1, delta2, q_idx=None, r_idx=None):
         """
         Computes c_Y(u) * c_gn(u).
         u1, u2 are GRID index lags (e.g., -n1..0..n1)
         t is the PHYSICAL time lag.
+
+        If taper_autocorr_grid is 4-D (p, p, 2n1-1, 2n2-1) — multivariate per-pair
+        correction per Guillaumin et al. (2022) Section 4.3.4 — pass q_idx and r_idx
+        to select the corresponding c_{g,n}^{(qr)} slice.
+        Otherwise falls back to the 2-D single-taper behaviour.
         """
         device = params.device
         u1_dev = u1.to(device) if isinstance(u1, torch.Tensor) else torch.tensor(u1, device=device, dtype=torch.float64)
@@ -538,7 +660,10 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         idx1 = torch.clamp(idx1, 0, 2 * n1 - 2)
         idx2 = torch.clamp(idx2, 0, 2 * n2 - 2)
 
-        taper_autocorr_value = taper_autocorr_grid[idx1, idx2]
+        if taper_autocorr_grid.ndim == 4 and q_idx is not None and r_idx is not None:
+            taper_autocorr_value = taper_autocorr_grid[q_idx, r_idx, idx1, idx2]
+        else:
+            taper_autocorr_value = taper_autocorr_grid[idx1, idx2]
 
         if torch.isnan(cov_X_value).any() or torch.isnan(taper_autocorr_value).any():
             out_shape = torch.broadcast_shapes(cov_X_value.shape, taper_autocorr_value.shape)
@@ -572,14 +697,17 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
             for r in range(p_time):
                 t_diff = t_lags[q] - t_lags[r]
                 
-                term1 = debiased_whittle_likelihood.cn_bar_tapered(u1_mesh, u2_mesh, t_diff, 
-                                    params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2)
-                term2 = debiased_whittle_likelihood.cn_bar_tapered(u1_mesh - n1, u2_mesh, t_diff, 
-                                    params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2)
-                term3 = debiased_whittle_likelihood.cn_bar_tapered(u1_mesh, u2_mesh - n2, t_diff, 
-                                    params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2)
+                # For 4-D taper_autocorr_grid pass per-pair indices (multivariate correction)
+                _q = q if taper_autocorr_grid.ndim == 4 else None
+                _r = r if taper_autocorr_grid.ndim == 4 else None
+                term1 = debiased_whittle_likelihood.cn_bar_tapered(u1_mesh, u2_mesh, t_diff,
+                                    params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2, _q, _r)
+                term2 = debiased_whittle_likelihood.cn_bar_tapered(u1_mesh - n1, u2_mesh, t_diff,
+                                    params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2, _q, _r)
+                term3 = debiased_whittle_likelihood.cn_bar_tapered(u1_mesh, u2_mesh - n2, t_diff,
+                                    params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2, _q, _r)
                 term4 = debiased_whittle_likelihood.cn_bar_tapered(u1_mesh - n1, u2_mesh - n2, t_diff,
-                                    params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2)
+                                    params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2, _q, _r)
                 
                 tilde_cn_grid_qr = (term1 + term2 + term3 + term4)
                 
@@ -825,7 +953,7 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
             return "[Error in raw param conversion]"
     
     @staticmethod
-    def run_lbfgs_tapered(params_list, optimizer, I_sample, n1, n2, p_time, taper_autocorr_grid, max_steps=50, device='cpu',grad_tol=1e-5):
+    def run_lbfgs_tapered(params_list, optimizer, I_sample, n1, n2, p_time, taper_autocorr_grid, max_steps=5, device='cpu',grad_tol=1e-5):
         """Training loop using L-BFGS optimizer with improved convergence checks."""
         
         #params_list = [p.to(device) for p in params_list]

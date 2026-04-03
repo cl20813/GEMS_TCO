@@ -5,7 +5,7 @@ scp -r "/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO" jl2815@amarel.rutge
 
 ### Transfer run file (mac → Amarel)
 ```
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_heads_vs_limit_032726.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/will_use_again/sim_heads_vs_limit_032726.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 ```
 
 ---
@@ -45,7 +45,7 @@ conda activate faiss_env
 
 ---
 
-### Job array (10 parallel jobs, each 10 iters)
+### Single job (10 iters, 35 combos each)
 
 ~35 combos × ~12 min × 10 iters ≈ 70 h; set time=72h.
 
@@ -58,15 +58,14 @@ sbatch sim_heads_vs_limit_032726.sh
 ```bash
 #!/bin/bash
 #SBATCH --job-name=hvl_032726
-#SBATCH --output=/home/jl2815/tco/exercise_output/hvl_032726_%A_%a.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/hvl_032726_%A_%a.err
+#SBATCH --output=/home/jl2815/tco/exercise_output/hvl_032726_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/hvl_032726_%j.err
 #SBATCH --time=72:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --array=0-9
 
 module purge
 module use /projects/community/modulefiles
@@ -75,12 +74,12 @@ module load cuda/12.1.0
 eval "$(conda shell.bash hook)"
 conda activate faiss_env
 
-echo "Running on: $(hostname)  array_task=${SLURM_ARRAY_TASK_ID}"
+echo "Running on: $(hostname)"
 nvidia-smi
 
 srun python /home/jl2815/tco/exercise_25/st_model/sim_heads_vs_limit_032726.py \
     --num-iters 10 \
-    --job-id ${SLURM_ARRAY_TASK_ID} \
+    --job-id 0 \
     --lat-factor 100 \
     --lon-factor 10 \
     --years "2022,2023,2024,2025" \

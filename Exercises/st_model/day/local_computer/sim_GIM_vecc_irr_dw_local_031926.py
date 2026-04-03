@@ -14,7 +14,7 @@ Differences from Amarel version:
 
 conda activate faiss_env
 cd /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer
-python sim_GIM_vecc_irr_dw_local_031926.py --sample-year 2024 --sample-day 1
+python sim_GIM_vecc_irr_dw_local_031926.py --sample-year 2022 --sample-day 22
 """
 import sys
 import gc
@@ -97,10 +97,10 @@ def cli(
     month:       int = typer.Option(7,      help="Month"),
     v:           float = typer.Option(0.5,  help="Matern smoothness"),
     mm_cond_number: int = typer.Option(100, help="Vecchia neighbors"),
-    nheads:      int = typer.Option(200,    help="Head points"),
-    limit_a:     int = typer.Option(8,      help="Set A neighbors"),
-    limit_b:     int = typer.Option(8,      help="Set B neighbors"),
-    limit_c:     int = typer.Option(8,      help="Set C neighbors"),
+    nheads:      int = typer.Option(0,      help="Head points"),
+    limit_a:     int = typer.Option(20,      help="Set A neighbors"),
+    limit_b:     int = typer.Option(20,      help="Set B neighbors"),
+    limit_c:     int = typer.Option(20,      help="Set C neighbors"),
     daily_stride: int = typer.Option(2,     help="Set C stride"),
 ) -> None:
 
@@ -115,7 +115,7 @@ def cli(
 
     # ── Load fitted estimates ─────────────────────────────────────────────────
     dw_csv   = LOCAL_EST_PATH / "real_dw_july_22_23_24_25.csv"
-    vecc_csv = LOCAL_EST_PATH / "real_vecc_july_22_23_24_25_h1000_mm16.csv"
+    vecc_csv = LOCAL_EST_PATH / "real_vecc_july_22_23_24_25_h0_mm100.csv"
     if not dw_csv.exists() or not vecc_csv.exists():
         print(f"[Error] CSV not found in {LOCAL_EST_PATH}")
         raise SystemExit(1)
@@ -178,10 +178,11 @@ def cli(
     unique_times = torch.unique(cur_df[:, 3])
     time_slices  = [cur_df[cur_df[:, 3] == t] for t in unique_times]
 
-    J_vec, n1, n2, p_time, taper_grid = dwl.generate_Jvector_tapered(
+    J_vec, n1, n2, p_time, taper_grid, obs_masks = dwl.generate_Jvector_tapered_mv(
         time_slices, dwl.cgn_hamming, 0, 1, 2, DEVICE)
     I_obs  = dwl.calculate_sample_periodogram_vectorized(J_vec)
-    t_auto = dwl.calculate_taper_autocorrelation_fft(taper_grid, n1, n2, DEVICE)
+    t_auto = dwl.calculate_taper_autocorrelation_multivariate(taper_grid, obs_masks, n1, n2, DEVICE)
+    del obs_masks
 
     def nll_dw(p):
         loss = dwl.whittle_likelihood_loss_tapered(

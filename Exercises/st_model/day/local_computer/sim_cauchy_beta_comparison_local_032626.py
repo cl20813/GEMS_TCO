@@ -255,10 +255,10 @@ def calculate_rmsre(out_params, true_dict):
 def cli(
     v:              float = typer.Option(0.5,    help="Matérn smoothness (data generation only)"),
     mm_cond_number: int   = typer.Option(100,    help="Vecchia neighbors"),
-    nheads:         int   = typer.Option(100,    help="Vecchia head points per time step"),
-    limit_a:        int   = typer.Option(6,      help="Set A neighbors"),
-    limit_b:        int   = typer.Option(6,      help="Set B neighbors"),
-    limit_c:        int   = typer.Option(6,      help="Set C neighbors"),
+    nheads:         int   = typer.Option(0,      help="Vecchia head points per time step"),
+    limit_a:        int   = typer.Option(20,      help="Set A neighbors"),
+    limit_b:        int   = typer.Option(20,      help="Set B neighbors"),
+    limit_c:        int   = typer.Option(20,      help="Set C neighbors"),
     daily_stride:   int   = typer.Option(4,      help="Daily stride for Set C"),
     num_iters:      int   = typer.Option(3,      help="Simulation iterations"),
     years:          str   = typer.Option("2024", help="Years to sample obs patterns from"),
@@ -399,9 +399,9 @@ def cli(
 
     # ── Optimization settings ─────────────────────────────────────────────────
     LBFGS_LR    = 1.0
-    LBFGS_STEPS = 3
-    LBFGS_HIST  = 100
-    LBFGS_EVAL  = 100
+    LBFGS_STEPS = 5
+    LBFGS_HIST  = 10
+    LBFGS_EVAL  = 20
 
     records = []
 
@@ -446,10 +446,10 @@ def cli(
                 )
                 model.precompute_conditioning_sets()
                 opt = model.set_optimizer(p_vals, lr=LBFGS_LR, max_iter=LBFGS_EVAL,
-                                          history_size=LBFGS_HIST)
+                                          max_eval=LBFGS_EVAL, history_size=LBFGS_HIST)
                 t0 = time.time()
                 out, _ = model.fit_vecc_lbfgs(p_vals, opt,
-                                              max_steps=LBFGS_STEPS, grad_tol=1e-7)
+                                              max_steps=LBFGS_STEPS, grad_tol=1e-5)
                 elapsed = time.time() - t0
                 rmsre, est = calculate_rmsre(out, true_dict)
                 print(f"  RMSRE = {rmsre:.4f}  ({elapsed:.1f}s)")
@@ -517,7 +517,11 @@ def cli(
                     for col, tv in zip(p_cols_, true_vals_)]
             per_param_rmsre[m]  = [float(np.sqrt(np.mean(np.array(a)**2))) for a in ares]
             per_param_mdare[m]  = [float(np.median(a))                     for a in ares]
-            per_param_p90p10[m] = [float(np.percentile(a, 90) - np.percentile(a, 10)) for a in ares]
+            per_param_p90p10[m] = [
+                float(np.percentile([r[col] for r in sub_recs], 90)
+                      - np.percentile([r[col] for r in sub_recs], 10))
+                for col, _ in zip(p_cols_, true_vals_)
+            ]
 
         for metric_lbl, model_dict in [
             ('RMSRE',   per_param_rmsre),
@@ -552,8 +556,7 @@ def cli(
         return float(np.median(np.abs((sub[col].values - tv) / abs(tv))))
 
     def param_p90p10(sub, col, tv):
-        are = np.abs((sub[col].values - tv) / abs(tv))
-        return float(np.percentile(are, 90) - np.percentile(are, 10))
+        return float(np.percentile(sub[col].values, 90) - np.percentile(sub[col].values, 10))
 
     print(f"\n{'='*75}")
     print(f"  FINAL SUMMARY — Cauchy β comparison  ({num_iters} iterations)")

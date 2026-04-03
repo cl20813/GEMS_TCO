@@ -65,9 +65,9 @@ def cli(
     print(f"nheads={nheads}  mm={mm_cond_number}  A/B/C={limit_a}/{limit_b}/{limit_c}  stride={daily_stride}")
 
     LBFGS_LR        = lr
-    LBFGS_MAX_STEPS = 3
-    LBFGS_HIST      = 100
-    LBFGS_MAX_EVAL  = 30
+    LBFGS_MAX_STEPS = 5
+    LBFGS_HIST      = 10
+    LBFGS_MAX_EVAL  = 20
 
     output_path = Path(config.amarel_estimates_day_path) / "july_22_23_24_25"
     output_path.mkdir(parents=True, exist_ok=True)
@@ -163,12 +163,13 @@ def cli(
 
                 optimizer = model.set_optimizer(
                     params_list, lr=LBFGS_LR,
-                    max_iter=LBFGS_MAX_EVAL, history_size=LBFGS_HIST
+                    max_iter=LBFGS_MAX_EVAL, max_eval=LBFGS_MAX_EVAL,
+                    history_size=LBFGS_HIST
                 )
 
                 t0  = time.time()
                 out, _ = model.fit_vecc_lbfgs(params_list, optimizer,
-                                              max_steps=LBFGS_MAX_STEPS, grad_tol=1e-7)
+                                              max_steps=LBFGS_MAX_STEPS, grad_tol=1e-5)
                 elapsed = time.time() - t0
 
                 # out = [log_phi1, ..., log_phi7 (7 params), final_nll]

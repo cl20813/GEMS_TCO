@@ -176,10 +176,10 @@ def cli(
     v:              float = typer.Option(0.5,       help="Matern smoothness"),
     gc_beta:        float = typer.Option(1.0,       help="Cauchy tail exponent β"),
     mm_cond_number: int   = typer.Option(100,       help="Vecchia neighbors"),
-    nheads:         int   = typer.Option(1000,      help="Head points"),
-    limit_a:        int   = typer.Option(16,        help="Set A neighbors"),
-    limit_b:        int   = typer.Option(16,        help="Set B neighbors"),
-    limit_c:        int   = typer.Option(16,        help="Set C neighbors"),
+    nheads:         int   = typer.Option(0,          help="Head points"),
+    limit_a:        int   = typer.Option(20,        help="Set A neighbors"),
+    limit_b:        int   = typer.Option(20,        help="Set B neighbors"),
+    limit_c:        int   = typer.Option(20,        help="Set C neighbors"),
     daily_stride:   int   = typer.Option(2,         help="Set C stride"),
 ) -> None:
 
@@ -298,10 +298,11 @@ def cli(
                 unique_times = torch.unique(cur_df[:, 3])
                 time_slices  = [cur_df[cur_df[:, 3] == t] for t in unique_times]
 
-                J_vec, n1, n2, p_time, taper_grid = dwl.generate_Jvector_tapered(
+                J_vec, n1, n2, p_time, taper_grid, obs_masks = dwl.generate_Jvector_tapered_mv(
                     time_slices, dwl.cgn_hamming, 0, 1, 2, DEVICE)
                 I_obs  = dwl.calculate_sample_periodogram_vectorized(J_vec)
-                t_auto = dwl.calculate_taper_autocorrelation_fft(taper_grid, n1, n2, DEVICE)
+                t_auto = dwl.calculate_taper_autocorrelation_multivariate(taper_grid, obs_masks, n1, n2, DEVICE)
+                del obs_masks
 
                 def nll_dw(p):
                     loss = dwl.whittle_likelihood_loss_tapered(

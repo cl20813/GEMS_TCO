@@ -254,7 +254,7 @@ def cli(
     ord_grid = _orderings.maxmin_cpp(grid_coords.cpu().numpy())
     nns_grid = _orderings.find_nns_l2(locs=grid_coords.cpu().numpy()[ord_grid], max_nn=MM_COND)
 
-    LBFGS_LR, LBFGS_STEPS, LBFGS_HIST, LBFGS_EVAL = 1.0, 3, 100, 30
+    LBFGS_LR, LBFGS_STEPS, LBFGS_HIST, LBFGS_EVAL = 1.0, 5, 10, 20
     records  = []
 
     for it in range(num_iters):
@@ -288,9 +288,10 @@ def cli(
                     limit_A=limit, limit_B=limit, limit_C=limit,
                     daily_stride=daily_stride)
                 opt = model.set_optimizer(p_vals, lr=LBFGS_LR,
-                                          max_iter=LBFGS_EVAL, history_size=LBFGS_HIST)
+                                          max_iter=LBFGS_EVAL, max_eval=LBFGS_EVAL,
+                                          history_size=LBFGS_HIST)
                 t0 = time.time()
-                out, _ = model.fit_vecc_lbfgs(p_vals, opt, max_steps=LBFGS_STEPS, grad_tol=1e-7)
+                out, _ = model.fit_vecc_lbfgs(p_vals, opt, max_steps=LBFGS_STEPS, grad_tol=1e-5)
                 elapsed = time.time() - t0
                 raw_params = out[:-1];  nll_val = float(out[-1])
                 rmsre_val, est_d = calc_rmsre(raw_params, true_dict)

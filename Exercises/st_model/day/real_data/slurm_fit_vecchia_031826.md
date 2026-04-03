@@ -55,9 +55,9 @@ sbatch fit_vecc_gpu_031826.sh
 ```bash
 
 #!/bin/bash
-#SBATCH --job-name=fit_vecc_h300m30
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_vecc_h300m30.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_vecc_h300m30.err
+#SBATCH --job-name=fit_vecc_040226
+#SBATCH --output=/home/jl2815/tco/exercise_output/fit_vecc_040226.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/fit_vecc_040226.err
 #SBATCH --time=48:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -87,9 +87,9 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_day_v05_031826.py
     --years "2022,2023,2024,2025" \
     --mm-cond-number 100 \
     --nheads 0 \
-    --limit-a 24 \
-    --limit-b 24 \
-    --limit-c 24 \
+    --limit-a 20 \
+    --limit-b 20 \
+    --limit-c 20 \
     --daily-stride 2 \
     --keep-exact-loc
 

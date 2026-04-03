@@ -5,7 +5,7 @@ scp -r "/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO" jl2815@amarel.rutge
 
 ### Transfer run files (mac → Amarel)
 ```
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_dw_filter_comparison_032626.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/will_use_again/sim_dw_filter_comparison_032626.py" jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model
 ```
 
 ---

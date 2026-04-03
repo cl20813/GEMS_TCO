@@ -239,9 +239,9 @@ def cli(
         print("Pre-computing J-vector (Hamming taper)...")
         
         # --- 💥 REVISED: Renamed 'p' to 'p_time' 💥 ---
-        J_vec, n1, n2, p_time, taper_grid = dwl.generate_Jvector_tapered( 
+        J_vec, n1, n2, p_time, taper_grid, obs_masks = dwl.generate_Jvector_tapered_mv(
             time_slices_list,
-            tapering_func=TAPERING_FUNC, 
+            tapering_func=TAPERING_FUNC,
             lat_col=LAT_COL, lon_col=LON_COL, val_col=VAL_COL,
             device=DEVICE
         )
@@ -249,10 +249,11 @@ def cli(
         if J_vec is None or J_vec.numel() == 0 or n1 == 0 or n2 == 0 or p_time == 0:
             print(f"Error: J-vector generation failed for Day {day_idx+1}.")
             exit()
-        
+
 
         I_sample = dwl.calculate_sample_periodogram_vectorized(J_vec)
-        taper_autocorr_grid = dwl.calculate_taper_autocorrelation_fft(taper_grid, n1, n2, DEVICE)
+        taper_autocorr_grid = dwl.calculate_taper_autocorrelation_multivariate(taper_grid, obs_masks, n1, n2, DEVICE)
+        del obs_masks
 
         # Set up Optimizer for Whittle
         optimizer_dw = torch.optim.LBFGS(

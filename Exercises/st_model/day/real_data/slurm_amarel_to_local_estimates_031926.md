@@ -6,15 +6,16 @@ scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vec
 
 scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/vecchia_v150_r2s10_4508.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/estimates/df_cv_smooth_15" 
 
-# real data fitted, dw and vecc estimates
+# real data fitted estimates — July 2022/2023/2024/2025
+# naming convention: real_{model}_july_22_23_24_25_h{nheads}_mm{mm}.csv
+# current run: nheads=0, mm=100
 
-# 2022,2023,2024,2025 together
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/july_22_23_24_25/real_dw_july_22_23_24_25.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/july_22_23_24_25"
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/july_22_23_24_25/real_dw_july_22_23_24_25.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/july_22_23_24_25/" 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/july_22_23_24_25/real_vecc_july_22_23_24_25_mm20.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/july_22_23_24_25"
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/july_22_23_24_25/real_vecc_july_22_23_24_25_h1000_mm16.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/july_22_23_24_25/" 
 
-scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/july_22_23_24_25/real_cauchy_b10_july_22_23_24_25_h1000_mm100.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/july_22_23_24_25/" 
+scp jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/july_22_23_24_25/real_cauchy_b10_july_22_23_24_25_mm20.csv "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/july_22_23_24_25"
 
 
 

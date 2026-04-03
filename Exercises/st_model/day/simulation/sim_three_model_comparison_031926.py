@@ -324,10 +324,10 @@ def calculate_rmsre(out_params, true_dict):
 def cli(
     v: float = typer.Option(0.5,    help="Matern smoothness"),
     mm_cond_number: int = typer.Option(100,  help="Vecchia neighbors"),
-    nheads: int = typer.Option(300,  help="Vecchia head points per time step"),
-    limit_a: int = typer.Option(8,   help="Set A neighbors"),
-    limit_b: int = typer.Option(8,   help="Set B neighbors"),
-    limit_c: int = typer.Option(8,   help="Set C neighbors"),
+    nheads: int = typer.Option(0,    help="Vecchia head points per time step"),
+    limit_a: int = typer.Option(20,  help="Set A neighbors"),
+    limit_b: int = typer.Option(20,  help="Set B neighbors"),
+    limit_c: int = typer.Option(20,  help="Set C neighbors"),
     daily_stride: int = typer.Option(8, help="Daily stride for Set C"),
     num_iters: int = typer.Option(10,  help="Simulation iterations"),
     years: str = typer.Option("2022,2024,2025", help="Years to sample obs patterns from"),
@@ -394,15 +394,15 @@ def cli(
     #}
 
     # Scenario D — strong lat advection, moderate lon advection
-    # true_dict = {
-    #     'sigmasq':    10.0,
-    #     'range_lat':  0.5,
-    #     'range_lon':  0.6,
-    #     'range_time': 2.5,
-    #     'advec_lat':  0.25,
-    #     'advec_lon':  -0.16,
-    #     'nugget':     1.2,
-    # }
+    #true_dict = {
+    #    'sigmasq':    10.0,
+    #    'range_lat':  0.5,
+    #    'range_lon':  0.6,
+    #    'range_time': 2.5,
+    #    'advec_lat':  0.25,
+    #    'advec_lon':  -0.16,
+    #    'nugget':     1.2,
+    #}
 
     phi2 = 1.0 / true_dict['range_lon']
     phi1 = true_dict['sigmasq'] * phi2
@@ -529,10 +529,10 @@ def cli(
 
     # ── Shared optimization settings ──────────────────────────────────────────
     LBFGS_LR    = 1.0
-    LBFGS_STEPS = 3
-    LBFGS_HIST  = 100
-    LBFGS_EVAL  = 100
-    DWL_STEPS   = 3
+    LBFGS_STEPS = 5
+    LBFGS_HIST  = 10
+    LBFGS_EVAL  = 20
+    DWL_STEPS   = 5
     LAT_COL, LON_COL, VAL_COL, TIME_COL = 0, 1, 2, 3
 
     records = []
@@ -589,7 +589,7 @@ def cli(
                                               history_size=LBFGS_HIST)
             t0 = time.time()
             out_irr, _ = model_irr.fit_vecc_lbfgs(p_irr, opt_irr,
-                                                   max_steps=LBFGS_STEPS, grad_tol=1e-7)
+                                                   max_steps=LBFGS_STEPS, grad_tol=1e-5)
             t_irr          = time.time() - t0
             rmsre_irr, est_irr = calculate_rmsre(out_irr, true_dict)
             print(f"  RMSRE = {rmsre_irr:.4f}  ({t_irr:.1f}s)")
@@ -611,7 +611,7 @@ def cli(
                                               history_size=LBFGS_HIST)
             t0 = time.time()
             out_reg, _ = model_reg.fit_vecc_lbfgs(p_reg, opt_reg,
-                                                   max_steps=LBFGS_STEPS, grad_tol=1e-7)
+                                                   max_steps=LBFGS_STEPS, grad_tol=1e-5)
             t_reg          = time.time() - t0
             rmsre_reg, est_reg = calculate_rmsre(out_reg, true_dict)
             print(f"  RMSRE = {rmsre_reg:.4f}  ({t_reg:.1f}s)")
@@ -638,14 +638,15 @@ def cli(
             unique_t    = torch.unique(cur_df[:, TIME_COL])
             time_slices = [cur_df[cur_df[:, TIME_COL] == t] for t in unique_t]
 
-            J_vec, n1, n2, p_time, taper = dwl.generate_Jvector_tapered(
+            J_vec, n1, n2, p_time, taper, obs_masks = dwl.generate_Jvector_tapered_mv(
                 time_slices, dwl.cgn_hamming, LAT_COL, LON_COL, VAL_COL, DEVICE)
             I_samp = dwl.calculate_sample_periodogram_vectorized(J_vec)
-            t_auto = dwl.calculate_taper_autocorrelation_fft(taper, n1, n2, DEVICE)
+            t_auto = dwl.calculate_taper_autocorrelation_multivariate(taper, obs_masks, n1, n2, DEVICE)
+            del obs_masks
 
             opt_dw = torch.optim.LBFGS(
-                p_dw, lr=1.0, max_iter=20, history_size=100,
-                line_search_fn="strong_wolfe", tolerance_grad=1e-5)
+                p_dw, lr=1.0, max_iter=20, max_eval=20,
+                history_size=10, line_search_fn="strong_wolfe", tolerance_grad=1e-5)
             t0 = time.time()
             _, _, _, loss_dw, _ = dwl.run_lbfgs_tapered(
                 params_list=p_dw, optimizer=opt_dw, I_sample=I_samp,
@@ -727,8 +728,8 @@ def cli(
                 for col, tv in zip(p_cols_, true_vals_)
             ]
             per_param_med_by_model[m] = [
-                float(np.sqrt(np.percentile([((r[col] - tv) / abs(tv)) ** 2 for r in sub_recs], 90))
-                      - np.sqrt(np.percentile([((r[col] - tv) / abs(tv)) ** 2 for r in sub_recs], 10)))
+                float(np.percentile([r[col] for r in sub_recs], 90)
+                      - np.percentile([r[col] for r in sub_recs], 10))
                 for col, tv in zip(p_cols_, true_vals_)
             ]
         for metric_lbl, model_dict in [
@@ -766,8 +767,7 @@ def cli(
         return float(np.median(np.abs((sub[col].values - tv) / abs(tv))))
 
     def param_med_rmsre(sub, col, tv):
-        sq_rel_err = ((sub[col].values - tv) / abs(tv)) ** 2
-        return float(np.sqrt(np.percentile(sq_rel_err, 90)) - np.sqrt(np.percentile(sq_rel_err, 10)))
+        return float(np.percentile(sub[col].values, 90) - np.percentile(sub[col].values, 10))
 
     # ── Per-parameter RMSRE table (printed) ───────────────────────────────────
     print(f"\n{'='*75}")

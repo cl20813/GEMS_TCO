@@ -69,10 +69,10 @@ nvidia-smi
 srun python /home/jl2815/tco/exercise_25/st_model/sim_three_model_comparison_031926.py \
     --v 0.5 \
     --mm-cond-number 100 \
-    --nheads 200 \
-    --limit-a 8 \
-    --limit-b 8 \
-    --limit-c 8 \
+    --nheads 0 \
+    --limit-a 20 \
+    --limit-b 20 \
+    --limit-c 20 \
     --daily-stride 2 \
     --num-iters 1000 \
     --years "2022,2024,2025" \

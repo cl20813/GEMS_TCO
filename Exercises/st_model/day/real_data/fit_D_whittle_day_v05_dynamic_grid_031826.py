@@ -41,14 +41,14 @@ def cli(
 
     month_range = [month]
 
-    output_path = Path(config.amarel_estimates_day_path)
+    output_path = Path(config.amarel_estimates_day_path) / "july_22_23_24_25"
     output_path.mkdir(parents=True, exist_ok=True)
 
     data_load_instance = load_data_dynamic_processed(config.amarel_data_load_path)
 
     dwl = debiased_whittle.debiased_whittle_likelihood()
     TAPERING_FUNC = dwl.cgn_hamming
-    DWL_MAX_STEPS = 20
+    DWL_MAX_STEPS = 5
     LAT_COL, LON_COL, VAL_COL, TIME_COL = 0, 1, 2, 3
 
     for year in years_list:
@@ -136,17 +136,18 @@ def cli(
                 time_slices_list = [cur_df[cur_df[:, TIME_COL] == t_val] for t_val in unique_times]
 
                 print("Pre-computing J-vector...")
-                J_vec, n1, n2, p_time, taper_grid = dwl.generate_Jvector_tapered(
+                J_vec, n1, n2, p_time, taper_grid, obs_masks = dwl.generate_Jvector_tapered_mv(
                     time_slices_list, tapering_func=TAPERING_FUNC,
                     lat_col=LAT_COL, lon_col=LON_COL, val_col=VAL_COL, device=DEVICE_DW
                 )
 
                 I_sample = dwl.calculate_sample_periodogram_vectorized(J_vec)
-                taper_autocorr_grid = dwl.calculate_taper_autocorrelation_fft(taper_grid, n1, n2, DEVICE_DW)
+                taper_autocorr_grid = dwl.calculate_taper_autocorrelation_multivariate(taper_grid, obs_masks, n1, n2, DEVICE_DW)
+                del obs_masks
 
                 optimizer_dw = torch.optim.LBFGS(
-                    params_list, lr=1.0, max_iter=20, history_size=100,
-                    line_search_fn="strong_wolfe", tolerance_grad=1e-7
+                    params_list, lr=1.0, max_iter=20, max_eval=100,
+                    history_size=10, line_search_fn="strong_wolfe", tolerance_grad=1e-5
                 )
 
                 start_time = time.time()
@@ -176,8 +177,7 @@ def cli(
                     rmsre=0.0
                 )
 
-                date = datetime.now().strftime("%m%d%y")
-                common_filename = f"real_dw_summary_LBFGS_{grid_res}_{date}"
+                common_filename = f"real_dw_july_22_23_24_25"
 
                 json_filepath = output_path / f"{common_filename}.json"
                 current_data = BaseLogger.load_list(json_filepath)

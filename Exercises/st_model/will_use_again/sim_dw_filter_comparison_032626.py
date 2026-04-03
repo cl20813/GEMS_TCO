@@ -240,13 +240,14 @@ def run_dw(dw_module, reg_map, reg_agg, lat_r, lon_r, initial_vals,
 
     p_dw = [torch.tensor([val], device=device, dtype=DTYPE, requires_grad=True)
             for val in initial_vals]
-    J_vec, n1, n2, p_time, taper = dwl.generate_Jvector_tapered(
+    J_vec, n1, n2, p_time, taper, obs_masks = dwl.generate_Jvector_tapered_mv(
         time_slices, dwl.cgn_hamming, LAT_COL, LON_COL, VAL_COL, device)
     I_samp = dwl.calculate_sample_periodogram_vectorized(J_vec)
-    t_auto = dwl.calculate_taper_autocorrelation_fft(taper, n1, n2, device)
+    t_auto = dwl.calculate_taper_autocorrelation_multivariate(taper, obs_masks, n1, n2, device)
+    del obs_masks
     opt_dw = torch.optim.LBFGS(
-        p_dw, lr=1.0, max_iter=20, history_size=100,
-        line_search_fn="strong_wolfe", tolerance_grad=1e-5)
+        p_dw, lr=1.0, max_iter=20, max_eval=20,
+        history_size=10, line_search_fn="strong_wolfe", tolerance_grad=1e-5)
 
     t0 = time.time()
     _, _, _, loss_dw, _ = dwl.run_lbfgs_tapered(

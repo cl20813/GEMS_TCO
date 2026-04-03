@@ -373,12 +373,13 @@ def cli(
     unique_times = torch.unique(cur_df[:, 3])
     time_slices_list = [cur_df[cur_df[:, 3] == t_val] for t_val in unique_times]
     
-    J_vec_obs, n1, n2, p_time, taper_grid = dwl.generate_Jvector_tapered( 
-        time_slices_list, tapering_func=TAPERING_FUNC, 
+    J_vec_obs, n1, n2, p_time, taper_grid, obs_masks = dwl.generate_Jvector_tapered_mv(
+        time_slices_list, tapering_func=TAPERING_FUNC,
         lat_col=0, lon_col=1, val_col=2, device=DEVICE
     )
     I_sample_obs = dwl.calculate_sample_periodogram_vectorized(J_vec_obs)
-    taper_autocorr_grid = dwl.calculate_taper_autocorrelation_fft(taper_grid, n1, n2, DEVICE)
+    taper_autocorr_grid = dwl.calculate_taper_autocorrelation_multivariate(taper_grid, obs_masks, n1, n2, DEVICE)
+    del obs_masks
 
     optimizer_dw = torch.optim.LBFGS(params_dw, lr=1.0, max_iter=20, line_search_fn="strong_wolfe")
     print("Fitting Whittle...")
@@ -435,16 +436,17 @@ def cli(
             day_slice_diff = apply_spatial_difference(day_slice) # <--- DIFFERENCING APPLIED
             boot_slices.append(day_slice_diff)
             
-        J_vec_boot, boot_n1, boot_n2, _, boot_taper_grid = dwl.generate_Jvector_tapered(
+        J_vec_boot, boot_n1, boot_n2, _, boot_taper_grid, boot_obs_masks = dwl.generate_Jvector_tapered_mv(
              boot_slices, tapering_func=TAPERING_FUNC, lat_col=0, lon_col=1, val_col=2, device=DEVICE
         )
         I_sample_boot = dwl.calculate_sample_periodogram_vectorized(J_vec_boot)
-        
+
         # Dynamic Taper Update
         if (boot_n1 != obs_n1) or (boot_n2 != obs_n2):
-            current_taper_autocorr = dwl.calculate_taper_autocorrelation_fft(boot_taper_grid, boot_n1, boot_n2, DEVICE)
+            current_taper_autocorr = dwl.calculate_taper_autocorrelation_multivariate(boot_taper_grid, boot_obs_masks, boot_n1, boot_n2, DEVICE)
         else:
             current_taper_autocorr = taper_autocorr_grid
+        del boot_obs_masks
 
         if best_params_dw.grad is not None: best_params_dw.grad.zero_()
         

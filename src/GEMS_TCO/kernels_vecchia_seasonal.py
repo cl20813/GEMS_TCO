@@ -365,9 +365,9 @@ class VecchiaAR1Daily(_CovBase):
         ]
 
         optimizer = torch.optim.LBFGS(
-            params_list, lr=lr, max_iter=max_iter,
+            params_list, lr=lr, max_iter=max_iter, max_eval=max_iter,
             tolerance_grad=tolerance_grad, tolerance_change=1e-9,
-            history_size=100
+            history_size=10, line_search_fn="strong_wolfe"
         )
 
         def closure():

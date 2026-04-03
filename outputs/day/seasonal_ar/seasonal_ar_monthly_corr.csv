@@ -1,0 +1,13 @@
+lag,label,pearson_r,n_pairs
+1,lag-1 (prev month),0.0033,23
+2,lag-2,-0.0546,22
+3,lag-3,-0.3938,21
+4,lag-4,0.258,20
+5,lag-5,-0.0684,19
+6,lag-6 (same month prev year),0.0681,18
+7,lag-7,-0.578,17
+8,lag-8,0.1036,16
+9,lag-9,0.0102,15
+10,lag-10,0.5271,14
+11,lag-11,-0.0658,13
+12,lag-12 (same month 2yr ago),-0.1343,12
