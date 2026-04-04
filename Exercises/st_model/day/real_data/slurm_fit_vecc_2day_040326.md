@@ -50,7 +50,7 @@ sbatch fit_vecc_2day_040326.sh
 #SBATCH --time=72:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=120G
+#SBATCH --mem=150G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
 #SBATCH --nodelist=gpu043
@@ -76,9 +76,9 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_gpu_vecc_2day_v05_040326.p
     --years "2022,2023,2024,2025" \
     --mm-cond-number 100 \
     --nheads 0 \
-    --limit-a 20 \
-    --limit-b 20 \
-    --limit-c 20 \
+    --limit-a 12 \
+    --limit-b 12 \
+    --limit-c 12 \
     --daily-stride 2 \
     --keep-exact-loc
 

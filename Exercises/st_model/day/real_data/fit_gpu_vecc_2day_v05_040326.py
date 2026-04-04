@@ -16,6 +16,7 @@ Output CSV: real_vecc_2day_july_22_23_24_25_mm{mm}.csv
   `day` column format: "YYYY-MM-DD_DD" (e.g. "2022-07-01_02")
 """
 import sys
+import gc
 import time
 import json
 import pandas as pd
@@ -233,7 +234,15 @@ def cli(
                 import traceback
                 print(f"Window {win_idx} ({day_str}) Failed: {e}")
                 traceback.print_exc()
-                continue
+
+            finally:
+                # Free GPU memory between windows regardless of success/failure
+                for _var in ['win_map_vecc', 'model_instance', 'optimizer_vecc',
+                             'params_list_vecc']:
+                    if _var in dir():
+                        del _var
+                gc.collect()
+                torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":
