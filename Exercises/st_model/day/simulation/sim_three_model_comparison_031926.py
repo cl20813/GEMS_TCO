@@ -361,15 +361,15 @@ def cli(
 
     # ── True parameters ────────────────────────────────────────────────────────
     # Scenario A — original real-data fitted parameters
-    true_dict = {
-        'sigmasq':    13.059,
-        'range_lat':  0.154,
-        'range_lon':  0.195,
-        'range_time': 1.0,
-        'advec_lat':  0.0218,
-        'advec_lon':  -0.1689,
-        'nugget':     0.247,
-    }
+    #true_dict = {
+    #    'sigmasq':    13.059,
+    #    'range_lat':  0.154,
+    #    'range_lon':  0.195,
+    #    'range_time': 1.0,
+    #    'advec_lat':  0.0218,
+    #    'advec_lon':  -0.1689,
+    #    'nugget':     0.247,
+    #}
 
     # Scenario B (revised)
     # true_dict = {
@@ -394,15 +394,15 @@ def cli(
     #}
 
     # Scenario D — strong lat advection, moderate lon advection
-    #true_dict = {
-    #    'sigmasq':    10.0,
-    #    'range_lat':  0.5,
-    #    'range_lon':  0.6,
-    #    'range_time': 2.5,
-    #    'advec_lat':  0.25,
-    #    'advec_lon':  -0.16,
-    #    'nugget':     1.2,
-    #}
+    true_dict = {
+        'sigmasq':    10.0,
+        'range_lat':  0.5,
+        'range_lon':  0.6,
+        'range_time': 2.5,
+        'advec_lat':  0.25,
+        'advec_lon':  -0.16,
+        'nugget':     1.2,
+    }
 
     phi2 = 1.0 / true_dict['range_lon']
     phi1 = true_dict['sigmasq'] * phi2

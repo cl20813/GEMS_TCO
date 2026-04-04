@@ -51,7 +51,7 @@ sbatch sim_three_models_031926.sh
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu039
+#SBATCH --nodelist=gpu033
 
 #### Load Modules
 module purge

@@ -201,8 +201,8 @@ def cli(
     # ── Load fitted estimates (all years, all three methods) ─────────────────
     est_path   = Path(config.amarel_estimates_day_path) / "july_22_23_24_25"
     dw_csv     = est_path / "real_dw_july_22_23_24_25.csv"
-    vecc_csv   = est_path / "real_vecc_july_22_23_24_25_h1000_mm16.csv"
-    cauchy_csv = est_path / "real_cauchy_b10_july_22_23_24_25_h1000_mm100.csv"
+    vecc_csv   = est_path / "real_vecc_july_22_23_24_25_mm20.csv"
+    cauchy_csv = est_path / "real_cauchy_b10_july_22_23_24_25_mm20.csv"
 
     for label, path in [("DW", dw_csv), ("VC", vecc_csv), ("CY", cauchy_csv)]:
         if not path.exists():

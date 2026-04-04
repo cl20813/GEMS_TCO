@@ -180,7 +180,12 @@ def cli(
                 common_filename = f"real_dw_july_22_23_24_25"
 
                 json_filepath = output_path / f"{common_filename}.json"
-                current_data = BaseLogger.load_list(json_filepath)
+                try:
+                    current_data = BaseLogger.load_list(json_filepath)
+                    if not isinstance(current_data, list):
+                        current_data = []
+                except Exception:
+                    current_data = []
                 current_data.append(res.__dict__)
                 with json_filepath.open('w', encoding='utf-8') as f:
                     json.dump(current_data, f, separators=(",", ":"), indent=4)

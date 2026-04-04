@@ -1,0 +1,100 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath, amssymb, booktabs, geometry, bm}
+\geometry{margin=2.5cm}
+
+\title{\texttt{cross\_periodogram\_test\_cauchy\_040126.py}\\[0.5em]
+        \large Mathematical Summary}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\bigskip
+\noindent\textbf{Fixed setup.}
+Grid $n_1=11$ (lat) $\times$ $n_2=20$ (lon), $p=8$ time steps,
+physical spacing $\Delta_1=0.44^{\circ}$\,lat, $\Delta_2=0.50^{\circ}$\,lon,
+$\Delta_t=1\,\mathrm{h}$,
+observation fraction 70\,\% (spatially clustered random missing, seed-fixed
+and held constant across all Monte Carlo iterations), Hamming taper.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Field Simulation via FFT Circulant Embedding}
+
+A stationary random field on a finite grid is not periodic; thus, naive FFT simulation introduces boundary artefacts. Circulant embedding avoids this by doubling the domain in every dimension ($P_d = 2n_d$), constructing a circulant covariance matrix on the enlarged grid whose spectral density is non-negative, simulating on that grid, and retaining only the original $n_1 \times n_2 \times p$ sub-block.
+
+Concretely, with $P_1=2n_1$, $P_2=2n_2$, $P_t=2p$, we construct $C \in \mathbb{R}^{P_1 \times P_2 \times P_t}$ by evaluating $C_X$ at the physical lag grid $(i\Delta_1, j\Delta_2, k\Delta_t)$ with wrap-around (negative lags for $i > P_1/2$, etc.). Then:
+\[
+  \hat{X} = \sqrt{\max(\operatorname{Re}[\mathcal{F}[C]], 0)} \odot \mathcal{F}[Z], \qquad Z \sim \mathcal{N}(0, I_{P_1 P_2 P_t}),
+\]
+\[
+  X = \operatorname{Re}[\mathcal{F}^{-1}[\hat{X}]]_{n_1 \times n_2 \times p}.
+\]
+The $\max(\cdot, 0)$ clamp corrects for small negative numerical eigenvalues. $\mathcal{F}[Z]$ generates complex white noise in the spectral domain. Nugget noise $\varepsilon_{\mathbf{s}}^{(q)} \overset{\text{iid}}{\sim} \mathcal{N}(0, \tau)$ is added independently at each observed cell.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Empirical Sample Cross-Periodogram}
+
+\subsection{Observation Mask and Taper}
+A Hamming taper $h_{(i,j)}$ is defined to reduce leakage from the grid boundaries.
+\[
+  h_{(i,j)} = \left(0.54 - 0.46\cos\frac{2\pi i}{n_1}\right) \left(0.54 - 0.46\cos\frac{2\pi j}{n_2}\right).
+\]
+Let $\mathcal{O}^{(q)}$ be the set of observed cells at time $q$. The per-variate tapered weight is:
+\[
+  g_{\mathbf{s}}^{(q)} = h_{\mathbf{s}} \cdot \mathbf{1}[\mathbf{s} \in \mathcal{O}^{(q)}], \qquad H_q = \sum_{\mathbf{s}}(g_{\mathbf{s}}^{(q)})^2.
+\]
+
+\subsection{Tapered DFT (J-vector)}
+The taper is applied element-wise in the spatial domain before the 2D DFT:
+\[
+  J^{(q)}(\boldsymbol{\omega}_{\mathbf{k}}) = \frac{1}{2\pi\sqrt{H_q}} \mathcal{F}_{2D}[g^{(q)} \odot X^{(q)}](\mathbf{k}).
+\]
+The physical frequencies $\boldsymbol{\omega}_{\mathbf{k}} = (\omega^{\text{lat}}_{k_1}, \omega^{\text{lon}}_{k_2})$ are determined by the spacing $\Delta_1, \Delta_2$.
+
+\subsection{Monte Carlo Periodogram Estimation}
+The sample cross-periodogram for a single realization is $\hat{I}^{qr}(\boldsymbol{\omega}_{\mathbf{k}}) = J^{(q)}(\boldsymbol{\omega}_{\mathbf{k}}) \overline{J^{(r)}(\boldsymbol{\omega}_{\mathbf{k}})}$. After $N_{\text{iter}}$ iterations, the empirical expectation is:
+\[
+  \bar{I}^{qr}_{\text{emp}}(\boldsymbol{\omega}_{\mathbf{k}}) = \frac{1}{N_{\text{iter}}} \sum_{\ell=1}^{N_{\text{iter}}} \hat{I}^{qr}_{\ell}(\boldsymbol{\omega}_{\mathbf{k}}).
+\]
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Theoretical Expected Cross-Periodogram}
+
+\subsection{Taper Cross-Autocorrelation ($c_{g,n}$)}
+The cross-correlation of tapered weights characterizes the distortion of the spectrum:
+\[
+  c_{g,n}^{(qr)}(\mathbf{u}) = \frac{\sum_{\mathbf{s}} g_{\mathbf{s}}^{(q)} g_{\mathbf{s}+\mathbf{u}}^{(r)}}{\sqrt{H_q H_r}}, \qquad \mathbf{u} \in \mathbb{Z}^2.
+\]
+The resulting 4D tensor of shape $(p, p, 2n_1-1, 2n_2-1)$ \textbf{quantifies both spectral leakage from the finite-domain taper and the effect of time-varying observation masks on the cross-spectral structure}. It maps how power spills across frequencies due to the finite domain and missing data patterns (masks).
+
+\subsection{Aliasing-corrected Kernel (Lemma 2)}
+To account for \textbf{periodic folding (aliasing)} inherent in the DFT, we define the kernel for $\mathbf{u} \in \{0, \dots, n_1-1\} \times \{0, \dots, n_2-1\}$:
+\[
+  \tilde{\xi}^{qr}(\mathbf{u}) = \sum_{k \in \{0,-n_1\}} \sum_{l \in \{0,-n_2\}}
+  C_X\!\bigl((u_1+k)\Delta_1,\,(u_2+l)\Delta_2,\,(q-r)\Delta_t\bigr)
+  \cdot c_{g,n}^{(qr)}(u_1+k,\, u_2+l)
+\]
+\noindent\textit{Technical Note}: This summation ensures that the theoretical expectation matches the circular geometry of the FFT. The indices $k \in \{0, -n_1\}$ are chosen because the support of $c_{g,n}$ is restricted to $[-(n_i-1), n_i-1]$. For a lag $u_1=3$ with $n_1=10$, the index $u_1-n_1 = -7$ is within the valid support of the taper autocorrelation, whereas $u_1+n_1 = 13$ is outside. Thus, we only sum the nearest valid periodic contributions. Aliasing represents folding of high-frequency power into lower frequency power. Since the discrete-time spectrum is the sum---not the average---of its continuous-time counterparts, we sum the aliased terms without normalization. This preserves the total energy and matches the scale of the empirical periodogram.
+
+\subsection{Expected Periodogram via FFT}
+The $p \times p$ cross-spectral matrix at each frequency is obtained by:
+\[
+  \boxed{ E^{qr}_{\text{theory}}(\boldsymbol{\omega}) = \frac{1}{(2\pi)^2} \mathcal{F}_{2D}[\tilde{\xi}^{qr}](\boldsymbol{\omega}) }
+\]
+The final tensor shape is $(n_1, n_2, p, p)$. This is the true expected cross-periodogram $\mathbb{E}[\hat{I}^{qr}(\bm{\omega})]$
+under the assumed model, accounting for the Hamming taper and missing-data
+structure. It serves as the denominator in the Debiased Whittle loss,
+correcting for the bias introduced by tapering and irregular observations.
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Validation Metrics and Results}
+
+The convergence is validated using the Mean Absolute Difference (MAD):
+\[
+  \text{MAD} = \frac{1}{n_1 n_2 p^2} \sum_{\boldsymbol{\omega}, q, r} \left| \bar{I}^{qr}_{\text{emp}}(\boldsymbol{\omega}) - E^{qr}_{\text{theory}}(\boldsymbol{\omega}) \right|.
+\]
+
+\textbf{Results}: For a simulation study with $N_{\text{iter}} = 1000$, the obtained MAD was \textbf{0.00648}, confirming the numerical accuracy of the Debiased Spatial Whittle formulation.
+
+\end{document}

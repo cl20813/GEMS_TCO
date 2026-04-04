@@ -185,7 +185,7 @@ def cli(
     # ── Load fitted estimates (all years, both methods) ───────────────────────
     est_path = Path(config.amarel_estimates_day_path) / "july_22_23_24_25"
     dw_csv   = est_path / "real_dw_july_22_23_24_25.csv"
-    vecc_csv = est_path / "real_vecc_july_22_23_24_25_h0_mm100.csv"
+    vecc_csv = est_path / "real_vecc_july_22_23_24_25_mm20.csv"
     if not dw_csv.exists() or not vecc_csv.exists():
         print(f"[Error] Missing estimate CSVs in {est_path}")
         raise SystemExit(1)

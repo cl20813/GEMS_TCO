@@ -52,8 +52,8 @@ sbatch fit_dw_031826.sh
 ```bash
 #!/bin/bash
 #SBATCH --job-name=fit_dw_040226
-#SBATCH --output=/home/jl2815/tco/exercise_output/fit_dw_040226.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/fit_dw_040226.err
+#SBATCH --output=/home/jl2815/tco/exercise_output/fit_dw_040226_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/fit_dw_040226_%j.err
 #SBATCH --time=48:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8

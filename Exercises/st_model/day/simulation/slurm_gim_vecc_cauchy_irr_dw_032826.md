@@ -17,8 +17,8 @@ scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/si
   - VC / CY: per-unit score outer products — `jac.T @ jac / N_units²`
 - **Input estimates**:
   - DW  : `real_dw_july_22_23_24_25.csv`
-  - VC  : `real_vecc_july_22_23_24_25_h1000_mm16.csv`
-  - CY  : `real_cauchy_b10_july_22_23_24_25_h1000_m100.csv`
+  - VC  : `real_vecc_july_22_23_24_25_mm20.csv`
+  - CY  : `real_cauchy_b10_july_22_23_24_25_mm20.csv`
 - **Skip policy**: a day is skipped if **any** of the three models has no estimate for that day
 
 ---
