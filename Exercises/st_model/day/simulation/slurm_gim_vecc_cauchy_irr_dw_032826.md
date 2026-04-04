@@ -62,7 +62,7 @@ sbatch sim_gim_vecc_cauchy_irr_dw_032826.sh
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu033
+#SBATCH --nodelist=gpu035
 
 #### Load Modules
 module purge
@@ -84,10 +84,10 @@ srun python /home/jl2815/tco/exercise_25/st_model/sim_gim_vecc_cauchy_irr_dw_032
     --v 0.5 \
     --gc-beta 1.0 \
     --mm-cond-number 100 \
-    --nheads 1000 \
-    --limit-a 16 \
-    --limit-b 16 \
-    --limit-c 16 \
+    --nheads 0 \
+    --limit-a 20 \
+    --limit-b 20 \
+    --limit-c 20 \
     --daily-stride 2
 
 echo "Current date and time: $(date)"
