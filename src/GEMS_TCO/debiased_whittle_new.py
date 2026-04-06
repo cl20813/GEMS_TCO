@@ -485,7 +485,13 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
     @staticmethod
     def whittle_likelihood_loss_tapered(params, I_sample, n1, n2, p_time, taper_autocorr_grid, delta1, delta2):
         """
-        ✅ Whittle Likelihood Loss (AVERAGED) using data tapering.
+        Whittle Likelihood Loss (AVERAGED) using data tapering.
+
+        Separable filter [-1,1;1,-1] has |H(ω₁,ω₂)|² = 4sin²(ω₁/2)·4sin²(ω₂/2),
+        which is zero on the entire ω₁=0 row AND ω₂=0 column.
+        These frequencies are excluded via boolean mask BEFORE any matrix operations
+        to avoid near-singular solves that propagate NaN across the full batch.
+        Valid interior frequencies: (n1-1)×(n2-1)  (skip row 0 and col 0).
         """
         device = I_sample.device
         params_tensor = params.to(device)
@@ -495,7 +501,7 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
             return torch.tensor(float('nan'), device=device, dtype=torch.float64)
 
         I_expected = debiased_whittle_likelihood.expected_periodogram_fft_tapered(
-            params_tensor, n1, n2, p_time, taper_autocorr_grid, 
+            params_tensor, n1, n2, p_time, taper_autocorr_grid,
             delta1, delta2
         )
 
@@ -503,64 +509,59 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
             print("Warning: NaN/Inf returned from expected_periodogram calculation.")
             return torch.tensor(float('nan'), device=device, dtype=torch.float64)
 
-        eye_matrix = torch.eye(p_time, dtype=torch.complex128, device=device)
-        diag_vals = torch.abs(I_expected.diagonal(dim1=-2, dim2=-1))
-        mean_diag_abs = diag_vals.mean().item() if diag_vals.numel() > 0 and not torch.isnan(diag_vals).all() else 1.0
-        diag_load = max(mean_diag_abs * 1e-8, 1e-9)
-        I_expected_stable = I_expected + eye_matrix * diag_load
+        # ── Axis exclusion: mask BEFORE any matrix op ─────────────────────────
+        # I_expected and I_sample: (n1, n2, p, p). Skip ω₁=0 (row 0) and ω₂=0 (col 0).
+        # Valid slice: rows 1..n1-1, cols 1..n2-1  → shape (n1-1, n2-1, p, p)
+        if n1 > 1 and n2 > 1:
+            I_exp_valid  = I_expected[1:, 1:]    # (n1-1, n2-1, p, p)
+            I_samp_valid = I_sample[1:, 1:]
+            num_terms    = (n1 - 1) * (n2 - 1)
+        else:
+            I_exp_valid  = I_expected
+            I_samp_valid = I_sample
+            num_terms    = n1 * n2
 
-        sign, logabsdet = torch.linalg.slogdet(I_expected_stable)
+        if num_terms == 0:
+            return torch.tensor(float('nan'), device=device, dtype=torch.float64)
+
+        eye_matrix   = torch.eye(p_time, dtype=torch.complex128, device=device)
+        diag_vals    = torch.abs(I_exp_valid.diagonal(dim1=-2, dim2=-1))
+        mean_diag_abs = diag_vals.mean().item() if diag_vals.numel() > 0 and not torch.isnan(diag_vals).all() else 1.0
+        diag_load    = max(mean_diag_abs * 1e-8, 1e-9)
+        I_exp_stable = I_exp_valid + eye_matrix * diag_load
+
+        sign, logabsdet = torch.linalg.slogdet(I_exp_stable)
         if torch.any(sign.real <= 1e-9):
-            print("Warning: Non-positive determinant encountered. Applying penalty.")
-            log_det_term = torch.where(sign.real > 1e-9, logabsdet, torch.tensor(1e10, device=device, dtype=torch.float64))
+            log_det_term = torch.where(sign.real > 1e-9, logabsdet,
+                                       torch.tensor(1e10, device=device, dtype=torch.float64))
         else:
             log_det_term = logabsdet
 
-        if torch.isnan(I_sample).any() or torch.isinf(I_sample).any():
-            print("Warning: NaN/Inf detected in I_sample input to likelihood.")
-            return torch.tensor(float('nan'), device=device)
+        if torch.isnan(I_samp_valid).any() or torch.isinf(I_samp_valid).any():
+            print("Warning: NaN/Inf detected in I_sample (valid frequencies).")
+            return torch.tensor(float('nan'), device=device, dtype=torch.float64)
 
         try:
-            solved_term = torch.linalg.solve(I_expected_stable, I_sample)
-            trace_term = torch.einsum('...ii->...', solved_term).real
+            solved_term = torch.linalg.solve(I_exp_stable, I_samp_valid)
+            trace_term  = torch.einsum('...ii->...', solved_term).real
         except torch.linalg.LinAlgError as e:
-            print(f"Warning: LinAlgError during solve: {e}. Applying high loss penalty.")
+            print(f"Warning: LinAlgError during solve: {e}.")
             return torch.tensor(float('inf'), device=device, dtype=torch.float64)
 
         if torch.isnan(trace_term).any() or torch.isinf(trace_term).any():
-            print("Warning: NaN/Inf detected in trace_term. Returning NaN loss.")
+            print("Warning: NaN/Inf in trace_term. Returning NaN loss.")
             return torch.tensor(float('nan'), device=device, dtype=torch.float64)
 
-        likelihood_terms = log_det_term + trace_term
+        likelihood_terms = log_det_term + trace_term  # (n1-1, n2-1)
 
         if torch.isnan(likelihood_terms).any():
-            print("Warning: NaN detected in likelihood_terms before summation. Returning NaN loss.")
+            print("Warning: NaN in likelihood_terms. Returning NaN loss.")
             return torch.tensor(float('nan'), device=device, dtype=torch.float64)
 
-        total_sum = torch.sum(likelihood_terms)
-
-        # Exclude w1=0 row and w2=0 column entirely (separable filter zeros out these axes).
-        # Row 0 sum + Col 0 sum - DC (counted twice):
-        if n1 > 0 and n2 > 0:
-            axis_sum = likelihood_terms[0, :].sum() + likelihood_terms[:, 0].sum() - likelihood_terms[0, 0]
-        else:
-            axis_sum = torch.tensor(0.0, device=device, dtype=torch.float64)
-        if torch.isnan(axis_sum) or torch.isinf(axis_sum):
-            axis_sum = torch.tensor(0.0, device=device, dtype=torch.float64)
-
-        sum_loss = total_sum - axis_sum if (n1 > 1 and n2 > 1) else total_sum
-
-        # --- REVISION: Convert sum to average ---
-        # Valid terms = interior (n1-1)*(n2-1) frequencies only
-        num_terms = (n1 - 1) * (n2 - 1)
-        if num_terms > 0:
-            avg_loss = sum_loss / num_terms
-        else:
-            avg_loss = sum_loss # Handle edge case of 1x1 grid (where num_terms=0)
-        # --- End Revision ---
+        avg_loss = likelihood_terms.sum() / num_terms
 
         if torch.isnan(avg_loss) or torch.isinf(avg_loss):
-            print("Warning: NaN/Inf detected in final loss. Returning Inf penalty.")
+            print("Warning: NaN/Inf in final loss. Returning Inf penalty.")
             return torch.tensor(float('inf'), device=device, dtype=torch.float64)
 
         return avg_loss

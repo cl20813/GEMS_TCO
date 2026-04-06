@@ -1,32 +1,26 @@
 """
-sim_dw_filter_comparison_032626.py
+sim_dw_lat1d_040526.py
 
-Simulation study: Debiased Whittle with new 2D filter [[-1,1],[1,-1]].
+Simulation study: Debiased Whittle with lat-only 1D differencing.
 
-Filter: Z(i,j) = -X(i,j) + X(i+1,j) + X(i,j+1) - X(i+1,j+1)
-  (separable product filter; excludes ω₁=0 row AND ω₂=0 column)
+Comparison target: sim_three_model_comparison_031926.py (DW column)
+  - Same data generation pipeline (FFT circulant + step3 obs→cell)
+  - Same true parameters (Scenario D)
+  - Same random init scheme
+  - Only change: debiased_whittle_lat1d  (Z(i,j) = X(i+1,j) - X(i,j))
+    vs.          debiased_whittle        (Z(i,j) = -2X(i,j)+X(i+1,j)+X(i,j+1))
 
-Architecture:
-  - Sample side  (J-vector, periodogram, taper): debiased_whittle  (dw_old)
-    → has generate_Jvector_tapered_mv / calculate_taper_autocorrelation_multivariate
-  - Spatial filter + model side (expected periodogram, likelihood): debiased_whittle_new
-    → uses new [[-1,1],[1,-1]] filter and axis-exclusion loss
+Output grid after lat-only diff:
+  (nlat-1) × nlon   (lon dimension unchanged, vs. (nlat-1)×(nlon-1) in v05)
 
-Comparison target: sim_dw_lat1d_040526.py (lat-only 1D filter)
-  - Same true parameters (Scenario: real-data-calibrated)
-  - Same random init scheme, same obs patterns
-
-Usage (local):
-  cd /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/will_use_again
-  python sim_dw_filter_comparison_032626.py --num-iters 5 --lat-factor 10 --lon-factor 4
-
-Usage (Amarel):
-  python sim_dw_filter_comparison_032626.py --num-iters 300
+Usage:
+  cd /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation
+  python sim_dw_lat1d_040526.py --num-iters 1 --lat-factor 10 --lon-factor 4
+  python sim_dw_lat1d_040526.py --num-iters 1000
 """
 
 import sys
 import time
-import os
 from datetime import datetime
 import numpy as np
 import torch
@@ -36,25 +30,13 @@ import typer
 from pathlib import Path
 from sklearn.neighbors import BallTree
 
-# ── Path setup ────────────────────────────────────────────────────────────────
-AMAREL_SRC = "/home/jl2815/tco"
-LOCAL_SRC  = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
-_src = AMAREL_SRC if os.path.exists(AMAREL_SRC) else LOCAL_SRC
-sys.path.insert(0, _src)
+sys.path.append("/Users/joonwonlee/Documents/GEMS_TCO-1/src")
 
+from GEMS_TCO import debiased_whittle_lat1d as debiased_whittle
 from GEMS_TCO import configuration as config
-# sample-side methods (generate_Jvector_tapered_mv, etc.)
-from GEMS_TCO import debiased_whittle     as dw_sample
-# filter + model-side (debiased_whittle_preprocess with new filter, run_lbfgs_tapered)
-from GEMS_TCO import debiased_whittle_new as dw_new
 from GEMS_TCO.data_loader import load_data_dynamic_processed
 
-is_amarel = os.path.exists(config.amarel_data_load_path)
-
-# GPU used only for FFT field generation; DW likelihood runs on CPU
-# (GPU device-side asserts are triggered by near-singular matrices in DW spectral ops)
-DEVICE     = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-DEVICE_DW  = torch.device("cpu")
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DTYPE  = torch.float64
 DELTA_LAT_BASE = 0.044
 DELTA_LON_BASE = 0.063
@@ -160,6 +142,15 @@ def precompute_mapping_indices(ref_day_map, lats_hr, lons_hr, grid_coords, sorte
 
 def assemble_reg_dataset(field, step3_per_t, hr_idx_per_t, src_locs_per_t,
                          sorted_keys, grid_coords, true_params, t_offset=21.0):
+    """
+    Build regular-grid dataset (reg_map, reg_agg) from one FFT field realization.
+
+    reg_map[key]: [N_grid, 11]
+      Assigned cell: [grid_lat, grid_lon, sim_val, t, D1..D7]
+      Unassigned   : [grid_lat, grid_lon, NaN,     t, D1..D7]
+
+    This is the input to debiased_whittle_lat1d.debiased_whittle_preprocess.
+    """
     nugget_std = torch.sqrt(torch.exp(true_params[6]))
     N_grid     = grid_coords.shape[0]
     field_flat = field.reshape(-1, 8)
@@ -237,47 +228,47 @@ def calculate_rmsre(out_params, true_dict):
 
 @app.command()
 def cli(
-    num_iters:  int   = typer.Option(300,  help="Simulation iterations"),
-    years:      str   = typer.Option("2022,2024,2025", help="Years to sample obs patterns from"),
-    month:      int   = typer.Option(7,    help="Reference month"),
-    lat_range:  str   = typer.Option("-3,2",    help="lat_min,lat_max"),
-    lon_range:  str   = typer.Option("121,131", help="lon_min,lon_max"),
-    lat_factor: int   = typer.Option(100,  help="High-res lat multiplier"),
-    lon_factor: int   = typer.Option(20,   help="High-res lon multiplier"),
-    init_noise: float = typer.Option(0.7,  help="Uniform noise half-width in log space"),
-    dw_steps:   int   = typer.Option(5,    help="LBFGS max steps per run"),
-    seed:       int   = typer.Option(42,   help="Random seed"),
+    v: float = typer.Option(0.5,    help="Matern smoothness"),
+    mm_cond_number: int = typer.Option(100, help="(unused: kept for API parity with three-model script)"),
+    num_iters: int = typer.Option(1000, help="Simulation iterations"),
+    years: str = typer.Option("2022,2024,2025", help="Years to sample obs patterns from"),
+    month: int = typer.Option(7,    help="Reference month"),
+    lat_range: str = typer.Option("-3,2",    help="lat_min,lat_max"),
+    lon_range: str = typer.Option("121,131", help="lon_min,lon_max"),
+    lat_factor: int = typer.Option(100, help="High-res lat multiplier"),
+    lon_factor: int = typer.Option(20,  help="High-res lon multiplier"),
+    init_noise: float = typer.Option(0.7, help="Uniform noise half-width in log space"),
+    seed: int = typer.Option(42,    help="Random seed"),
 ) -> None:
 
     rng = np.random.default_rng(seed)
 
-    lat_r      = [float(x) for x in lat_range.split(',')]
-    lon_r      = [float(x) for x in lon_range.split(',')]
+    lat_r  = [float(x) for x in lat_range.split(',')]
+    lon_r  = [float(x) for x in lon_range.split(',')]
     years_list = [y.strip() for y in years.split(',')]
 
     print(f"Device     : {DEVICE}")
-    print(f"Filter     : DW_new [[-1,1],[1,-1]]  (2D separable, axis exclusion)")
+    print(f"Filter     : lat-only 1D diff  Z(i,j)=X(i+1,j)-X(i,j)")
     print(f"Region     : lat {lat_r}, lon {lon_r}")
     print(f"Years      : {years_list}  month={month}")
     print(f"Iterations : {num_iters}")
     print(f"Init noise : ±{init_noise} log-space")
 
-    output_path = Path(config.amarel_estimates_day_path if is_amarel
-                       else config.mac_estimates_day_path)
+    output_path = Path(config.amarel_estimates_day_path)
     output_path.mkdir(parents=True, exist_ok=True)
     date_tag    = datetime.now().strftime("%m%d%y")
-    csv_raw     = f"sim_dw_new_{date_tag}.csv"
-    csv_summary = f"sim_dw_new_summary_{date_tag}.csv"
+    csv_raw     = f"sim_dw_lat1d_{date_tag}.csv"
+    csv_summary = f"sim_dw_lat1d_summary_{date_tag}.csv"
 
-    # ── True parameters (real-data-calibrated) ────────────────────────────────
+    # ── True parameters: Scenario D (same as three-model script) ─────────────
     true_dict = {
-        'sigmasq':    13.059,
-        'range_lat':  0.154,
-        'range_lon':  0.195,
-        'range_time': 1.0,
-        'advec_lat':  0.0218,
-        'advec_lon':  -0.1689,
-        'nugget':     0.247,
+        'sigmasq':    10.0,
+        'range_lat':  0.5,
+        'range_lon':  0.6,
+        'range_time': 2.5,
+        'advec_lat':  0.25,
+        'advec_lon':  -0.16,
+        'nugget':     1.2,
     }
     phi2      = 1.0 / true_dict['range_lon']
     phi1      = true_dict['sigmasq'] * phi2
@@ -298,14 +289,14 @@ def cli(
 
     # ── Load GEMS obs patterns ────────────────────────────────────────────────
     print("\n[Setup 1/4] Loading GEMS obs patterns...")
-    data_loader = load_data_dynamic_processed(
-        config.amarel_data_load_path if is_amarel else config.mac_data_load_path)
+    data_loader = load_data_dynamic_processed(config.amarel_data_load_path)
     all_day_mappings = []
     year_dfmaps, year_means = {}, {}
 
     for yr in years_list:
         df_map_yr, _, _, monthly_mean_yr = data_loader.load_maxmin_ordered_data_bymonthyear(
-            lat_lon_resolution=[1, 1], mm_cond_number=8,
+            lat_lon_resolution=[1, 1],
+            mm_cond_number=mm_cond_number,
             years_=[yr], months_=[month],
             lat_range=lat_r, lon_range=lon_r,
             is_whittle=False
@@ -328,7 +319,7 @@ def cli(
     n_lat        = len(lats_grid)
     n_lon        = len(lons_grid)
     print(f"  Grid: {n_lat} lat × {n_lon} lon = {N_grid} cells")
-    print(f"  After 2D diff: {n_lat-1} lat × {n_lon-1} lon = {(n_lat-1)*(n_lon-1)} cells per time step")
+    print(f"  After lat-only diff: {n_lat-1} lat × {n_lon} lon = {(n_lat-1)*n_lon} cells per time step")
 
     # ── Build high-res grid & precompute mappings ─────────────────────────────
     print("[Setup 3/4] Building high-res grid and precomputing obs mappings...")
@@ -370,14 +361,10 @@ def cli(
     n_reg_valid = (~torch.isnan(first_reg[:, 2])).sum().item()
     print(f"  reg_map first step: {n_reg_valid}/{N_grid} valid (assigned) cells")
 
-    # ── DW objects ────────────────────────────────────────────────────────────
-    # sample side: J-vector, periodogram, taper autocorrelation
-    dwl_sample = dw_sample.debiased_whittle_likelihood()
-    # model side: expected periodogram + likelihood (new filter [[-1,1],[1,-1]])
-    dwl_model  = dw_new.debiased_whittle_likelihood()
-
-    DWL_STEPS = dw_steps
+    # ── DW optimization settings ──────────────────────────────────────────────
+    DWL_STEPS = 5
     LAT_COL, LON_COL, VAL_COL, TIME_COL = 0, 1, 2, 3
+    dwl = debiased_whittle.debiased_whittle_likelihood()
 
     P_COLS   = ['sigmasq_est', 'range_lat_est', 'range_lon_est',
                 'range_t_est', 'advec_lat_est', 'advec_lon_est', 'nugget_est']
@@ -398,6 +385,7 @@ def cli(
         print(f"  Iter {it+1}/{num_iters}  (skipped: {skipped})")
         print(f"{'='*55}")
 
+        # Sample obs pattern and make random init
         yr_it, d_it, step3_per_t, hr_idx_per_t, src_locs_per_t = \
             all_day_mappings[rng.integers(len(all_day_mappings))]
         initial_vals = make_random_init(rng)
@@ -415,12 +403,11 @@ def cli(
                 DUMMY_KEYS, grid_coords, true_params)
             del field
 
-            # ── DW_new: 2D filter [[-1,1],[1,-1]] (runs on CPU) ──────────────
-            p_dw = [torch.tensor([val], device=DEVICE_DW, dtype=DTYPE, requires_grad=True)
+            # ── DW with lat-only 1D diff ──────────────────────────────────────
+            p_dw = [torch.tensor([val], device=DEVICE, dtype=DTYPE, requires_grad=True)
                     for val in initial_vals]
 
-            # Apply new 2D filter (from dw_new module)
-            db = dw_new.debiased_whittle_preprocess(
+            db = debiased_whittle.debiased_whittle_preprocess(
                 [reg_agg], [reg_map], day_idx=0,
                 params_list=[
                     true_dict['sigmasq'], true_dict['range_lat'],  true_dict['range_lon'],
@@ -430,34 +417,32 @@ def cli(
                 lat_range=lat_r, lon_range=lon_r
             )
 
-            # generate_spatially_filtered_days applies new 2D filter:
-            #   Z(i,j) = -X(i,j) + X(i+1,j) + X(i,j+1) - X(i+1,j+1)
-            # output grid: (nlat-1) × (nlon-1)
+            # generate_spatially_filtered_days applies lat-only diff:
+            #   Z(i,j) = X(i+1,j) - X(i,j)
+            # output grid: (nlat-1) × nlon
             cur_df      = db.generate_spatially_filtered_days(
-                lat_r[0], lat_r[1], lon_r[0], lon_r[1]).to(DEVICE_DW)
+                lat_r[0], lat_r[1], lon_r[0], lon_r[1]).to(DEVICE)
             unique_t    = torch.unique(cur_df[:, TIME_COL])
             time_slices = [cur_df[cur_df[:, TIME_COL] == t] for t in unique_t]
 
-            # Compute sample periodogram using dw_sample (has generate_Jvector_tapered_mv)
-            J_vec, n1, n2, p_time, taper, obs_masks = dwl_sample.generate_Jvector_tapered_mv(
-                time_slices, dwl_sample.cgn_hamming, LAT_COL, LON_COL, VAL_COL, DEVICE_DW)
-            I_samp = dwl_sample.calculate_sample_periodogram_vectorized(J_vec)
-            t_auto = dwl_sample.calculate_taper_autocorrelation_multivariate(
-                taper, obs_masks, n1, n2, DEVICE_DW)
+            J_vec, n1, n2, p_time, taper, obs_masks = dwl.generate_Jvector_tapered_mv(
+                time_slices, dwl.cgn_hamming, LAT_COL, LON_COL, VAL_COL, DEVICE)
+            I_samp = dwl.calculate_sample_periodogram_vectorized(J_vec)
+            t_auto = dwl.calculate_taper_autocorrelation_multivariate(
+                taper, obs_masks, n1, n2, DEVICE)
             del obs_masks
 
-            print(f"  DW_new grid: {n1}×{n2}, {p_time} time steps")
+            print(f"  DW grid: {n1}×{n2}, {p_time} time steps  (lat-only diff: nlon={n2} unchanged)")
 
-            # Optimize using dw_new likelihood (axis-exclusion loss, new filter Cov_Z)
             opt_dw = torch.optim.LBFGS(
                 p_dw, lr=1.0, max_iter=20, max_eval=100,
                 history_size=10, line_search_fn="strong_wolfe", tolerance_grad=1e-5)
 
             t0 = time.time()
-            _, _, _, loss_dw, _ = dwl_model.run_lbfgs_tapered(
+            _, _, _, loss_dw, _ = dwl.run_lbfgs_tapered(
                 params_list=p_dw, optimizer=opt_dw, I_sample=I_samp,
                 n1=n1, n2=n2, p_time=p_time, taper_autocorr_grid=t_auto,
-                max_steps=DWL_STEPS, device=DEVICE_DW)
+                max_steps=DWL_STEPS, device=DEVICE)
             t_dw = time.time() - t0
 
             out_dw = [p.item() for p in p_dw]
@@ -476,7 +461,7 @@ def cli(
             'iter':          it + 1,
             'obs_year':      yr_it,
             'obs_day':       d_it,
-            'model':         'DW_new',
+            'model':         'DW_lat1d',
             'rmsre':         round(rmsre_dw,         6),
             'time_s':        round(t_dw,             2),
             'loss_dw':       round(float(loss_dw),   6),
@@ -502,7 +487,7 @@ def cli(
         print(f"  {'param':<12} {'true':>{cw}}  {'mean':>{cw}}  {'bias':>{cw}}  {'RMSRE':>{cw}}  {'MdARE':>{cw}}  {'P90-P10':>{cw}}")
         print(f"  {'-'*80}")
         for lbl, col, tv in zip(P_LABELS, P_COLS, TRUE_VALS):
-            vals    = np.array([r[col] for r in records])
+            vals = np.array([r[col] for r in records])
             mean_   = np.mean(vals)
             bias_   = mean_ - tv
             rmsre_  = np.sqrt(np.mean(((vals - tv) / abs(tv)) ** 2))
@@ -525,28 +510,28 @@ def cli(
     for lbl, col, tv in zip(P_LABELS, P_COLS, TRUE_VALS):
         vals = df_final[col].values
         summary_rows.append({
-            'param':   lbl,
-            'true':    tv,
-            'mean':    round(float(np.mean(vals)),   6),
-            'median':  round(float(np.median(vals)), 6),
-            'bias':    round(float(np.mean(vals) - tv), 6),
-            'std':     round(float(np.std(vals)),    6),
-            'RMSRE':   round(float(np.sqrt(np.mean(((vals - tv) / abs(tv)) ** 2))), 6),
-            'MdARE':   round(float(np.median(np.abs((vals - tv) / abs(tv)))), 6),
-            'P10':     round(float(np.percentile(vals, 10)), 6),
-            'P90':     round(float(np.percentile(vals, 90)), 6),
-            'P90_P10': round(float(np.percentile(vals, 90) - np.percentile(vals, 10)), 6),
+            'param':      lbl,
+            'true':       tv,
+            'mean':       round(float(np.mean(vals)),   6),
+            'median':     round(float(np.median(vals)), 6),
+            'bias':       round(float(np.mean(vals) - tv), 6),
+            'std':        round(float(np.std(vals)),    6),
+            'RMSRE':      round(float(np.sqrt(np.mean(((vals - tv) / abs(tv)) ** 2))), 6),
+            'MdARE':      round(float(np.median(np.abs((vals - tv) / abs(tv)))), 6),
+            'P10':        round(float(np.percentile(vals, 10)), 6),
+            'P90':        round(float(np.percentile(vals, 90)), 6),
+            'P90_P10':    round(float(np.percentile(vals, 90) - np.percentile(vals, 10)), 6),
         })
     summary_rows.append({
-        'param':   'Overall',
-        'true':    float('nan'),
-        'mean':    float('nan'),
-        'median':  float('nan'),
-        'bias':    float('nan'),
-        'std':     float('nan'),
-        'RMSRE':   round(float(np.mean(df_final['rmsre'].values)), 6),
-        'MdARE':   round(float(np.median(df_final['rmsre'].values)), 6),
-        'P10':     float('nan'), 'P90': float('nan'), 'P90_P10': float('nan'),
+        'param':  'Overall',
+        'true':   float('nan'),
+        'mean':   float('nan'),
+        'median': float('nan'),
+        'bias':   float('nan'),
+        'std':    float('nan'),
+        'RMSRE':  round(float(np.mean(df_final['rmsre'].values)), 6),
+        'MdARE':  round(float(np.median(df_final['rmsre'].values)), 6),
+        'P10':    float('nan'), 'P90': float('nan'), 'P90_P10': float('nan'),
     })
 
     df_summary = pd.DataFrame(summary_rows)
