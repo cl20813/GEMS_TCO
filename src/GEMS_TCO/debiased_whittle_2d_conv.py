@@ -796,21 +796,26 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
             return torch.tensor(float('nan'), device=device, dtype=torch.float64)
 
         total_sum = torch.sum(likelihood_terms)
-        dc_term = likelihood_terms[0, 0] if n1 > 0 and n2 > 0 else torch.tensor(0.0, device=device, dtype=torch.float64)
-        if torch.isnan(dc_term).any() or torch.isinf(dc_term).any():
-            print("Warning: NaN/Inf detected in DC term. Setting to 0.")
-            dc_term = torch.tensor(0.0, device=device, dtype=torch.float64)
 
-        # This is the sum of non-zero frequency likelihood terms
-        sum_loss = total_sum - dc_term if (n1 > 1 or n2 > 1) else total_sum
+        # 2D conv filter: |H(w)|^2 = 4sin^2(w1/2)*4sin^2(w2/2) = 0 when w1=0 OR w2=0.
+        # Exclude entire w1=0 row AND entire w2=0 column (inclusion-exclusion to avoid
+        # double-counting the (0,0) corner).
+        if n1 > 0 and n2 > 0:
+            row0_sum = likelihood_terms[0, :].sum()  # w1=0 row: n2 terms
+            col0_sum = likelihood_terms[:, 0].sum()  # w2=0 col: n1 terms
+            dc_term  = likelihood_terms[0, 0]        # (0,0) counted twice above
+            if torch.isnan(row0_sum + col0_sum - dc_term):
+                row0_sum = col0_sum = dc_term = torch.tensor(0.0, device=device, dtype=torch.float64)
+            sum_loss = total_sum - row0_sum - col0_sum + dc_term
+        else:
+            sum_loss = total_sum
 
-        # --- REVISION: Convert sum to average ---
-        num_terms = (n1 * n2) - 1
+        # Number of remaining terms: (n1-1)*(n2-1)
+        num_terms = (n1 - 1) * (n2 - 1)
         if num_terms > 0:
             avg_loss = sum_loss / num_terms
         else:
-            avg_loss = sum_loss # Handle edge case of 1x1 grid (where num_terms=0)
-        # --- End Revision ---
+            avg_loss = sum_loss
 
         if torch.isnan(avg_loss) or torch.isinf(avg_loss):
             print("Warning: NaN/Inf detected in final loss. Returning Inf penalty.")
@@ -873,19 +878,23 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
             return torch.tensor(float('nan'), device=device, dtype=torch.float64)
 
         total_sum = torch.sum(likelihood_terms)
-        dc_term = likelihood_terms[0, 0] if n1 > 0 and n2 > 0 else torch.tensor(0.0, device=device)
-        if torch.isnan(dc_term).any() or torch.isinf(dc_term).any():
-            print("Warning: NaN/Inf detected in DC term. Setting to 0.")
-            dc_term = torch.tensor(0.0, device=device, dtype=torch.float64)
 
-        # This is the sum of non-zero frequency likelihood terms
-        sum_loss = total_sum - dc_term if (n1 > 1 or n2 > 1) else total_sum
+        # 2D conv filter: exclude w1=0 row AND w2=0 column (same as tapered version)
+        if n1 > 0 and n2 > 0:
+            row0_sum = likelihood_terms[0, :].sum()
+            col0_sum = likelihood_terms[:, 0].sum()
+            dc_term  = likelihood_terms[0, 0]
+            if torch.isnan(row0_sum + col0_sum - dc_term):
+                row0_sum = col0_sum = dc_term = torch.tensor(0.0, device=device, dtype=torch.float64)
+            sum_loss = total_sum - row0_sum - col0_sum + dc_term
+        else:
+            sum_loss = total_sum
 
         if torch.isnan(sum_loss) or torch.isinf(sum_loss):
             print("Warning: NaN/Inf detected in final loss. Returning Inf penalty.")
             return torch.tensor(float('inf'), device=device, dtype=torch.float64)
 
-        return sum_loss, n1, n2 #total_sum to sum_loss
+        return sum_loss, n1, n2
     
 
     # =========================================================================

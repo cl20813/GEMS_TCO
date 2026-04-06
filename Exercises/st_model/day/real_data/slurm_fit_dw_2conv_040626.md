@@ -102,7 +102,7 @@ scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/
 | `apply_first_diff` kernel | 2×2 | 2×1 | 2×2 |
 | 출력 그리드 | (nlat-1)×(nlon-1) | (nlat-1)×nlon | (nlat-1)×(nlon-1) |
 | Cov_Z 항 수 | 9항 (cross term 포함) | 3항 | 9항 (대칭, cross 없음) |
-| DC exclusion | (0,0)만 | ω₁=0 row만 | ω₁=0 row + ω₂=0 col |
+| DC exclusion | (0,0)만 | ω₁=0 row만 | ω₁=0 row + ω₂=0 col ✓ (버그수정 040626) |
 | `taper_autocorr_grid` | 4D multivariate | 4D multivariate | 4D multivariate ✓ |
 | `DELTA_LAT/LON` | 0.044/0.063 | 0.044/0.063 | 0.044/0.063 ✓ |
 | API 모듈 | `debiased_whittle` | `debiased_whittle_lat1d` | `debiased_whittle_2d_conv` |
@@ -112,3 +112,7 @@ scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/
   `(0,1)` 항이 `b_idx=1` → `offset_a2 = 1 * delta2 = 0.063` 올바르게 참조
 - lat1d와 달리 lon 방향 shift `δ₂` 가 Cov_Z에 반영됨
 - `run_lbfgs_tapered` 내 `DELTA_LAT=0.044, DELTA_LON=0.063` 하드코딩 — 2D 필터에도 동일 적용 ✓
+- **[버그수정 040626]** `whittle_likelihood_loss_tapered` 및 `_sum`: DC(0,0)만 제외 → ω₁=0 row + ω₂=0 col 전체 제외로 수정
+  - 이전: `sum_loss = total_sum - dc_term`, `num_terms = n1*n2 - 1`
+  - 수정: `sum_loss = total_sum - row0_sum - col0_sum + dc_term`, `num_terms = (n1-1)*(n2-1)`
+  - 이유: |H(ω)|²=4sin²(ω₁/2)·4sin²(ω₂/2)=0 when ω₁=0 OR ω₂=0 → 해당 frequency에서 f_Z(ω)=0 → 무한대 penalty가 likelihood에 포함되면 추정 편향 발생
