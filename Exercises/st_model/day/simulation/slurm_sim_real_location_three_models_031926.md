@@ -48,7 +48,7 @@ sbatch sim_three_models_031926.sh
 #SBATCH --time=48:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=120G
+#SBATCH --mem=150G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
 #SBATCH --nodelist=gpu033
@@ -74,8 +74,8 @@ srun python /home/jl2815/tco/exercise_25/st_model/sim_three_model_comparison_031
     --limit-b 20 \
     --limit-c 20 \
     --daily-stride 2 \
-    --num-iters 1000 \
-    --years "2022,2024,2025" \
+    --num-iters 300 \
+    --years "2022,2023,2024,2025" \
     --month 7 \
     --lat-factor 100 \
     --lon-factor 10 \

@@ -713,6 +713,16 @@ def cli(
                 row += f"  {np.mean(vals):>{cw}.4f}"
             print(row)
         print(f"  {'-'*55}")
+        # Min | Q1 | Q2 | Q3 | Max per parameter
+        print(f"\n  [Min | Q1 | Q2(med) | Q3 | Max]")
+        for lbl, col, tv in zip(p_labels_, p_cols_, true_vals_):
+            print(f"  {lbl} (true={tv:.4f})")
+            for m in MODELS_:
+                vals = np.array([r[col] for r in records if r['model'] == m])
+                vmin = vals.min()
+                q1, q2, q3 = np.percentile(vals, [25, 50, 75])
+                vmax = vals.max()
+                print(f"    {m:<12} {vmin:.4f} | {q1:.4f} | {q2:.4f} | {q3:.4f} | {vmax:.4f}")
         # Per-parameter RMSRE rows
         per_param_by_model = {}
         per_param_mdare_by_model = {}
@@ -817,6 +827,22 @@ def cli(
             row_str += f"  {me:>6.3f}({sd:.3f})"
         print(row_str)
 
+    # ── 5-Number summary (Min | Q1 | Q2/Med | Q3 | Max) ──────────────────────
+    print(f"\n{'='*75}")
+    print(f"  5-NUMBER SUMMARY  (Min | Q1 | Median | Q3 | Max)")
+    print(f"{'='*75}")
+    for lbl, col, tv in zip(param_labels, param_cols, true_vals):
+        print(f"\n  {lbl}  (true = {tv:.4f})")
+        hdr5 = f"    {'Model':<12}  {'Min':>8}  {'Q1':>8}  {'Median':>8}  {'Q3':>8}  {'Max':>8}"
+        print(hdr5)
+        print(f"    {'-'*58}")
+        for m in MODELS:
+            sub  = df_final[df_final['model'] == m][col].dropna().values
+            vmin = sub.min()
+            q1, q2, q3 = np.percentile(sub, [25, 50, 75])
+            vmax = sub.max()
+            print(f"    {m:<12}  {vmin:>8.4f}  {q1:>8.4f}  {q2:>8.4f}  {q3:>8.4f}  {vmax:>8.4f}")
+
     # ── Save summary CSV (parameter × model) ──────────────────────────────────
     summary_rows = []
     for lbl, col, tv in zip(param_labels, param_cols, true_vals):
@@ -843,6 +869,121 @@ def cli(
     pd.DataFrame(summary_rows).to_csv(output_path / csv_summary, index=False)
     print(f"\n  Saved: {csv_raw}  (all {num_iters} iterations, raw)")
     print(f"  Saved: {csv_summary}     (per-parameter RMSRE table)")
+
+    # ── Distribution plots (saved as PNG) ─────────────────────────────────────
+    try:
+        import matplotlib
+        matplotlib.use('Agg')   # non-interactive — works on Amarel / no display
+        import matplotlib.pyplot as plt
+        from scipy.stats import gaussian_kde
+
+        plot_dir = output_path / "plots"
+        plot_dir.mkdir(exist_ok=True)
+
+        MODEL_COLORS  = {'Vecc_Irr': '#2196F3', 'Vecc_Reg': '#FF9800', 'DW': '#4CAF50'}
+        MODEL_MARKERS = {'Vecc_Irr': 'o',        'Vecc_Reg': 's',       'DW': '^'}
+
+        # ── 1. Per-parameter plot: 3 panels (one per model), hist + KDE ──────
+        for lbl, col, tv in zip(param_labels, param_cols, true_vals):
+            fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+            fig.suptitle(f"Distribution of estimates: {lbl}  (true = {tv:.4f})",
+                         fontsize=12, fontweight='bold')
+            for ax, m in zip(axes, MODELS):
+                sub  = df_final[df_final['model'] == m][col].dropna().values
+                c    = MODEL_COLORS[m]
+                n_b  = max(5, min(20, len(sub) // 3 + 1))
+                ax.hist(sub, bins=n_b, alpha=0.35, color=c, density=True,
+                        edgecolor='white', linewidth=0.5)
+                if len(sub) >= 3:
+                    try:
+                        kde = gaussian_kde(sub)
+                        xs  = np.linspace(sub.min(), sub.max(), 300)
+                        ax.plot(xs, kde(xs), color=c, lw=2.0)
+                    except Exception:
+                        pass
+                ax.axvline(tv, color='black',  lw=1.5, ls='--', label=f'true={tv:.3f}')
+                ax.axvline(np.median(sub), color=c, lw=1.5, ls=':',
+                           label=f'median={np.median(sub):.3f}')
+                q1, q3 = np.percentile(sub, [25, 75])
+                ax.axvspan(q1, q3, alpha=0.10, color=c)
+                ax.set_title(m, fontsize=11)
+                ax.set_xlabel(lbl, fontsize=9)
+                ax.legend(fontsize=8, framealpha=0.7)
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+            plt.tight_layout()
+            plt.savefig(plot_dir / f"{col}_dist.png", dpi=130, bbox_inches='tight')
+            plt.close()
+
+        # ── 2. Overview: all 7 params, 3 models overlaid per panel ──────────
+        n_params = len(param_labels)
+        n_cols   = 2
+        n_rows   = (n_params + 1) // n_cols
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(14, 4 * n_rows))
+        axes = axes.flatten()
+        for i, (lbl, col, tv) in enumerate(zip(param_labels, param_cols, true_vals)):
+            ax = axes[i]
+            for m in MODELS:
+                sub = df_final[df_final['model'] == m][col].dropna().values
+                c   = MODEL_COLORS[m]
+                if len(sub) >= 3:
+                    try:
+                        kde = gaussian_kde(sub)
+                        xs  = np.linspace(sub.min(), sub.max(), 300)
+                        ax.plot(xs, kde(xs), color=c, lw=2.0, label=m)
+                        ax.fill_between(xs, kde(xs), alpha=0.10, color=c)
+                    except Exception:
+                        ax.hist(sub, bins=10, alpha=0.3, color=c, density=True, label=m)
+                else:
+                    ax.hist(sub, bins=5, alpha=0.3, color=c, density=True, label=m)
+            ax.axvline(tv, color='black', lw=1.5, ls='--', label=f'true={tv:.3f}')
+            ax.set_title(f"{lbl}  (true={tv:.3f})", fontsize=10)
+            ax.legend(fontsize=8, framealpha=0.7)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+        for j in range(n_params, len(axes)):
+            axes[j].set_visible(False)
+        fig.suptitle(f"Parameter Estimate Distributions  ({num_iters} iterations)",
+                     fontsize=13, fontweight='bold')
+        plt.tight_layout()
+        plt.savefig(plot_dir / "all_params_overview.png", dpi=130, bbox_inches='tight')
+        plt.close()
+
+        # ── 3. Boxplot comparison across models ──────────────────────────────
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(14, 4 * n_rows))
+        axes = axes.flatten()
+        for i, (lbl, col, tv) in enumerate(zip(param_labels, param_cols, true_vals)):
+            ax = axes[i]
+            data_bp = [df_final[df_final['model'] == m][col].dropna().values for m in MODELS]
+            bp = ax.boxplot(data_bp, labels=MODELS, patch_artist=True, widths=0.5,
+                            medianprops={'color': 'black', 'lw': 2})
+            for patch, m in zip(bp['boxes'], MODELS):
+                patch.set_facecolor(MODEL_COLORS[m])
+                patch.set_alpha(0.6)
+            ax.axhline(tv, color='black', lw=1.5, ls='--', label=f'true={tv:.3f}')
+            ax.set_title(f"{lbl}  (true={tv:.3f})", fontsize=10)
+            ax.legend(fontsize=8, framealpha=0.7)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+        for j in range(n_params, len(axes)):
+            axes[j].set_visible(False)
+        fig.suptitle(f"Boxplot of Parameter Estimates  ({num_iters} iterations)",
+                     fontsize=13, fontweight='bold')
+        plt.tight_layout()
+        plt.savefig(plot_dir / "all_params_boxplot.png", dpi=130, bbox_inches='tight')
+        plt.close()
+
+        print(f"\n  Plots saved → {plot_dir}/")
+        print(f"  - {col}_dist.png  × {n_params}  (per-param, 3-panel hist+KDE)")
+        print(f"  - all_params_overview.png  (KDE overlay, all params)")
+        print(f"  - all_params_boxplot.png   (boxplot comparison)")
+
+    except ImportError as ie:
+        print(f"\n  [Plot skipped — missing library: {ie}]")
+    except Exception as pe:
+        import traceback
+        print(f"\n  [Plot generation failed: {pe}]")
+        traceback.print_exc()
 
 
 if __name__ == "__main__":

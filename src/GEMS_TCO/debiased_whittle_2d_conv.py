@@ -202,7 +202,11 @@ class debiased_whittle_preprocess(full_vecc_dw_likelihoods):
         if lat_count < 2 or lon_count < 2:
             return torch.empty(0, 4)
 
-        # 2. Reshape and apply 2D conv kernel (2 x 2)
+        # 2. Sort by (lat, lon) so reshape is always lat-major, lon-minor
+        sort_idx = (df_tensor[:, 0] * 1e6 + df_tensor[:, 1]).argsort()
+        df_tensor = df_tensor[sort_idx]
+
+        # 3. Reshape and apply 2D conv kernel (2 x 2)
         # Z(i,j) = -X(i,j) + X(i,j+1) + X(i+1,j) - X(i+1,j+1)
         ozone_data = df_tensor[:, 2].reshape(1, 1, lat_count, lon_count)
         diff_kernel = torch.tensor([[[[-1., 1.], [1., -1.]]]], dtype=torch.float64, device=df_tensor.device)
