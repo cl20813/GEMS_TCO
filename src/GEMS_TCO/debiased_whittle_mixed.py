@@ -510,16 +510,25 @@ class debiased_whittle_likelihood:
             Ie_diff, I_samp_diff.to(dev), p_time, dev)   # (n1d, n2d)
 
         # ── Frequency masks ───────────────────────────────────────────────────
-        # Low-freq: from raw grid, k1≤K1 AND k2≤K2, DC excluded
+        # Low-freq: from raw grid
+        #   (a) rectangle {k1≤K1, k2≤K2}
+        #   (b) entire k1=0 row  — 2D diff filter H(0,ω2)=(e^0-1)(·)=0,
+        #       so these frequencies have zero expected power under diff for ALL θ.
+        #       Must be handled by raw, where f_raw(0,ω2) = f_X(0,ω2) > 0.
+        #   (c) entire k2=0 col  — same reason: H(ω1,0)=(·)(e^0-1)=0.
+        #   DC (0,0) excluded from likelihood.
         low_mask = torch.zeros(n1, n2, dtype=torch.bool, device=dev)
-        low_mask[:K1+1, :K2+1] = True
-        low_mask[0, 0] = False                      # DC always excluded
+        low_mask[:K1+1, :K2+1] = True   # rectangle
+        low_mask[0, :]          = True   # k1=0 row  → raw (H_diff=0 there)
+        low_mask[:, 0]          = True   # k2=0 col  → raw (H_diff=0 there)
+        low_mask[0, 0]          = False  # DC always excluded
 
-        # High-freq: from diff grid, NOT in low-freq corner
-        # (diff grid has no DC issue since H(0)=0, but we exclude it anyway
-        #  to match the low-freq region we already counted in raw)
+        # High-freq: from diff grid — interior only (k1>0 AND k2>0)
+        #   |H(ω1,ω2)|² = 4sin²(ω1/2)·4sin²(ω2/2) > 0  for k1>0, k2>0.
         high_mask = torch.ones(n1d, n2d, dtype=torch.bool, device=dev)
-        high_mask[:K1+1, :K2+1] = False            # exclude Ω_L region
+        high_mask[:K1+1, :K2+1] = False  # exclude low-freq rectangle
+        high_mask[0, :]          = False  # k1=0 row: H_diff=0, zero expected power
+        high_mask[:, 0]          = False  # k2=0 col: H_diff=0, zero expected power
 
         # ── Sums ─────────────────────────────────────────────────────────────
         sum_low  = terms_raw[low_mask].sum()

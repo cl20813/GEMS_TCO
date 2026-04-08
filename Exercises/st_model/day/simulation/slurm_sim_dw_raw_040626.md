@@ -59,7 +59,7 @@ sbatch sim_dw_raw_040626.sh
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu035
+#SBATCH --nodelist=gpu048
 
 module purge
 module use /projects/community/modulefiles
