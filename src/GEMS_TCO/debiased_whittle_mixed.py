@@ -422,7 +422,8 @@ class debiased_whittle_likelihood:
 
         if torch.isnan(cn).any():
             return torch.full((n1,n2,p_time,p_time), float('nan'), dtype=torch.complex128, device=dev)
-        return torch.fft.fft2(cn, dim=(0,1)).real * (1./(4.*cmath.pi**2))
+        result_raw = torch.fft.fft2(cn, dim=(0,1)) * (1./(4.*cmath.pi**2))
+        return (result_raw + result_raw.conj().transpose(-1, -2)) / 2.0
 
     @staticmethod
     def expected_periodogram_raw(params, n1, n2, p_time, taper_auto, delta1, delta2):
@@ -455,8 +456,8 @@ class debiased_whittle_likelihood:
         Is  = I_exp + eye * dl
 
         sign, logdet = torch.linalg.slogdet(Is)
-        logdet = torch.where(sign.real > 1e-9, logdet,
-                             torch.full_like(logdet, 1e10))
+        logdet = torch.where(sign.real > 1e-9, logdet.real,
+                             torch.full(logdet.shape, 1e10, device=logdet.device, dtype=torch.float64))
 
         try:
             trace = torch.einsum('...ii->...', torch.linalg.solve(Is, I_samp)).real

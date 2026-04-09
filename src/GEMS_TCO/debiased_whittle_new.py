@@ -469,12 +469,10 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         tilde_cn_tensor_c = tilde_cn_tensor.to(torch.complex128)
         
         fft_result = torch.fft.fft2(tilde_cn_tensor_c, dim=(0, 1))
-        
-        # Take Real part (Power Spectrum is real)
-        fft_result_real = fft_result.real 
-        
+
         normalization_factor = 1.0 / (4.0 * cmath.pi**2)
-        result = fft_result_real * normalization_factor
+        result_raw = fft_result * normalization_factor
+        result = (result_raw + result_raw.conj().transpose(-1, -2)) / 2.0
 
         return result
 
@@ -532,10 +530,10 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
 
         sign, logabsdet = torch.linalg.slogdet(I_exp_stable)
         if torch.any(sign.real <= 1e-9):
-            log_det_term = torch.where(sign.real > 1e-9, logabsdet,
+            log_det_term = torch.where(sign.real > 1e-9, logabsdet.real,
                                        torch.tensor(1e10, device=device, dtype=torch.float64))
         else:
-            log_det_term = logabsdet
+            log_det_term = logabsdet.real
 
         if torch.isnan(I_samp_valid).any() or torch.isinf(I_samp_valid).any():
             print("Warning: NaN/Inf detected in I_sample (valid frequencies).")

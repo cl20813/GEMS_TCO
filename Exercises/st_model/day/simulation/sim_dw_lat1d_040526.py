@@ -307,7 +307,7 @@ def cli(
 
     # ── Build regular target grid ─────────────────────────────────────────────
     print("[Setup 2/4] Building regular target grid...")
-    lats_grid = torch.arange(max(lat_r), min(lat_r) - 0.0001, -DELTA_LAT_BASE,
+    lats_grid = torch.arange(min(lat_r), max(lat_r) + 0.0001,  DELTA_LAT_BASE,
                               device=DEVICE, dtype=DTYPE)
     lons_grid = torch.arange(lon_r[0],   lon_r[1]  + 0.0001,  DELTA_LON_BASE,
                               device=DEVICE, dtype=DTYPE)

@@ -733,11 +733,11 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
             return torch.full(nan_shape, float('nan'), dtype=torch.complex128, device=device)
 
         fft_result = torch.fft.fft2(tilde_cn_tensor, dim=(0, 1))
-        fft_result_real = fft_result.real 
         normalization_factor = 1.0 / (4.0 * cmath.pi**2)
-        result = fft_result_real * normalization_factor
+        result_raw = fft_result * normalization_factor
+        result = (result_raw + result_raw.conj().transpose(-1, -2)) / 2.0
 
-        if torch.isnan(result).any(): print("Warning: NaN in expected_periodogram_fft_tapered output.")
+        if torch.isnan(result.real).any(): print("Warning: NaN in expected_periodogram_fft_tapered output.")
         return result
 
     # =========================================================================
@@ -774,9 +774,9 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         sign, logabsdet = torch.linalg.slogdet(I_expected_stable)
         if torch.any(sign.real <= 1e-9):
             print("Warning: Non-positive determinant encountered. Applying penalty.")
-            log_det_term = torch.where(sign.real > 1e-9, logabsdet, torch.tensor(1e10, device=device, dtype=torch.float64))
+            log_det_term = torch.where(sign.real > 1e-9, logabsdet.real, torch.tensor(1e10, device=device, dtype=torch.float64))
         else:
-            log_det_term = logabsdet
+            log_det_term = logabsdet.real
 
         if torch.isnan(I_sample).any() or torch.isinf(I_sample).any():
             print("Warning: NaN/Inf detected in I_sample input to likelihood.")
@@ -857,9 +857,9 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         sign, logabsdet = torch.linalg.slogdet(I_expected_stable)
         if torch.any(sign.real <= 1e-9):
             print("Warning: Non-positive determinant encountered. Applying penalty.")
-            log_det_term = torch.where(sign.real > 1e-9, logabsdet, torch.tensor(1e10, device=device, dtype=torch.float64))
+            log_det_term = torch.where(sign.real > 1e-9, logabsdet.real, torch.tensor(1e10, device=device, dtype=torch.float64))
         else:
-            log_det_term = logabsdet
+            log_det_term = logabsdet.real
 
         if torch.isnan(I_sample).any() or torch.isinf(I_sample).any():
             print("Warning: NaN/Inf detected in I_sample input to likelihood.")

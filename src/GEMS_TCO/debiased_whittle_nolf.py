@@ -88,10 +88,10 @@ class debiased_whittle_likelihood(_RawDWL):
         sign, logabsdet = torch.linalg.slogdet(I_exp_stab)
         if torch.any(sign.real <= 1e-9):
             log_det_term = torch.where(
-                sign.real > 1e-9, logabsdet,
+                sign.real > 1e-9, logabsdet.real,
                 torch.tensor(1e10, device=device, dtype=torch.float64))
         else:
-            log_det_term = logabsdet
+            log_det_term = logabsdet.real
 
         if torch.isnan(I_sample).any() or torch.isinf(I_sample).any():
             print("Warning: NaN/Inf in I_sample.")
