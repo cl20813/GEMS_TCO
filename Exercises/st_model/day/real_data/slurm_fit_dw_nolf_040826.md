@@ -84,7 +84,7 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_dw_nolf_day_v05_040826.py 
     --days "0,28" \
     --month 7 \
     --years "2022,2023,2024,2025" \
-    --alpha 0.20 \
+    --alpha 0.30 \
     --no-keep-exact-loc
 
 echo "Done: $(date)"

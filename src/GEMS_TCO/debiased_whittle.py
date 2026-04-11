@@ -198,7 +198,11 @@ class debiased_whittle_preprocess(full_vecc_dw_likelihoods):
         if lat_count < 2 or lon_count < 2:
             return torch.empty(0, 4)
 
-        # 2. Reshape data and define the correct kernel
+        # 2. Sort by (lat, lon) before reshape to ensure correct grid ordering
+        sidx = (df_tensor[:, 0] * 1e6 + df_tensor[:, 1]).argsort()
+        df_tensor = df_tensor[sidx]
+
+        # 3. Reshape data and define the correct kernel
         ozone_data = df_tensor[:, 2].reshape(1, 1, lat_count, lon_count)
         
         # ✅ CORRECT KERNEL: This kernel results in the standard first-order difference:

@@ -50,7 +50,7 @@ sbatch fit_dw_lat1d_040426.sh
 #SBATCH --job-name=dw_lat1d
 #SBATCH --output=/home/jl2815/tco/exercise_output/dw_lat1d_%j.out
 #SBATCH --error=/home/jl2815/tco/exercise_output/dw_lat1d_%j.err
-#SBATCH --time=48:00:00
+#SBATCH --time=26:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=120G
