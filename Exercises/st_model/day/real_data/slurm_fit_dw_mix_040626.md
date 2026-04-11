@@ -57,6 +57,7 @@ sbatch fit_dw_mix_040626.sh
 ```
 
 ```bash
+
 #!/bin/bash
 #SBATCH --job-name=dw_mixed
 #SBATCH --output=/home/jl2815/tco/exercise_output/dw_mixed_%j.out
@@ -67,7 +68,7 @@ sbatch fit_dw_mix_040626.sh
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu038
+#SBATCH --nodelist=gpu047
 
 module purge
 module use /projects/community/modulefiles
@@ -85,10 +86,11 @@ srun python /home/jl2815/tco/exercise_25/st_model/fit_dw_mix_day_v05_040626.py \
     --days "0,28" \
     --month 7 \
     --years "2022,2023,2024,2025" \
-    --freq-alpha 0.20 \
+    --freq-alpha 0.6 \
     --no-keep-exact-loc
 
 echo "Done: $(date)"
+
 ```
 
 ```bash

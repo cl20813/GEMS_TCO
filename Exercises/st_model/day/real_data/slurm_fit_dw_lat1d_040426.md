@@ -40,6 +40,7 @@ conda activate faiss_env
 ```bash
 cd ~/jobscript/tco/gp_exercise
 nano fit_dw_lat1d_040426.sh
+sbatch fit_dw_lat1d_040426.sh
 ```
 
 ```bash
@@ -55,7 +56,7 @@ nano fit_dw_lat1d_040426.sh
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu038
+#SBATCH --nodelist=gpu039
 
 module purge
 module use /projects/community/modulefiles

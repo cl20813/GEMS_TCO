@@ -60,7 +60,7 @@ sbatch fit_dw_031826.sh
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu046
+#SBATCH --nodelist=gpu044
 
 #### Load Modules
 module purge

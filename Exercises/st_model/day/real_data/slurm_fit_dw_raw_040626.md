@@ -59,7 +59,7 @@ sbatch fit_dw_raw_040626.sh
 #SBATCH --mem=120G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu043
+#SBATCH --nodelist=gpu042
 
 module purge
 module use /projects/community/modulefiles

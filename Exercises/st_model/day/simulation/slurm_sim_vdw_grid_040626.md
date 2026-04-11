@@ -50,6 +50,9 @@ conda activate faiss_env
 ```bash
 cd ~/jobscript/tco/gp_exercise
 nano sim_vdw_grid_040626.sh
+sbatch sim_vdw_grid_040626.sh
+
+
 ```
 
 ```bash
