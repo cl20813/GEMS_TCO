@@ -54,19 +54,18 @@ sbatch fit_dw_031826.sh
 #SBATCH --job-name=fit_dw_040226
 #SBATCH --output=/home/jl2815/tco/exercise_output/fit_dw_040226_%j.out
 #SBATCH --error=/home/jl2815/tco/exercise_output/fit_dw_040226_%j.err
-#SBATCH --time=26:00:00
+#SBATCH --time=12:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=120G
-#SBATCH --partition=gpu-redhat
-#SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu044
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=256G
+#SBATCH --partition=main-redhat
+
 
 #### Load Modules
 module purge
 module use /projects/community/modulefiles
 module load anaconda/2024.06-ts840
-module load cuda/12.1.0
+
 
 #### Initialize conda
 eval "$(conda shell.bash hook)"

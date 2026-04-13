@@ -50,23 +50,21 @@ sbatch fit_dw_lat1d_040426.sh
 #SBATCH --job-name=dw_lat1d
 #SBATCH --output=/home/jl2815/tco/exercise_output/dw_lat1d_%j.out
 #SBATCH --error=/home/jl2815/tco/exercise_output/dw_lat1d_%j.err
-#SBATCH --time=26:00:00
+#SBATCH --time=12:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=120G
-#SBATCH --partition=gpu-redhat
-#SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu039
+#SBATCH --cpus-per-task=32
+#SBATCH --mem=256G
+#SBATCH --partition=main-redhat
 
 module purge
 module use /projects/community/modulefiles
 module load anaconda/2024.06-ts840
-module load cuda/12.1.0
+
 eval "$(conda shell.bash hook)"
 conda activate faiss_env
 
 echo "Running on: $(hostname)"
-nvidia-smi
+
 
 srun python /home/jl2815/tco/exercise_25/st_model/fit_D_whittle_day_v06_lat1d_040426.py \
     --v 0.5 \

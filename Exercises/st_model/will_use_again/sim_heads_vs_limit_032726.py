@@ -1,47 +1,39 @@
 """
 sim_heads_vs_limit_032726.py
 
-Vecchia approximation efficiency study: nheads vs conditioning limit.
+Vecchia approximation: heads-as-low-frequency-diagnostic study.
 
 Research question
 -----------------
-For a fixed compute budget, is it better to allocate to:
-  (a) nheads  — exact GP block for the top-N max-min observations, or
-  (b) limit   — larger conditioning set for all remaining observations?
+Does nheads act as a low-frequency diagnostic?
+  - Short range (0.20/0.25°): local Vecchia already captures structure → heads negligible
+  - Long  range (1.50/2.00°): global skeleton matters → heads should win iso-compute
 
-Key iso-compute test (built into the grid):
-  (heads=0, limit=24)  vs  (heads=800, limit=16)  — similar wall-clock cost,
-  different budget allocation.  RMSRE tells which recovers parameters better.
+Design
+------
+Range cases : 'short' (range_lat=0.20, range_lon=0.25)
+              'long'  (range_lat=1.50, range_lon=2.00)
+Iso-compute :
+    (h=0,   L=24, 'limit_all')  ← limit에 올인
+    (h=400, L=16, 'balanced')   ← 절충
+    (h=800, L=12, 'heads_all')  ← heads에 올인
+→ 2 × 3 = 6 fits per iteration (one field generated per range case)
 
-Study design
-------------
-DGP  : Generalized Cauchy β=1.0 via FFT circulant embedding
-         (correctly specified — model and DGP are both Cauchy β=1.0)
-Grid :
-    nheads  ∈ {0, 100, 200, 400, 800}       5 values
-    limit   ∈ {4, 6, 8, 12, 16, 20, 24}    7 values  (limit_a = limit_b = limit_c)
-    → 35 combinations per iteration, all fitted on the same generated dataset.
-mm_cond_number = 30 (fixed for all combos; NNS map stores 30 neighbors).
+gc_beta = 1.0 fixed (Cauchy), correctly specified for both DGP and model.
+MM_COND = 30 (fixed NNS map; must be >= max limit = 24).
 
-NOTE on NLL comparison
-    Each (heads, limit) defines a different Vecchia likelihood approximation.
-    NLL differences across combos are not pure "goodness-of-fit" differences.
-    Use RMSRE and runtime as the primary efficiency metrics.
-    NLL is still useful within a fixed-limit group (varying heads only).
-
-Metrics per (nheads, limit):
-    loss    : Vecchia NLL at MLE
-    time_s  : elapsed wall-clock seconds
-    rmsre   : overall RMSRE vs true DGP params
-    per-param estimates (sigma, ranges, advections, nugget)
+Key prediction
+--------------
+  short range : RMSRE(limit_all) ≈ RMSRE(balanced) ≈ RMSRE(heads_all)
+  long  range : RMSRE(heads_all) < RMSRE(balanced)  < RMSRE(limit_all)
 
 Output
 ------
-    estimates/day/sim_heads_vs_limit_{date}_j{job_id}.csv        raw records
-    estimates/day/sim_heads_vs_limit_summary_{date}_j{job_id}.csv  mean/sd table
+    estimates/day/sim_heads_diagnostic_{date}_j{job_id}.csv
+    estimates/day/sim_heads_diagnostic_summary_{date}_j{job_id}.csv
 
 Parallel use (recommended: 10 jobs × 10 iters each = 100 total iters)
-    sbatch --array=0-9  (set --job-id=$SLURM_ARRAY_TASK_ID)
+    sbatch --array=0-9
     Merge CSVs afterward: pd.concat([pd.read_csv(f) for f in glob("*_j*.csv")])
 """
 
@@ -68,17 +60,27 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DTYPE  = torch.float64
 DELTA_LAT_BASE = 0.044
 DELTA_LON_BASE = 0.063
-GC_BETA_DGP    = 1.0
+GC_BETA        = 1.0
 
-HEADS_LIST  = [0, 100, 200, 400, 800]
-LIMITS_LIST = [4, 6, 8, 12, 16, 20, 24]
-COMBOS      = [(h, L) for h in HEADS_LIST for L in LIMITS_LIST]   # 35
-MM_COND     = 30   # fixed NNS map size; must be >= max(LIMITS_LIST)
+MM_COND = 30  # fixed NNS map; must be >= max(limit) = 24
+
+ISO_COMBOS = [
+    (0,   24, 'limit_all'),
+    (400, 16, 'balanced'),
+    (800, 12, 'heads_all'),
+]
+
+RANGE_CASES = {
+    'short': {'sigmasq': 10.0, 'range_lat': 0.20, 'range_lon': 0.25, 'range_time': 1.5,
+              'advec_lat': 0.02, 'advec_lon': -0.17, 'nugget': 0.25},
+    'long':  {'sigmasq': 10.0, 'range_lat': 1.50, 'range_lon': 2.00, 'range_time': 1.5,
+              'advec_lat': 0.02, 'advec_lon': -0.17, 'nugget': 0.25},
+}
 
 
 # ── Cauchy covariance for FFT data generation ─────────────────────────────────
 
-def get_covariance_on_grid_cauchy(lx, ly, lt, params, gc_beta=GC_BETA_DGP):
+def get_covariance_on_grid_cauchy(lx, ly, lt, params, gc_beta=GC_BETA):
     params = torch.clamp(params, min=-15.0, max=15.0)
     phi1, phi2, phi3, phi4 = (torch.exp(params[i]) for i in range(4))
     u_lat = lx - params[4] * lt
@@ -115,7 +117,7 @@ def generate_field_values(lats_hr, lons_hr, t_steps, params, dlat, dlon):
     return field.to(dtype=DTYPE, device=DEVICE)
 
 
-# ── Obs-location pipeline (identical to sim_cauchy_beta_comparison) ───────────
+# ── Obs-location pipeline ─────────────────────────────────────────────────────
 
 def apply_step3_1to1(src_np_valid, grid_coords_np, grid_tree):
     N_grid     = len(grid_coords_np)
@@ -192,6 +194,25 @@ def assemble_irr_dataset(field, step3_per_t, hr_idx_per_t, src_locs_per_t,
 
 # ── Parameter helpers ─────────────────────────────────────────────────────────
 
+def true_dict_to_log(true_dict):
+    phi2 = 1.0 / true_dict['range_lon']
+    phi1 = true_dict['sigmasq'] * phi2
+    phi3 = (true_dict['range_lon'] / true_dict['range_lat'])  ** 2
+    phi4 = (true_dict['range_lon'] / true_dict['range_time']) ** 2
+    return [np.log(phi1), np.log(phi2), np.log(phi3), np.log(phi4),
+            true_dict['advec_lat'], true_dict['advec_lon'], np.log(true_dict['nugget'])]
+
+
+def make_init(rng, true_log, init_noise):
+    noisy = list(true_log)
+    for i in [0, 1, 2, 3, 6]:
+        noisy[i] = true_log[i] + rng.uniform(-init_noise, init_noise)
+    for i in [4, 5]:
+        noisy[i] = true_log[i] + rng.uniform(-2 * max(abs(true_log[i]), 0.05),
+                                               2 * max(abs(true_log[i]), 0.05))
+    return noisy
+
+
 def backmap_params(p):
     if isinstance(p[0], torch.Tensor):
         p = [x.item() for x in p]
@@ -241,36 +262,17 @@ def cli(
 
     print(f"Device  : {DEVICE}")
     print(f"Job     : {job_id}  (seed={actual_seed})")
-    print(f"DGP     : Cauchy β={GC_BETA_DGP}  (correctly specified)")
-    print(f"Grid    : {len(COMBOS)} combos — heads {HEADS_LIST}  ×  limits {LIMITS_LIST}")
-    print(f"MM_COND : {MM_COND} (fixed NNS map for all combos)")
+    print(f"DGP     : Cauchy β={GC_BETA}  (correctly specified)")
+    print(f"Range cases : {list(RANGE_CASES.keys())}")
+    print(f"Iso-combos  : {[(h, L, name) for h, L, name in ISO_COMBOS]}")
+    print(f"MM_COND : {MM_COND}")
     print(f"Iters   : {num_iters}  lat×{lat_factor}  lon×{lon_factor}")
 
     output_path = Path(config.amarel_estimates_day_path)
     output_path.mkdir(parents=True, exist_ok=True)
     date_tag    = datetime.now().strftime("%m%d%y")
-    csv_raw     = output_path / f"sim_heads_vs_limit_{date_tag}_j{job_id}.csv"
-    csv_summary = output_path / f"sim_heads_vs_limit_summary_{date_tag}_j{job_id}.csv"
-
-    # ── True DGP parameters ────────────────────────────────────────────────────
-    true_dict = {'sigmasq': 10.0, 'range_lat': 0.2, 'range_lon': 0.25, 'range_time': 1.5,
-                 'advec_lat': 0.02, 'advec_lon': -0.17, 'nugget': 0.25}
-    phi2 = 1.0 / true_dict['range_lon']
-    phi1 = true_dict['sigmasq'] * phi2
-    phi3 = (true_dict['range_lon'] / true_dict['range_lat'])  ** 2
-    phi4 = (true_dict['range_lon'] / true_dict['range_time']) ** 2
-    true_log    = [np.log(phi1), np.log(phi2), np.log(phi3), np.log(phi4),
-                   true_dict['advec_lat'], true_dict['advec_lon'], np.log(true_dict['nugget'])]
-    true_params = torch.tensor(true_log, device=DEVICE, dtype=DTYPE)
-
-    def make_init(rng):
-        noisy = list(true_log)
-        for i in [0, 1, 2, 3, 6]:
-            noisy[i] = true_log[i] + rng.uniform(-init_noise, init_noise)
-        for i in [4, 5]:
-            noisy[i] = true_log[i] + rng.uniform(-2 * max(abs(true_log[i]), 0.05),
-                                                    2 * max(abs(true_log[i]), 0.05))
-        return noisy
+    csv_raw     = output_path / f"sim_heads_diagnostic_{date_tag}_j{job_id}.csv"
+    csv_summary = output_path / f"sim_heads_diagnostic_summary_{date_tag}_j{job_id}.csv"
 
     # ── Load obs patterns ──────────────────────────────────────────────────────
     print("\n[Setup 1/5] Loading GEMS obs patterns...")
@@ -319,14 +321,16 @@ def cli(
 
     # ── Shared NNS ordering (MM_COND=30, fixed for all combos) ────────────────
     print("[Setup 4/5] Computing maxmin ordering (MM_COND=30)...")
-    ord_grid, nns_grid = _orderings.maxmin_cpp(grid_coords.cpu().numpy()), None
+    ord_grid = _orderings.maxmin_cpp(grid_coords.cpu().numpy())
     nns_grid = _orderings.find_nns_l2(locs=grid_coords.cpu().numpy()[ord_grid], max_nn=MM_COND)
     print(f"  N_grid={N_grid}  MM_COND={MM_COND}")
 
     # ── Sanity check ──────────────────────────────────────────────────────────
     print("[Setup 5/5] Sanity check...")
-    field0 = generate_field_values(lats_hr, lons_hr, 8, true_params, dlat_hr, dlon_hr)
-    irr0, _ = assemble_irr_dataset(field0, *all_day_mappings[0][2:], DUMMY_KEYS, grid_coords, true_params)
+    _short_log    = true_dict_to_log(RANGE_CASES['short'])
+    _short_params = torch.tensor(_short_log, device=DEVICE, dtype=DTYPE)
+    field0 = generate_field_values(lats_hr, lons_hr, 8, _short_params, dlat_hr, dlon_hr)
+    irr0, _ = assemble_irr_dataset(field0, *all_day_mappings[0][2:], DUMMY_KEYS, grid_coords, _short_params)
     del field0
     n_v = (~torch.isnan(list(irr0.values())[0][:, 2])).sum().item()
     print(f"  Sample step valid obs: {n_v}/{N_grid}")
@@ -343,166 +347,176 @@ def cli(
 
         yr_it, d_it, step3_per_t, hr_idx_per_t, src_locs_per_t = \
             all_day_mappings[rng.integers(len(all_day_mappings))]
-        initial_vals = make_init(rng)
-        init_est     = backmap_params(initial_vals)
-        print(f"  Obs: {yr_it} day {d_it}  |  init σ²={init_est['sigmasq']:.3f}  "
-              f"r_lon={init_est['range_lon']:.3f}  nugget={init_est['nugget']:.3f}")
+        print(f"  Obs pattern: {yr_it} day {d_it}")
 
-        try:
-            field = generate_field_values(lats_hr, lons_hr, 8, true_params, dlat_hr, dlon_hr)
-            irr_map, _ = assemble_irr_dataset(
-                field, step3_per_t, hr_idx_per_t, src_locs_per_t,
-                DUMMY_KEYS, grid_coords, true_params)
-            del field
-            irr_map_ord = {k: v[ord_grid] for k, v in irr_map.items()}
-        except Exception as e:
-            skipped += 1
-            print(f"  [SKIP] Data generation failed: {e}")
-            continue
+        for case_name, true_dict in RANGE_CASES.items():
+            print(f"\n  ── Range case: {case_name} "
+                  f"(r_lat={true_dict['range_lat']}, r_lon={true_dict['range_lon']}) ──")
 
-        iter_ok = True
-        for nheads, limit in COMBOS:
-            tag = f"h{nheads}_L{limit}"
-            print(f"  {tag}", flush=True)
+            true_log    = true_dict_to_log(true_dict)
+            true_params = torch.tensor(true_log, device=DEVICE, dtype=DTYPE)
+            initial_vals = make_init(rng, true_log, init_noise)
+            init_est     = backmap_params(initial_vals)
+            print(f"    init σ²={init_est['sigmasq']:.3f}  "
+                  f"r_lon={init_est['range_lon']:.3f}  nugget={init_est['nugget']:.3f}")
+
             try:
-                p_vals = [torch.tensor([v], device=DEVICE, dtype=DTYPE, requires_grad=True)
-                          for v in initial_vals]
-                model  = kernels_vecchia_cauchy.fit_cauchy_vecchia_lbfgs(
-                    smooth=0.5, gc_beta=GC_BETA_DGP,
-                    input_map=irr_map_ord, nns_map=nns_grid,
-                    mm_cond_number=MM_COND, nheads=nheads,
-                    limit_A=limit, limit_B=limit, limit_C=limit,
-                    daily_stride=daily_stride,
-                )
-                opt = model.set_optimizer(p_vals, lr=LBFGS_LR,
-                                          max_iter=LBFGS_EVAL, history_size=LBFGS_HIST)
-                t0      = time.time()
-                out, _  = model.fit_vecc_lbfgs(p_vals, opt,
-                                               max_steps=LBFGS_STEPS, grad_tol=1e-7)
-                elapsed = time.time() - t0
-
-                raw_params = out[:-1];  nll_val = float(out[-1])
-                rmsre_val, est_d = calc_rmsre(raw_params, true_dict)
-                print(f"    NLL={nll_val:.4f}  RMSRE={rmsre_val:.4f}  ({elapsed:.1f}s)")
-
-                records.append({
-                    'iter':          it + 1,
-                    'job_id':        job_id,
-                    'obs_year':      yr_it,
-                    'obs_day':       d_it,
-                    'nheads':        nheads,
-                    'limit':         limit,
-                    'loss':          round(nll_val,         4),
-                    'time_s':        round(elapsed,         2),
-                    'rmsre':         round(rmsre_val,       6),
-                    'sigmasq_est':   round(est_d['sigmasq'],    4),
-                    'range_lat_est': round(est_d['range_lat'],  4),
-                    'range_lon_est': round(est_d['range_lon'],  4),
-                    'range_t_est':   round(est_d['range_time'], 4),
-                    'advec_lat_est': round(est_d['advec_lat'],  4),
-                    'advec_lon_est': round(est_d['advec_lon'],  4),
-                    'nugget_est':    round(est_d['nugget'],     4),
-                })
-
+                field = generate_field_values(lats_hr, lons_hr, 8, true_params, dlat_hr, dlon_hr)
+                irr_map, _ = assemble_irr_dataset(
+                    field, step3_per_t, hr_idx_per_t, src_locs_per_t,
+                    DUMMY_KEYS, grid_coords, true_params)
+                del field
+                irr_map_ord = {k: v[ord_grid] for k, v in irr_map.items()}
             except Exception as e:
-                import traceback
-                print(f"    [FAIL] {tag}: {type(e).__name__}: {e}")
-                traceback.print_exc()
-                iter_ok = False
+                skipped += 1
+                print(f"    [SKIP] Field generation failed: {e}")
+                continue
 
-        if not iter_ok:
-            skipped += 1
+            for nheads, limit, combo_name in ISO_COMBOS:
+                tag = f"{case_name}/{combo_name}(h={nheads},L={limit})"
+                print(f"    {tag}", flush=True)
+                try:
+                    p_vals = [torch.tensor([v], device=DEVICE, dtype=DTYPE, requires_grad=True)
+                              for v in initial_vals]
+                    model  = kernels_vecchia_cauchy.fit_cauchy_vecchia_lbfgs(
+                        smooth=0.5, gc_beta=GC_BETA,
+                        input_map=irr_map_ord, nns_map=nns_grid,
+                        mm_cond_number=MM_COND, nheads=nheads,
+                        limit_A=limit, limit_B=limit, limit_C=limit,
+                        daily_stride=daily_stride,
+                    )
+                    opt = model.set_optimizer(p_vals, lr=LBFGS_LR,
+                                              max_iter=LBFGS_EVAL, history_size=LBFGS_HIST)
+                    t0      = time.time()
+                    out, _  = model.fit_vecc_lbfgs(p_vals, opt,
+                                                   max_steps=LBFGS_STEPS, grad_tol=1e-7)
+                    elapsed = time.time() - t0
+
+                    raw_params = out[:-1];  nll_val = float(out[-1])
+                    rmsre_val, est_d = calc_rmsre(raw_params, true_dict)
+                    print(f"      NLL={nll_val:.4f}  RMSRE={rmsre_val:.4f}  ({elapsed:.1f}s)")
+
+                    records.append({
+                        'iter':          it + 1,
+                        'job_id':        job_id,
+                        'obs_year':      yr_it,
+                        'obs_day':       d_it,
+                        'range_case':    case_name,
+                        'combo':         combo_name,
+                        'nheads':        nheads,
+                        'limit':         limit,
+                        'loss':          round(nll_val,         4),
+                        'time_s':        round(elapsed,         2),
+                        'rmsre':         round(rmsre_val,       6),
+                        'sigmasq_est':   round(est_d['sigmasq'],    4),
+                        'range_lat_est': round(est_d['range_lat'],  4),
+                        'range_lon_est': round(est_d['range_lon'],  4),
+                        'range_t_est':   round(est_d['range_time'], 4),
+                        'advec_lat_est': round(est_d['advec_lat'],  4),
+                        'advec_lon_est': round(est_d['advec_lon'],  4),
+                        'nugget_est':    round(est_d['nugget'],     4),
+                    })
+
+                except Exception as e:
+                    import traceback
+                    print(f"      [FAIL] {tag}: {type(e).__name__}: {e}")
+                    traceback.print_exc()
 
         pd.DataFrame(records).to_csv(csv_raw, index=False)
-        _print_running_summary(records, true_dict, it + 1)
+        _print_running_summary(records, it + 1)
 
-    _print_final_summary(records, true_dict, csv_summary)
+    _print_final_summary(records, csv_summary)
     print(f"\nDone. {len(records)} records → {csv_raw.name}")
 
 
 # ── Summary helpers ───────────────────────────────────────────────────────────
 
-def _print_table(df, col, fmt='.4f'):
-    cw = 8
-    print(f"  {'h \\ L':<8}" + "".join(f"  {L:>{cw}}" for L in LIMITS_LIST))
-    for h in HEADS_LIST:
-        row = f"  {h:<8}"
-        for L in LIMITS_LIST:
-            sub = df[(df['nheads'] == h) & (df['limit'] == L)][col]
-            row += f"  {np.mean(sub):{cw}{fmt}}" if len(sub) > 0 else f"  {'---':>{cw}}"
-        print(row)
+def _print_combo_table(df, col, fmt='.4f'):
+    cw = 12
+    header = f"  {'range_case':<8}  {'combo':<12}  {'nheads':>6}  {'limit':>5}  {col:>{cw}}"
+    print(header)
+    print("  " + "-" * (len(header) - 2))
+    for case_name in ['short', 'long']:
+        for nheads, limit, combo_name in ISO_COMBOS:
+            sub = df[(df['range_case'] == case_name) & (df['combo'] == combo_name)][col]
+            val = f"{np.mean(sub):{cw}{fmt}}" if len(sub) > 0 else f"{'---':>{cw}}"
+            print(f"  {case_name:<8}  {combo_name:<12}  {nheads:>6}  {limit:>5}  {val}")
+        print()
 
 
-def _print_running_summary(records, true_dict, n_done):
+def _print_running_summary(records, n_done):
     if not records:
         return
     df = pd.DataFrame(records)
     n_iters = df['iter'].nunique()
     print(f"\n  ── Running summary ({n_iters} complete iters) ──")
-    for label, col, fmt in [('Mean NLL', 'loss', '.4f'),
-                             ('Mean time (s)', 'time_s', '.1f'),
-                             ('Mean RMSRE', 'rmsre', '.4f')]:
+    for label, col, fmt in [('Mean NLL',    'loss',   '.4f'),
+                             ('Mean time(s)','time_s', '.1f'),
+                             ('Mean RMSRE',  'rmsre',  '.4f')]:
         print(f"\n  [{label}]")
-        _print_table(df, col, fmt)
+        _print_combo_table(df, col, fmt)
 
 
-def _print_final_summary(records, true_dict, csv_summary):
+def _print_final_summary(records, csv_summary):
     if not records:
         return
     df = pd.DataFrame(records)
     print(f"\n{'='*70}\n  FINAL SUMMARY\n{'='*70}")
+
     param_cols   = ['sigmasq_est', 'range_lat_est', 'range_lon_est',
                     'range_t_est', 'advec_lat_est', 'advec_lon_est', 'nugget_est']
     param_labels = ['sigmasq', 'range_lat', 'range_lon', 'range_time',
                     'advec_lat', 'advec_lon', 'nugget']
-    true_vals    = [true_dict[k] for k in param_labels[:4]] + \
-                   [true_dict['advec_lat'], true_dict['advec_lon'], true_dict['nugget']]
 
     rows = []
-    for nheads, limit in COMBOS:
-        sub = df[(df['nheads'] == nheads) & (df['limit'] == limit)]
-        if len(sub) == 0:
-            continue
-        row = {'nheads': nheads, 'limit': limit, 'n': len(sub),
-               'mean_loss':   round(sub['loss'].mean(),   4), 'sd_loss':   round(sub['loss'].std(),   4),
-               'mean_time_s': round(sub['time_s'].mean(), 2), 'sd_time_s': round(sub['time_s'].std(), 2),
-               'mean_rmsre':  round(sub['rmsre'].mean(),  6), 'sd_rmsre':  round(sub['rmsre'].std(),  6)}
-        for col, lbl, tv in zip(param_cols, param_labels, true_vals):
-            row[f'rmsre_{lbl}'] = round(
-                float(np.sqrt(np.mean(((sub[col].values - tv) / abs(tv)) ** 2))), 6)
-        rows.append(row)
+    for case_name, true_dict in RANGE_CASES.items():
+        true_vals = [true_dict[k] for k in param_labels]
+        for nheads, limit, combo_name in ISO_COMBOS:
+            sub = df[(df['range_case'] == case_name) & (df['combo'] == combo_name)]
+            if len(sub) == 0:
+                continue
+            row = {
+                'range_case':  case_name,
+                'combo':       combo_name,
+                'nheads':      nheads,
+                'limit':       limit,
+                'n':           len(sub),
+                'mean_loss':   round(sub['loss'].mean(),   4),
+                'sd_loss':     round(sub['loss'].std(),    4),
+                'mean_time_s': round(sub['time_s'].mean(), 2),
+                'sd_time_s':   round(sub['time_s'].std(),  2),
+                'mean_rmsre':  round(sub['rmsre'].mean(),  6),
+                'sd_rmsre':    round(sub['rmsre'].std(),   6),
+            }
+            for col, lbl, tv in zip(param_cols, param_labels, true_vals):
+                row[f'rmsre_{lbl}'] = round(
+                    float(np.sqrt(np.mean(((sub[col].values - tv) / abs(tv)) ** 2))), 6)
+            rows.append(row)
 
     df_summary = pd.DataFrame(rows)
     df_summary.to_csv(csv_summary, index=False)
     print(f"\n  Summary CSV → {csv_summary.name}")
 
-    for label, col, fmt in [('Final Mean NLL', 'loss', '.4f'),
-                             ('Final Mean time (s)', 'time_s', '.1f'),
-                             ('Final Mean RMSRE', 'rmsre', '.4f')]:
+    for label, col, fmt in [('Final Mean NLL',    'loss',   '.4f'),
+                             ('Final Mean time(s)','time_s', '.1f'),
+                             ('Final Mean RMSRE',  'rmsre',  '.4f')]:
         print(f"\n  [{label}]")
-        _print_table(df, col, fmt)
+        _print_combo_table(df, col, fmt)
 
-    # Key comparisons: iso-compute tests
-    print("\n  [Key iso-compute comparison]")
-    print("  (heads=0,   limit=24)  vs  (heads=800, limit=16)  — similar cost, different allocation")
-    for h, L in [(0, 24), (800, 16), (0, 16), (400, 8)]:
-        sub = df[(df['nheads'] == h) & (df['limit'] == L)]
-        if len(sub) > 0:
-            print(f"  h={h:<4} L={L:<3}  NLL={sub['loss'].mean():.4f}  "
-                  f"time={sub['time_s'].mean():.1f}s  RMSRE={sub['rmsre'].mean():.4f}")
-
-    # Top 5 by RMSRE
-    print("\n  [Top 5 combos by mean RMSRE (best accuracy)]")
-    top5 = df_summary.nsmallest(5, 'mean_rmsre')[
-        ['nheads', 'limit', 'mean_loss', 'mean_time_s', 'mean_rmsre']]
-    print(top5.to_string(index=False))
-
-    # Top 5 fastest among below-median RMSRE
-    med = df_summary['mean_rmsre'].median()
-    fast5 = df_summary[df_summary['mean_rmsre'] <= med].nsmallest(5, 'mean_time_s')[
-        ['nheads', 'limit', 'mean_loss', 'mean_time_s', 'mean_rmsre']]
-    print(f"\n  [Top 5 fastest with RMSRE ≤ median ({med:.4f})]")
-    print(fast5.to_string(index=False))
+    # Key diagnostic: RMSRE gap between limit_all and heads_all per range case
+    print("\n  [Diagnostic: RMSRE gap  (limit_all - heads_all)  per range case]")
+    print(f"  {'range_case':<8}  {'limit_all RMSRE':>16}  {'heads_all RMSRE':>16}  {'gap':>8}  {'verdict':>20}")
+    print("  " + "-" * 75)
+    for case_name in ['short', 'long']:
+        sub_lim  = df[(df['range_case'] == case_name) & (df['combo'] == 'limit_all')]['rmsre']
+        sub_head = df[(df['range_case'] == case_name) & (df['combo'] == 'heads_all')]['rmsre']
+        if len(sub_lim) == 0 or len(sub_head) == 0:
+            continue
+        r_lim  = np.mean(sub_lim)
+        r_head = np.mean(sub_head)
+        gap    = r_lim - r_head
+        verdict = 'heads wins (low-freq)' if gap > 0.005 else 'no clear difference'
+        print(f"  {case_name:<8}  {r_lim:>16.4f}  {r_head:>16.4f}  {gap:>8.4f}  {verdict:>20}")
 
 
 if __name__ == "__main__":

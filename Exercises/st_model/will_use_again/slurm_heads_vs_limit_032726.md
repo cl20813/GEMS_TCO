@@ -78,7 +78,7 @@ echo "Running on: $(hostname)"
 nvidia-smi
 
 srun python /home/jl2815/tco/exercise_25/st_model/sim_heads_vs_limit_032726.py \
-    --num-iters 10 \
+    --num-iters 100 \
     --job-id 0 \
     --lat-factor 100 \
     --lon-factor 10 \
