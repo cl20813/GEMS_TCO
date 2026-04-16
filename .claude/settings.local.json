@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ls -lh /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/*.py)"
+      "Bash(ls -lh /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/*.py)",
+      "Bash(cp /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/debiased_whittle.py /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/debiased_whittle_2110.py)",
+      "Bash(cp /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/debiased_whittle_new.py /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/debiased_whittle_1111.py)",
+      "Bash(mv /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/debiased_whittle.py '/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/not used/debiased_whittle_2110_orig.py')",
+      "Bash(mv /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/debiased_whittle_new.py '/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/not used/debiased_whittle_1111_orig.py')",
+      "Bash(mv /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/debiased_whittle_complex.py '/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/not used/')",
+      "Bash(mv /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/debiased_whittle_reduced.py '/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/not used/')",
+      "Bash(mv /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/debiased_whittle_nolf.py '/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/not used/')",
+      "Bash(python3 *)",
+      "Bash(xargs -I{} basename {})"
     ]
   }
 }

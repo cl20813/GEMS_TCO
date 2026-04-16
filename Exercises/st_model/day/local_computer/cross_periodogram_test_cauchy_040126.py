@@ -38,7 +38,7 @@ from pathlib import Path
 
 sys.path.append("/Users/joonwonlee/Documents/GEMS_TCO-1/src")
 
-from GEMS_TCO import debiased_whittle as dw_module
+from GEMS_TCO import debiased_whittle_2110 as dw_module
 
 DEVICE = torch.device("cpu")   # cross-periodogram computation is CPU-only in DW
 DTYPE  = torch.float64

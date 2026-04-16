@@ -23,6 +23,7 @@ Usage (Amarel):
 import sys
 import time
 import os
+import pickle
 from datetime import datetime
 import numpy as np
 import torch
@@ -42,9 +43,9 @@ from GEMS_TCO import configuration as config
 # sample-side DFT (per-variate H_q normalization — complex update)
 from GEMS_TCO import debiased_whittle_raw   as dw_raw
 # model 2: 2-1-1-0 covariance, DC-only exclusion
-from GEMS_TCO import debiased_whittle       as dw_old
+from GEMS_TCO import debiased_whittle_2110  as dw_2110
 # model 3 preprocessing + 1-1-1-1 covariance, axis-exclusion likelihood
-from GEMS_TCO import debiased_whittle_new   as dw_new
+from GEMS_TCO import debiased_whittle_1111  as dw_1111
 # model 4: mixed raw+diff likelihood
 from GEMS_TCO import debiased_whittle_mixed as dw_mixed
 from GEMS_TCO.data_loader import load_data_dynamic_processed
@@ -119,27 +120,46 @@ def apply_step3_1to1(src_np_valid, grid_coords_np, grid_tree):
     for obs_i, (c, d) in enumerate(zip(cell, dist)):
         if d < best[c]:
             assignment[c] = obs_i; best[c] = d
+    # Threshold: match step3_enforce_regular_grid (lat_thresh=DELTA_LAT/2, lon_thresh=DELTA_LON/2)
+    filled = assignment >= 0
+    if filled.any():
+        win_obs  = assignment[filled]
+        lat_diff = np.abs(src_np_valid[win_obs, 0] - grid_coords_np[filled, 0])
+        lon_diff = np.abs(src_np_valid[win_obs, 1] - grid_coords_np[filled, 1])
+        too_far  = (lat_diff > DELTA_LAT_BASE / 2) | (lon_diff > DELTA_LON_BASE / 2)
+        assignment[np.where(filled)[0][too_far]] = -1
     return assignment
 
 
-def precompute_mapping_indices(ref_day_map, lats_hr, lons_hr, grid_coords, sorted_keys):
+def precompute_mapping_indices(orbit_day_map, lats_hr, lons_hr, grid_coords, sorted_keys):
+    """obs pool = raw orbit_map pixels (all GEMS pixels, not tco_grid Source_Lat/Lon)."""
     hr_lat_g, hr_lon_g = torch.meshgrid(lats_hr, lons_hr, indexing='ij')
     hr_np   = torch.stack([hr_lat_g.flatten(), hr_lon_g.flatten()], dim=1).cpu().numpy()
     hr_tree = BallTree(np.radians(hr_np), metric='haversine')
     gc_np   = grid_coords.cpu().numpy()
+    N_grid  = len(gc_np)
     gc_tree = BallTree(np.radians(gc_np),  metric='haversine')
     s3, hr_idx, src = [], [], []
     for key in sorted_keys:
-        ref_t = ref_day_map[key].to(DEVICE)
-        slocs = ref_t[:, :2]; snp = slocs.cpu().numpy()
-        vm    = ~np.isnan(snp).any(axis=1)
-        s3.append(apply_step3_1to1(snp[vm], gc_np, gc_tree))
-        if vm.sum() > 0:
-            _, hri = hr_tree.query(np.radians(snp[vm]), k=1)
+        df = orbit_day_map.get(key)
+        if df is None or len(df) == 0:
+            s3.append(np.full(N_grid, -1, dtype=np.int64))
+            hr_idx.append(torch.zeros(0, dtype=torch.long, device=DEVICE))
+            src.append(torch.zeros((0, 2), dtype=DTYPE, device=DEVICE))
+            continue
+        if 'Latitude' in df.columns and 'Longitude' in df.columns:
+            snp = df[['Latitude', 'Longitude']].values
+        else:
+            snp = df.iloc[:, :2].values
+        vm  = ~np.isnan(snp).any(axis=1)
+        snp_v = snp[vm]
+        s3.append(apply_step3_1to1(snp_v, gc_np, gc_tree))
+        if len(snp_v) > 0:
+            _, hri = hr_tree.query(np.radians(snp_v), k=1)
             hr_idx.append(torch.tensor(hri.flatten(), device=DEVICE))
         else:
             hr_idx.append(torch.zeros(0, dtype=torch.long, device=DEVICE))
-        src.append(slocs[vm])
+        src.append(torch.tensor(snp_v, device=DEVICE, dtype=DTYPE))
     return s3, hr_idx, src
 
 
@@ -165,6 +185,12 @@ def assemble_reg_dataset(field, step3_per_t, hr_idx_per_t, src_locs_per_t,
         if N_v > 0:
             a = torch.tensor(assign, device=DEVICE, dtype=torch.long)
             filled = a >= 0
+            # Defensive: guard against assignment indices >= N_v
+            oob = filled & (a >= N_v)
+            if oob.any():
+                print(f"  [WARN] t_idx={t_idx}: {oob.sum().item()} assign idx "
+                      f">= N_v={N_v} (max={a[filled].max().item()}), treating as missing")
+                a = a.clone(); a[oob] = -1; filled = a >= 0
             rows[filled, 2] = sim_vals[a[filled]]
         reg_map[key] = rows.detach(); reg_list.append(rows.detach())
     return reg_map, torch.cat(reg_list, dim=0)
@@ -360,10 +386,10 @@ def cli(
 
     # ── Load GEMS obs patterns ────────────────────────────────────────────────
     print("\n[Setup 1/4] Loading GEMS obs patterns...")
-    data_loader = load_data_dynamic_processed(
-        config.amarel_data_load_path if is_amarel else config.mac_data_load_path)
+    data_path   = config.amarel_data_load_path if is_amarel else config.mac_data_load_path
+    data_loader = load_data_dynamic_processed(data_path)
     all_day_mappings = []
-    year_dfmaps, year_means = {}, {}
+    year_dfmaps, year_means, year_orbit_maps = {}, {}, {}
 
     for yr in years_list:
         df_map_yr, _, _, mm_yr = data_loader.load_maxmin_ordered_data_bymonthyear(
@@ -372,6 +398,19 @@ def cli(
             lat_range=lat_r, lon_range=lon_r, is_whittle=False)
         year_dfmaps[yr] = df_map_yr; year_means[yr] = mm_yr
         print(f"  {yr}-{month:02d}: {len(df_map_yr)} time slots")
+
+        yr2     = str(yr)[2:]
+        om_path = Path(data_path) / f"pickle_{yr}" / f"orbit_map{yr2}_{month:02d}.pkl"
+        orbit_yr = {}
+        if om_path.exists():
+            with open(om_path, 'rb') as f:
+                om = pickle.load(f)
+            for k, v in om.items():
+                orbit_yr[f"{yr}_{month:02d}_{k}"] = v
+            print(f"  orbit_map: {len(om)} slots loaded")
+        else:
+            print(f"  [WARN] orbit_map not found: {om_path}")
+        year_orbit_maps[yr] = orbit_yr
 
     # ── Build regular target grid (ascending lat: south → north) ─────────────
     print("[Setup 2/4] Building regular target grid...")
@@ -401,13 +440,11 @@ def cli(
         n_days_yr  = len(all_sorted) // 8
         print(f"  {yr}: precomputing {n_days_yr} days...", flush=True)
         for d_idx in range(n_days_yr):
-            ref_day_map, _ = data_loader.load_working_data(
-                year_dfmaps[yr], year_means[yr], [d_idx*8, (d_idx+1)*8],
-                ord_mm=None, dtype=DTYPE, keep_ori=True)
-            day_keys = sorted(ref_day_map.keys())[:8]
+            day_keys = all_sorted[d_idx * 8 : (d_idx + 1) * 8]
             if len(day_keys) < 8: continue
+            orbit_day = {k: year_orbit_maps[yr].get(k, pd.DataFrame()) for k in day_keys}
             s3, hr_i, src = precompute_mapping_indices(
-                ref_day_map, lats_hr, lons_hr, grid_coords, day_keys)
+                orbit_day, lats_hr, lons_hr, grid_coords, day_keys)
             all_day_mappings.append((yr, d_idx, s3, hr_i, src))
     print(f"  Total available day-patterns: {len(all_day_mappings)}")
 
@@ -422,8 +459,8 @@ def cli(
 
     # ── DW likelihood objects ─────────────────────────────────────────────────
     dwl_raw    = dw_raw.debiased_whittle_likelihood()    # sample-side DFT + model 1
-    dwl_old    = dw_old.debiased_whittle_likelihood()    # model 2 expected periodogram
-    dwl_new    = dw_new.debiased_whittle_likelihood()    # model 3 expected periodogram
+    dwl_2110   = dw_2110.debiased_whittle_likelihood()   # model 2 expected periodogram
+    dwl_1111   = dw_1111.debiased_whittle_likelihood()   # model 3 expected periodogram
     dwl_mixed  = dw_mixed.debiased_whittle_likelihood()  # model 4 mixed loss
 
     LC, NC, VC, TC = 0, 1, 2, 3
@@ -481,10 +518,11 @@ def cli(
             del om_raw
 
             # 2-1-1-0 slices (model 2)
-            db_old  = dw_new.debiased_whittle_preprocess([reg_agg], [reg_map], day_idx=0,
-                                                          **params_kwargs)
+            # dw_2110.generate_spatially_filtered_days always applies 2-1-1-0 filter (no kernel_type arg)
+            db_old  = dw_2110.debiased_whittle_preprocess([reg_agg], [reg_map], day_idx=0,
+                                                           **params_kwargs)
             cur_old = db_old.generate_spatially_filtered_days(
-                lat_r[0], lat_r[1], lon_r[0], lon_r[1], kernel_type='old').to(DEVICE_DW)
+                lat_r[0], lat_r[1], lon_r[0], lon_r[1]).to(DEVICE_DW)
             sl_old  = [cur_old[cur_old[:, TC]==t] for t in torch.unique(cur_old[:, TC])]
 
             J_old, n1o, n2o, _, tap_old, om_old = dwl_raw.generate_Jvector_tapered_mv(
@@ -495,8 +533,9 @@ def cli(
             del om_old
 
             # 1-1-1-1 slices (model 3, 4-diff)
-            db_new  = dw_new.debiased_whittle_preprocess([reg_agg], [reg_map], day_idx=0,
-                                                          **params_kwargs)
+            # dw_1111.generate_spatially_filtered_days always applies 1-1-1-1 filter
+            db_new  = dw_1111.debiased_whittle_preprocess([reg_agg], [reg_map], day_idx=0,
+                                                           **params_kwargs)
             cur_new = db_new.generate_spatially_filtered_days(
                 lat_r[0], lat_r[1], lon_r[0], lon_r[1]).to(DEVICE_DW)
             sl_new  = [cur_new[cur_new[:, TC]==t] for t in torch.unique(cur_new[:, TC])]
@@ -504,6 +543,7 @@ def cli(
             J_new, n1d, n2d, _, tap_new, om_new = dwl_raw.generate_Jvector_tapered_mv(
                 sl_new, dwl_raw.cgn_hamming, LC, NC, VC, DEVICE_DW)
             I_new   = dwl_raw.calculate_sample_periodogram_vectorized(J_new)
+            # debiased_whittle_1111 (2d_conv base) supports 4D multivariate taper
             ta_new  = dwl_raw.calculate_taper_autocorrelation_multivariate(
                 tap_new, om_new, n1d, n2d, DEVICE_DW)
             del om_new
@@ -533,7 +573,7 @@ def cli(
                                       history_size=10, line_search_fn="strong_wolfe",
                                       tolerance_grad=1e-5)
             t0 = time.time()
-            _, _, _, loss2, _ = dwl_old.run_lbfgs_tapered(
+            _, _, _, loss2, _ = dwl_2110.run_lbfgs_tapered(
                 params_list=p2, optimizer=opt2, I_sample=I_old,
                 n1=n1o, n2=n2o, p_time=p_time, taper_autocorr_grid=ta_old,
                 max_steps=dw_steps, device=DEVICE_DW)
@@ -548,7 +588,7 @@ def cli(
                                       history_size=10, line_search_fn="strong_wolfe",
                                       tolerance_grad=1e-5)
             t0 = time.time()
-            _, _, _, loss3, _ = dwl_new.run_lbfgs_tapered(
+            _, _, _, loss3, _ = dwl_1111.run_lbfgs_tapered(
                 params_list=p3, optimizer=opt3, I_sample=I_new,
                 n1=n1d, n2=n2d, p_time=p_time, taper_autocorr_grid=ta_new,
                 max_steps=dw_steps, device=DEVICE_DW)
@@ -616,24 +656,25 @@ def cli(
 
         for m, ml in zip(MODELS, MODEL_LABELS):
             print(f"\n  [{ml}]")
-            print(f"  {'param':<12} {'true':>{cw}}  {'cum_mean':>{cw}}  {'bias':>{cw}}  "
-                  f"{'RMSRE':>{cw}}  {'RMSRE_med':>{cw}}  {'P90-P10':>{cw}}")
-            print(f"  {'-'*82}")
+            print(f"  {'param':<12} {'true':>{cw}}  {'mean':>{cw}}  {'median':>{cw}}  "
+                  f"{'bias':>{cw}}  {'RMSRE':>{cw}}  {'RMSRE_med':>{cw}}  {'P90-P10':>{cw}}")
+            print(f"  {'-'*94}")
             for lbl, tv in zip(P_LABELS, TRUE_VALS):
                 col  = f'range_t_est_{m}' if lbl == 'range_t' else f'{lbl}_est_{m}'
                 vals = np.array([r[col] for r in records])
-                cm   = np.mean(vals)
+                cm   = float(np.mean(vals))
+                med  = float(np.median(vals))
                 bi   = cm - tv
-                rm   = np.sqrt(np.mean(((vals - tv)/abs(tv))**2))
-                rmd  = np.median(np.abs((vals - tv)/abs(tv)))
-                p9p1 = np.percentile(vals, 90) - np.percentile(vals, 10)
-                print(f"  {lbl:<12} {tv:>{cw}.4f}  {cm:>{cw}.4f}  {bi:>{cw}.4f}  "
-                      f"{rm:>{cw}.4f}  {rmd:>{cw}.4f}  {p9p1:>{cw}.4f}")
+                rm   = float(np.sqrt(np.mean(((vals - tv) / abs(tv)) ** 2)))
+                rmd  = float(np.median(np.abs((vals - tv) / abs(tv))))
+                p9p1 = float(np.percentile(vals, 90) - np.percentile(vals, 10))
+                print(f"  {lbl:<12} {tv:>{cw}.4f}  {cm:>{cw}.4f}  {med:>{cw}.4f}  "
+                      f"{bi:>{cw}.4f}  {rm:>{cw}.4f}  {rmd:>{cw}.4f}  {p9p1:>{cw}.4f}")
             rv = np.array([r[f'rmsre_{m}'] for r in records])
-            print(f"  {'-'*82}")
-            print(f"  {'Overall':<12} {'':>{cw}}  {'':>{cw}}  {'':>{cw}}  "
+            print(f"  {'-'*94}")
+            print(f"  {'Overall':<12} {'':>{cw}}  {'':>{cw}}  {'':>{cw}}  {'':>{cw}}  "
                   f"{np.mean(rv):>{cw}.4f}  {np.median(rv):>{cw}.4f}  "
-                  f"{np.percentile(rv,90)-np.percentile(rv,10):>{cw}.4f}")
+                  f"{np.percentile(rv, 90) - np.percentile(rv, 10):>{cw}.4f}")
 
     # ── Final summary ─────────────────────────────────────────────────────────
     print(f"\n{'='*60}")
@@ -685,6 +726,45 @@ def cli(
             'P10': float('nan'), 'P90': float('nan'),
             'P90_P10': round(p9p1_rv, 6),
         })
+
+    # ── Distribution: Q1 / Q2(median) / Q3 / min / max ──────────────────────
+    print(f"\n{'='*60}")
+    print(f"  FINAL DISTRIBUTION — Q1 / Median / Q3 / Min / Max")
+    print(f"{'='*60}")
+    cw2 = 9
+    for m, ml in zip(MODELS, MODEL_LABELS):
+        print(f"\n  ── [{ml}] ──")
+        print(f"  {'param':<12} {'true':>{cw2}}  {'Q1':>{cw2}}  {'median':>{cw2}}  "
+              f"{'Q3':>{cw2}}  {'min':>{cw2}}  {'max':>{cw2}}")
+        print(f"  {'-'*80}")
+        for lbl, tv in zip(P_LABELS, TRUE_VALS):
+            col  = f'range_t_est_{m}' if lbl == 'range_t' else f'{lbl}_est_{m}'
+            if col not in df_final.columns:
+                continue
+            vals = df_final[col].values
+            q1   = float(np.percentile(vals, 25))
+            med  = float(np.median(vals))
+            q3   = float(np.percentile(vals, 75))
+            vmin = float(np.min(vals))
+            vmax = float(np.max(vals))
+            print(f"  {lbl:<12} {tv:>{cw2}.4f}  {q1:>{cw2}.4f}  {med:>{cw2}.4f}  "
+                  f"{q3:>{cw2}.4f}  {vmin:>{cw2}.4f}  {vmax:>{cw2}.4f}")
+        # also update summary_rows with Q1/Q2/Q3/min/max
+        for sr in summary_rows:
+            if sr.get('model') != ml:
+                continue
+            p = sr.get('param')
+            if p == 'Overall':
+                continue
+            col = f'range_t_est_{m}' if p == 'range_t' else f'{p}_est_{m}'
+            if col not in df_final.columns:
+                continue
+            vals = df_final[col].values
+            sr['Q1']     = round(float(np.percentile(vals, 25)), 6)
+            sr['median'] = round(float(np.median(vals)), 6)
+            sr['Q3']     = round(float(np.percentile(vals, 75)), 6)
+            sr['min']    = round(float(np.min(vals)), 6)
+            sr['max']    = round(float(np.max(vals)), 6)
 
     df_summary = pd.DataFrame(summary_rows)
     df_summary.to_csv(output_path / csv_summary, index=False)

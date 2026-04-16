@@ -34,7 +34,7 @@ from pathlib import Path
 sys.path.append("/Users/joonwonlee/Documents/GEMS_TCO-1/src")
 sys.path.append("/Users/joonwonlee/Documents/GEMS_TCO-1")
 
-from GEMS_TCO import debiased_whittle
+from GEMS_TCO import debiased_whittle_2110 as debiased_whittle
 
 app    = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

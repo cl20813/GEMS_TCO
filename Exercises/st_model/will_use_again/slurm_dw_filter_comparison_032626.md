@@ -33,6 +33,15 @@ nano sim_dw_filter_comparison_032626.sh
 sbatch sim_dw_filter_comparison_032626.sh
 ```
 
+
+
+#SBATCH --time=24:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=40
+#SBATCH --mem=128G
+#SBATCH --partition=mem
+
+
 ```bash
 #!/bin/bash
 #SBATCH --job-name=dw_filter_cmp_032626
@@ -41,10 +50,11 @@ sbatch sim_dw_filter_comparison_032626.sh
 #SBATCH --time=48:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=120G
+#SBATCH --mem=150G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu035
+#SBATCH --ntasks=1
+#SBATCH --nodelist=gpu048
 
 #### Load Modules
 module purge
@@ -70,6 +80,7 @@ srun python /home/jl2815/tco/exercise_25/st_model/sim_dw_filter_comparison_03262
     --seed 42
 
 echo "Current date and time: $(date)"
+
 ```
 
 ---
