@@ -1,23 +1,19 @@
 """
 sim_dw_filter_comparison_032626.py
 
-Simulation study: Debiased Whittle with new 2D filter [[-1,1],[1,-1]].
+4-way Debiased Whittle filter comparison:
+  Model 1 — Raw      : no spatial filter   (debiased_whittle_raw)
+  Model 2 — 2-1-1-0  : filter [[-2,1],[1,0]]  (debiased_whittle old, DC-only exclusion)
+  Model 3 — 1-1-1-1  : filter [[-1,1],[1,-1]] (debiased_whittle_new, axis exclusion)
+  Model 4 — Mixed    : α=0.45 → low-freq raw + high-freq 1-1-1-1  (debiased_whittle_mixed)
+             Mixed loss ≈ 0.45²~0.20 raw (low-freq) + 0.55²~0.30 diff (high-freq)
+             i.e. K1=floor(n1·0.45), K2=floor(n2·0.45)
 
-Filter: Z(i,j) = -X(i,j) + X(i+1,j) + X(i,j+1) - X(i+1,j+1)
-  (separable product filter; excludes ω₁=0 row AND ω₂=0 column)
+Sample DFT (all models): debiased_whittle_raw — per-variate H_q normalization.
 
-Architecture:
-  - Sample side  (J-vector, periodogram, taper): debiased_whittle  (dw_old)
-    → has generate_Jvector_tapered_mv / calculate_taper_autocorrelation_multivariate
-  - Spatial filter + model side (expected periodogram, likelihood): debiased_whittle_new
-    → uses new [[-1,1],[1,-1]] filter and axis-exclusion loss
+Lat ordering: lats_grid ascending (south → north) — consistent with torch.unique.
 
-Comparison target: sim_dw_lat1d_040526.py (lat-only 1D filter)
-  - Same true parameters (Scenario: real-data-calibrated)
-  - Same random init scheme, same obs patterns
-
-Usage (local):
-  cd /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/will_use_again
+Usage (local test):
   python sim_dw_filter_comparison_032626.py --num-iters 5 --lat-factor 10 --lon-factor 4
 
 Usage (Amarel):
@@ -43,21 +39,30 @@ _src = AMAREL_SRC if os.path.exists(AMAREL_SRC) else LOCAL_SRC
 sys.path.insert(0, _src)
 
 from GEMS_TCO import configuration as config
-# sample-side methods (generate_Jvector_tapered_mv, etc.)
-from GEMS_TCO import debiased_whittle     as dw_sample
-# filter + model-side (debiased_whittle_preprocess with new filter, run_lbfgs_tapered)
-from GEMS_TCO import debiased_whittle_new as dw_new
+# sample-side DFT (per-variate H_q normalization — complex update)
+from GEMS_TCO import debiased_whittle_raw   as dw_raw
+# model 2: 2-1-1-0 covariance, DC-only exclusion
+from GEMS_TCO import debiased_whittle       as dw_old
+# model 3 preprocessing + 1-1-1-1 covariance, axis-exclusion likelihood
+from GEMS_TCO import debiased_whittle_new   as dw_new
+# model 4: mixed raw+diff likelihood
+from GEMS_TCO import debiased_whittle_mixed as dw_mixed
 from GEMS_TCO.data_loader import load_data_dynamic_processed
 
 is_amarel = os.path.exists(config.amarel_data_load_path)
 
-# GPU used only for FFT field generation; DW likelihood runs on CPU
-# (GPU device-side asserts are triggered by near-singular matrices in DW spectral ops)
-DEVICE     = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-DEVICE_DW  = torch.device("cpu")
-DTYPE  = torch.float64
+DEVICE    = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE_DW = torch.device("cpu")
+DTYPE     = torch.float64
 DELTA_LAT_BASE = 0.044
 DELTA_LON_BASE = 0.063
+FREQ_ALPHA     = 0.45   # mixed model low-freq cutoff
+
+MODELS       = ['raw', 'filt_2110', 'filt_1111', 'mixed']
+MODEL_LABELS = ['Raw', '2-1-1-0', '1-1-1-1', f'Mixed(α={FREQ_ALPHA})']
+
+P_LABELS = ['sigmasq', 'range_lat', 'range_lon', 'range_t',
+            'advec_lat', 'advec_lon', 'nugget']
 
 app = typer.Typer(context_settings={"help_option_names": ["--help", "-h"]})
 
@@ -86,151 +91,204 @@ def build_high_res_grid(lat_range, lon_range, lat_factor=100, lon_factor=20):
 
 
 def generate_field_values(lats_hr, lons_hr, t_steps, params, dlat, dlon):
-    """FFT circulant embedding realization on high-res grid."""
-    CPU = torch.device("cpu")
-    F32 = torch.float32
+    CPU = torch.device("cpu"); F32 = torch.float32
     Nx, Ny, Nt = len(lats_hr), len(lons_hr), t_steps
     Px, Py, Pt = 2*Nx, 2*Ny, 2*Nt
-
     lx = torch.arange(Px, device=CPU, dtype=F32) * dlat; lx[Px//2:] -= Px * dlat
     ly = torch.arange(Py, device=CPU, dtype=F32) * dlon; ly[Py//2:] -= Py * dlon
     lt = torch.arange(Pt, device=CPU, dtype=F32);        lt[Pt//2:] -= Pt
-
     params_cpu = params.cpu().float()
     Lx, Ly, Lt = torch.meshgrid(lx, ly, lt, indexing='ij')
     C = get_covariance_on_grid(Lx, Ly, Lt, params_cpu)
-    S = torch.fft.fftn(C)
-    S.real = torch.clamp(S.real, min=0)
+    S = torch.fft.fftn(C); S.real = torch.clamp(S.real, min=0)
     noise = torch.fft.fftn(torch.randn(Px, Py, Pt, device=CPU, dtype=F32))
     field = torch.fft.ifftn(torch.sqrt(S.real) * noise).real[:Nx, :Ny, :Nt]
     return field.to(dtype=DTYPE, device=DEVICE)
 
 
-# ── Obs → grid mapping (step3) ────────────────────────────────────────────────
+# ── Obs → grid mapping ────────────────────────────────────────────────────────
 
 def apply_step3_1to1(src_np_valid, grid_coords_np, grid_tree):
     N_grid = len(grid_coords_np)
     if len(src_np_valid) == 0:
         return np.full(N_grid, -1, dtype=np.int64)
-    dist_to_cell, cell_for_obs = grid_tree.query(np.radians(src_np_valid), k=1)
-    dist_to_cell = dist_to_cell.flatten()
-    cell_for_obs = cell_for_obs.flatten()
-    assignment   = np.full(N_grid, -1, dtype=np.int64)
-    best_dist    = np.full(N_grid, np.inf)
-    for obs_i, (cell_j, d) in enumerate(zip(cell_for_obs, dist_to_cell)):
-        if d < best_dist[cell_j]:
-            assignment[cell_j] = obs_i
-            best_dist[cell_j]  = d
+    dist, cell = grid_tree.query(np.radians(src_np_valid), k=1)
+    dist = dist.flatten(); cell = cell.flatten()
+    assignment = np.full(N_grid, -1, dtype=np.int64)
+    best = np.full(N_grid, np.inf)
+    for obs_i, (c, d) in enumerate(zip(cell, dist)):
+        if d < best[c]:
+            assignment[c] = obs_i; best[c] = d
     return assignment
 
 
 def precompute_mapping_indices(ref_day_map, lats_hr, lons_hr, grid_coords, sorted_keys):
     hr_lat_g, hr_lon_g = torch.meshgrid(lats_hr, lons_hr, indexing='ij')
-    hr_coords_np = torch.stack(
-        [hr_lat_g.flatten(), hr_lon_g.flatten()], dim=1).cpu().numpy()
-    hr_tree = BallTree(np.radians(hr_coords_np), metric='haversine')
-
-    grid_coords_np = grid_coords.cpu().numpy()
-    grid_tree = BallTree(np.radians(grid_coords_np), metric='haversine')
-
-    step3_per_t, hr_idx_per_t, src_locs_per_t = [], [], []
-
+    hr_np   = torch.stack([hr_lat_g.flatten(), hr_lon_g.flatten()], dim=1).cpu().numpy()
+    hr_tree = BallTree(np.radians(hr_np), metric='haversine')
+    gc_np   = grid_coords.cpu().numpy()
+    gc_tree = BallTree(np.radians(gc_np),  metric='haversine')
+    s3, hr_idx, src = [], [], []
     for key in sorted_keys:
-        ref_t      = ref_day_map[key].to(DEVICE)
-        src_locs   = ref_t[:, :2]
-        src_np     = src_locs.cpu().numpy()
-        valid_mask = ~np.isnan(src_np).any(axis=1)
-        src_np_valid = src_np[valid_mask]
-
-        assignment = apply_step3_1to1(src_np_valid, grid_coords_np, grid_tree)
-        step3_per_t.append(assignment)
-
-        if valid_mask.sum() > 0:
-            _, hr_idx = hr_tree.query(np.radians(src_np_valid), k=1)
-            hr_idx_per_t.append(torch.tensor(hr_idx.flatten(), device=DEVICE))
+        ref_t = ref_day_map[key].to(DEVICE)
+        slocs = ref_t[:, :2]; snp = slocs.cpu().numpy()
+        vm    = ~np.isnan(snp).any(axis=1)
+        s3.append(apply_step3_1to1(snp[vm], gc_np, gc_tree))
+        if vm.sum() > 0:
+            _, hri = hr_tree.query(np.radians(snp[vm]), k=1)
+            hr_idx.append(torch.tensor(hri.flatten(), device=DEVICE))
         else:
-            hr_idx_per_t.append(torch.zeros(0, dtype=torch.long, device=DEVICE))
+            hr_idx.append(torch.zeros(0, dtype=torch.long, device=DEVICE))
+        src.append(slocs[vm])
+    return s3, hr_idx, src
 
-        src_locs_per_t.append(src_locs[valid_mask])
-
-    return step3_per_t, hr_idx_per_t, src_locs_per_t
-
-
-# ── Dataset assembly ──────────────────────────────────────────────────────────
 
 def assemble_reg_dataset(field, step3_per_t, hr_idx_per_t, src_locs_per_t,
                          sorted_keys, grid_coords, true_params, t_offset=21.0):
     nugget_std = torch.sqrt(torch.exp(true_params[6]))
-    N_grid     = grid_coords.shape[0]
+    N_grid = grid_coords.shape[0]
     field_flat = field.reshape(-1, 8)
-
     reg_map, reg_list = {}, []
-
     for t_idx, key in enumerate(sorted_keys):
-        t_val    = float(t_offset + t_idx)
-        assign   = step3_per_t[t_idx]
-        hr_idx   = hr_idx_per_t[t_idx]
-        src_locs = src_locs_per_t[t_idx]
-        N_valid  = hr_idx.shape[0]
-
-        dummy = torch.zeros(7, device=DEVICE, dtype=DTYPE)
-        if t_idx > 0:
-            dummy[t_idx - 1] = 1.0
-
-        if N_valid > 0:
-            gp_vals  = field_flat[hr_idx, t_idx]
-            sim_vals = gp_vals + torch.randn(N_valid, device=DEVICE, dtype=DTYPE) * nugget_std
-        else:
-            sim_vals = torch.zeros(0, device=DEVICE, dtype=DTYPE)
-
-        dummy_row = dummy.unsqueeze(0).expand(N_grid, -1)
-
-        reg_rows = torch.full((N_grid, 11), float('nan'), device=DEVICE, dtype=DTYPE)
-        reg_rows[:, :2] = grid_coords
-        reg_rows[:, 3]  = t_val
-        reg_rows[:, 4:] = dummy_row
-
-        if N_valid > 0:
-            assign_t = torch.tensor(assign, device=DEVICE, dtype=torch.long)
-            filled   = assign_t >= 0
-            win_obs  = assign_t[filled]
-            reg_rows[filled, 2] = sim_vals[win_obs]
-
-        reg_map[key] = reg_rows.detach()
-        reg_list.append(reg_rows.detach())
-
+        t_val  = float(t_offset + t_idx)
+        assign = step3_per_t[t_idx]
+        hr_i   = hr_idx_per_t[t_idx]
+        N_v    = hr_i.shape[0]
+        dummy  = torch.zeros(7, device=DEVICE, dtype=DTYPE)
+        if t_idx > 0: dummy[t_idx - 1] = 1.0
+        sim_vals = (field_flat[hr_i, t_idx]
+                    + torch.randn(N_v, device=DEVICE, dtype=DTYPE) * nugget_std
+                    ) if N_v > 0 else torch.zeros(0, device=DEVICE, dtype=DTYPE)
+        rows = torch.full((N_grid, 11), float('nan'), device=DEVICE, dtype=DTYPE)
+        rows[:, :2] = grid_coords; rows[:, 3] = t_val
+        rows[:, 4:] = dummy.unsqueeze(0).expand(N_grid, -1)
+        if N_v > 0:
+            a = torch.tensor(assign, device=DEVICE, dtype=torch.long)
+            filled = a >= 0
+            rows[filled, 2] = sim_vals[a[filled]]
+        reg_map[key] = rows.detach(); reg_list.append(rows.detach())
     return reg_map, torch.cat(reg_list, dim=0)
 
 
-# ── Parameter back-mapping ────────────────────────────────────────────────────
+# ── Parameter utils ───────────────────────────────────────────────────────────
 
 def backmap_params(out_params):
-    p = out_params
-    if isinstance(p[0], torch.Tensor):
-        p = [x.item() if x.numel() == 1 else x[0].item() for x in p]
-    p = [float(x) for x in p]
+    p = [x.item() if isinstance(x, torch.Tensor) else float(x) for x in out_params]
     phi2 = np.exp(p[1]); phi3 = np.exp(p[2]); phi4 = np.exp(p[3])
     rlon = 1.0 / phi2
-    return {
-        'sigmasq':    np.exp(p[0]) / phi2,
-        'range_lat':  rlon / phi3 ** 0.5,
-        'range_lon':  rlon,
-        'range_time': rlon / phi4 ** 0.5,
-        'advec_lat':  p[4],
-        'advec_lon':  p[5],
-        'nugget':     np.exp(p[6]),
-    }
+    return {'sigmasq':    np.exp(p[0]) / phi2,
+            'range_lat':  rlon / phi3**0.5,
+            'range_lon':  rlon,
+            'range_time': rlon / phi4**0.5,
+            'advec_lat':  p[4],
+            'advec_lon':  p[5],
+            'nugget':     np.exp(p[6])}
 
 
 def calculate_rmsre(out_params, true_dict):
-    est      = backmap_params(out_params)
-    est_arr  = np.array([est['sigmasq'],       est['range_lat'],  est['range_lon'],
-                         est['range_time'],    est['advec_lat'],  est['advec_lon'],
-                         est['nugget']])
-    true_arr = np.array([true_dict['sigmasq'], true_dict['range_lat'], true_dict['range_lon'],
-                         true_dict['range_time'], true_dict['advec_lat'], true_dict['advec_lon'],
-                         true_dict['nugget']])
-    return float(np.sqrt(np.mean(((est_arr - true_arr) / np.abs(true_arr)) ** 2))), est
+    est  = backmap_params(out_params)
+    keys = ['sigmasq','range_lat','range_lon','range_time','advec_lat','advec_lon','nugget']
+    e    = np.array([est[k]        for k in keys])
+    t    = np.array([true_dict[k]  for k in keys])
+    return float(np.sqrt(np.mean(((e - t) / np.abs(t))**2))), est
+
+
+def p_cols(m):
+    return [f'sigmasq_est_{m}', f'range_lat_est_{m}', f'range_lon_est_{m}',
+            f'range_t_est_{m}', f'advec_lat_est_{m}', f'advec_lon_est_{m}',
+            f'nugget_est_{m}']
+
+
+# ── Plots ─────────────────────────────────────────────────────────────────────
+
+def make_plots(df, true_dict, plot_dir, n_iters):
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from scipy.stats import gaussian_kde
+
+    tv_list  = [true_dict['sigmasq'],    true_dict['range_lat'], true_dict['range_lon'],
+                true_dict['range_time'], true_dict['advec_lat'], true_dict['advec_lon'],
+                true_dict['nugget']]
+    COLORS = {'raw': '#1976D2', 'filt_2110': '#E53935', 'filt_1111': '#43A047', 'mixed': '#FF6F00'}
+    iters  = df['iter'].values
+
+    # ── 1. KDE per parameter (4 models overlaid) ─────────────────────────────
+    fig, axes = plt.subplots(4, 2, figsize=(16, 20))
+    axes = axes.flatten()
+    fig.suptitle(f'4-Model DW — Parameter Distributions  ({n_iters} iters)',
+                 fontsize=13, fontweight='bold')
+    for idx, (lbl, tv) in enumerate(zip(P_LABELS, tv_list)):
+        ax = axes[idx]
+        for m, ml in zip(MODELS, MODEL_LABELS):
+            col  = f'{lbl}_est_{m}' if lbl != 'range_t' else f'range_t_est_{m}'
+            # handle naming
+            if lbl == 'range_t':
+                col = f'range_t_est_{m}'
+            else:
+                col = f'{lbl}_est_{m}'
+            if col not in df.columns:
+                continue
+            vals = df[col].dropna().values
+            if len(vals) < 3: continue
+            try:
+                kde = gaussian_kde(vals)
+                lo  = vals.min() - 0.15*(vals.max()-vals.min())
+                hi  = vals.max() + 0.15*(vals.max()-vals.min())
+                xs  = np.linspace(lo, hi, 300)
+                ax.plot(xs, kde(xs), color=COLORS[m], lw=2.0, label=ml)
+                ax.fill_between(xs, kde(xs), alpha=0.07, color=COLORS[m])
+            except Exception:
+                ax.hist(vals, bins=25, color=COLORS[m], alpha=0.3, label=ml)
+        ax.axvline(tv, color='black', ls='--', lw=1.5, label=f'true={tv:.4f}')
+        ax.set_title(f'{lbl}  (true={tv:.4f})', fontsize=10)
+        ax.legend(fontsize=7); ax.grid(True, alpha=0.3)
+    if len(P_LABELS) < len(axes): axes[-1].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(plot_dir / 'dw_4model_kde.png', dpi=130, bbox_inches='tight')
+    plt.close(); print(f"  Saved: dw_4model_kde.png")
+
+    # ── 2. Scatter + cumulative mean per parameter, per model ─────────────────
+    for m, ml in zip(MODELS, MODEL_LABELS):
+        fig, axes = plt.subplots(4, 2, figsize=(14, 18))
+        axes = axes.flatten()
+        fig.suptitle(f'{ml} — Scatter + Cumulative Mean  ({n_iters} iters)',
+                     fontsize=12, fontweight='bold')
+        for idx, (lbl, tv) in enumerate(zip(P_LABELS, tv_list)):
+            if lbl == 'range_t':
+                col = f'range_t_est_{m}'
+            else:
+                col = f'{lbl}_est_{m}'
+            ax = axes[idx]
+            if col not in df.columns: ax.set_title(lbl); continue
+            vals = df[col].values
+            ax.scatter(iters, vals, c=COLORS[m], s=16, alpha=0.5, linewidths=0)
+            ax.axhline(tv, color='black', ls='--', lw=1.5, label=f'true={tv:.4f}')
+            cum = pd.Series(vals).expanding().mean().values
+            ax.plot(iters, cum, color='black', lw=1.8, label='cum. mean')
+            ax.set_xlabel('Iteration', fontsize=9); ax.set_ylabel(lbl, fontsize=9)
+            ax.set_title(f'{lbl}  (true={tv:.4f})', fontsize=10)
+            ax.legend(fontsize=7); ax.grid(True, alpha=0.2)
+        if len(P_LABELS) < len(axes): axes[-1].set_visible(False)
+        plt.tight_layout()
+        plt.savefig(plot_dir / f'dw_{m}_scatter.png', dpi=130, bbox_inches='tight')
+        plt.close(); print(f"  Saved: dw_{m}_scatter.png")
+
+    # ── 3. RMSRE comparison ───────────────────────────────────────────────────
+    fig, ax = plt.subplots(figsize=(12, 5))
+    for m, ml in zip(MODELS, MODEL_LABELS):
+        col = f'rmsre_{m}'
+        if col not in df.columns: continue
+        rv  = df[col].values
+        ax.scatter(iters, rv,  c=COLORS[m], s=16, alpha=0.4, linewidths=0)
+        cum = pd.Series(rv).expanding().mean().values
+        ax.plot(iters, cum, color=COLORS[m], lw=2.0, label=f'{ml} (med={np.median(rv):.3f})')
+    ax.set_xlabel('Iteration', fontsize=11); ax.set_ylabel('RMSRE', fontsize=11)
+    ax.set_title(f'4-Model DW — RMSRE  ({n_iters} iters)', fontsize=12)
+    ax.legend(fontsize=9); ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(plot_dir / 'dw_4model_rmsre.png', dpi=130, bbox_inches='tight')
+    plt.close(); print(f"  Saved: dw_4model_rmsre.png")
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
@@ -238,7 +296,7 @@ def calculate_rmsre(out_params, true_dict):
 @app.command()
 def cli(
     num_iters:  int   = typer.Option(300,  help="Simulation iterations"),
-    years:      str   = typer.Option("2022,2024,2025", help="Years to sample obs patterns from"),
+    years:      str   = typer.Option("2022,2024,2025", help="Years to sample obs patterns"),
     month:      int   = typer.Option(7,    help="Reference month"),
     lat_range:  str   = typer.Option("-3,2",    help="lat_min,lat_max"),
     lon_range:  str   = typer.Option("121,131", help="lon_min,lon_max"),
@@ -250,26 +308,26 @@ def cli(
 ) -> None:
 
     rng = np.random.default_rng(seed)
-
     lat_r      = [float(x) for x in lat_range.split(',')]
     lon_r      = [float(x) for x in lon_range.split(',')]
     years_list = [y.strip() for y in years.split(',')]
 
     print(f"Device     : {DEVICE}")
-    print(f"Filter     : DW_new [[-1,1],[1,-1]]  (2D separable, axis exclusion)")
+    print(f"Models     : {MODEL_LABELS}")
     print(f"Region     : lat {lat_r}, lon {lon_r}")
+    print(f"freq_alpha : {FREQ_ALPHA}  (Mixed model low-freq cutoff)")
     print(f"Years      : {years_list}  month={month}")
-    print(f"Iterations : {num_iters}")
+    print(f"Iterations : {num_iters}  |  DW steps/iter: {dw_steps}")
     print(f"Init noise : ±{init_noise} log-space")
 
     output_path = Path(config.amarel_estimates_day_path if is_amarel
                        else config.mac_estimates_day_path)
     output_path.mkdir(parents=True, exist_ok=True)
     date_tag    = datetime.now().strftime("%m%d%y")
-    csv_raw     = f"sim_dw_new_{date_tag}.csv"
-    csv_summary = f"sim_dw_new_summary_{date_tag}.csv"
+    csv_raw     = f"sim_dw_4model_{date_tag}.csv"
+    csv_summary = f"sim_dw_4model_summary_{date_tag}.csv"
 
-    # ── True parameters (real-data-calibrated) ────────────────────────────────
+    # ── True parameters ───────────────────────────────────────────────────────
     true_dict = {
         'sigmasq':    13.059,
         'range_lat':  0.154,
@@ -279,21 +337,25 @@ def cli(
         'advec_lon':  -0.1689,
         'nugget':     0.247,
     }
-    phi2      = 1.0 / true_dict['range_lon']
-    phi1      = true_dict['sigmasq'] * phi2
-    phi3      = (true_dict['range_lon'] / true_dict['range_lat'])  ** 2
-    phi4      = (true_dict['range_lon'] / true_dict['range_time']) ** 2
-    true_log  = [np.log(phi1), np.log(phi2), np.log(phi3), np.log(phi4),
-                 true_dict['advec_lat'], true_dict['advec_lon'], np.log(true_dict['nugget'])]
+    phi2     = 1.0 / true_dict['range_lon']
+    phi1     = true_dict['sigmasq'] * phi2
+    phi3     = (true_dict['range_lon'] / true_dict['range_lat'])  ** 2
+    phi4     = (true_dict['range_lon'] / true_dict['range_time']) ** 2
+    true_log = [np.log(phi1), np.log(phi2), np.log(phi3), np.log(phi4),
+                true_dict['advec_lat'], true_dict['advec_lon'], np.log(true_dict['nugget'])]
     true_params = torch.tensor(true_log, device=DEVICE, dtype=DTYPE)
+
+    TRUE_VALS = [true_dict['sigmasq'],    true_dict['range_lat'], true_dict['range_lon'],
+                 true_dict['range_time'], true_dict['advec_lat'], true_dict['advec_lon'],
+                 true_dict['nugget']]
 
     def make_random_init(rng):
         noisy = list(true_log)
         for i in [0, 1, 2, 3, 6]:
             noisy[i] = true_log[i] + rng.uniform(-init_noise, init_noise)
         for i in [4, 5]:
-            scale   = max(abs(true_log[i]), 0.05)
-            noisy[i] = true_log[i] + rng.uniform(-2 * scale, 2 * scale)
+            scale    = max(abs(true_log[i]), 0.05)
+            noisy[i] = true_log[i] + rng.uniform(-2*scale, 2*scale)
         return noisy
 
     # ── Load GEMS obs patterns ────────────────────────────────────────────────
@@ -304,19 +366,16 @@ def cli(
     year_dfmaps, year_means = {}, {}
 
     for yr in years_list:
-        df_map_yr, _, _, monthly_mean_yr = data_loader.load_maxmin_ordered_data_bymonthyear(
+        df_map_yr, _, _, mm_yr = data_loader.load_maxmin_ordered_data_bymonthyear(
             lat_lon_resolution=[1, 1], mm_cond_number=8,
             years_=[yr], months_=[month],
-            lat_range=lat_r, lon_range=lon_r,
-            is_whittle=False
-        )
-        year_dfmaps[yr] = df_map_yr
-        year_means[yr]  = monthly_mean_yr
-        print(f"  {yr}-{month:02d}: {len(df_map_yr)} time slots loaded")
+            lat_range=lat_r, lon_range=lon_r, is_whittle=False)
+        year_dfmaps[yr] = df_map_yr; year_means[yr] = mm_yr
+        print(f"  {yr}-{month:02d}: {len(df_map_yr)} time slots")
 
-    # ── Build regular target grid ─────────────────────────────────────────────
+    # ── Build regular target grid (ascending lat: south → north) ─────────────
     print("[Setup 2/4] Building regular target grid...")
-    lats_grid = torch.arange(max(lat_r), min(lat_r) - 0.0001, -DELTA_LAT_BASE,
+    lats_grid = torch.arange(min(lat_r), max(lat_r) + 0.0001, DELTA_LAT_BASE,
                               device=DEVICE, dtype=DTYPE)
     lons_grid = torch.arange(lon_r[0],   lon_r[1]  + 0.0001,  DELTA_LON_BASE,
                               device=DEVICE, dtype=DTYPE)
@@ -325,67 +384,49 @@ def cli(
     g_lat, g_lon = torch.meshgrid(lats_grid, lons_grid, indexing='ij')
     grid_coords  = torch.stack([g_lat.flatten(), g_lon.flatten()], dim=1)
     N_grid       = grid_coords.shape[0]
-    n_lat        = len(lats_grid)
-    n_lon        = len(lons_grid)
-    print(f"  Grid: {n_lat} lat × {n_lon} lon = {N_grid} cells")
-    print(f"  After 2D diff: {n_lat-1} lat × {n_lon-1} lon = {(n_lat-1)*(n_lon-1)} cells per time step")
+    n_lat, n_lon = len(lats_grid), len(lons_grid)
+    print(f"  Grid: {n_lat} lat × {n_lon} lon = {N_grid} cells  "
+          f"(lat {lats_grid[0].item():.3f}→{lats_grid[-1].item():.3f})")
+    print(f"  After diff filter: {n_lat-1}×{n_lon-1} per time step")
 
-    # ── Build high-res grid & precompute mappings ─────────────────────────────
+    # ── High-res grid & obs mappings ──────────────────────────────────────────
     print("[Setup 3/4] Building high-res grid and precomputing obs mappings...")
     lats_hr, lons_hr, dlat_hr, dlon_hr = build_high_res_grid(lat_r, lon_r,
                                                                lat_factor, lon_factor)
-    print(f"  High-res: {len(lats_hr)} lat × {len(lons_hr)} lon = {len(lats_hr)*len(lons_hr):,} cells")
+    print(f"  High-res: {len(lats_hr)}×{len(lons_hr)} = {len(lats_hr)*len(lons_hr):,} cells")
 
     DUMMY_KEYS = [f't{i}' for i in range(8)]
-
     for yr in years_list:
-        df_map_yr     = year_dfmaps[yr]
-        monthly_mean_yr = year_means[yr]
-        all_sorted    = sorted(df_map_yr.keys())
-        n_days_yr     = len(all_sorted) // 8
+        all_sorted = sorted(year_dfmaps[yr].keys())
+        n_days_yr  = len(all_sorted) // 8
         print(f"  {yr}: precomputing {n_days_yr} days...", flush=True)
         for d_idx in range(n_days_yr):
-            hour_indices = [d_idx * 8, (d_idx + 1) * 8]
             ref_day_map, _ = data_loader.load_working_data(
-                df_map_yr, monthly_mean_yr, hour_indices,
-                ord_mm=None, dtype=DTYPE, keep_ori=True
-            )
+                year_dfmaps[yr], year_means[yr], [d_idx*8, (d_idx+1)*8],
+                ord_mm=None, dtype=DTYPE, keep_ori=True)
             day_keys = sorted(ref_day_map.keys())[:8]
-            if len(day_keys) < 8:
-                continue
-            s3, hr_idx, src = precompute_mapping_indices(
+            if len(day_keys) < 8: continue
+            s3, hr_i, src = precompute_mapping_indices(
                 ref_day_map, lats_hr, lons_hr, grid_coords, day_keys)
-            all_day_mappings.append((yr, d_idx, s3, hr_idx, src))
-
+            all_day_mappings.append((yr, d_idx, s3, hr_i, src))
     print(f"  Total available day-patterns: {len(all_day_mappings)}")
 
-    # ── Verify dataset structure ──────────────────────────────────────────────
+    # ── Verify ────────────────────────────────────────────────────────────────
     print("[Setup 4/4] Verifying dataset structure...")
     _yr0, _d0, _s3_0, _hr0, _src0 = all_day_mappings[0]
-    field0   = generate_field_values(lats_hr, lons_hr, 8, true_params, dlat_hr, dlon_hr)
-    reg0, _  = assemble_reg_dataset(field0, _s3_0, _hr0, _src0,
-                                     DUMMY_KEYS, grid_coords, true_params)
-    del field0
-    first_reg  = list(reg0.values())[0]
-    n_reg_valid = (~torch.isnan(first_reg[:, 2])).sum().item()
-    print(f"  reg_map first step: {n_reg_valid}/{N_grid} valid (assigned) cells")
+    f0 = generate_field_values(lats_hr, lons_hr, 8, true_params, dlat_hr, dlon_hr)
+    r0, _ = assemble_reg_dataset(f0, _s3_0, _hr0, _src0, DUMMY_KEYS, grid_coords, true_params)
+    del f0
+    fv = (~torch.isnan(list(r0.values())[0][:, 2])).sum().item()
+    print(f"  reg_map first step: {fv}/{N_grid} valid")
 
-    # ── DW objects ────────────────────────────────────────────────────────────
-    # sample side: J-vector, periodogram, taper autocorrelation
-    dwl_sample = dw_sample.debiased_whittle_likelihood()
-    # model side: expected periodogram + likelihood (new filter [[-1,1],[1,-1]])
-    dwl_model  = dw_new.debiased_whittle_likelihood()
+    # ── DW likelihood objects ─────────────────────────────────────────────────
+    dwl_raw    = dw_raw.debiased_whittle_likelihood()    # sample-side DFT + model 1
+    dwl_old    = dw_old.debiased_whittle_likelihood()    # model 2 expected periodogram
+    dwl_new    = dw_new.debiased_whittle_likelihood()    # model 3 expected periodogram
+    dwl_mixed  = dw_mixed.debiased_whittle_likelihood()  # model 4 mixed loss
 
-    DWL_STEPS = dw_steps
-    LAT_COL, LON_COL, VAL_COL, TIME_COL = 0, 1, 2, 3
-
-    P_COLS   = ['sigmasq_est', 'range_lat_est', 'range_lon_est',
-                'range_t_est', 'advec_lat_est', 'advec_lon_est', 'nugget_est']
-    P_LABELS = ['sigmasq', 'range_lat', 'range_lon', 'range_t',
-                'advec_lat', 'advec_lon', 'nugget']
-    TRUE_VALS = [true_dict['sigmasq'],    true_dict['range_lat'], true_dict['range_lon'],
-                 true_dict['range_time'], true_dict['advec_lat'], true_dict['advec_lon'],
-                 true_dict['nugget']]
+    LC, NC, VC, TC = 0, 1, 2, 3
 
     records = []
     skipped = 0
@@ -394,75 +435,147 @@ def cli(
     # SIMULATION LOOP
     # ─────────────────────────────────────────────────────────────────────────
     for it in range(num_iters):
-        print(f"\n{'='*55}")
+        print(f"\n{'='*60}")
         print(f"  Iter {it+1}/{num_iters}  (skipped: {skipped})")
-        print(f"{'='*55}")
+        print(f"{'='*60}")
 
         yr_it, d_it, step3_per_t, hr_idx_per_t, src_locs_per_t = \
             all_day_mappings[rng.integers(len(all_day_mappings))]
         initial_vals = make_random_init(rng)
         init_orig    = backmap_params(initial_vals)
-        print(f"  Obs: {yr_it} day {d_it}  |  "
-              f"init sigmasq={init_orig['sigmasq']:.3f}  "
-              f"range_lon={init_orig['range_lon']:.3f}  "
-              f"nugget={init_orig['nugget']:.3f}")
+        print(f"  Obs: {yr_it} day {d_it}  |  init sig={init_orig['sigmasq']:.3f} "
+              f"rl={init_orig['range_lon']:.3f} nug={init_orig['nugget']:.3f}")
+
+        rec = {'iter': it+1, 'obs_year': yr_it, 'obs_day': d_it,
+               'init_sigmasq': round(init_orig['sigmasq'], 4),
+               'init_range_lon': round(init_orig['range_lon'], 4)}
 
         try:
-            # Generate simulated field
-            field    = generate_field_values(lats_hr, lons_hr, 8, true_params, dlat_hr, dlon_hr)
+            # ── Generate field and reg_map once ───────────────────────────────
+            field = generate_field_values(lats_hr, lons_hr, 8, true_params, dlat_hr, dlon_hr)
             reg_map, reg_agg = assemble_reg_dataset(
                 field, step3_per_t, hr_idx_per_t, src_locs_per_t,
                 DUMMY_KEYS, grid_coords, true_params)
             del field
 
-            # ── DW_new: 2D filter [[-1,1],[1,-1]] (runs on CPU) ──────────────
-            p_dw = [torch.tensor([val], device=DEVICE_DW, dtype=DTYPE, requires_grad=True)
-                    for val in initial_vals]
+            params_kwargs = dict(
+                params_list=[true_dict['sigmasq'], true_dict['range_lat'], true_dict['range_lon'],
+                             true_dict['range_time'], true_dict['advec_lat'], true_dict['advec_lon'],
+                             true_dict['nugget']],
+                lat_range=lat_r, lon_range=lon_r)
 
-            # Apply new 2D filter (from dw_new module)
-            db = dw_new.debiased_whittle_preprocess(
-                [reg_agg], [reg_map], day_idx=0,
-                params_list=[
-                    true_dict['sigmasq'], true_dict['range_lat'],  true_dict['range_lon'],
-                    true_dict['range_time'], true_dict['advec_lat'], true_dict['advec_lon'],
-                    true_dict['nugget']
-                ],
-                lat_range=lat_r, lon_range=lon_r
-            )
-
-            # generate_spatially_filtered_days applies new 2D filter:
-            #   Z(i,j) = -X(i,j) + X(i+1,j) + X(i,j+1) - X(i+1,j+1)
-            # output grid: (nlat-1) × (nlon-1)
-            cur_df      = db.generate_spatially_filtered_days(
+            # ─────────────────────────────────────────────────────────────────
+            # ── Shared preprocessing steps ────────────────────────────────────
+            # Raw slices (model 1, 4-raw)
+            db_raw = dw_raw.debiased_whittle_preprocess([reg_agg], [reg_map], day_idx=0,
+                                                         **params_kwargs)
+            cur_raw  = db_raw.generate_spatially_filtered_days(
                 lat_r[0], lat_r[1], lon_r[0], lon_r[1]).to(DEVICE_DW)
-            unique_t    = torch.unique(cur_df[:, TIME_COL])
-            time_slices = [cur_df[cur_df[:, TIME_COL] == t] for t in unique_t]
+            sl_raw   = [cur_raw[cur_raw[:, TC]==t] for t in torch.unique(cur_raw[:, TC])]
 
-            # Compute sample periodogram using dw_sample (has generate_Jvector_tapered_mv)
-            J_vec, n1, n2, p_time, taper, obs_masks = dwl_sample.generate_Jvector_tapered_mv(
-                time_slices, dwl_sample.cgn_hamming, LAT_COL, LON_COL, VAL_COL, DEVICE_DW)
-            I_samp = dwl_sample.calculate_sample_periodogram_vectorized(J_vec)
-            t_auto = dwl_sample.calculate_taper_autocorrelation_multivariate(
-                taper, obs_masks, n1, n2, DEVICE_DW)
-            del obs_masks
+            J_raw, n1, n2, p_time, tap_raw, om_raw = dwl_raw.generate_Jvector_tapered_mv(
+                sl_raw, dwl_raw.cgn_hamming, LC, NC, VC, DEVICE_DW)
+            I_raw   = dwl_raw.calculate_sample_periodogram_vectorized(J_raw)
+            ta_raw  = dwl_raw.calculate_taper_autocorrelation_multivariate(
+                tap_raw, om_raw, n1, n2, DEVICE_DW)
+            del om_raw
 
-            print(f"  DW_new grid: {n1}×{n2}, {p_time} time steps")
+            # 2-1-1-0 slices (model 2)
+            db_old  = dw_new.debiased_whittle_preprocess([reg_agg], [reg_map], day_idx=0,
+                                                          **params_kwargs)
+            cur_old = db_old.generate_spatially_filtered_days(
+                lat_r[0], lat_r[1], lon_r[0], lon_r[1], kernel_type='old').to(DEVICE_DW)
+            sl_old  = [cur_old[cur_old[:, TC]==t] for t in torch.unique(cur_old[:, TC])]
 
-            # Optimize using dw_new likelihood (axis-exclusion loss, new filter Cov_Z)
-            opt_dw = torch.optim.LBFGS(
-                p_dw, lr=1.0, max_iter=20, max_eval=100,
-                history_size=10, line_search_fn="strong_wolfe", tolerance_grad=1e-5)
+            J_old, n1o, n2o, _, tap_old, om_old = dwl_raw.generate_Jvector_tapered_mv(
+                sl_old, dwl_raw.cgn_hamming, LC, NC, VC, DEVICE_DW)
+            I_old   = dwl_raw.calculate_sample_periodogram_vectorized(J_old)
+            ta_old  = dwl_raw.calculate_taper_autocorrelation_multivariate(
+                tap_old, om_old, n1o, n2o, DEVICE_DW)
+            del om_old
 
+            # 1-1-1-1 slices (model 3, 4-diff)
+            db_new  = dw_new.debiased_whittle_preprocess([reg_agg], [reg_map], day_idx=0,
+                                                          **params_kwargs)
+            cur_new = db_new.generate_spatially_filtered_days(
+                lat_r[0], lat_r[1], lon_r[0], lon_r[1]).to(DEVICE_DW)
+            sl_new  = [cur_new[cur_new[:, TC]==t] for t in torch.unique(cur_new[:, TC])]
+
+            J_new, n1d, n2d, _, tap_new, om_new = dwl_raw.generate_Jvector_tapered_mv(
+                sl_new, dwl_raw.cgn_hamming, LC, NC, VC, DEVICE_DW)
+            I_new   = dwl_raw.calculate_sample_periodogram_vectorized(J_new)
+            ta_new  = dwl_raw.calculate_taper_autocorrelation_multivariate(
+                tap_new, om_new, n1d, n2d, DEVICE_DW)
+            del om_new
+
+            print(f"  Raw:{n1}×{n2}  filt_2110:{n1o}×{n2o}  filt_1111:{n1d}×{n2d}  p={p_time}")
+
+            # ─────────────────────────────────────────────────────────────────
+            # ── Model 1: Raw ──────────────────────────────────────────────────
+            p1 = [torch.tensor([v], device=DEVICE_DW, dtype=DTYPE, requires_grad=True)
+                  for v in initial_vals]
+            opt1 = torch.optim.LBFGS(p1, lr=1.0, max_iter=20, max_eval=100,
+                                      history_size=10, line_search_fn="strong_wolfe",
+                                      tolerance_grad=1e-5)
             t0 = time.time()
-            _, _, _, loss_dw, _ = dwl_model.run_lbfgs_tapered(
-                params_list=p_dw, optimizer=opt_dw, I_sample=I_samp,
-                n1=n1, n2=n2, p_time=p_time, taper_autocorr_grid=t_auto,
-                max_steps=DWL_STEPS, device=DEVICE_DW)
-            t_dw = time.time() - t0
+            _, _, _, loss1, _ = dwl_raw.run_lbfgs_tapered(
+                params_list=p1, optimizer=opt1, I_sample=I_raw,
+                n1=n1, n2=n2, p_time=p_time, taper_autocorr_grid=ta_raw,
+                max_steps=dw_steps, device=DEVICE_DW)
+            t1 = time.time() - t0
+            rmsre1, est1 = calculate_rmsre([p.item() for p in p1], true_dict)
+            print(f"  [raw]    RMSRE={rmsre1:.4f}  ({t1:.1f}s)")
 
-            out_dw = [p.item() for p in p_dw]
-            rmsre_dw, est_dw = calculate_rmsre(out_dw, true_dict)
-            print(f"  RMSRE={rmsre_dw:.4f}  ({t_dw:.1f}s)")
+            # ── Model 2: 2-1-1-0 ─────────────────────────────────────────────
+            p2 = [torch.tensor([v], device=DEVICE_DW, dtype=DTYPE, requires_grad=True)
+                  for v in initial_vals]
+            opt2 = torch.optim.LBFGS(p2, lr=1.0, max_iter=20, max_eval=100,
+                                      history_size=10, line_search_fn="strong_wolfe",
+                                      tolerance_grad=1e-5)
+            t0 = time.time()
+            _, _, _, loss2, _ = dwl_old.run_lbfgs_tapered(
+                params_list=p2, optimizer=opt2, I_sample=I_old,
+                n1=n1o, n2=n2o, p_time=p_time, taper_autocorr_grid=ta_old,
+                max_steps=dw_steps, device=DEVICE_DW)
+            t2 = time.time() - t0
+            rmsre2, est2 = calculate_rmsre([p.item() for p in p2], true_dict)
+            print(f"  [filt_2110] RMSRE={rmsre2:.4f}  ({t2:.1f}s)")
+
+            # ── Model 3: 1-1-1-1 ─────────────────────────────────────────────
+            p3 = [torch.tensor([v], device=DEVICE_DW, dtype=DTYPE, requires_grad=True)
+                  for v in initial_vals]
+            opt3 = torch.optim.LBFGS(p3, lr=1.0, max_iter=20, max_eval=100,
+                                      history_size=10, line_search_fn="strong_wolfe",
+                                      tolerance_grad=1e-5)
+            t0 = time.time()
+            _, _, _, loss3, _ = dwl_new.run_lbfgs_tapered(
+                params_list=p3, optimizer=opt3, I_sample=I_new,
+                n1=n1d, n2=n2d, p_time=p_time, taper_autocorr_grid=ta_new,
+                max_steps=dw_steps, device=DEVICE_DW)
+            t3 = time.time() - t0
+            rmsre3, est3 = calculate_rmsre([p.item() for p in p3], true_dict)
+            print(f"  [filt_1111] RMSRE={rmsre3:.4f}  ({t3:.1f}s)")
+
+            # ── Model 4: Mixed (α=FREQ_ALPHA) ─────────────────────────────────
+            K1 = int(n1  * FREQ_ALPHA)
+            K2 = int(n2  * FREQ_ALPHA)
+            p4 = [torch.tensor([v], device=DEVICE_DW, dtype=DTYPE, requires_grad=True)
+                  for v in initial_vals]
+            opt4 = torch.optim.LBFGS(p4, lr=1.0, max_iter=20, max_eval=100,
+                                      history_size=10, line_search_fn="strong_wolfe",
+                                      tolerance_grad=1e-5)
+            t0 = time.time()
+            _, _, _, loss4, _ = dwl_mixed.run_lbfgs_mixed(
+                params_list=p4, optimizer=opt4,
+                I_samp_raw=I_raw, I_samp_diff=I_new,
+                n1=n1, n2=n2, n1d=n1d, n2d=n2d,
+                p_time=p_time,
+                taper_auto_raw=ta_raw, taper_auto_diff=ta_new,
+                K1=K1, K2=K2,
+                max_steps=dw_steps, device=DEVICE_DW)
+            t4 = time.time() - t0
+            rmsre4, est4 = calculate_rmsre([p.item() for p in p4], true_dict)
+            print(f"  [mixed]  RMSRE={rmsre4:.4f}  ({t4:.1f}s)  K1={K1} K2={K2}")
 
         except Exception as e:
             skipped += 1
@@ -472,88 +585,121 @@ def cli(
             continue
 
         # ── Record ───────────────────────────────────────────────────────────
-        records.append({
-            'iter':          it + 1,
-            'obs_year':      yr_it,
-            'obs_day':       d_it,
-            'model':         'DW_new',
-            'rmsre':         round(rmsre_dw,         6),
-            'time_s':        round(t_dw,             2),
-            'loss_dw':       round(float(loss_dw),   6),
-            'sigmasq_est':   round(est_dw['sigmasq'],    6),
-            'range_lat_est': round(est_dw['range_lat'],  6),
-            'range_lon_est': round(est_dw['range_lon'],  6),
-            'range_t_est':   round(est_dw['range_time'], 6),
-            'advec_lat_est': round(est_dw['advec_lat'],  6),
-            'advec_lon_est': round(est_dw['advec_lon'],  6),
-            'nugget_est':    round(est_dw['nugget'],     6),
-            'init_sigmasq':  round(init_orig['sigmasq'],   4),
-            'init_range_lon':round(init_orig['range_lon'], 4),
-            'n1': n1, 'n2': n2,
-        })
+        keys = ['sigmasq', 'range_lat', 'range_lon', 'range_time',
+                'advec_lat', 'advec_lon', 'nugget']
+        rec_cols = [('range_t', 'range_time')]   # alias mapping
+        for m, est, rmsre, loss, t_s, n1_, n2_ in [
+            ('raw',    est1, rmsre1, loss1, t1, n1,  n2),
+            ('filt_2110', est2, rmsre2, loss2, t2, n1o, n2o),
+            ('filt_1111', est3, rmsre3, loss3, t3, n1d, n2d),
+            ('mixed',  est4, rmsre4, loss4, t4, n1,  n2),
+        ]:
+            rec[f'rmsre_{m}']         = round(rmsre,        6)
+            rec[f'time_s_{m}']        = round(t_s,          2)
+            rec[f'loss_{m}']          = round(float(loss),  6)
+            rec[f'sigmasq_est_{m}']   = round(est['sigmasq'],    6)
+            rec[f'range_lat_est_{m}'] = round(est['range_lat'],  6)
+            rec[f'range_lon_est_{m}'] = round(est['range_lon'],  6)
+            rec[f'range_t_est_{m}']   = round(est['range_time'], 6)
+            rec[f'advec_lat_est_{m}'] = round(est['advec_lat'],  6)
+            rec[f'advec_lon_est_{m}'] = round(est['advec_lon'],  6)
+            rec[f'nugget_est_{m}']    = round(est['nugget'],     6)
+            rec[f'n1_{m}'] = n1_; rec[f'n2_{m}'] = n2_
 
-        # Save after every iteration
+        records.append(rec)
         pd.DataFrame(records).to_csv(output_path / csv_raw, index=False)
 
         # ── Running summary ───────────────────────────────────────────────────
         n_done = len(records)
         print(f"\n  ── Running summary ({n_done} done / {it+1} attempted) ──")
-        cw = 10
-        print(f"  {'param':<12} {'true':>{cw}}  {'mean':>{cw}}  {'bias':>{cw}}  {'RMSRE':>{cw}}  {'MdARE':>{cw}}  {'P90-P10':>{cw}}")
-        print(f"  {'-'*80}")
-        for lbl, col, tv in zip(P_LABELS, P_COLS, TRUE_VALS):
-            vals    = np.array([r[col] for r in records])
-            mean_   = np.mean(vals)
-            bias_   = mean_ - tv
-            rmsre_  = np.sqrt(np.mean(((vals - tv) / abs(tv)) ** 2))
-            mdare_  = np.median(np.abs((vals - tv) / abs(tv)))
-            p90p10_ = np.percentile(vals, 90) - np.percentile(vals, 10)
-            print(f"  {lbl:<12} {tv:>{cw}.4f}  {mean_:>{cw}.4f}  {bias_:>{cw}.4f}  {rmsre_:>{cw}.4f}  {mdare_:>{cw}.4f}  {p90p10_:>{cw}.4f}")
-        rmsre_all = np.array([r['rmsre'] for r in records])
-        print(f"  {'-'*80}")
-        print(f"  {'Overall':<12} {'':>{cw}}  {'':>{cw}}  {'':>{cw}}  {np.mean(rmsre_all):>{cw}.4f}  {np.median(rmsre_all):>{cw}.4f}  {np.percentile(rmsre_all,90)-np.percentile(rmsre_all,10):>{cw}.4f}")
+        cw = 9
 
-    # ── Final summary CSV ─────────────────────────────────────────────────────
-    print(f"\n{'='*55}")
+        for m, ml in zip(MODELS, MODEL_LABELS):
+            print(f"\n  [{ml}]")
+            print(f"  {'param':<12} {'true':>{cw}}  {'cum_mean':>{cw}}  {'bias':>{cw}}  "
+                  f"{'RMSRE':>{cw}}  {'RMSRE_med':>{cw}}  {'P90-P10':>{cw}}")
+            print(f"  {'-'*82}")
+            for lbl, tv in zip(P_LABELS, TRUE_VALS):
+                col  = f'range_t_est_{m}' if lbl == 'range_t' else f'{lbl}_est_{m}'
+                vals = np.array([r[col] for r in records])
+                cm   = np.mean(vals)
+                bi   = cm - tv
+                rm   = np.sqrt(np.mean(((vals - tv)/abs(tv))**2))
+                rmd  = np.median(np.abs((vals - tv)/abs(tv)))
+                p9p1 = np.percentile(vals, 90) - np.percentile(vals, 10)
+                print(f"  {lbl:<12} {tv:>{cw}.4f}  {cm:>{cw}.4f}  {bi:>{cw}.4f}  "
+                      f"{rm:>{cw}.4f}  {rmd:>{cw}.4f}  {p9p1:>{cw}.4f}")
+            rv = np.array([r[f'rmsre_{m}'] for r in records])
+            print(f"  {'-'*82}")
+            print(f"  {'Overall':<12} {'':>{cw}}  {'':>{cw}}  {'':>{cw}}  "
+                  f"{np.mean(rv):>{cw}.4f}  {np.median(rv):>{cw}.4f}  "
+                  f"{np.percentile(rv,90)-np.percentile(rv,10):>{cw}.4f}")
+
+    # ── Final summary ─────────────────────────────────────────────────────────
+    print(f"\n{'='*60}")
     print(f"  DONE: {len(records)} completed, {skipped} skipped")
-    print(f"{'='*55}")
+    print(f"{'='*60}")
 
     df_final = pd.DataFrame(records)
     df_final.to_csv(output_path / csv_raw, index=False)
 
+    cw = 9
     summary_rows = []
-    for lbl, col, tv in zip(P_LABELS, P_COLS, TRUE_VALS):
-        vals = df_final[col].values
+    for m, ml in zip(MODELS, MODEL_LABELS):
+        print(f"\n  ── FINAL [{ml}] ({len(records)} completed) ──")
+        print(f"  {'param':<12} {'true':>{cw}}  {'mean':>{cw}}  {'median':>{cw}}  {'bias':>{cw}}  "
+              f"{'RMSRE':>{cw}}  {'RMSRE_med':>{cw}}  {'P90-P10':>{cw}}")
+        print(f"  {'-'*95}")
+        for lbl, tv in zip(P_LABELS, TRUE_VALS):
+            col  = f'range_t_est_{m}' if lbl == 'range_t' else f'{lbl}_est_{m}'
+            vals = df_final[col].values
+            mean_   = float(np.mean(vals))
+            med_    = float(np.median(vals))
+            bias_   = mean_ - tv
+            rmsre_  = float(np.sqrt(np.mean(((vals-tv)/abs(tv))**2)))
+            rmsre_m = float(np.median(np.abs((vals-tv)/abs(tv))))
+            p10_    = float(np.percentile(vals, 10))
+            p90_    = float(np.percentile(vals, 90))
+            p9p1_   = p90_ - p10_
+            print(f"  {lbl:<12} {tv:>{cw}.4f}  {mean_:>{cw}.4f}  {med_:>{cw}.4f}  {bias_:>{cw}.4f}  "
+                  f"{rmsre_:>{cw}.4f}  {rmsre_m:>{cw}.4f}  {p9p1_:>{cw}.4f}")
+            summary_rows.append({
+                'model': ml, 'param': lbl, 'true': tv,
+                'mean': round(mean_, 6), 'median': round(med_, 6),
+                'bias': round(bias_, 6), 'std': round(float(np.std(vals)), 6),
+                'RMSRE': round(rmsre_, 6), 'RMSRE_median': round(rmsre_m, 6),
+                'P10': round(p10_, 6), 'P90': round(p90_, 6),
+                'P90_P10': round(p9p1_, 6),
+            })
+        rv = df_final[f'rmsre_{m}'].values
+        p9p1_rv = float(np.percentile(rv,90) - np.percentile(rv,10))
+        print(f"  {'-'*95}")
+        print(f"  {'Overall':<12} {'':>{cw}}  {'':>{cw}}  {'':>{cw}}  {'':>{cw}}  "
+              f"{np.mean(rv):>{cw}.4f}  {np.median(rv):>{cw}.4f}  {p9p1_rv:>{cw}.4f}")
         summary_rows.append({
-            'param':   lbl,
-            'true':    tv,
-            'mean':    round(float(np.mean(vals)),   6),
-            'median':  round(float(np.median(vals)), 6),
-            'bias':    round(float(np.mean(vals) - tv), 6),
-            'std':     round(float(np.std(vals)),    6),
-            'RMSRE':   round(float(np.sqrt(np.mean(((vals - tv) / abs(tv)) ** 2))), 6),
-            'MdARE':   round(float(np.median(np.abs((vals - tv) / abs(tv)))), 6),
-            'P10':     round(float(np.percentile(vals, 10)), 6),
-            'P90':     round(float(np.percentile(vals, 90)), 6),
-            'P90_P10': round(float(np.percentile(vals, 90) - np.percentile(vals, 10)), 6),
+            'model': ml, 'param': 'Overall', 'true': float('nan'),
+            'mean': float('nan'), 'median': float('nan'), 'bias': float('nan'),
+            'std': float('nan'),
+            'RMSRE': round(float(np.mean(rv)), 6),
+            'RMSRE_median': round(float(np.median(rv)), 6),
+            'P10': float('nan'), 'P90': float('nan'),
+            'P90_P10': round(p9p1_rv, 6),
         })
-    summary_rows.append({
-        'param':   'Overall',
-        'true':    float('nan'),
-        'mean':    float('nan'),
-        'median':  float('nan'),
-        'bias':    float('nan'),
-        'std':     float('nan'),
-        'RMSRE':   round(float(np.mean(df_final['rmsre'].values)), 6),
-        'MdARE':   round(float(np.median(df_final['rmsre'].values)), 6),
-        'P10':     float('nan'), 'P90': float('nan'), 'P90_P10': float('nan'),
-    })
 
     df_summary = pd.DataFrame(summary_rows)
     df_summary.to_csv(output_path / csv_summary, index=False)
-
     print(f"\nSaved:\n  {output_path / csv_raw}\n  {output_path / csv_summary}")
-    print(f"\nFinal summary:\n{df_summary[['param','true','mean','bias','RMSRE','MdARE']].to_string(index=False)}")
+
+    # ── Plots ─────────────────────────────────────────────────────────────────
+    try:
+        plot_dir = output_path / "plots" / "dw_4model"
+        plot_dir.mkdir(parents=True, exist_ok=True)
+        make_plots(df_final, true_dict, plot_dir, len(records))
+        print(f"\n  Plots saved to: {plot_dir}")
+    except Exception as e:
+        import traceback
+        print(f"  [Plot error] {e}")
+        traceback.print_exc()
 
 
 if __name__ == "__main__":

@@ -289,7 +289,7 @@ def cli(
 
     # ── Regular target grid ────────────────────────────────────────────────────
     print("[Setup 2/5] Building regular target grid...")
-    lats_grid = torch.round(torch.arange(max(lat_r), min(lat_r) - 1e-4, -DELTA_LAT_BASE,
+    lats_grid = torch.round(torch.arange(min(lat_r), max(lat_r) + 1e-4, DELTA_LAT_BASE,
                                           device=DEVICE, dtype=DTYPE) * 10000) / 10000
     lons_grid = torch.round(torch.arange(lon_r[0], lon_r[1] + 1e-4, DELTA_LON_BASE,
                                           device=DEVICE, dtype=DTYPE) * 10000) / 10000
