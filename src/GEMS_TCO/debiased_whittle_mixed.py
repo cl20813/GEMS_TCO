@@ -405,22 +405,30 @@ class debiased_whittle_likelihood:
         u1m, u2m = torch.meshgrid(torch.arange(n1,dtype=torch.float64,device=dev),
                                    torch.arange(n2,dtype=torch.float64,device=dev), indexing='ij')
         tl = torch.arange(p_time, dtype=torch.float64, device=dev)
-        cn = torch.zeros((n1,n2,p_time,p_time), dtype=torch.complex128, device=dev)
 
+        rows = []
+        has_nan = False
         for q in range(p_time):
+            cols = []
             for r in range(p_time):
                 td = tl[q] - tl[r]
                 _q = q if taper_auto.ndim==4 else None
                 _r = r if taper_auto.ndim==4 else None
 
-                def cb(du1, du2):
+                def cb(du1, du2, _q=_q, _r=_r, td=td):
                     return debiased_whittle_likelihood._cn_bar(
                         cov_fn, du1, du2, td, pt, n1, n2, taper_auto, delta1, delta2, _q, _r)
 
                 grid = cb(u1m, u2m) + cb(u1m-n1, u2m) + cb(u1m, u2m-n2) + cb(u1m-n1, u2m-n2)
-                cn[:,:,q,r] = float('nan') if torch.isnan(grid).any() else grid.to(torch.complex128)
+                if torch.isnan(grid).any():
+                    has_nan = True
+                    cols.append(torch.zeros(n1, n2, dtype=torch.complex128, device=dev))
+                else:
+                    cols.append(grid.to(torch.complex128))
+            rows.append(torch.stack(cols, dim=-1))  # (n1, n2, p_time)
+        cn = torch.stack(rows, dim=-2)  # (n1, n2, p_time, p_time)
 
-        if torch.isnan(cn).any():
+        if has_nan:
             return torch.full((n1,n2,p_time,p_time), float('nan'), dtype=torch.complex128, device=dev)
         result_raw = torch.fft.fft2(cn, dim=(0,1)) * (1./(4.*cmath.pi**2))
         return (result_raw + result_raw.conj().transpose(-1, -2)) / 2.0

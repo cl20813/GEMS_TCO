@@ -431,10 +431,11 @@ class debiased_whittle_likelihood:
         u1_mesh, u2_mesh = torch.meshgrid(u1_lags, u2_lags, indexing='ij')
 
         t_lags = torch.arange(p_time, dtype=torch.float64, device=device)
-        tilde_cn_tensor = torch.zeros((n1, n2, p_time, p_time),
-                                       dtype=torch.complex128, device=device)
 
+        rows = []
+        has_nan = False
         for q in range(p_time):
+            cols = []
             for r in range(p_time):
                 t_diff = t_lags[q] - t_lags[r]
                 _q = q if taper_autocorr_grid.ndim == 4 else None
@@ -456,11 +457,14 @@ class debiased_whittle_likelihood:
                 tilde_cn_grid_qr = term1 + term2 + term3 + term4
 
                 if torch.isnan(tilde_cn_grid_qr).any():
-                    tilde_cn_tensor[:, :, q, r] = float('nan')
+                    has_nan = True
+                    cols.append(torch.zeros(n1, n2, dtype=torch.complex128, device=device))
                 else:
-                    tilde_cn_tensor[:, :, q, r] = tilde_cn_grid_qr.to(torch.complex128)
+                    cols.append(tilde_cn_grid_qr.to(torch.complex128))
+            rows.append(torch.stack(cols, dim=-1))  # (n1, n2, p_time)
+        tilde_cn_tensor = torch.stack(rows, dim=-2)  # (n1, n2, p_time, p_time)
 
-        if torch.isnan(tilde_cn_tensor).any():
+        if has_nan:
             print("Warning: NaN detected in tilde_cn_tensor before FFT.")
             return torch.full((n1, n2, p_time, p_time), float('nan'),
                               dtype=torch.complex128, device=device)

@@ -28,6 +28,7 @@ sbatch:
 """
 
 import sys
+import os
 import time
 import pickle
 from datetime import datetime
@@ -130,8 +131,8 @@ def apply_step3_1to1(src_np_valid, grid_coords_np, grid_tree):
     return assignment
 
 
-def precompute_mapping_indices(orbit_day_map, lats_hr, lons_hr, grid_coords, sorted_keys):
-    """obs pool = raw orbit_map pixels (all GEMS pixels, not tco_grid Source_Lat/Lon)."""
+def precompute_mapping_indices(ref_day_map, lats_hr, lons_hr, grid_coords, sorted_keys):
+    """obs pool = tco_grid Source_Latitude/Source_Longitude (1 obs per cell)."""
     hr_lat_g, hr_lon_g = torch.meshgrid(lats_hr, lons_hr, indexing='ij')
     hr_coords_np = torch.stack(
         [hr_lat_g.flatten(), hr_lon_g.flatten()], dim=1).cpu().numpy()
@@ -143,16 +144,13 @@ def precompute_mapping_indices(orbit_day_map, lats_hr, lons_hr, grid_coords, sor
 
     step3_assignment_per_t, hr_idx_per_t, src_locs_per_t = [], [], []
     for key in sorted_keys:
-        df = orbit_day_map.get(key)
+        df = ref_day_map.get(key)
         if df is None or len(df) == 0:
             step3_assignment_per_t.append(np.full(N_grid, -1, dtype=np.int64))
             hr_idx_per_t.append(torch.zeros(0, dtype=torch.long, device=DEVICE))
             src_locs_per_t.append(torch.zeros((0, 2), dtype=DTYPE, device=DEVICE))
             continue
-        if 'Latitude' in df.columns and 'Longitude' in df.columns:
-            src_np = df[['Latitude', 'Longitude']].values
-        else:
-            src_np = df.iloc[:, :2].values
+        src_np = df[['Source_Latitude', 'Source_Longitude']].values
         valid_mask   = ~np.isnan(src_np).any(axis=1)
         src_np_valid = src_np[valid_mask]
 
@@ -350,9 +348,11 @@ def cli(
 
     # ── Load obs patterns ──────────────────────────────────────────────────────
     print("\n[Setup 1/5] Loading GEMS obs patterns for all years...")
-    data_loader    = load_data_dynamic_processed(config.amarel_data_load_path)
+    is_amarel   = os.path.exists(config.amarel_data_load_path)
+    data_path   = config.amarel_data_load_path if is_amarel else config.mac_data_load_path
+    data_loader = load_data_dynamic_processed(data_path)
     all_day_mappings = []
-    year_dfmaps, year_means, year_orbit_maps = {}, {}, {}
+    year_dfmaps, year_means, year_tco_maps = {}, {}, {}
 
     for yr in years_list:
         df_map_yr, _, _, monthly_mean_yr = data_loader.load_maxmin_ordered_data_bymonthyear(
@@ -366,18 +366,15 @@ def cli(
         year_means[yr]  = monthly_mean_yr
         print(f"  {yr}-{month:02d}: {len(df_map_yr)} time slots loaded")
 
-        yr2     = str(yr)[2:]
-        om_path = Path(config.amarel_data_load_path) / f"pickle_{yr}" / f"orbit_map{yr2}_{month:02d}.pkl"
-        orbit_yr = {}
-        if om_path.exists():
-            with open(om_path, 'rb') as f:
-                om = pickle.load(f)
-            for k, v in om.items():
-                orbit_yr[f"{yr}_{month:02d}_{k}"] = v
-            print(f"  orbit_map: {len(om)} slots loaded")
+        yr2      = str(yr)[2:]
+        tco_path = Path(data_path) / f"pickle_{yr}" / f"tco_grid_{yr2}_{month:02d}.pkl"
+        if tco_path.exists():
+            with open(tco_path, 'rb') as f:
+                year_tco_maps[yr] = pickle.load(f)
+            print(f"  tco_grid: {len(year_tco_maps[yr])} slots loaded")
         else:
-            print(f"  [WARN] orbit_map not found: {om_path}")
-        year_orbit_maps[yr] = orbit_yr
+            year_tco_maps[yr] = {}
+            print(f"  [WARN] tco_grid not found: {tco_path}")
 
     # ── Regular target grid ────────────────────────────────────────────────────
     print("[Setup 2/5] Building regular target grid...")
@@ -410,9 +407,11 @@ def cli(
             day_keys = all_sorted[d_idx * 8 : (d_idx + 1) * 8]
             if len(day_keys) < 8:
                 continue
-            orbit_day = {k: year_orbit_maps[yr].get(k, pd.DataFrame()) for k in day_keys}
+            # orbit_map keys have "YYYY_MM_" prefix; tco_grid keys do not — strip prefix
+            ref_day = {k: year_tco_maps[yr].get(k.split('_', 2)[-1], pd.DataFrame())
+                       for k in day_keys}
             s3, hr_idx, src = precompute_mapping_indices(
-                orbit_day, lats_hr, lons_hr, grid_coords, day_keys)
+                ref_day, lats_hr, lons_hr, grid_coords, day_keys)
             all_day_mappings.append((yr, d_idx, s3, hr_idx, src))
 
     print(f"  Total available day-patterns: {len(all_day_mappings)}")

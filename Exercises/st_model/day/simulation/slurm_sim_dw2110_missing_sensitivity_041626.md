@@ -8,7 +8,7 @@ cell j observed  iff  |obs_lat - cell_lat| ≤ frac × DELTA_LAT  AND
                        |obs_lon - cell_lon| ≤ frac × DELTA_LON
 ```
 - `frac = 0.5` → Voronoi 셀 내부 (standard)
-- `frac = 0.333, 0.25, 0.2` → 더 엄격 → 더 많은 missing
+- `frac = 0.45, 0.4, 0.35` → 더 엄격 → 더 많은 missing
 
 **현재 sim_dw2110_three_model_041626.py와의 차이:**
 - 기존: threshold 없음 (obs → 가장 가까운 cell에 무조건 배정)
@@ -62,16 +62,26 @@ sbatch sim_dw2110_miss_sens_041626.sh
 #SBATCH --nodelist=gpu048
 
 
-```bash
-#!/bin/bash
-#SBATCH --job-name=sim_miss_sens
-#SBATCH --output=/home/jl2815/tco/exercise_output/sim_miss_sens_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/sim_miss_sens_%j.err
 #SBATCH --time=24:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=48
 #SBATCH --mem=128G
 #SBATCH --partition=mem
+
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=sim_miss_sens
+#SBATCH --output=/home/jl2815/tco/exercise_output/sim_miss_sens_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/sim_miss_sens_%j.err
+#SBATCH --time=48:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=150G
+#SBATCH --partition=gpu-redhat
+#SBATCH --gres=gpu:1
+#SBATCH --ntasks=1
+#SBATCH --nodelist=gpu035
 
 module purge
 module use /projects/community/modulefiles
@@ -92,7 +102,7 @@ srun python /home/jl2815/tco/exercise_25/st_model/sim_dw2110_missing_sensitivity
     --limit-c 20 \
     --daily-stride 2 \
     --num-iters 300 \
-    --thresholds "0.5,0.333,0.25,0.2" \
+    --thresholds "0.5,0.45,0.4,0.35" \
     --years "2022,2024,2025" \
     --month 7 \
     --lat-factor 100 \
@@ -124,9 +134,9 @@ scp "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/si
 | threshold frac | max_lat 허용 | max_lon 허용 | 예상 missing % |
 |---|---|---|---|
 | 0.5 | 0.022° | 0.0315° | 낮음 (Voronoi = baseline) |
-| 0.333 | 0.0147° | 0.021° | 중간 |
-| 0.25 | 0.011° | 0.01575° | 높음 |
-| 0.2 | 0.0088° | 0.0126° | 매우 높음 |
+| 0.45 | 0.0198° | 0.02835° | 낮음~중간 |
+| 0.4 | 0.0176° | 0.0252° | 중간 |
+| 0.35  | 0.0154° | 0.0221° | 중간~높음 |
 
 **핵심 질문:**
 - Vecc_Irr RMSRE는 threshold와 무관 → baseline
@@ -134,7 +144,7 @@ scp "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/estimates/day/si
 - 어느 threshold부터 유의미한 성능 저하가 발생하는가?
 
 **출력 CSV 주요 컬럼:**
-- `threshold`: frac 값 (0.5 / 0.333 / 0.25 / 0.2)
+- `threshold`: frac 값 (0.5 / 0.45 / 0.4 / 0.35)
 - `n_obs_reg`: 해당 threshold에서 관측된 셀 수 (missing 아닌 것)
 - `rmsre`: 전체 파라미터 RMSRE
 - `model`: Vecc_Irr / Vecc_Reg / DW

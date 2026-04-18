@@ -249,9 +249,9 @@ class debiased_whittle_preprocess(full_vecc_dw_likelihoods):
                 except ValueError as e:
                     print(f"Skipping data chunk on day {self.day_idx+1} due to error: {e}")
 
-        if tensors_to_aggregate:
-            subsetted_aggregated_day= torch.cat(tensors_to_aggregate, dim=0)
-            subsetted_aggregated_day = subsetted_aggregated_day
+        if not tensors_to_aggregate:
+            return torch.empty(0, 4)
+        subsetted_aggregated_day = torch.cat(tensors_to_aggregate, dim=0)
         return subsetted_aggregated_day
     
 
@@ -702,12 +702,14 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         u1_mesh, u2_mesh = torch.meshgrid(u1_lags, u2_lags, indexing='ij')
 
         t_lags = torch.arange(p_time, dtype=torch.float64, device=device)
-        tilde_cn_tensor = torch.zeros((n1, n2, p_time, p_time), dtype=torch.complex128, device=device)
 
+        rows = []
+        has_nan = False
         for q in range(p_time):
+            cols = []
             for r in range(p_time):
                 t_diff = t_lags[q] - t_lags[r]
-                
+
                 # For 4-D taper_autocorr_grid pass per-pair indices (multivariate correction)
                 _q = q if taper_autocorr_grid.ndim == 4 else None
                 _r = r if taper_autocorr_grid.ndim == 4 else None
@@ -719,15 +721,18 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
                                     params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2, _q, _r)
                 term4 = debiased_whittle_likelihood.cn_bar_tapered(u1_mesh - n1, u2_mesh - n2, t_diff,
                                     params_tensor, n1, n2, taper_autocorr_grid, delta1, delta2, _q, _r)
-                
-                tilde_cn_grid_qr = (term1 + term2 + term3 + term4)
-                
-                if torch.isnan(tilde_cn_grid_qr).any():
-                    tilde_cn_tensor[:, :, q, r] = float('nan')
-                else:
-                    tilde_cn_tensor[:, :, q, r] = tilde_cn_grid_qr.to(torch.complex128)
 
-        if torch.isnan(tilde_cn_tensor).any():
+                tilde_cn_grid_qr = (term1 + term2 + term3 + term4)
+
+                if torch.isnan(tilde_cn_grid_qr).any():
+                    has_nan = True
+                    cols.append(torch.zeros(n1, n2, dtype=torch.complex128, device=device))
+                else:
+                    cols.append(tilde_cn_grid_qr.to(torch.complex128))
+            rows.append(torch.stack(cols, dim=-1))  # (n1, n2, p_time)
+        tilde_cn_tensor = torch.stack(rows, dim=-2)  # (n1, n2, p_time, p_time)
+
+        if has_nan:
             print("Warning: NaN detected in tilde_cn_tensor before FFT.")
             nan_shape = (n1, n2, p_time, p_time)
             return torch.full(nan_shape, float('nan'), dtype=torch.complex128, device=device)
@@ -993,16 +998,25 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
 
         def closure():
             optimizer.zero_grad()
-            params_tensor = torch.cat(params_list) 
-            
-            loss = debiased_whittle_likelihood.whittle_likelihood_loss_tapered(
+            params_tensor = torch.cat(params_list)
+
+            # 1-1-1-1 filter: H(w1,w2)=(e^{-iw1}-1)(1-e^{-iw2}) → zeros at w1=0 row AND w2=0 col.
+            # Must exclude these from the likelihood to avoid log(0) singularity.
+            result = debiased_whittle_likelihood.whittle_likelihood_loss_tapered_sum(
                 params_tensor, I_sample_dev, n1, n2, p_time, taper_autocorr_grid_dev, DELTA_LAT, DELTA_LON
             )
-            
+            # whittle_likelihood_loss_tapered_sum returns (sum_loss, n1, n2) or a scalar on error
+            if isinstance(result, tuple):
+                sum_loss, _n1, _n2 = result
+                n_terms = (_n1 - 1) * (_n2 - 1)
+                loss = sum_loss / n_terms if n_terms > 0 else sum_loss
+            else:
+                loss = result
+
             if torch.isnan(loss) or torch.isinf(loss):
                 print("Loss is NaN/Inf inside closure. Returning.")
-                return loss 
-            
+                return loss
+
             loss.backward()
             
             nan_grad = False

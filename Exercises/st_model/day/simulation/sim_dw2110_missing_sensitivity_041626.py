@@ -11,7 +11,7 @@ Step3 threshold rule (rectangular check):
   Otherwise → NaN (missing).
 
   frac = 0.5 → standard Voronoi cell (obs lies within the grid cell rectangle)
-  frac = 0.45, 0.4, 0.333 → progressively stricter → more cells missing
+  frac = 0.45, 0.4, 0.35 → progressively stricter → more cells missing
 
 NOTE: Vecchia-Irregular uses raw GEMS obs locations and is completely
       unaffected by the threshold.  Results are replicated in the CSV
@@ -28,10 +28,11 @@ Usage:
   cd /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation
   conda activate faiss_env
   python sim_missing_sensitivity_041526.py --num-iters 1 --lat-factor 10 --lon-factor 4
-  python sim_missing_sensitivity_041526.py --num-iters 100 --thresholds "0.5,0.45,0.4,0.333"
+  python sim_missing_sensitivity_041526.py --num-iters 100 --thresholds "0.5,0.45,0.4,0.35"
 """
 
 import sys
+import os
 import time
 import pickle
 from datetime import datetime
@@ -44,13 +45,18 @@ from pathlib import Path
 from typing import List
 from sklearn.neighbors import BallTree
 
-sys.path.append("/Users/joonwonlee/Documents/GEMS_TCO-1/src")
+AMAREL_SRC = "/home/jl2815/tco"
+LOCAL_SRC  = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
+_src = AMAREL_SRC if os.path.exists(AMAREL_SRC) else LOCAL_SRC
+sys.path.insert(0, _src)
 
 from GEMS_TCO import kernels_vecchia
 from GEMS_TCO import orderings as _orderings
 from GEMS_TCO import debiased_whittle_2110 as debiased_whittle
 from GEMS_TCO import configuration as config
 from GEMS_TCO.data_loader import load_data_dynamic_processed
+
+is_amarel = os.path.exists(config.amarel_data_load_path)
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DTYPE  = torch.float64
@@ -164,13 +170,13 @@ def apply_threshold(assignment, lat_dist, lon_dist, frac):
 
 # ── Precomputed mapping (per day-pattern) ─────────────────────────────────────
 
-def precompute_mapping_indices(orbit_day_map, lats_hr, lons_hr, grid_coords, sorted_keys):
+def precompute_mapping_indices(ref_day_map, lats_hr, lons_hr, grid_coords, sorted_keys):
     """
-    Build per-time-step BallTree queries using orbit_map raw pixel locations.
+    Build per-time-step BallTree queries using tco_grid Source_Latitude/Source_Longitude.
 
-    obs pool = all raw GEMS pixels (orbit_map), matching the logic of
-    analyze_missing_rate_by_month.  This gives more realistic coverage than
-    using tco_grid Source_Lat/Lon (which is pre-filtered to frac=0.5, 1 obs/cell).
+    obs pool = tco_grid Source_Lat/Lon (1 obs per cell, already within frac=0.5).
+    apply_threshold(frac) then controls how many cells are 'observed' for the
+    threshold sensitivity analysis.
 
     Returns per time-step:
       step3_per_t    : list of (N_grid,) int64 assignment arrays (no threshold applied)
@@ -195,7 +201,7 @@ def precompute_mapping_indices(orbit_day_map, lats_hr, lons_hr, grid_coords, sor
     src_locs_per_t = []
 
     for key in sorted_keys:
-        df = orbit_day_map.get(key)
+        df = ref_day_map.get(key)
         if df is None or len(df) == 0:
             step3_per_t.append(np.full(N_grid, -1, dtype=np.int64))
             lat_dist_per_t.append(np.full(N_grid, np.inf))
@@ -204,11 +210,8 @@ def precompute_mapping_indices(orbit_day_map, lats_hr, lons_hr, grid_coords, sor
             src_locs_per_t.append(torch.zeros((0, 2), dtype=DTYPE, device=DEVICE))
             continue
 
-        # Raw pixel locations from orbit_map (all GEMS pixels, not pre-filtered)
-        if 'Latitude' in df.columns and 'Longitude' in df.columns:
-            src_np = df[['Latitude', 'Longitude']].values
-        else:
-            src_np = df.iloc[:, :2].values
+        # tco_grid Source_Latitude/Source_Longitude: actual obs position (1 per cell)
+        src_np = df[['Source_Latitude', 'Source_Longitude']].values
         valid_mask   = ~np.isnan(src_np).any(axis=1)
         src_np_valid = src_np[valid_mask]
 
@@ -491,7 +494,7 @@ def cli(
     limit_c: int          = typer.Option(20,     help="Set C neighbors"),
     daily_stride: int     = typer.Option(8,      help="Daily stride for Set C"),
     num_iters: int        = typer.Option(100,    help="Simulation iterations"),
-    thresholds: str       = typer.Option("0.5,0.45,0.4,0.333",
+    thresholds: str       = typer.Option("0.5,0.45,0.4,0.35",
                                          help="Comma-separated threshold fractions "
                                               "(frac × DELTA_LAT and frac × DELTA_LON)"),
     years: str            = typer.Option("2022,2024,2025", help="Years for obs patterns"),
@@ -524,7 +527,8 @@ def cli(
     print(f"High-res    : lat×{lat_factor}, lon×{lon_factor}")
     print(f"Init noise  : ±{init_noise} log-space (×{np.exp(init_noise):.2f} in original)")
 
-    output_path = Path(config.amarel_estimates_day_path)
+    output_path = Path(config.amarel_estimates_day_path if is_amarel
+                       else config.mac_estimates_day_path)
     output_path.mkdir(parents=True, exist_ok=True)
     date_tag    = datetime.now().strftime("%m%d%y")
     csv_raw     = f"sim_missing_sensitivity_{date_tag}.csv"
@@ -560,9 +564,10 @@ def cli(
 
     # ── [Setup 1/5] Load GEMS obs patterns ───────────────────────────────────
     print("\n[Setup 1/5] Loading GEMS obs patterns...")
-    data_loader  = load_data_dynamic_processed(config.amarel_data_load_path)
+    data_path   = config.amarel_data_load_path if is_amarel else config.mac_data_load_path
+    data_loader = load_data_dynamic_processed(data_path)
     all_day_mappings = []
-    year_dfmaps, year_means, year_orbit_maps = {}, {}, {}
+    year_dfmaps, year_means, year_tco_maps = {}, {}, {}
 
     for yr in years_list:
         df_map_yr, _, _, monthly_mean_yr = data_loader.load_maxmin_ordered_data_bymonthyear(
@@ -576,19 +581,16 @@ def cli(
         year_means[yr]  = monthly_mean_yr
         print(f"  {yr}-{month:02d}: {len(df_map_yr)} time slots loaded")
 
-        # Load raw orbit_map (all GEMS pixels) for realistic obs pool
+        # Load tco_grid for Source_Latitude/Source_Longitude (actual obs positions)
         yr2      = str(yr)[2:]
-        om_path  = Path(config.amarel_data_load_path) / f"pickle_{yr}" / f"orbit_map{yr2}_{month:02d}.pkl"
-        orbit_yr = {}
-        if om_path.exists():
-            with open(om_path, 'rb') as f:
-                om = pickle.load(f)
-            for k, v in om.items():
-                orbit_yr[f"{yr}_{month:02d}_{k}"] = v
-            print(f"  orbit_map: {len(om)} slots loaded")
+        tco_path = Path(data_path) / f"pickle_{yr}" / f"tco_grid_{yr2}_{month:02d}.pkl"
+        if tco_path.exists():
+            with open(tco_path, 'rb') as f:
+                year_tco_maps[yr] = pickle.load(f)
+            print(f"  tco_grid: {len(year_tco_maps[yr])} slots loaded")
         else:
-            print(f"  [WARN] orbit_map not found: {om_path}")
-        year_orbit_maps[yr] = orbit_yr
+            year_tco_maps[yr] = {}
+            print(f"  [WARN] tco_grid not found: {tco_path}")
 
     # ── [Setup 2/5] Build regular target grid ────────────────────────────────
     print("[Setup 2/5] Building regular target grid...")
@@ -621,10 +623,11 @@ def cli(
             day_keys = all_sorted[d_idx * 8 : (d_idx + 1) * 8]
             if len(day_keys) < 8:
                 continue
-            # Use raw orbit_map pixels (all GEMS pixels) instead of tco_grid Source_Lat/Lon
-            orbit_day = {k: year_orbit_maps[yr].get(k, pd.DataFrame()) for k in day_keys}
+            # orbit_map keys have "YYYY_MM_" prefix; tco_grid keys do not — strip prefix
+            ref_day = {k: year_tco_maps[yr].get(k.split('_', 2)[-1], pd.DataFrame())
+                       for k in day_keys}
             s3, ld, od, hr_idx, src = precompute_mapping_indices(
-                orbit_day, lats_hr, lons_hr, grid_coords, day_keys)
+                ref_day, lats_hr, lons_hr, grid_coords, day_keys)
             all_day_mappings.append((yr, d_idx, s3, ld, od, hr_idx, src))
 
     print(f"  Total available day-patterns: {len(all_day_mappings)}")
@@ -942,7 +945,7 @@ def cli(
         plot_dir = output_path / "plots"
         plot_dir.mkdir(exist_ok=True)
 
-        THR_COLORS  = {0.5: '#1565C0', 0.45: '#1976D2', 0.4: '#388E3C', 0.333: '#F57C00'}
+        THR_COLORS  = {0.5: '#1565C0', 0.45: '#1976D2', 0.4: '#388E3C', 0.35: '#F57C00'}
         MODEL_LS    = {'Vecc_Irr': '-', 'Vecc_Reg': '--', 'DW': ':'}
 
         # RMSRE vs threshold per model (line plot)

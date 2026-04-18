@@ -42,9 +42,9 @@ sbatch sim_dw2110_three_model_041626.sh
 ```bash
 
 #!/bin/bash
-#SBATCH --job-name=sim_three_031926
-#SBATCH --output=/home/jl2815/tco/exercise_output/sim_three_031926_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/sim_three_031926_%j.err
+#SBATCH --job-name=sim_three_041626
+#SBATCH --output=/home/jl2815/tco/exercise_output/sim_three_041626_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/sim_three_041626_%j.err
 #SBATCH --time=48:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
