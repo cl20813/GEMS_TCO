@@ -59,10 +59,10 @@ sbatch sim_dw2110_miss_sens_041626.sh
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
-#SBATCH --nodelist=gpu048
+#SBATCH --nodelist=gpu037
 
 
-#SBATCH --time=24:00:00
+#SBATCH --time=48:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=48
 #SBATCH --mem=128G
@@ -81,7 +81,7 @@ sbatch sim_dw2110_miss_sens_041626.sh
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
-#SBATCH --nodelist=gpu035
+#SBATCH --nodelist=gpu037
 
 module purge
 module use /projects/community/modulefiles

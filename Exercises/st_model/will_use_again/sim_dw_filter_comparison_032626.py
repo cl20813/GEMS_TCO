@@ -351,25 +351,25 @@ def cli(
     csv_summary = f"sim_dw_4model_summary_{date_tag}.csv"
 
     # ── True parameters ───────────────────────────────────────────────────────
-    #true_dict = {
-    #    'sigmasq':    13.059,
-    #    'range_lat':  0.154,
-    #    'range_lon':  0.195,
-    #    'range_time': 1.0,
-    #    'advec_lat':  0.0218,
-    #    'advec_lon':  -0.1689,
-    #    'nugget':     0.247,
-    #}
-
     true_dict = {
-        'sigmasq':    10,
-        'range_lat':  0.2,
-        'range_lon':  0.2,
-        'range_time': 2.0,
-        'advec_lat':  0.2,
-        'advec_lon':  0.2,
+        'sigmasq':    13.059,
+        'range_lat':  0.154,
+        'range_lon':  0.195,
+        'range_time': 1.0,
+        'advec_lat':  0.0218,
+        'advec_lon':  -0.1689,
         'nugget':     0.247,
     }
+
+    #true_dict = {
+    #    'sigmasq':    10,
+    #    'range_lat':  0.2,
+    #    'range_lon':  0.2,
+    #    'range_time': 2.0,
+    #    'advec_lat':  0.2,
+    #   'advec_lon':  0.2,
+    #    'nugget':     0.247,
+    #}
 
     phi2     = 1.0 / true_dict['range_lon']
     phi1     = true_dict['sigmasq'] * phi2

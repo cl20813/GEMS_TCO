@@ -43,6 +43,7 @@ sbatch sim_dw_filter_comparison_032626.sh
 
 
 ```bash
+
 #!/bin/bash
 #SBATCH --job-name=dw_filter_cmp_032626
 #SBATCH --output=/home/jl2815/tco/exercise_output/dw_filter_cmp_032626_%j.out

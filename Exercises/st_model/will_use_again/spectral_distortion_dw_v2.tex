@@ -1,0 +1,927 @@
+\documentclass[12pt]{article}
+
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{natbib}
+
+\geometry{margin=1.1in}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+\newtheorem{lemma}{Lemma}
+\newtheorem{remark}{Remark}
+\newtheorem{definition}{Definition}
+
+\title{Spectral Distortion in Debiased Whittle Estimation\\
+Under Structured Satellite Sampling and Missing Data:\\
+A Unified Spectral Operator Framework}
+
+\author{Joonwon Lee}
+\date{April 2026 (working draft)}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\bigskip
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Introduction}
+%─────────────────────────────────────────────────────────────────────────────
+
+The Debiased Whittle (DW) estimator \citep{Sykulski2019} is a widely used
+frequency-domain method for estimating the parameters of a stationary
+Gaussian process (GP).  Its appeal lies in computational scalability via
+the Fast Fourier Transform.  Standard implementations, however, assume
+that observations lie on a complete regular grid.
+
+In satellite datasets such as GEMS TCO, this assumption fails in two
+distinct, physically motivated ways:
+\begin{enumerate}
+  \item \textbf{Structured missing data}: GEMS retrievals are missing not
+        at random but in an \emph{anisotropic, latitude-structured} pattern
+        driven by orbital geometry (East--West orbital stripes, viewing
+        angle constraints) and systematic cloud contamination.
+        The missingness fraction varies strongly with latitude.
+  \item \textbf{Irregular sampling / resampling}: Satellite footprints do
+        not fall on the analysis grid.
+        In the simulation setup used to validate our framework,
+        a high-resolution field is generated and then \emph{mapped to
+        actual observation locations} by matching each grid cell to its
+        nearest true retrieval location.
+        This resampling introduces a spatially structured filtering
+        effect---not a simple random jitter.
+\end{enumerate}
+A common fix is \emph{zero-imputation}: missing or off-grid cells are
+filled with zero (after centering) before computing the periodogram.
+This paper shows that zero-imputation induces a systematic spectral
+distortion that biases DW estimates of the variance $\sigma^2$ downward
+and inflates the nugget $\tau^2$, while leaving range parameters
+approximately unbiased.
+
+\paragraph{Central theoretical contribution.}
+The key insight is that zero-imputation is equivalent to multiplying
+the field by a masking process, which induces a \emph{spectral convolution}.
+We develop this convolution framework in three layers of increasing
+realism for the GEMS setting:
+\begin{enumerate}
+  \item \textbf{Random i.i.d.\ masking} (Theorem~\ref{thm:general_mask}):
+        the idealised tractable case; produces a flat white-noise floor.
+  \item \textbf{Deterministic structured masking}
+        (Theorem~\ref{thm:deterministic_mask}):
+        the latitude-dependent orbital pattern produces an
+        \emph{anisotropic}, frequency-dependent distortion.
+  \item \textbf{GEMS observation operator}
+        (Theorem~\ref{thm:gems_operator}):
+        combines the deterministic mask with the resampling kernel
+        (nearest-neighbour or cell-averaging) into a single spectral
+        operator.
+\end{enumerate}
+The i.i.d.\ Bernoulli case of prior work is recovered as a special
+corollary of Theorem~\ref{thm:general_mask}.
+
+\paragraph{Empirical motivation.}
+Using GEMS TCO July data from 2022--2025 (106 analysis days):
+\begin{itemize}
+  \item The DW GIM standard error for $\sigma^2$ is $0.3960$,
+        almost exactly \emph{twice} the Vecchia Matérn SE of $0.1992$.
+  \item The DW GIM SE for $\tau^2$ ($0.0404$) is \emph{lower} than
+        Vecchia ($0.0620$): the opposite direction from $\sigma^2$.
+  \item Score/gradient test with 300 replicates: DW gradient
+        $\nabla\ell(\theta_{\mathrm{true}})$ is not negligible
+        (mean $L^\infty$ ratio $= 0.73$), while Vecchia Matérn passes
+        (ratio $= 0.19$).
+\end{itemize}
+These findings are precisely consistent with the unified framework.
+
+\paragraph{Outline.}
+Section~\ref{sec:background} reviews DW estimation.
+Section~\ref{sec:masking_random} develops spectral distortion theory
+for random masking.
+Section~\ref{sec:masking_det} treats deterministic structured masking,
+the latitude-separable GEMS model, and the resampling operator.
+Section~\ref{sec:unified} states the unified GEMS operator theorem.
+Sections~\ref{sec:pseudo}--\ref{sec:score} derive pseudo-true parameters,
+estimation uncertainty, and gradient misspecification.
+Sections~\ref{sec:empirical}--\ref{sec:bias} present empirical results
+and a bias-correction procedure.
+
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Background: Debiased Whittle Estimation}
+\label{sec:background}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Setup}
+
+Let $\{Y(\mathbf{s})\}$ be a zero-mean stationary GP on a $d$-dimensional
+domain with spectral density $f(\boldsymbol{\omega};\theta)$,
+$\theta\in\Theta$.  Given $N$ observations on a regular grid with spacing
+$\delta$, the discrete Fourier transform (DFT) at frequency
+$\boldsymbol{\omega}_j$ is
+\[
+    d_j \;=\; \frac{1}{\sqrt{N}}\sum_{k=1}^N Y(s_k)\,
+                e^{-i\langle\boldsymbol{\omega}_j,\,s_k\rangle},
+\]
+with periodogram $I_j = |d_j|^2$.
+Under Gaussianity, the DFT coefficients are approximately i.i.d.\
+$\mathcal{CN}(0, f_j)$ for large $N$, giving the Whittle log-likelihood
+\[
+    \ell_W(\theta) \;=\; -\sum_j \left[
+        \frac{I_j}{f_j(\theta)} + \log f_j(\theta)
+    \right].
+\]
+The debiased variant \citep{Sykulski2019} replaces $f_j(\theta)$ with
+$\tilde{f}_j(\theta)$, the expected periodogram of the discretised and
+tapered process, correcting for tapering and aliasing.
+
+\subsection{Matérn--nugget spectral model}
+
+We work with the Matérn spectral density with nugget:
+\[
+  f(\boldsymbol{\omega};\theta)
+  \;=\; \sigma^2 f_0(\boldsymbol{\omega};\rho)
+        + \frac{\tau^2}{(2\pi)^d},
+\]
+where $f_0(\cdot;\rho)$ is the unit-variance Matérn density with range
+$\rho$, $\sigma^2$ is the partial sill, and $\tau^2$ is the nugget.
+
+\subsection{Zero-imputation}
+
+In standard GEMS TCO implementations (\texttt{generate\_Jvector\_tapered}),
+grid cells without valid retrievals are set to zero (after centering by
+the observed-cell mean), and the DFT is computed on this zero-imputed field.
+We refer to this as \emph{zero-imputation} throughout.
+
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Spectral Distortion from Random Masking}
+\label{sec:masking_random}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Random masking model}
+\label{sec:random_mask_model}
+
+Let $Y = \{Y_k\}_{k\in\mathbb{Z}^d}$ be a zero-mean, second-order
+stationary field with spectral density $f_Y \in L^1(\mathbb{T}^d)$.
+Let $M = \{M_k\}$ be a second-order stationary masking process with mean
+$p = \mathbb{E}[M_k]$ and covariance $C_M(h) = \mathrm{Cov}(M_0, M_h)$,
+with spectral density $f_M$ of the centered mask $\tilde{M}_k = M_k - p$.
+Assume $M \perp Y$.
+
+\begin{theorem}[Spectral distortion under random masking]
+\label{thm:general_mask}
+Under the above model, $X_k = M_k Y_k$ is second-order stationary with
+\[
+    C_X(h) \;=\; \bigl[p^2 + C_M(h)\bigr]\,C_Y(h),
+\]
+and spectral density
+\[
+\boxed{
+    f_X(\boldsymbol{\omega})
+    \;=\; p^2\, f_Y(\boldsymbol{\omega})
+    \;+\; \frac{1}{(2\pi)^d}
+          \bigl(f_M \ast f_Y\bigr)(\boldsymbol{\omega}).
+}
+\]
+\end{theorem}
+
+\begin{proof}
+By independence of $M$ and $Y$:
+$C_X(h) = \mathbb{E}[M_0 M_h]\,\mathbb{E}[Y_0 Y_h]
+= (p^2 + C_M(h))\,C_Y(h)$.
+The spectral density follows from the Fourier transform and the
+convolution theorem $\mathcal{F}[g_1 \cdot g_2]
+= (2\pi)^{-d}(\mathcal{F}[g_1] \ast \mathcal{F}[g_2])$. \qed
+\end{proof}
+
+\begin{corollary}[i.i.d.\ Bernoulli masking]
+\label{cor:iid_mask}
+If $M_k \sim \mathrm{i.i.d.\ Bernoulli}(p)$, then $f_M \equiv p(1-p)/(2\pi)^d$
+and
+\[
+    f_X(\boldsymbol{\omega})
+    \;=\; p^2\, f_Y(\boldsymbol{\omega})
+    \;+\; \frac{p(1-p)\,\sigma^2_Y}{(2\pi)^d}.
+\]
+The distortion decomposes into an attenuated signal ($p^2 f_Y$) plus
+a flat white-noise floor.
+\end{corollary}
+
+\begin{corollary}[Spatially correlated masking induces coloured distortion]
+\label{cor:corr_mask}
+If $C_M(h) \neq 0$ for $h \neq 0$, the masking-induced distortion is
+frequency-dependent (coloured):
+\[
+    f_X(\boldsymbol{\omega})
+    \;=\; p^2 f_Y(\boldsymbol{\omega})
+    \;+\; \frac{1}{(2\pi)^d}(f_M \ast f_Y)(\boldsymbol{\omega}).
+\]
+The noise floor peaks at frequencies where $f_M$ has excess power.
+Under spatially clustered cloud cover (low-frequency $f_M$), the
+distortion concentrates at low spatial frequencies, contaminating
+the signal frequencies most relevant for estimating $\rho$.
+\end{corollary}
+
+\begin{remark}[Tapering interaction]
+\label{rem:taper}
+In practice, the DFT input is $X'_k = W_k M_k Y_k$ with deterministic
+taper $W_k$.  The DW debiasing step corrects for the fixed taper through
+$\tilde{f}_j(\theta)$, but cannot correct for the random masking $M_k$.
+Below we set $W_k \equiv 1$ to isolate masking effects; the taper
+extension follows by replacing $f_Y$ with the tapered spectrum in all
+theorems.
+\end{remark}
+
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Spectral Distortion from Deterministic Structured Sampling}
+\label{sec:masking_det}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Motivation: GEMS TCO sampling geometry}
+
+The random masking model of Section~\ref{sec:masking_random} captures the
+stochastic component of day-to-day cloud variability, but it does not
+account for the \emph{deterministic} sampling structure imposed by orbital
+geometry.
+In GEMS TCO data:
+\begin{itemize}
+  \item Coverage fraction varies systematically with latitude due to
+        orbital scan angles and repeat period.
+  \item On any given day, the pattern of valid retrievals is a
+        near-deterministic stripe pattern overlaid by cloud variability.
+  \item In our simulation study, a high-resolution field is generated
+        and then mapped to the actual retrieval locations by
+        nearest-neighbour assignment---a deterministic resampling
+        operator, not a random jitter.
+\end{itemize}
+This motivates a deterministic masking theorem distinct from
+Theorem~\ref{thm:general_mask}.
+
+\subsection{Deterministic structured masking}
+
+Let $m = \{m_k\}_{k\in\mathbb{Z}^d}$ be a \emph{fixed} (deterministic)
+binary mask, with $m_k \in \{0, 1\}$.
+Define $X_k = m_k Y_k$.
+Since $m$ is deterministic, $X$ is generally nonstationary; we
+characterise the expected periodogram rather than the power spectrum.
+
+\begin{theorem}[Spectral distortion under deterministic masking]
+\label{thm:deterministic_mask}
+Let $Y$ be a zero-mean stationary field with spectral density $f_Y$.
+Let $m = \{m_k\}$ be a deterministic mask with discrete Fourier
+transform $\hat{m}(\boldsymbol{\omega})
+= N^{-1/2}\sum_k m_k e^{-i\langle\boldsymbol{\omega},s_k\rangle}$.
+Then the expected periodogram of $X_k = m_k Y_k$ satisfies
+\[
+\boxed{
+    \mathbb{E}[I_X(\boldsymbol{\omega})]
+    \;=\; \frac{1}{(2\pi)^d}
+          \int_{\mathbb{T}^d}
+          f_Y(\boldsymbol{\lambda})\,
+          \bigl|\hat{m}(\boldsymbol{\omega} - \boldsymbol{\lambda})\bigr|^2
+          \,d\boldsymbol{\lambda}.
+}
+\]
+\end{theorem}
+
+\begin{proof}
+$\mathbb{E}[I_X(\omega)] = \mathbb{E}[|d_X(\omega)|^2]
+= N^{-1}\sum_{k,\ell} m_k m_\ell C_Y(s_k-s_\ell) e^{-i\omega(s_k-s_\ell)}$.
+By the Wiener relation, as $N\to\infty$ this converges to
+$\frac{1}{(2\pi)^d}\int f_Y(\lambda)|\hat{m}(\omega-\lambda)|^2 d\lambda$.
+\qed
+\end{proof}
+
+\begin{remark}[Comparison with random masking]
+The random masking theorem (Theorem~\ref{thm:general_mask}) involves the
+spectral density $f_M$ of the \emph{centered} mask process (an
+expectation over randomness), while the deterministic masking theorem
+(Theorem~\ref{thm:deterministic_mask}) involves $|\hat{m}|^2$ (the
+squared magnitude of the mask's Fourier transform).
+Both are spectral convolutions, but with structurally different kernels.
+For a random i.i.d.\ Bernoulli mask,
+$\mathbb{E}[|\hat{M}(\omega)|^2] \propto f_M(\omega) + p^2 \delta_0(\omega)$,
+so the two theorems are consistent in expectation.
+\end{remark}
+
+\subsection{Latitude-structured (separable) mask}
+\label{sec:lat_mask}
+
+\begin{definition}[Latitude-separable mask]
+\label{def:lat_mask}
+The GEMS TCO mask is modelled as approximately separable:
+\[
+    m(s) \;=\; m_{\mathrm{lat}}(s_{\mathrm{lat}})\cdot
+                m_{\mathrm{lon}}(s_{\mathrm{lon}}),
+\]
+where $m_{\mathrm{lat}}$ captures the latitude-dependent orbital coverage
+pattern and $m_{\mathrm{lon}}$ captures longitude-dependent cloud effects.
+\end{definition}
+
+\begin{corollary}[Anisotropic spectral distortion under separable mask]
+\label{cor:anisotropic}
+Under the latitude-separable mask of Definition~\ref{def:lat_mask},
+\[
+    |\hat{m}(\boldsymbol{\omega})|^2
+    \;=\; |\hat{m}_{\mathrm{lat}}(\omega_{\mathrm{lat}})|^2\cdot
+           |\hat{m}_{\mathrm{lon}}(\omega_{\mathrm{lon}})|^2,
+\]
+and the spectral distortion in Theorem~\ref{thm:deterministic_mask} is
+\emph{anisotropic}: it is concentrated at frequencies where
+$|\hat{m}_{\mathrm{lat}}|^2$ or $|\hat{m}_{\mathrm{lon}}|^2$ has excess
+power.
+If $m_{\mathrm{lat}}$ varies slowly with latitude (wide stripes),
+$|\hat{m}_{\mathrm{lat}}|^2$ is concentrated at low latitude frequencies,
+causing the distortion to affect the low-frequency spectral content most
+relevant for estimating the latitude range parameter $\rho_{\mathrm{lat}}$.
+\end{corollary}
+
+\begin{remark}[Implication for range bias]
+Corollary~\ref{cor:anisotropic} partially qualifies the ``range is
+unbiased'' result of Proposition~\ref{prop:pseudo} (Section~\ref{sec:pseudo}).
+Under i.i.d.\ Bernoulli masking, the distortion is isotropic (flat floor)
+and does not affect spectral shape.
+Under the GEMS latitude-structured mask, the distortion concentrates at
+certain directional frequencies, potentially biasing the latitude range
+$\rho_{\mathrm{lat}}$ more than the longitude range $\rho_{\mathrm{lon}}$.
+Whether this anisotropic bias is significant in practice depends on the
+severity of the latitude coverage gradient $m_{\mathrm{lat}}$.
+\end{remark}
+
+\subsection{Resampling operator: GEMS simulation setup}
+\label{sec:resample}
+
+In the GEMS simulation study, a high-resolution field $Y$ on a fine grid
+is generated, and then for each coarse grid cell $k$, the assigned value
+is taken from the nearest actual satellite retrieval location:
+\[
+    X(s_k) \;=\; m_k \sum_i w_{k,i} Y(s_i^{\mathrm{fine}}),
+\]
+where $w_{k,i}$ are the resampling weights (nearest-neighbour: $w_{k,i}
+\in \{0,1\}$, with $\sum_i w_{k,i} = 1$ for observed cells).
+
+\begin{remark}[Jitter vs.\ resampling]
+This construction is fundamentally different from the jitter model
+$\tilde{s}_k = s_k + \varepsilon_k$ of earlier literature
+\citep{Masry1978, Beutler1970}, which assumes a continuous perturbation
+of the observation location.
+The GEMS resampling operator is a \emph{deterministic, discrete
+aggregation}: it selects specific values from the high-resolution field
+rather than interpolating a continuously perturbed observation.
+
+In the frequency domain, the resampling operator with weights $\{w_{k,i}\}$
+acts as a linear filter with transfer function
+$H(\boldsymbol{\omega}) = \sum_i w_{k,i} e^{-i\langle\boldsymbol{\omega},
+s_i^{\mathrm{fine}} - s_k\rangle}$, so that
+$\mathbb{E}[|d_X(\omega)|^2] \approx f_Y(\omega)|H(\omega)|^2$.
+For nearest-neighbour resampling with random footprint location within each
+cell,
+$|H(\boldsymbol{\omega})|^2 \approx 1$
+at low frequencies and decays at high frequencies (spatial smoothing).
+For cell averaging,
+$|H(\boldsymbol{\omega})|^2 = \mathrm{sinc}^2(\delta\omega/2)$
+(boxcar filter), providing a sharper low-pass rolloff.
+Unlike Gaussian jitter (which gives $e^{-\sigma^2_\varepsilon\omega^2}$),
+the boxcar sinc$^2$ rolloff is sharper and does not decay exponentially.
+\end{remark}
+
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Unified GEMS Observation Operator}
+\label{sec:unified}
+%─────────────────────────────────────────────────────────────────────────────
+
+We now combine the deterministic latitude-structured mask with the
+resampling operator into a single theorem that captures the full
+observational process for GEMS TCO.
+
+\begin{theorem}[Spectral distortion under structured satellite sampling]
+\label{thm:gems_operator}
+Let $Y(s)$ be a stationary random field with spectral density $f_Y$.
+Suppose observations are generated as
+\[
+    X(s_k)
+    \;=\; m(s_k)\;\sum_i w_{k,i}\, Y(s_i^{\mathrm{fine}}),
+\]
+where $m(s_k) \in \{0,1\}$ is the deterministic mask and $H(\boldsymbol{\omega})$
+is the transfer function of the resampling operator $\{w_{k,i}\}$.
+Then the expected periodogram of $X$ satisfies
+\[
+\boxed{
+    \mathbb{E}[I_X(\boldsymbol{\omega})]
+    \;=\;
+    \frac{1}{(2\pi)^d}
+    \int_{\mathbb{T}^d}
+    f_Y(\boldsymbol{\lambda})\,
+    |H(\boldsymbol{\lambda})|^2\,
+    |\hat{m}(\boldsymbol{\omega} - \boldsymbol{\lambda})|^2\,
+    d\boldsymbol{\lambda}.
+}
+\]
+\end{theorem}
+
+\begin{proof}
+Write $Z(s_k) = \sum_i w_{k,i} Y(s_i^{\mathrm{fine}})$ (resampled field).
+The spectral density of $Z$ is $f_Z(\boldsymbol{\omega}) = f_Y(\boldsymbol{\omega})
+|H(\boldsymbol{\omega})|^2$.
+The observed process $X_k = m_k Z_k$ is deterministically masked.
+Applying Theorem~\ref{thm:deterministic_mask} to $Z$ with spectral density
+$f_Z$ gives the result.
+\qed
+\end{proof}
+
+\begin{remark}[Three-factor decomposition]
+Theorem~\ref{thm:gems_operator} decomposes the expected observed
+periodogram into three factors:
+\begin{itemize}
+  \item $f_Y(\boldsymbol{\lambda})$:
+        the true spectral content at input frequency $\boldsymbol{\lambda}$;
+  \item $|H(\boldsymbol{\lambda})|^2$:
+        the resampling filter (low-pass rolloff from nearest-neighbour
+        or cell-averaging);
+  \item $|\hat{m}(\boldsymbol{\omega}-\boldsymbol{\lambda})|^2$:
+        the spectral leakage from the deterministic mask, which mixes
+        frequency $\boldsymbol{\lambda}$ into observed frequency
+        $\boldsymbol{\omega}$.
+\end{itemize}
+The total distortion is the integral of $f_Y \cdot |H|^2$ convolved with
+$|\hat{m}|^2$.
+\end{remark}
+
+\paragraph{GEMS approximation.}
+For GEMS TCO with typical parameters, Theorem~\ref{thm:gems_operator}
+simplifies as follows.
+\begin{enumerate}
+  \item \textbf{Resampling filter}: nearest-neighbour resampling on a
+        coarse grid (half-degree resolution) means that $|H(\omega)|^2$
+        is approximately flat at the analysis resolution; we set
+        $|H|^2 \approx 1$ as a first-order approximation.
+  \item \textbf{Mask structure}: replacing the deterministic mask $m$
+        with its expectation $\bar{m}(s) \approx p$ (mean coverage fraction)
+        plus a random centered deviation $\tilde{M}_k$,
+        and treating $\tilde{M}_k$ as approximately i.i.d.\ Bernoulli
+        deviations with variance $p(1-p)$, Theorem~\ref{thm:gems_operator}
+        reduces (in expectation over $\tilde{M}$) to
+        Corollary~\ref{cor:iid_mask}:
+        \[
+          \mathbb{E}[I_X(\boldsymbol{\omega})]
+          \;\approx\; p^2 f_Y(\boldsymbol{\omega})
+          + \frac{p(1-p)\sigma^2_Y}{(2\pi)^d}.
+        \]
+\end{enumerate}
+This approximation is used in Sections~\ref{sec:pseudo}--\ref{sec:score}
+to derive closed-form bias expressions, while
+Theorem~\ref{thm:gems_operator} provides the more accurate description
+that accounts for latitude-structured coverage anisotropy.
+
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Pseudo-True Parameters of the Debiased Whittle Estimator}
+\label{sec:pseudo}
+%─────────────────────────────────────────────────────────────────────────────
+
+The DW estimator minimises the population KL criterion
+\[
+    \mathcal{K}(\theta)
+    \;=\; \int_{\mathbb{T}^d} \left[
+        \frac{\mathbb{E}[I_X(\boldsymbol{\omega})]}{f(\boldsymbol{\omega};\theta)}
+        + \log f(\boldsymbol{\omega};\theta)
+    \right] d\boldsymbol{\omega},
+\]
+and its limit in probability is the pseudo-true parameter $\theta^*$
+\citep{White1982}.
+
+\begin{proposition}[Pseudo-true parameters under i.i.d.\ Bernoulli masking]
+\label{prop:pseudo}
+Under the GEMS approximation $\mathbb{E}[I_X]
+\approx p^2 f_Y + p(1-p)\sigma^2_Y/(2\pi)^d$
+and the Matérn--nugget model, the pseudo-true parameter
+$\theta^* = (\sigma^{2*}, \rho^*, \tau^{2*})$ satisfies
+\begin{align}
+  \sigma^{2*} &= p^2\,\sigma^2_{\mathrm{true}},
+  \label{eq:sigma_bias} \\[4pt]
+  \rho^* &= \rho_{\mathrm{true}},
+  \label{eq:range_unbias} \\[4pt]
+  \tau^{2*} &= \tau^2_{\mathrm{true}}
+               + p(1-p)\,\sigma^2_{\mathrm{true}}.
+  \label{eq:nugget_bias}
+\end{align}
+\end{proposition}
+
+\begin{proof}[Sketch]
+The target $\mathbb{E}[I_X]$ lies exactly within the Matérn--nugget model
+family with parameters $(\sigma^{2*}, \rho_{\mathrm{true}}, \tau^{2*})$
+as given above.  Setting $f(\cdot;\theta) = \mathbb{E}[I_X(\cdot)]$
+achieves $\mathcal{K}(\theta) = 1 + $ const (minimum KL), confirming $\theta^*$.
+\end{proof}
+
+\begin{remark}[Why range is unbiased: low-frequency argument]
+\label{rem:range_unbiased}
+Under i.i.d.\ Bernoulli masking, the distortion is isotropic:
+$p^2$ scaling of $f_Y$ plus a flat additive constant.
+Neither operation changes the spectral shape.
+More precisely, for Matérn spectral density
+$f_0(\boldsymbol{\omega};\rho) \sim C(1 + \rho^2|\omega|^2)^{-\nu-d/2}$,
+at low frequencies the nugget floor $\tau^{2*}/(2\pi)^d$ is negligible
+relative to $\sigma^{2*} f_0$, so the shape of $f_0$ is
+preserved and identifies $\rho$.
+\textit{Range is identified from low-frequency content, where the
+masking-induced white-noise floor vanishes asymptotically.}
+
+Under the GEMS deterministic mask (Corollary~\ref{cor:anisotropic}),
+this argument partially breaks down: the anisotropic distortion
+$|\hat{m}(\boldsymbol{\omega})|^2$ is not flat, and concentrates at
+certain directional frequencies, potentially biasing $\rho_{\mathrm{lat}}$.
+The severity depends on the gradient of $m_{\mathrm{lat}}$.
+\end{remark}
+
+\paragraph{Consequences.}
+\begin{enumerate}
+  \item \textbf{$\sigma^2$ underestimated}: by factor $p^2 \approx 0.49$
+        for $p = 0.70$.
+  \item \textbf{$\tau^2$ overestimated}: inflated by $p(1-p)\sigma^2_{\mathrm{true}}$.
+  \item \textbf{Range approximately unbiased} under i.i.d.\ masking;
+        potentially biased under GEMS latitude structure.
+\end{enumerate}
+
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Effect on Estimation Uncertainty}
+\label{sec:fisher}
+%─────────────────────────────────────────────────────────────────────────────
+
+The Whittle Fisher information for $\sigma^2$ at pseudo-true $\theta^*$ is
+\[
+    \mathcal{I}^{\mathrm{DW}}_W(\sigma^2)
+    \;=\; \frac{1}{2}
+    \int
+    \left[
+      \frac{p^2 f_0(\boldsymbol{\omega};\rho)}
+           {p^2\sigma^2 f_0(\boldsymbol{\omega};\rho) + \tau^{2*}/(2\pi)^d}
+    \right]^2 d\boldsymbol{\omega}.
+\]
+The masking-induced floor $\tau^{2*}/(2\pi)^d$ reduces the contribution of
+high-frequency periodogram values to $\mathcal{I}^{\mathrm{DW}}_W(\sigma^2)$,
+since there the denominator is dominated by the floor rather than the
+signal.
+
+\begin{corollary}[GIM SE inflation for $\sigma^2$]
+\label{cor:se}
+Under Bernoulli masking with fraction $p$,
+\[
+  \frac{\mathrm{SE}_{\mathrm{DW}}(\sigma^2)}
+       {\mathrm{SE}_{\mathrm{Vecchia}}(\sigma^2)}
+  \;\approx\; \frac{1}{p^2}.
+\]
+For $p = 0.70$: ratio $\approx 2.04$.
+\end{corollary}
+
+\begin{proof}[Heuristic]
+The DW estimator targets $\sigma^{2*} = p^2\sigma^2$.
+The SE of $\hat\sigma^{2*}$ (the estimand) is comparable to the Vecchia
+SE for $\sigma^2_{\mathrm{true}}$, since both fit the same spectral family
+at their respective parameter scales.
+Converting the SE of $\hat\sigma^{2*}$ to the implied SE for $\sigma^2$
+introduces a factor $1/p^2$.
+\end{proof}
+
+\begin{remark}[Paradoxical SE reduction for $\tau^2$]
+The masking floor inflates the apparent nugget signal in $\mathbb{E}[I_X]$.
+Intuitively: $\sigma^2$ is estimated from spectral energy, which is
+diminished by missing data; $\tau^2$ is estimated from the high-frequency
+flat floor, to which zero-imputation contributes a consistent additive
+term, paradoxically \emph{increasing} information about the flat component
+and thus reducing the SE.
+\end{remark}
+
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Score (Gradient) Test and Model Misspecification}
+\label{sec:score}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{KL gradient at the true parameters}
+
+For the DW criterion, the population gradient at $\theta$ is
+\[
+  \mathbb{E}\!\left[\frac{\partial \mathcal{K}}{\partial \theta}\right]
+  \;=\; \int
+        \left[
+          1 - \frac{\mathbb{E}[I_X(\boldsymbol{\omega})]}
+                   {f(\boldsymbol{\omega};\theta)}
+        \right]
+        \frac{\partial \log f(\boldsymbol{\omega};\theta)}{\partial \theta}
+        \,d\boldsymbol{\omega}.
+\]
+At $\theta = \theta_{\mathrm{true}}$, we have $f(\cdot;\theta_{\mathrm{true}}) = f_Y(\cdot)$
+but $\mathbb{E}[I_X] = p^2 f_Y + c/(2\pi)^d \neq f_Y$ for $p < 1$.
+The dominant bias direction is $\sigma^2$:
+\begin{equation}
+  \mathbb{E}\!\left[\frac{\partial \mathcal{K}}{\partial \sigma^2}\right]
+  \bigg|_{\theta_{\mathrm{true}}}
+  \;\propto\; \left(\frac{1}{p^2} - 1\right) > 0,
+  \label{eq:sigma_gradient}
+\end{equation}
+indicating deterministic model misspecification bias (not sampling noise).
+
+\subsection{Score test ratio}
+
+The score/gradient test uses
+\[
+  r \;=\; \frac{\|\nabla_\theta\ell(\theta_{\mathrm{true}})\|_\infty}
+               {\|\nabla_\theta\ell(\theta_{\mathrm{perturbed}})\|_\infty}.
+\]
+A correctly specified model has $r \ll 1$; large $r$ indicates that
+the true parameters are not a stationary point of the expected criterion.
+
+\paragraph{Empirical validation.}
+
+\begin{table}[h]
+\centering
+\caption{Score test results (mean $L^\infty$ ratio, 300 replicates).}
+\begin{tabular}{lccc}
+\toprule
+Method & Mean ratio (300 iter) & Mean ratio (50 iter) & Interpretation \\
+\midrule
+Vecchia Matérn (VM) & 0.19 & 0.10 & Pass $\checkmark$ \\
+Debiased Whittle (DW) & 0.73 & 0.44 & Fail ($\sigma^2$ bias) \\
+Vecchia Cauchy (VC) & 1.47 & 0.73 & Fail (model mismatch) \\
+\bottomrule
+\end{tabular}
+\label{tab:score_test}
+\end{table}
+
+VM passes (correctly specified).
+VC fails due to model mismatch.
+DW fails due to the deterministic $\sigma^2$ gradient bias
+in \eqref{eq:sigma_gradient}.
+
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Empirical Results}
+\label{sec:empirical}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Real-data GIM (GEMS TCO July 2022--2025, 106 days)}
+
+\begin{table}[h]
+\centering
+\caption{GIM standard errors averaged over 106 July days (2022--2025).}
+\begin{tabular}{lcccc}
+\toprule
+Parameter & DW SE & Vecchia-Irr SE & Cauchy-Vecchia SE & DW/Vecchia ratio \\
+\midrule
+$\sigma^2$ & 0.3960 & 0.1992 & 0.1954 & 1.99 \\
+$\tau^2$ (nugget) & 0.0404 & 0.0620 & 0.0879 & 0.65 \\
+Range (lon) & --- & --- & --- & --- \\
+Range (lat) & --- & --- & --- & --- \\
+Range (time) & 0.0726 & 0.0836 & --- & 0.87 \\
+\bottomrule
+\end{tabular}
+\label{tab:gim}
+\end{table}
+
+Key observations:
+\begin{itemize}
+  \item $\mathrm{SE}_{\mathrm{DW}}(\sigma^2)/\mathrm{SE}_{\mathrm{VC}}(\sigma^2)
+        = 1.99 \approx 1/p^2 = 2.04$ for $p \approx 0.70$
+        (Corollary~\ref{cor:se}).
+  \item $\mathrm{SE}_{\mathrm{DW}}(\tau^2) = 0.0404 <
+        \mathrm{SE}_{\mathrm{VC}}(\tau^2) = 0.0620$: DW has lower nugget
+        uncertainty due to the masking-induced noise floor.
+  \item Range SE ratio $\approx 0.87$, close to 1, consistent with
+        approximate range unbiasedness under near-i.i.d.\ masking
+        (Remark~\ref{rem:range_unbiased}).
+\end{itemize}
+
+\subsection{Simulation study (1000 replicates)}
+
+The simulation uses the actual GEMS TCO observation geometry:
+a Matérn random field is generated on a fine grid and then mapped to
+the actual satellite retrieval locations by nearest-neighbour assignment
+(Section~\ref{sec:resample}).
+This captures the deterministic resampling structure of
+Theorem~\ref{thm:gems_operator}.
+
+\begin{itemize}
+  \item DW: RMSRE for $\sigma^2 \approx 0.175$, MdARE $\approx 0.37$.
+        Bias consistent with $\sigma^{2*} = p^2\sigma^2_{\mathrm{true}}$
+        (Proposition~\ref{prop:pseudo}).
+  \item Vecchia Irregular: extreme RMSRE ($\sim 10^{35}$ for $\sigma^2$)
+        in some replicates due to near-singular conditioning matrices
+        when two actual retrieval locations are nearly co-located.
+        A small nugget regularisation (positive diagonal) resolves this.
+  \item Vecchia Regular: stable, RMSRE $\approx 0.12$ for all parameters.
+\end{itemize}
+
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Bias Correction for DW Under Missing Data}
+\label{sec:bias}
+%─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Two-step corrected periodogram}
+
+\begin{definition}[Corrected periodogram]
+Given $\hat{p}$ (fraction of non-missing cells) and $\hat{\sigma}^2_Y$,
+define
+\[
+  I_{\mathrm{corr}}(\boldsymbol{\omega})
+  \;=\; \frac{I_X(\boldsymbol{\omega})
+             - \hat{p}(1-\hat{p})\hat{\sigma}^2_Y / (2\pi)^d}
+             {\hat{p}^2}.
+\]
+\end{definition}
+
+\begin{proposition}[Corrected estimator is approximately unbiased]
+Under Corollary~\ref{cor:iid_mask} and $|H|^2 \approx 1$:
+$\mathbb{E}[I_{\mathrm{corr}}(\boldsymbol{\omega})] \approx f_Y(\boldsymbol{\omega})$.
+\end{proposition}
+
+\paragraph{Iterative estimation.}
+Initialise $\hat\sigma^{2(0)}$ from uncorrected DW, then iterate
+$\hat\sigma^{2(1)}_Y = \hat\sigma^{2(0)}/\hat{p}^2$ until convergence.
+
+\subsection{Limitations}
+
+\begin{enumerate}
+  \item \textbf{Independence}: The correction assumes $m_k \perp Y_k$.
+        GEMS cloud cover is positively correlated with aerosol load,
+        violating this assumption.
+  \item \textbf{Latitude structure / coloured noise floor}:
+        The correction removes only a flat floor.
+        Under the GEMS latitude-structured mask (Corollary~\ref{cor:anisotropic}
+        and Theorem~\ref{thm:gems_operator}), the actual distortion is
+        frequency-dependent and anisotropic.
+        The residual error after flat-floor correction equals
+        $(2\pi)^{-d}\int f_Y(\lambda)[|\hat{m}(\omega-\lambda)|^2
+        - p(1-p)]\,d\lambda$,
+        which is non-negligible when $|\hat{m}|^2$ departs significantly
+        from uniformity.
+        A full deconvolution correction requires estimating $|\hat{m}|^2$
+        from the binary mask, which is straightforward since $m$ is
+        observed.
+  \item \textbf{Resampling filter}: For $|H|^2 \not\approx 1$
+        (aggressive cell averaging), a frequency-domain deconvolution
+        of the filter $|H|^2$ is additionally required.
+  \item \textbf{Small $p$}: For $p < 0.3$, the $\hat{p}^2$ denominator
+        amplifies noise; spatial methods (Vecchia) are preferred.
+\end{enumerate}
+
+
+%─────────────────────────────────────────────────────────────────────────────
+\section{Discussion and Conclusions}
+\label{sec:discussion}
+%─────────────────────────────────────────────────────────────────────────────
+
+We have developed a unified spectral operator framework that characterises
+spectral distortion in the Debiased Whittle estimator under the realistic
+satellite observational conditions of GEMS TCO.
+
+The three theorems (random masking, deterministic structured masking,
+and the GEMS observation operator) provide a hierarchy of increasingly
+accurate descriptions.
+The i.i.d.\ Bernoulli approximation (Corollary~\ref{cor:iid_mask})
+yields closed-form pseudo-true parameters and SE inflation factors that
+match empirical results with quantitative precision.
+The deterministic latitude-structured model
+(Theorem~\ref{thm:deterministic_mask}, Corollary~\ref{cor:anisotropic},
+Theorem~\ref{thm:gems_operator}) reveals that the actual distortion is
+\emph{anisotropic} and \emph{frequency-dependent}, with implications for
+directional range estimation.
+
+\paragraph{Practical recommendations.}
+\begin{itemize}
+  \item Use \textbf{Vecchia Matérn} as the primary estimator for $\sigma^2$.
+        Raw DW underestimates $\sigma^2$ by $\approx 50\%$.
+  \item Use \textbf{DW with two-step correction} as a fast secondary
+        estimator; account for latitude structure if
+        $|\hat{m}_{\mathrm{lat}}|^2$ departs substantially from flat.
+  \item Avoid Vecchia Irregular without nugget regularisation
+        (near-duplicate retrieval locations cause numerical instability).
+  \item The GEMS simulation design (high-res field $\to$ actual retrieval
+        locations) correctly captures the deterministic resampling
+        operator $H$; use Theorem~\ref{thm:gems_operator} to characterise
+        the resulting periodogram distortion.
+\end{itemize}
+
+\paragraph{Future work.}
+(a) Estimation of $|\hat{m}|^2$ from binary masks and
+    deconvolution-based correction for latitude-structured distortion.
+(b) Simulation study quantifying range bias under the GEMS latitude mask.
+(c) Extension to the full spatio-temporal DW setting with
+    latitude-by-time varying coverage.
+
+
+%─────────────────────────────────────────────────────────────────────────────
+\appendix
+\section{Proof of Theorem~\ref{thm:general_mask}}
+\label{app:proof1}
+%─────────────────────────────────────────────────────────────────────────────
+
+By independence of $M$ and $Y$:
+$C_X(h) = \mathbb{E}[M_0 M_h]\,C_Y(h) = (p^2 + C_M(h))\,C_Y(h)$.
+Taking the Fourier transform and applying the convolution theorem:
+$f_X = p^2 f_Y + (2\pi)^{-d}(f_M \ast f_Y)$.  \qed
+
+\section{Proof of Theorem~\ref{thm:deterministic_mask}}
+\label{app:proof2}
+%─────────────────────────────────────────────────────────────────────────────
+
+$\mathbb{E}[I_X(\omega)]
+= N^{-1}\sum_{k,\ell} m_k m_\ell C_Y(s_k-s_\ell) e^{-i\omega(s_k-s_\ell)}$.
+Recognising the double sum as a bilinear form in $C_Y$, and writing
+$C_Y(h) = \int f_Y(\lambda) e^{i\lambda h} d\lambda$, the sum converges
+as $N\to\infty$ to
+$N^{-1}\sum_{k,\ell} m_k m_\ell \int f_Y(\lambda) e^{i(\lambda-\omega)(s_k-s_\ell)} d\lambda
+= \frac{1}{(2\pi)^d}\int f_Y(\lambda)|\hat{m}(\omega-\lambda)|^2 d\lambda$.  \qed
+
+\section{DFT Expected Periodogram under i.i.d.\ Bernoulli}
+\label{app:dft}
+%─────────────────────────────────────────────────────────────────────────────
+
+For i.i.d.\ Bernoulli mask:
+$\mathbb{E}[|d^X_j|^2]
+= N^{-1}\sum_k \mathbb{E}[M_k^2]\sigma^2_Y
++ N^{-1}\sum_{k\neq\ell} p^2 C_Y(s_k-s_\ell) e^{-i\omega_j(s_k-s_\ell)}$.
+Since $\mathbb{E}[M_k^2] = p$ and $p - p^2 = p(1-p)$, this equals
+$p^2 f_Y(\omega_j) + p(1-p)\sigma^2_Y/(2\pi)$, matching
+Corollary~\ref{cor:iid_mask}.  \qed
+
+\bigskip
+\begin{thebibliography}{99}
+
+\bibitem{Sykulski2019}
+Sykulski, A.M., Olhede, S.C., Guillaumin, A.P., Lilly, J.M., and Early, J.J.\
+(2019).
+The debiased Whittle likelihood.
+\emph{Biometrika}, \textbf{106}(2), 251--266.
+
+\bibitem{Masry1978}
+Masry, E.\ (1978).
+Alias-free sampling: an alternative conceptualization and its applications.
+\emph{IEEE Transactions on Information Theory}, \textbf{24}(3), 317--324.
+
+\bibitem{Beutler1970}
+Beutler, F.J.\ (1970).
+Alias-free randomly timed sampling of stochastic processes.
+\emph{IEEE Transactions on Information Theory}, \textbf{16}(2), 147--152.
+
+\bibitem{ShapiroSilverman1960}
+Shapiro, H.S.\ and Silverman, R.A.\ (1960).
+Alias-free sampling of random noise.
+\emph{Journal of the Society for Industrial and Applied Mathematics},
+\textbf{8}(2), 225--248.
+
+\bibitem{White1982}
+White, H.\ (1982).
+Maximum likelihood estimation of misspecified models.
+\emph{Econometrica}, \textbf{50}(1), 1--25.
+
+\bibitem{Guinness2018}
+Guinness, J.\ (2018).
+Permutation and grouping methods for sharpening Gaussian process
+approximations.
+\emph{Technometrics}, \textbf{60}(4), 415--429.
+
+\bibitem{KatzfussGuinness2021}
+Katzfuss, M.\ and Guinness, J.\ (2021).
+A general framework for Vecchia approximations of Gaussian processes.
+\emph{Statistical Science}, \textbf{36}(1), 124--141.
+
+\bibitem{Stein1999}
+Stein, M.L.\ (1999).
+\emph{Interpolation of Spatial Data: Some Theory for Kriging}.
+Springer, New York.
+
+\bibitem{LittleRubin2002}
+Little, R.J.A.\ and Rubin, D.B.\ (2002).
+\emph{Statistical Analysis with Missing Data}, 2nd ed.
+Wiley, Hoboken.
+
+\bibitem{Fuentes2007}
+Fuentes, M.\ (2007).
+Approximate likelihood for large irregularly spaced spatial data.
+\emph{Journal of the American Statistical Association},
+\textbf{102}(477), 321--331.
+
+\bibitem{Cressie1993}
+Cressie, N.\ (1993).
+\emph{Statistics for Spatial Data}, revised ed.
+Wiley, New York.
+
+\bibitem{Priestley1981}
+Priestley, M.B.\ (1981).
+\emph{Spectral Analysis and Time Series}.
+Academic Press, London.
+
+\end{thebibliography}
+
+\end{document}

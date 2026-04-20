@@ -1,0 +1,712 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\geometry{margin=2.5cm}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}{Corollary}
+\newtheorem{remark}{Remark}
+
+\title{\textbf{Covariance of Empirical Periodogram Ordinates}\\
+\large Mathematical Summary (Revised: Brillinger Convention)}
+\author{GEMS TCO Project}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+%───────────────────────────────────────────────────────────────
+\section{Setup and Notation}
+%───────────────────────────────────────────────────────────────
+
+Let $Y(\mathbf{s})$, $\mathbf{s} = (s_1, s_2) \in \{0,\ldots,M-1\}\times\{0,\ldots,N-1\}$,
+be a real-valued, mean-zero, second-order stationary spatial process on
+an $M\times N$ grid.
+The autocovariance function is
+\[
+  C(\mathbf{h}) = \mathrm{Cov}(Y(\mathbf{s}),\, Y(\mathbf{s}+\mathbf{h})),
+\]
+and the spectral density satisfies
+\[
+  f(\boldsymbol{\omega}) = \sum_{\mathbf{h}} C(\mathbf{h})\,e^{-i\boldsymbol{\omega}\cdot\mathbf{h}},
+  \qquad f(\boldsymbol{\omega}) \geq 0,
+\]
+with inverse
+\[
+  C(\mathbf{h}) = \frac{1}{MN}\sum_{\mathbf{k}} f(\boldsymbol{\omega}_{\mathbf{k}})\,
+    e^{i\boldsymbol{\omega}_{\mathbf{k}}\cdot\mathbf{h}},
+  \quad
+  \boldsymbol{\omega}_{\mathbf{k}} = 2\pi\!\left(\frac{k_1}{M},\frac{k_2}{N}\right).
+\]
+
+\paragraph{Observation model with masking.}
+In practice (GEMS TCO), cells without valid retrievals are
+zero-imputed.  Let $m(\mathbf{s}) \in \{0,1\}$ be the binary observation
+mask.  The zero-imputed field is
+\[
+  X(\mathbf{s}) \;=\; m(\mathbf{s})\,Y(\mathbf{s}).
+\]
+All formulas below are first derived for the complete field $Y$
+(mask $m\equiv 1$) and then extended to $X$ in
+Section~\ref{sec:masking}.
+
+
+%───────────────────────────────────────────────────────────────
+\section{Taper, Effective Weight, and Tapered DFT}
+%───────────────────────────────────────────────────────────────
+
+\subsection{Spatial taper}
+
+Let $h(\mathbf{s}) = h_1(s_1)h_2(s_2)$ be a separable, non-negative taper
+(e.g.\ Hamming window):
+\[
+  h_{(i,j)}
+  \;=\; \Bigl(0.54 - 0.46\cos\tfrac{2\pi i}{M}\Bigr)\,
+         \Bigl(0.54 - 0.46\cos\tfrac{2\pi j}{N}\Bigr).
+\]
+
+\subsection{Effective taper (taper $\times$ mask)}
+
+Let $\mathcal{O}^{(q)}$ be the set of observed cells at snapshot $q$.
+The \emph{effective weight} at cell $\mathbf{s}$ for snapshot $q$ is
+\[
+  g^{(q)}_{\mathbf{s}} \;=\; h_{\mathbf{s}}\cdot\mathbf{1}[\mathbf{s}\in\mathcal{O}^{(q)}].
+\]
+This combines the taper and the observation mask into a single weight;
+zero-imputed missing cells contribute zero weight.
+The normalisation constant is
+\[
+  H_q \;=\; \sum_{\mathbf{s}}\bigl(g^{(q)}_{\mathbf{s}}\bigr)^2
+       \;=\; \sum_{\mathbf{s}\in\mathcal{O}^{(q)}} h_{\mathbf{s}}^2.
+\]
+When all cells are observed ($\mathcal{O}^{(q)} = $ full grid):
+$H_q = \|h\|^2 \approx 0.375\,MN$ (Hamming) or $= MN$ (rectangular).
+
+\begin{remark}[Why $H_q$ instead of $MN$]
+Using $H_q$ rather than $MN$ as the normaliser ensures that the
+periodogram is approximately unbiased for $f(\boldsymbol{\omega})$ regardless
+of how many cells are observed.
+If $1/(MN)$ were used, missing data would attenuate the periodogram
+by the observation fraction $p = |\mathcal{O}^{(q)}|/MN$ --- exactly
+the $p^2$ attenuation analysed in the companion spectral distortion paper.
+\end{remark}
+
+\subsection{Tapered DFT (J-vector, code convention)}
+
+The tapered DFT at physical frequency $\boldsymbol{\omega}_{\mathbf{k}}$ for snapshot $q$ is
+\[
+\boxed{
+  J^{(q)}(\boldsymbol{\omega}_{\mathbf{k}})
+  \;=\; \frac{1}{2\pi\sqrt{H_q}}\,
+    \mathcal{F}_{2D}\!\bigl[g^{(q)}\odot X^{(q)}\bigr](\mathbf{k}),
+}
+\]
+where $\mathcal{F}_{2D}[\cdot](\mathbf{k}) = \sum_{\mathbf{s}}(\cdot)_{\mathbf{s}}\,
+e^{-i2\pi(k_1 s_1/M + k_2 s_2/N)}$ is the standard (non-unitary) 2-D DFT,
+and the physical frequencies are
+$\boldsymbol{\omega}_{\mathbf{k}} = (2\pi k_1/(M\Delta_1),\; 2\pi k_2/(N\Delta_2))$
+for grid spacings $\Delta_1, \Delta_2$.
+Expanding explicitly:
+\[
+  J^{(q)}(\boldsymbol{\omega}_{\mathbf{k}})
+  \;=\; \frac{1}{2\pi\sqrt{H_q}}\sum_{\mathbf{s}\in\mathcal{O}^{(q)}}
+    h_{\mathbf{s}}\,X^{(q)}(\mathbf{s})\,
+    e^{-i\boldsymbol{\omega}_{\mathbf{k}}\cdot\mathbf{s}\,\Delta},
+\]
+where $\boldsymbol{\omega}_{\mathbf{k}}\cdot\mathbf{s}\,\Delta = \omega^{\mathrm{lat}}_{k_1} s_1\Delta_1
++ \omega^{\mathrm{lon}}_{k_2} s_2\Delta_2$.
+
+\begin{remark}[Asymptotic distribution]
+Asymptotically, by Brillinger (1975, Thm.~4.4.1):
+\[
+  J^{(q)}(\boldsymbol{\omega}_{\mathbf{k}}) \;\sim\; \mathcal{CN}\!\Bigl(0,\,\tfrac{f(\boldsymbol{\omega}_{\mathbf{k}})}{(2\pi)^2}\Bigr).
+\]
+Writing $J^{(q)} = a_{\mathbf{k}} + ib_{\mathbf{k}}$:
+$a_{\mathbf{k}}, b_{\mathbf{k}} \sim \mathcal{N}(0,\, f(\boldsymbol{\omega}_{\mathbf{k}})/(2(2\pi)^2))$,
+independently, so
+$\mathbb{E}[I^{(q)}_{\mathbf{k}}] = \mathbb{E}[|J^{(q)}(\boldsymbol{\omega}_{\mathbf{k}})|^2]
+\approx f(\boldsymbol{\omega}_{\mathbf{k}})/(2\pi)^2$.
+The periodogram estimates $f/(2\pi)^2$, not $f$ directly;
+the factor $(2\pi)^2$ is part of the spectral density convention used
+in \texttt{expected\_periodogram\_fft\_tapered}.
+\end{remark}
+
+\subsection{Sample cross-periodogram}
+
+For two snapshots $q, r$:
+\[
+  \hat{I}^{(q,r)}(\boldsymbol{\omega}_{\mathbf{k}})
+  \;=\; J^{(q)}(\boldsymbol{\omega}_{\mathbf{k}})\,\overline{J^{(r)}(\boldsymbol{\omega}_{\mathbf{k}})}.
+\]
+The empirical expectation over $N_{\mathrm{iter}}$ realisations is
+\[
+  \bar{I}^{(q,r)}_{\mathrm{emp}}(\boldsymbol{\omega}_{\mathbf{k}})
+  \;=\; \frac{1}{N_{\mathrm{iter}}}\sum_{\ell=1}^{N_{\mathrm{iter}}}
+    \hat{I}^{(q,r)}_\ell(\boldsymbol{\omega}_{\mathbf{k}}).
+\]
+
+\subsection{DFT of the taper (auxiliary, for spectral-domain formulas)}
+
+For the spectral-domain formula of $\tilde{C}_g$
+(Section~\ref{sec:Ctilde_spectral}), define
+\[
+  W^{(q)}[\mathbf{m}]
+  \;=\; \sum_{\mathbf{s}} g^{(q)}_{\mathbf{s}}\,e^{-i2\pi\mathbf{m}\cdot\mathbf{s}/(MN)}
+  \;=\; \mathrm{FFT}(g^{(q)})[\mathbf{m}].
+\]
+Note that $W^{(q)} = \mathrm{FFT}(h \cdot m^{(q)})$ combines the
+taper and mask spectra; when $m^{(q)}\equiv 1$, this reduces to
+$\mathrm{FFT}(h)$.
+
+
+%───────────────────────────────────────────────────────────────
+\section{The Effective-Taper Cross-Covariance Kernel $\tilde{C}_g$}
+\label{sec:Ctilde}
+%───────────────────────────────────────────────────────────────
+
+\subsection{Definition}
+
+\begin{definition}[Effective-taper cross-covariance kernel]
+\label{def:Ctilde}
+For snapshot $q$ with effective weight $g^{(q)}$ and normalisation $H_q$,
+and for physical frequencies $\boldsymbol{\omega}_{\mathbf{j}},\boldsymbol{\omega}_{\mathbf{k}}$, define
+\[
+\boxed{
+  \tilde{C}_{g^{(q)}}(\boldsymbol{\omega}_{\mathbf{j}},\boldsymbol{\omega}_{\mathbf{k}})
+  \;=\; \frac{1}{(2\pi)^2 H_q}
+    \sum_{\mathbf{u},\mathbf{v}}
+    g^{(q)}_{\mathbf{u}}\,g^{(q)}_{\mathbf{v}}\,C(\mathbf{u}-\mathbf{v})\,
+    e^{-i(\boldsymbol{\omega}_{\mathbf{j}}\cdot\mathbf{u}\Delta\,-\,\boldsymbol{\omega}_{\mathbf{k}}\cdot\mathbf{v}\Delta)}.
+}
+\]
+\end{definition}
+
+This equals the expected cross-periodogram between the DFT coefficients:
+\[
+  \tilde{C}_{g^{(q)}}(\boldsymbol{\omega}_{\mathbf{j}},\boldsymbol{\omega}_{\mathbf{k}})
+  \;=\; \mathbb{E}_Y\!\left[J^{(q)}(\boldsymbol{\omega}_{\mathbf{j}})\,
+                             \overline{J^{(q)}(\boldsymbol{\omega}_{\mathbf{k}})}\right].
+\]
+The mask is already incorporated in $g^{(q)} = h\cdot m^{(q)}$,
+so no separate masking treatment is needed at this level.
+For notational convenience we drop the superscript $(q)$ and write
+$\tilde{C}_g$ when the snapshot is clear from context.
+
+\begin{remark}[Physical interpretation]
+$\tilde{C}_g(\boldsymbol{\omega}_{\mathbf{j}},\boldsymbol{\omega}_{\mathbf{k}})$ measures spectral leakage
+from true frequency $\boldsymbol{\omega}_{\mathbf{k}}$ into observed frequency
+$\boldsymbol{\omega}_{\mathbf{j}}$ through the effective window $g$.
+For a rectangular window with full observations ($g\equiv 1$,
+$H_q = MN$): $\tilde{C}_g(\omega_{\mathbf{j}},\omega_{\mathbf{k}})
+= f(\boldsymbol{\omega}_{\mathbf{j}})/(2\pi)^2\cdot\delta_{\mathbf{j}=\mathbf{k}}$.
+\end{remark}
+
+\subsection{Spectral-domain equivalent}
+\label{sec:Ctilde_spectral}
+
+Substituting $C(\mathbf{h}) = (MN)^{-1}\sum_{\mathbf{m}} f(\boldsymbol{\omega}_{\mathbf{m}})
+e^{i\boldsymbol{\omega}_{\mathbf{m}}\cdot\mathbf{h}\Delta}$ into Definition~\ref{def:Ctilde}:
+
+\begin{proposition}[Spectral convolution representation]
+\label{prop:spectral_conv}
+\[
+  \tilde{C}_g(\boldsymbol{\omega}_{\mathbf{j}},\boldsymbol{\omega}_{\mathbf{k}})
+  \;=\; \frac{1}{(2\pi)^2(MN)H_q}\sum_{\mathbf{m}} f(\boldsymbol{\omega}_{\mathbf{m}})\,
+    W^{(q)}[\mathbf{j}-\mathbf{m}]\,\overline{W^{(q)}[\mathbf{k}-\mathbf{m}]}.
+\]
+\end{proposition}
+
+\textbf{Covariance-domain form is preferred for code} (Definition~\ref{def:Ctilde}):
+it uses $C(\mathbf{u}-\mathbf{v})$ and $g^{(q)}$ directly without computing $W^{(q)}$.
+The spectral-domain form (Proposition~\ref{prop:spectral_conv}) is useful
+for theoretical analysis and for connecting to Sykulski et al.\ (2019).
+
+\subsection{Pseudo cross-spectral density}
+
+For a real-valued process, $J(-\boldsymbol{\omega}) = \overline{J(\boldsymbol{\omega})}$, so
+\[
+  \tilde{P}_g(\boldsymbol{\omega}_{\mathbf{j}},\boldsymbol{\omega}_{\mathbf{k}})
+  \;=\; \mathbb{E}_Y\!\left[J^{(q)}(\boldsymbol{\omega}_{\mathbf{j}})\,J^{(q)}(\boldsymbol{\omega}_{\mathbf{k}})\right]
+  \;=\; \tilde{C}_g(\boldsymbol{\omega}_{\mathbf{j}},\,-\boldsymbol{\omega}_{\mathbf{k}}).
+\]
+
+
+%───────────────────────────────────────────────────────────────
+\section{Exact Covariance of the Empirical Periodogram}
+\label{sec:exact_cov}
+%───────────────────────────────────────────────────────────────
+
+\subsection{Gaussian case (Wick's theorem)}
+
+\begin{theorem}[Periodogram covariance via $\tilde{C}_g$]
+\label{thm:cov_gaussian}
+If $Y$ is Gaussian and the effective weight is $g^{(q)}$, then for any $\mathbf{j},\mathbf{k}$:
+\[
+\boxed{
+  \mathrm{Cov}(I^{(q)}_{\mathbf{j}},\, I^{(q)}_{\mathbf{k}})
+  \;=\;
+  \bigl|\tilde{C}_g(\boldsymbol{\omega}_{\mathbf{j}},\boldsymbol{\omega}_{\mathbf{k}})\bigr|^2
+  \;+\;
+  \bigl|\tilde{C}_g(\boldsymbol{\omega}_{\mathbf{j}},\,-\boldsymbol{\omega}_{\mathbf{k}})\bigr|^2.
+}
+\]
+\end{theorem}
+
+\begin{proof}
+By Wick's theorem (Isserlis):
+$\mathrm{Cov}(|J^{(q)}_{\mathbf{j}}|^2, |J^{(q)}_{\mathbf{k}}|^2)
+= |\mathbb{E}[J^{(q)}_{\mathbf{j}}\overline{J^{(q)}_{\mathbf{k}}}]|^2
++ |\mathbb{E}[J^{(q)}_{\mathbf{j}}J^{(q)}_{\mathbf{k}}]|^2
+= |\tilde{C}_g|^2 + |\tilde{P}_g|^2$. \qed
+\end{proof}
+
+\begin{corollary}[Simplified form for positive frequencies]
+\label{cor:pos_freq}
+For a real-valued process and positive Fourier frequencies
+$\mathbf{j},\mathbf{k}\neq\mathbf{0}$ with $\mathbf{j}\neq-\mathbf{k}$:
+\[
+\boxed{
+  \mathrm{Cov}(I^{(q)}_{\mathbf{j}},\, I^{(q)}_{\mathbf{k}})
+  \;\approx\;
+  2\,\bigl|\tilde{C}_g(\boldsymbol{\omega}_{\mathbf{j}},\boldsymbol{\omega}_{\mathbf{k}})\bigr|^2.
+}
+\]
+\end{corollary}
+
+This is the form used in the code (Brillinger, 1975, \S7.6).
+
+\subsection{Non-Gaussian case}
+
+\[
+  \mathrm{Cov}(I^{(q)}_{\mathbf{j}},\, I^{(q)}_{\mathbf{k}})
+  \;=\;
+  \bigl|\tilde{C}_g(\boldsymbol{\omega}_{\mathbf{j}},\boldsymbol{\omega}_{\mathbf{k}})\bigr|^2
+  +
+  \bigl|\tilde{C}_g(\boldsymbol{\omega}_{\mathbf{j}},\,-\boldsymbol{\omega}_{\mathbf{k}})\bigr|^2
+  + \kappa_{\mathbf{j},\mathbf{k}},
+\]
+where $\kappa_{\mathbf{j},\mathbf{k}}$ is the trispectrum contribution
+(Section~\ref{sec:nongauss}).
+
+\subsection{Hamming taper: spectral window width}
+
+For the Hamming window, $W^{(q)}[\mathbf{m}]$ (when $m^{(q)}\equiv 1$) has
+support only at $\mathbf{m}\in\{\mathbf{0},\pm\mathbf{e}_1,\pm\mathbf{e}_2\}$
+(3 non-negligible values per axis), so $\tilde{C}_g$ mixes power over
+roughly $\pm 1$ frequency bin.
+For the covariance estimators, we evaluate Definition~\ref{def:Ctilde}
+directly (covariance domain), avoiding explicit computation of $W^{(q)}$.
+
+
+%───────────────────────────────────────────────────────────────
+\section{Masking Effect: $H_q$ Normalisation vs.\ $MN$}
+\label{sec:masking}
+%───────────────────────────────────────────────────────────────
+
+Because the mask $m^{(q)}$ is already baked into the effective weight
+$g^{(q)} = h\cdot m^{(q)}$, there is no separate masking step in the
+DFT or in the $\tilde{C}_g$ formula.
+The masking enters solely through:
+\begin{enumerate}
+  \item the sum in $\tilde{C}_g$ running only over observed cells
+        ($g^{(q)}_{\mathbf{s}} = 0$ for unobserved $\mathbf{s}$), and
+  \item the normalisation $H_q = \sum_{\mathbf{s}\in\mathcal{O}^{(q)}}h_{\mathbf{s}}^2$
+        adapting to the current observation count.
+\end{enumerate}
+
+\subsection{Comparison with the fixed-$MN$ convention}
+
+If one instead normalised by $1/(2\pi\sqrt{MN})$ (ignoring masking),
+then with $|\mathcal{O}^{(q)}|/MN = p$:
+\[
+  \mathbb{E}[I^{(q)}_{\mathbf{j}}]\big|_{1/\sqrt{MN}}
+  \;\approx\; \frac{p^2\,f(\boldsymbol{\omega}_{\mathbf{j}}) + p(1-p)\sigma^2_Y}{(2\pi)^2}.
+\]
+The $p^2$ attenuation and $p(1-p)\sigma^2_Y$ white-noise floor are exactly
+the spectral distortion terms derived in the companion paper.
+The code's $H_q$-normalisation \emph{removes the $p^2$ attenuation}
+(since $H_q \approx p\|h\|^2$, dividing by $H_q$ rather than $MN$
+compensates by a factor $1/p$), leaving a residual white-noise floor:
+\[
+  \mathbb{E}[I^{(q)}_{\mathbf{j}}]\big|_{1/\sqrt{H_q}}
+  \;\approx\; \frac{f(\boldsymbol{\omega}_{\mathbf{j}}) + [(1-p)/p]\,\sigma^2_Y}{(2\pi)^2}.
+\]
+
+\begin{remark}[Practical implication]
+The $H_q$ normalisation partially mitigates the $\sigma^2$ downward bias
+identified in the companion paper, but does not eliminate the
+$(1-p)/p\cdot\sigma^2_Y$ white-noise floor.
+For GEMS TCO with $p\approx 0.70$, the residual floor is
+$\approx 0.43\,\sigma^2_Y/(2\pi)^2$ per frequency bin.
+\end{remark}
+
+\subsection{i.i.d.\ Bernoulli mask: theoretical expectation}
+
+For theoretical analysis, let $m(\mathbf{s})\sim\mathrm{i.i.d.\ Bernoulli}(p)$.
+Using $\mathbb{E}[m_\mathbf{u} m_\mathbf{v}] = p^2 + p(1-p)\delta_{\mathbf{u}=\mathbf{v}}$
+and the approximation $H_q \approx p\|h\|^2$:
+
+\begin{proposition}[Expected $\tilde{C}_g$ under i.i.d.\ Bernoulli, $H_q$ normalisation]
+\label{prop:mask_bernoulli}
+\[
+\boxed{
+  \mathbb{E}_m\!\bigl[\tilde{C}_g(\boldsymbol{\omega}_{\mathbf{j}},\boldsymbol{\omega}_{\mathbf{k}})\bigr]
+  \;\approx\;
+  \frac{1}{(2\pi)^2}\left[
+    \tilde{C}_g^{\mathrm{norm}}(\boldsymbol{\omega}_{\mathbf{j}},\boldsymbol{\omega}_{\mathbf{k}})
+  \;+\; \frac{(1-p)\,C(\mathbf{0})}{p\,\|h\|^2}\,F_{h^2}[\mathbf{j}-\mathbf{k}]
+  \right],
+}
+\]
+where $\tilde{C}_g^{\mathrm{norm}} = \frac{1}{\|h\|^2}\sum_{\mathbf{u},\mathbf{v}}h(\mathbf{u})h(\mathbf{v})C(\mathbf{u}-\mathbf{v})e^{-i(\omega_j \cdot \mathbf{u} - \omega_k \cdot \mathbf{v})}$
+and $F_{h^2}[\mathbf{j}-\mathbf{k}] = \sum_{\mathbf{s}}h_{\mathbf{s}}^2 e^{-i(\boldsymbol{\omega}_{\mathbf{j}}-\boldsymbol{\omega}_{\mathbf{k}})\cdot\mathbf{s}\Delta}$.
+\end{proposition}
+
+\begin{remark}[Connection to spectral distortion theory]
+At $\mathbf{j}=\mathbf{k}$ and using $F_{h^2}[\mathbf{0}]=\|h\|^2$:
+\[
+  \mathbb{E}_m\!\bigl[\tilde{C}_g(\omega_j,\omega_j)\bigr]
+  \;\approx\;
+  \frac{1}{(2\pi)^2}\!\left[f(\omega_j) + \frac{(1-p)}{p}\sigma^2_Y\right].
+\]
+This is the expected periodogram under $H_q$ normalisation.
+Compare with fixed-$MN$ normalisation: the $p^2$ factor is absorbed by
+$H_q$, leaving only the $(1-p)/p$ residual floor.
+\end{remark}
+
+
+%───────────────────────────────────────────────────────────────
+\section{Three Gaussian Baseline Estimators}
+\label{sec:baselines}
+%───────────────────────────────────────────────────────────────
+
+All three baselines use Corollary~\ref{cor:pos_freq}:
+$\mathrm{Cov}(I_{\mathbf{j}},I_{\mathbf{k}}) \approx 2|\tilde{C}_g(\omega_{\mathbf{j}},\omega_{\mathbf{k}})|^2$,
+differing in how $\tilde{C}_g$ is estimated.
+
+\subsection{Baseline 1: Smooth approximation (Priestley, 1981)}
+
+Assume $f(\boldsymbol{\omega})$ is locally flat near $\omega_j,\omega_k$.
+Using $f(\omega_m)\approx\sqrt{\hat{f}_j\hat{f}_k}$ in
+Proposition~\ref{prop:spectral_conv} and the Hamming identity
+$(W^{(q)}\star\overline{W^{(q)}})[\mathbf{d}]\approx H_q\cdot F_{g^2}[\mathbf{d}]$
+where $F_{g^2}[\mathbf{d}]=\sum_{\mathbf{s}}g_{\mathbf{s}}^2\,e^{-i(\omega_j-\omega_k)\cdot\mathbf{s}\Delta}$:
+\[
+  \tilde{C}_g^{\mathrm{smooth}}(\omega_j,\omega_k)
+  \;\approx\; \frac{\sqrt{\hat{f}_j\,\hat{f}_k}}{(2\pi)^2}\cdot
+    \frac{F_{g^2}[\mathbf{j}-\mathbf{k}]}{H_q},
+\]
+\[
+\boxed{
+  \widehat{\mathrm{Cov}}_{\mathrm{smooth}}(I_{\mathbf{j}},I_{\mathbf{k}})
+  \;=\; \frac{2\,\hat{f}_{\mathbf{j}}\,\hat{f}_{\mathbf{k}}}{(2\pi)^4}\cdot
+    \frac{|F_{g^2}[\mathbf{j}-\mathbf{k}]|^2}{H_q^2}.
+}
+\]
+
+\begin{remark}
+\textbf{Low variance, biased} when $f$ varies across frequencies.
+Recommended for trispectrum / non-Gaussian coupling detection.
+\end{remark}
+
+\subsection{Baseline 2: Exact full convolution (plug-in)}
+
+Compute $\tilde{C}_g$ directly via Definition~\ref{def:Ctilde}
+using empirical $\hat{C}(\mathbf{h})=N_{\mathrm{snap}}^{-1}\sum_n Y_n(\mathbf{s})Y_n(\mathbf{s}+\mathbf{h})$:
+\[
+  \hat{\tilde{C}}_g(\omega_j,\omega_k)
+  \;=\; \frac{1}{(2\pi)^2 H_q}\sum_{\mathbf{u},\mathbf{v}}
+    g_{\mathbf{u}}\,g_{\mathbf{v}}\,\hat{C}(\mathbf{u}-\mathbf{v})\,
+    e^{-i(\omega_j\cdot\mathbf{u}-\omega_k\cdot\mathbf{v})\Delta},
+\]
+\[
+\boxed{
+  \widehat{\mathrm{Cov}}_{\mathrm{exact}}(I_{\mathbf{j}},I_{\mathbf{k}})
+  \;=\; 2\,\bigl|\hat{\tilde{C}}_g(\omega_j,\omega_k)\bigr|^2.
+}
+\]
+
+\begin{remark}[Plug-in bias and variance]
+With true $C$: exactly unbiased.
+With plug-in $\hat{C}$: plug-in bias present; variance inflated.
+Recommended for Whittle bias correction ($\alpha=0$).
+\end{remark}
+
+\subsection{Baseline 3: Hybrid (structured shrinkage)}
+
+\[
+\boxed{
+  \hat{\tilde{C}}_g^{\mathrm{hyb}}(\omega_j,\omega_k)
+  \;=\; \alpha\,\tilde{C}_g^{\mathrm{smooth}}(\omega_j,\omega_k)
+       + (1-\alpha)\,\hat{\tilde{C}}_g^{\mathrm{exact}}(\omega_j,\omega_k),
+}
+\]
+with covariance estimate $2|\hat{\tilde{C}}_h^{\mathrm{hyb}}|^2$.
+
+\begin{itemize}
+  \item $\alpha \to 1$: smooth approx (low variance, biased for non-flat $f$)
+  \item $\alpha \to 0$: full convolution (lower bias, high variance)
+  \item $\alpha = 0.7$: recommended for trispectrum/physical coupling detection
+  \item $\alpha = 0.0$: recommended for Whittle bias correction
+\end{itemize}
+
+\subsection{Frequency-pair structure (Hann taper)}
+
+For the outer-product Hann taper, $W[\mathbf{m}]$ has support only at
+$\mathbf{m} \in \{0,\pm1\}^2$ per axis. Therefore:
+\begin{itemize}
+  \item \textbf{Adjacent in one axis only} ($|\mathbf{j}-\mathbf{k}|=1$ in one direction):
+        $|\tilde{C}_g(\omega_j,\omega_k)| \approx 0.45\,\sqrt{\hat{f}_j\hat{f}_k}$,
+        giving $|\mathrm{Corr}(I_j,I_k)| \approx 0.45$.
+  \item \textbf{Diagonal step} (both axes differ):
+        $|\tilde{C}_g| \approx 0.01\,\sqrt{\hat{f}_j\hat{f}_k}$,
+        trivially near zero.
+  \item \textbf{Well-separated}: $\tilde{C}_g \approx 0$.
+\end{itemize}
+For non-trivial Gaussian baseline validation, pairs must be
+\emph{adjacent in exactly one axis}.
+
+
+%───────────────────────────────────────────────────────────────
+\section{No-Taper Case (Rectangular Window)}
+\label{sec:no_taper}
+%───────────────────────────────────────────────────────────────
+
+When $h \equiv 1$, the tapered cross-covariance reduces to
+\[
+  \tilde{C}_1(\omega_j,\omega_k)
+  = \frac{1}{MN}\sum_{\mathbf{u},\mathbf{v}} C(\mathbf{u}-\mathbf{v})\,
+    e^{-i(\omega_j\cdot\mathbf{u}-\omega_k\cdot\mathbf{v})}
+  = f(\omega_j)\,\delta_{\mathbf{j}=\mathbf{k}},
+\]
+since at distinct Fourier frequencies the sum cancels exactly.
+Therefore, for $\mathbf{j} \neq \mathbf{k}$ (and $\mathbf{j} \neq -\mathbf{k}$):
+\[
+\boxed{
+  \mathrm{Cov}(I_{\mathbf{j}},\, I_{\mathbf{k}}) = 0
+  \quad\textbf{(exact, no approximation, no taper)}
+}
+\]
+
+\begin{remark}
+The sample mean correction $g(\mathbf{s}) = Y(\mathbf{s}) - \bar{Y}$ introduces
+a minor perturbation at the DC frequency, negligible for large $M,N$.
+\end{remark}
+
+
+%───────────────────────────────────────────────────────────────
+\section{Non-Gaussian Residual (Trispectrum)}
+\label{sec:nongauss}
+%───────────────────────────────────────────────────────────────
+
+\subsection{Empirical covariance}
+
+Given $N_{\mathrm{snap}}$ snapshots with periodogram values $I_n(\boldsymbol{\omega}_{\mathbf{j}})$:
+\[
+  \widehat{\mathrm{Cov}}_{\mathrm{emp}}(I_{\mathbf{j}},I_{\mathbf{k}})
+  \;=\; \frac{1}{N_{\mathrm{snap}}}\sum_{n=1}^{N_{\mathrm{snap}}}
+    \bigl(I_n(\boldsymbol{\omega}_{\mathbf{j}}) - \hat{f}_{\mathbf{j}}\bigr)
+    \bigl(I_n(\boldsymbol{\omega}_{\mathbf{k}}) - \hat{f}_{\mathbf{k}}\bigr).
+\]
+
+\subsection{Trispectrum residual}
+
+\[
+  \hat{\kappa}_{\mathbf{j},\mathbf{k}}
+  \;=\; \widehat{\mathrm{Cov}}_{\mathrm{emp}} - 2\,|\hat{\tilde{C}}_h(\omega_j,\omega_k)|^2.
+\]
+
+\subsection{Full decomposition}
+
+\[
+  \underbrace{\widehat{\mathrm{Cov}}_{\mathrm{emp}}}_{\text{total}}
+  \;=\;
+  \underbrace{2\,|\hat{\tilde{C}}_h(\omega_j,\omega_k)|^2}_{\text{Gaussian (Wick)}}
+  \;+\;
+  \underbrace{\hat{\kappa}_{\mathbf{j},\mathbf{k}}}_{\text{non-Gaussian (trispectrum)}}
+\]
+
+
+%───────────────────────────────────────────────────────────────
+\section{Significance Threshold}
+\label{sec:threshold}
+%───────────────────────────────────────────────────────────────
+
+Under the Whittle independence assumption, sample correlation
+$\hat\rho_{\mathbf{jk}}$ is asymptotically $\mathcal{N}(0, 1/N_{\mathrm{snap}})$.
+Two-sided 5\% threshold:
+\[
+  |\hat\rho_{\mathbf{jk}}| > \frac{2}{\sqrt{N_{\mathrm{snap}}}}.
+\]
+For $N_{\mathrm{snap}} = 248$: threshold $\approx 0.127$.
+
+
+%───────────────────────────────────────────────────────────────
+\section{Gaussian Simulation Validation}
+\label{sec:validation}
+%───────────────────────────────────────────────────────────────
+
+The formula
+$\mathrm{Cov}(I_j, I_k) = 2|\tilde{C}_g(\omega_j,\omega_k)|^2$
+was validated by two simulations.
+
+\subsection{1-D AR(1) validation}
+
+Setting: $N=128$, $T=2000$ realizations, $\rho_{\mathrm{AR}}=0.85$,
+Hann taper. True spectrum $f_{\mathrm{true}}[\omega_j]
+= \sigma^2/|1-\rho_{\mathrm{AR}}e^{-i\omega_j}|^2$.
+For adjacent pairs ($|\mathbf{j}-\mathbf{k}|=1$), the formula predicts
+$|\mathrm{Corr}| \approx 0.44$--$0.45$; empirical match within
+$2/\sqrt{T} \approx 0.045$.
+\textbf{Formula confirmed.}
+
+\subsection{2-D spatial field validation}
+
+Setting: $M\times N = 114\times 159$, $N_{\mathrm{snap}}=500$, Hann taper,
+exponential covariance. Gaussian field via circulant embedding:
+\[
+  Y = \sqrt{2}\cdot\mathrm{Re}\!\left(\mathrm{IFFT}\!\left(\sqrt{f_{\mathrm{true}}}\cdot Z\right)\right)\cdot\sqrt{MN},
+  \quad Z\sim\mathcal{CN}(0,I),
+\]
+where $\sqrt{2}$ corrects the variance halving from $\mathrm{Re}(\cdot)$.
+
+Frequency groups:
+\begin{itemize}
+  \item \textbf{NearLon}: $(5,8),(5,9),(5,10)$ --- same lat-index, adjacent lon-index.
+        Baseline predicts $|\tilde{C}_g| \approx 0.45\sqrt{f_jf_k}$,
+        $|\mathrm{Corr}| \approx 0.45$.
+  \item \textbf{NearLat}: $(8,20),(9,20),(10,20)$ --- adjacent lat-index,
+        same lon-index. Same prediction.
+  \item \textbf{Far}: $(20,40),(35,60),(50,75)$ ---
+        $|\tilde{C}_g| \approx 0$, $|\mathrm{Corr}| \approx 0$.
+\end{itemize}
+Empirical results match formula for both Near groups.
+\textbf{Formula confirmed in 2-D.}
+
+\begin{remark}[Frequency selection pitfall]
+``Diagonal step'' pairs ($\mathbf{j}-\mathbf{k}$ differs in both axes) give
+$|\tilde{C}_g| \approx 0.01\sqrt{f_jf_k}$ trivially, making off-diagonal
+validation vacuous.
+Pairs adjacent in exactly one axis are required for non-trivial
+validation of $\tilde{C}_g$.
+\end{remark}
+
+
+%───────────────────────────────────────────────────────────────
+\section{Summary}
+\label{sec:summary}
+%───────────────────────────────────────────────────────────────
+
+\subsection{Key formula hierarchy}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Object & Expression \\
+\midrule
+Effective weight & $g^{(q)}_\mathbf{s} = h_\mathbf{s}\cdot\mathbf{1}[\mathbf{s}\in\mathcal{O}^{(q)}]$,\quad $H_q=\sum_\mathbf{s}g_\mathbf{s}^2$ \\[4pt]
+Tapered DFT & $J^{(q)}(\omega_k) = \frac{1}{2\pi\sqrt{H_q}}\mathcal{F}_{2D}[g^{(q)}\odot X^{(q)}](\mathbf{k})$ \\[4pt]
+Cross-cov kernel & $\tilde{C}_g(\omega_j,\omega_k) = \frac{1}{(2\pi)^2 H_q}\sum_{u,v}g_u g_v C(u-v)e^{-i(\omega_j u - \omega_k v)\Delta}$ \\[4pt]
+Gauss cov & $\mathrm{Cov}(I_j,I_k) = 2|\tilde{C}_g(\omega_j,\omega_k)|^2$ \\[4pt]
+$H_q$ mask effect ($j=k$) & $\mathbb{E}[\tilde{C}_g(\omega_j,\omega_j)] \approx \frac{1}{(2\pi)^2}[f(\omega_j) + \frac{1-p}{p}\sigma^2_Y]$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Three Gaussian baseline estimators}
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{lcccc}
+\toprule
+Method & $\tilde{C}_g$ estimate & Bias & Variance & Recommended use \\
+\midrule
+Smooth & $\sqrt{\hat{f}_j\hat{f}_k}\cdot F_{h^2}[j-k]/(MN)$
+  & Biased & Low & Non-Gaussian detection \\
+Exact & $\frac{1}{MN}\sum_{u,v}h(u)h(v)\hat{C}(u-v)e^{-i(\cdot)}$
+  & Plug-in & High & Whittle bias correction \\
+Hybrid & $\alpha$-mixture & Intermediate & Intermediate & Physical coupling \\
+No taper & $f(\omega_j)\delta_{j=k}$ & None & Low & Baseline comparison \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%───────────────────────────────────────────────────────────────
+\section{Empirical Findings (GEMS TCO, July 2024)}
+\label{sec:empirical}
+%───────────────────────────────────────────────────────────────
+
+Grid: $114\times 159$, $D=31$ days, $N_{\mathrm{snap}}=248$ snapshots.
+Observation fraction $p \approx 0.70$--$0.75$ (missing $\approx 25$--$30\%$).
+Significance threshold $2/\sqrt{248}\approx0.127$.
+
+\paragraph{Masked kernel.}
+Under the actual GEMS masking, $\tilde{C}_{h,m}$ satisfies
+(Proposition~\ref{prop:mask_bernoulli}):
+\[
+  \mathbb{E}_m[\tilde{C}_{h,m}(\omega_j,\omega_k)]
+  = p^2\,\tilde{C}_g(\omega_j,\omega_k)
+  + \frac{p(1-p)\sigma^2_Y}{MN}\,F_{h^2}[j-k].
+\]
+At $j=k$: $\approx 0.49 f(\omega_j) + 0.21\sigma^2_Y$ (for $p=0.70$).
+The second term inflates the effective diagonal cross-covariance and
+must be accounted for when using the exact baseline.
+
+\paragraph{Frequency bands and findings.}
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{lll}
+\toprule
+Band & Gaussian baseline $|\tilde{C}_g|$ & Empirical finding \\
+\midrule
+Near (adj.\ in one axis) & $\approx 0.45\sqrt{\hat{f}_j\hat{f}_k}$
+  & Excess above 0.45 $\Rightarrow$ non-Gaussian \\
+Near $\times$ Mid/High & $\approx 0$
+  & Any $>0.127$ $\Rightarrow$ non-Gaussian coupling \\
+Mid $\times$ Mid & $\approx 0$
+  & Previously: Gaussian sufficient \\
+High $\times$ High & $\approx 0$
+  & $|\hat\rho|\leq0.18$; moderate non-Gaussian \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Main conclusion.}
+The Whittle independence assumption is most reliable for Mid-frequency
+bands ($\lambda\approx 0.3$--$0.6^\circ$).
+High-frequency bands show moderate non-Gaussian coupling
+($|\hat\rho|\approx0.18$).
+Zero-imputation masking inflates the effective diagonal of
+$\tilde{C}_{h,m}$ by $p(1-p)\sigma^2_Y$, which should be corrected
+before estimating the Gaussian baseline.
+
+\bigskip
+\begin{thebibliography}{9}
+\bibitem{Brillinger1975}
+Brillinger, D.R.\ (1975).
+\emph{Time Series: Data Analysis and Theory}.
+Holt, Rinehart and Winston.
+
+\bibitem{Priestley1981}
+Priestley, M.B.\ (1981).
+\emph{Spectral Analysis and Time Series}.
+Academic Press.
+
+\bibitem{Sykulski2019}
+Sykulski, A.M., Olhede, S.C., Guillaumin, A.P., Lilly, J.M., and Early, J.J.\
+(2019).
+The debiased Whittle likelihood.
+\emph{Biometrika}, \textbf{106}(2), 251--266.
+\end{thebibliography}
+
+\end{document}

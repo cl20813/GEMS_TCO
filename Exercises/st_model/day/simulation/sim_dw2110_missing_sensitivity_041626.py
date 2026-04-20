@@ -13,9 +13,9 @@ Step3 threshold rule (rectangular check):
   frac = 0.5 → standard Voronoi cell (obs lies within the grid cell rectangle)
   frac = 0.45, 0.4, 0.35 → progressively stricter → more cells missing
 
-NOTE: Vecchia-Irregular uses raw GEMS obs locations and is completely
-      unaffected by the threshold.  Results are replicated in the CSV
-      once per threshold for easy side-by-side comparison.
+NOTE: Vecchia-Irregular uses actual obs locations but obs count is also
+      filtered by the threshold (cells beyond frac × DELTA are excluded),
+      so all three models see the same number of observations per threshold.
 
 Three models per (iter × threshold):
   Vecc_Irr : Vecchia at actual GEMS obs locations  [threshold-INDEPENDENT]
@@ -341,12 +341,12 @@ def assemble_datasets(field, step3_per_t, lat_dist_per_t, lon_dist_per_t,
         NaN       = float('nan')
         dummy_row = dummy.unsqueeze(0).expand(N_grid, -1)
 
-        # ── irr_map (no threshold) ────────────────────────────────────────────
+        # ── irr_map (threshold applied: same obs count as reg_map) ──────────
         irr_rows = torch.full((N_grid, 11), NaN, device=DEVICE, dtype=DTYPE)
         irr_rows[:, 3]  = t_val
         irr_rows[:, 4:] = dummy_row
         if N_valid > 0:
-            assign_t = torch.tensor(assign, device=DEVICE, dtype=torch.long)
+            assign_t = torch.tensor(assign_reg, device=DEVICE, dtype=torch.long)
             filled   = assign_t >= 0
             win_obs  = assign_t[filled]
             irr_rows[filled, 0] = src_locs[win_obs, 0]
@@ -545,6 +545,16 @@ def cli(
         'nugget':     1.2,
     }
 
+    true_dict = {
+        'sigmasq':    13.059,
+        'range_lat':  0.154,
+        'range_lon':  0.195,
+        'range_time': 1.0,
+        'advec_lat':  0.0218,
+        'advec_lon':  -0.1689,
+        'nugget':     0.247,
+    }
+
     phi2 = 1.0 / true_dict['range_lon']
     phi1 = true_dict['sigmasq'] * phi2
     phi3 = (true_dict['range_lon'] / true_dict['range_lat'])  ** 2
@@ -697,43 +707,41 @@ def cli(
             field = generate_field_values(lats_hr, lons_hr, 8, true_params,
                                           dlat_hr, dlon_hr)
 
-            # ── Vecchia-Irregular (threshold-independent, run ONCE) ───────────
-            print("--- Model: Vecc_Irr (no threshold) ---")
-            # Build irr dataset from the no-threshold assignment (frac=None)
-            (irr_map, irr_agg), _, _ = assemble_datasets(
-                field, step3_per_t, lat_dist_per_t, lon_dist_per_t,
-                hr_idx_per_t, src_locs_per_t, DUMMY_KEYS, grid_coords, true_params,
-                threshold_frac=None)
-            irr_map_ord = {k: v[ord_grid] for k, v in irr_map.items()}
-
-            p_irr = [torch.tensor([val], device=DEVICE, dtype=DTYPE, requires_grad=True)
-                     for val in initial_vals]
-            model_irr = kernels_vecchia.fit_vecchia_lbfgs(
-                smooth=v, input_map=irr_map_ord,
-                nns_map=nns_grid, mm_cond_number=mm_cond_number, nheads=nheads,
-                limit_A=limit_a, limit_B=limit_b, limit_C=limit_c, daily_stride=daily_stride)
-            model_irr.precompute_conditioning_sets()
-            opt_irr = model_irr.set_optimizer(p_irr, lr=LBFGS_LR, max_iter=LBFGS_EVAL,
-                                              history_size=LBFGS_HIST)
-            t0 = time.time()
-            out_irr, _ = model_irr.fit_vecc_lbfgs(p_irr, opt_irr,
-                                                   max_steps=LBFGS_STEPS, grad_tol=1e-5)
-            t_irr = time.time() - t0
-            rmsre_irr, est_irr = calculate_rmsre(out_irr, true_dict)
-            n_irr_obs = int((~torch.isnan(list(irr_map.values())[0][:, 2])).sum())
-            print(f"  RMSRE={rmsre_irr:.4f}  ({t_irr:.1f}s)  obs={n_irr_obs}/{N_grid}")
-
             # ── Loop over thresholds ──────────────────────────────────────────
             for threshold_frac in threshold_list:
                 print(f"\n--- Threshold frac={threshold_frac:.4f} ---")
 
-                (_, _), (reg_map, reg_agg), n_obs_reg = assemble_datasets(
+                (irr_map, irr_agg), (reg_map, reg_agg), n_obs_reg = assemble_datasets(
                     field, step3_per_t, lat_dist_per_t, lon_dist_per_t,
                     hr_idx_per_t, src_locs_per_t, DUMMY_KEYS, grid_coords, true_params,
                     threshold_frac=threshold_frac)
+                irr_map_ord = {k: v[ord_grid] for k, v in irr_map.items()}
                 reg_map_ord = {k: v[ord_grid] for k, v in reg_map.items()}
-                print(f"  reg_map: {n_obs_reg:.1f} observed cells avg "
-                      f"({100*n_obs_reg/N_grid:.1f}%)")
+                n_irr_obs = int((~torch.isnan(list(irr_map.values())[0][:, 2])).sum())
+                print(f"  obs: {n_irr_obs}/{N_grid} ({100*n_obs_reg/N_grid:.1f}% observed)")
+
+                MIN_OBS = max(limit_a, limit_b, limit_c) * 2
+                if n_irr_obs < MIN_OBS:
+                    print(f"  [SKIP thr={threshold_frac}] only {n_irr_obs} obs < MIN_OBS={MIN_OBS}")
+                    continue
+
+                # Vecchia-Irregular
+                print("  [Vecc_Irr]")
+                p_irr = [torch.tensor([val], device=DEVICE, dtype=DTYPE, requires_grad=True)
+                         for val in initial_vals]
+                model_irr = kernels_vecchia.fit_vecchia_lbfgs(
+                    smooth=v, input_map=irr_map_ord,
+                    nns_map=nns_grid, mm_cond_number=mm_cond_number, nheads=nheads,
+                    limit_A=limit_a, limit_B=limit_b, limit_C=limit_c, daily_stride=daily_stride)
+                model_irr.precompute_conditioning_sets()
+                opt_irr = model_irr.set_optimizer(p_irr, lr=LBFGS_LR, max_iter=LBFGS_EVAL,
+                                                  history_size=LBFGS_HIST)
+                t0 = time.time()
+                out_irr, _ = model_irr.fit_vecc_lbfgs(p_irr, opt_irr,
+                                                       max_steps=LBFGS_STEPS, grad_tol=1e-5)
+                t_irr = time.time() - t0
+                rmsre_irr, est_irr = calculate_rmsre(out_irr, true_dict)
+                print(f"  RMSRE={rmsre_irr:.4f}  ({t_irr:.1f}s)")
 
                 # Vecchia-Regular
                 print("  [Vecc_Reg]")
