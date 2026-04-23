@@ -71,8 +71,8 @@ echo "Running on: $(hostname)"
 nvidia-smi
 
 srun python /home/jl2815/tco/exercise_25/st_model/sim_dw_filter_comparison_032626.py \
-    --num-iters 300 \
-    --years "2022,2024,2025" \
+    --num-iters 60 \
+    --years "2024,2025" \
     --month 7 \
     --lat-factor 100 \
     --lon-factor 10 \

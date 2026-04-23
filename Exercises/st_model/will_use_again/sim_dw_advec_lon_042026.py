@@ -1,21 +1,19 @@
 """
-sim_dw_filter_comparison_032626.py
+sim_dw_advec_lon_042026.py
 
-4-way Debiased Whittle filter comparison:
+4-way Debiased Whittle filter comparison — pure lon advection scenario:
+  advec_lat = 0.0,  advec_lon = -0.2
+
   Model 1 — Raw      : no spatial filter    (debiased_whittle_raw)
-  Model 2 — 2-1-1-0  : filter Z=−2X+X↓+X→  (debiased_whittle_2110)
+  Model 2 — 2-1-1-0  : filter Z=−2X+X↓+X→ (debiased_whittle_2110)
   Model 3 — Lat-1    : filter Z=X↓−X        (debiased_whittle_lat1)
   Model 4 — Lon-1    : filter Z=X→−X        (debiased_whittle_lon1)
 
-Sample DFT (all models): debiased_whittle_raw — per-variate H_q normalization.
-
-Lat ordering: lats_grid ascending (south → north) — consistent with torch.unique.
-
 Usage (local test):
-  python sim_dw_filter_comparison_032626.py --num-iters 5 --lat-factor 10 --lon-factor 4
+  python sim_dw_advec_lon_042026.py --num-iters 5 --lat-factor 10 --lon-factor 4
 
 Usage (Amarel):
-  python sim_dw_filter_comparison_032626.py --num-iters 300
+  python sim_dw_advec_lon_042026.py --num-iters 300
 """
 
 import sys
@@ -113,7 +111,6 @@ def apply_step3_1to1(src_np_valid, grid_coords_np, grid_tree):
     for obs_i, (c, d) in enumerate(zip(cell, dist)):
         if d < best[c]:
             assignment[c] = obs_i; best[c] = d
-    # Threshold: match step3_enforce_regular_grid (lat_thresh=DELTA_LAT/2, lon_thresh=DELTA_LON/2)
     filled = assignment >= 0
     if filled.any():
         win_obs  = assignment[filled]
@@ -175,7 +172,6 @@ def assemble_reg_dataset(field, step3_per_t, hr_idx_per_t, src_locs_per_t,
         if N_v > 0:
             a = torch.tensor(assign, device=DEVICE, dtype=torch.long)
             filled = a >= 0
-            # Defensive: guard against assignment indices >= N_v
             oob = filled & (a >= N_v)
             if oob.any():
                 print(f"  [WARN] t_idx={t_idx}: {oob.sum().item()} assign idx "
@@ -212,12 +208,6 @@ def calculate_rmsre(out_params, true_dict, zero_thresh=0.01):
     return rmsre, est
 
 
-def p_cols(m):
-    return [f'sigmasq_est_{m}', f'range_lat_est_{m}', f'range_lon_est_{m}',
-            f'range_t_est_{m}', f'advec_lat_est_{m}', f'advec_lon_est_{m}',
-            f'nugget_est_{m}']
-
-
 # ── Plots ─────────────────────────────────────────────────────────────────────
 
 def make_plots(df, true_dict, plot_dir, n_iters):
@@ -235,19 +225,13 @@ def make_plots(df, true_dict, plot_dir, n_iters):
     # ── 1. KDE per parameter (4 models overlaid) ─────────────────────────────
     fig, axes = plt.subplots(4, 2, figsize=(16, 20))
     axes = axes.flatten()
-    fig.suptitle(f'4-Model DW — Parameter Distributions  ({n_iters} iters)',
+    fig.suptitle(f'4-Model DW (advec_lon=-0.2) — Parameter Distributions  ({n_iters} iters)',
                  fontsize=13, fontweight='bold')
     for idx, (lbl, tv) in enumerate(zip(P_LABELS, tv_list)):
         ax = axes[idx]
         for m, ml in zip(MODELS, MODEL_LABELS):
-            col  = f'{lbl}_est_{m}' if lbl != 'range_t' else f'range_t_est_{m}'
-            # handle naming
-            if lbl == 'range_t':
-                col = f'range_t_est_{m}'
-            else:
-                col = f'{lbl}_est_{m}'
-            if col not in df.columns:
-                continue
+            col = f'range_t_est_{m}' if lbl == 'range_t' else f'{lbl}_est_{m}'
+            if col not in df.columns: continue
             vals = df[col].dropna().values
             if len(vals) < 3: continue
             try:
@@ -264,20 +248,17 @@ def make_plots(df, true_dict, plot_dir, n_iters):
         ax.legend(fontsize=7); ax.grid(True, alpha=0.3)
     if len(P_LABELS) < len(axes): axes[-1].set_visible(False)
     plt.tight_layout()
-    plt.savefig(plot_dir / 'dw_4model_kde.png', dpi=130, bbox_inches='tight')
-    plt.close(); print(f"  Saved: dw_4model_kde.png")
+    plt.savefig(plot_dir / 'dw_adveclon_4model_kde.png', dpi=130, bbox_inches='tight')
+    plt.close(); print(f"  Saved: dw_adveclon_4model_kde.png")
 
     # ── 2. Scatter + cumulative mean per parameter, per model ─────────────────
     for m, ml in zip(MODELS, MODEL_LABELS):
         fig, axes = plt.subplots(4, 2, figsize=(14, 18))
         axes = axes.flatten()
-        fig.suptitle(f'{ml} — Scatter + Cumulative Mean  ({n_iters} iters)',
+        fig.suptitle(f'{ml} (advec_lon=-0.2) — Scatter + Cumulative Mean  ({n_iters} iters)',
                      fontsize=12, fontweight='bold')
         for idx, (lbl, tv) in enumerate(zip(P_LABELS, tv_list)):
-            if lbl == 'range_t':
-                col = f'range_t_est_{m}'
-            else:
-                col = f'{lbl}_est_{m}'
+            col = f'range_t_est_{m}' if lbl == 'range_t' else f'{lbl}_est_{m}'
             ax = axes[idx]
             if col not in df.columns: ax.set_title(lbl); continue
             vals = df[col].values
@@ -290,8 +271,8 @@ def make_plots(df, true_dict, plot_dir, n_iters):
             ax.legend(fontsize=7); ax.grid(True, alpha=0.2)
         if len(P_LABELS) < len(axes): axes[-1].set_visible(False)
         plt.tight_layout()
-        plt.savefig(plot_dir / f'dw_{m}_scatter.png', dpi=130, bbox_inches='tight')
-        plt.close(); print(f"  Saved: dw_{m}_scatter.png")
+        plt.savefig(plot_dir / f'dw_adveclon_{m}_scatter.png', dpi=130, bbox_inches='tight')
+        plt.close(); print(f"  Saved: dw_adveclon_{m}_scatter.png")
 
     # ── 3. RMSRE comparison ───────────────────────────────────────────────────
     fig, ax = plt.subplots(figsize=(12, 5))
@@ -303,11 +284,11 @@ def make_plots(df, true_dict, plot_dir, n_iters):
         cum = pd.Series(rv).expanding().mean().values
         ax.plot(iters, cum, color=COLORS[m], lw=2.0, label=f'{ml} (med={np.median(rv):.3f})')
     ax.set_xlabel('Iteration', fontsize=11); ax.set_ylabel('RMSRE', fontsize=11)
-    ax.set_title(f'4-Model DW — RMSRE  ({n_iters} iters)', fontsize=12)
+    ax.set_title(f'4-Model DW (advec_lon=-0.2) — RMSRE  ({n_iters} iters)', fontsize=12)
     ax.legend(fontsize=9); ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(plot_dir / 'dw_4model_rmsre.png', dpi=130, bbox_inches='tight')
-    plt.close(); print(f"  Saved: dw_4model_rmsre.png")
+    plt.savefig(plot_dir / 'dw_adveclon_4model_rmsre.png', dpi=130, bbox_inches='tight')
+    plt.close(); print(f"  Saved: dw_adveclon_4model_rmsre.png")
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
@@ -334,6 +315,7 @@ def cli(
     print(f"Device     : {DEVICE}")
     print(f"Models     : {MODEL_LABELS}")
     print(f"Region     : lat {lat_r}, lon {lon_r}")
+    print(f"Scenario   : advec_lat=0.0, advec_lon=-0.2")
     print(f"Years      : {years_list}  month={month}")
     print(f"Iterations : {num_iters}  |  DW steps/iter: {dw_steps}")
     print(f"Init noise : ±{init_noise} log-space")
@@ -342,8 +324,8 @@ def cli(
                        else config.mac_estimates_day_path)
     output_path.mkdir(parents=True, exist_ok=True)
     date_tag    = datetime.now().strftime("%m%d%y")
-    csv_raw     = f"sim_dw_4model_{date_tag}.csv"
-    csv_summary = f"sim_dw_4model_summary_{date_tag}.csv"
+    csv_raw     = f"sim_dw_advec_lon_{date_tag}.csv"
+    csv_summary = f"sim_dw_advec_lon_summary_{date_tag}.csv"
 
     # ── True parameters ───────────────────────────────────────────────────────
     true_dict = {
@@ -351,20 +333,10 @@ def cli(
         'range_lat':  0.154,
         'range_lon':  0.195,
         'range_time': 1.0,
-        'advec_lat':  0.0218,
-        'advec_lon':  -0.1689,
+        'advec_lat':  0.0,
+        'advec_lon':  -0.2,
         'nugget':     0.247,
     }
-
-    #true_dict = {
-    #    'sigmasq':    10,
-    #    'range_lat':  0.2,
-    #    'range_lon':  0.2,
-    #    'range_time': 2.0,
-    #    'advec_lat':  0.2,
-    #   'advec_lon':  0.2,
-    #    'nugget':     0.247,
-    #}
 
     phi2     = 1.0 / true_dict['range_lon']
     phi1     = true_dict['sigmasq'] * phi2
@@ -412,7 +384,7 @@ def cli(
             year_tco_maps[yr] = {}
             print(f"  [WARN] tco_grid not found: {tco_path}")
 
-    # ── Build regular target grid (ascending lat: south → north) ─────────────
+    # ── Build regular target grid ─────────────────────────────────────────────
     print("[Setup 2/4] Building regular target grid...")
     lats_grid = torch.arange(min(lat_r), max(lat_r) + 0.0001, DELTA_LAT_BASE,
                               device=DEVICE, dtype=DTYPE)
@@ -426,7 +398,6 @@ def cli(
     n_lat, n_lon = len(lats_grid), len(lons_grid)
     print(f"  Grid: {n_lat} lat × {n_lon} lon = {N_grid} cells  "
           f"(lat {lats_grid[0].item():.3f}→{lats_grid[-1].item():.3f})")
-    print(f"  After diff filter: {n_lat-1}×{n_lon-1} per time step")
 
     # ── High-res grid & obs mappings ──────────────────────────────────────────
     print("[Setup 3/4] Building high-res grid and precomputing obs mappings...")
@@ -442,7 +413,6 @@ def cli(
         for d_idx in range(n_days_yr):
             day_keys = all_sorted[d_idx * 8 : (d_idx + 1) * 8]
             if len(day_keys) < 8: continue
-            # orbit_map keys have "YYYY_MM_" prefix; tco_grid keys do not — strip prefix
             ref_day = {k: year_tco_maps[yr].get(k.split('_', 2)[-1], pd.DataFrame())
                        for k in day_keys}
             s3, hr_i, src = precompute_mapping_indices(
@@ -503,38 +473,35 @@ def cli(
                              true_dict['nugget']],
                 lat_range=lat_r, lon_range=lon_r)
 
-            # ─────────────────────────────────────────────────────────────────
-            # ── Shared preprocessing steps ────────────────────────────────────
-            # Raw slices (model 1, 4-raw)
-            db_raw = dw_raw.debiased_whittle_preprocess([reg_agg], [reg_map], day_idx=0,
-                                                         **params_kwargs)
-            cur_raw  = db_raw.generate_spatially_filtered_days(
+            # ── Raw preprocessing ─────────────────────────────────────────────
+            db_raw  = dw_raw.debiased_whittle_preprocess([reg_agg], [reg_map], day_idx=0,
+                                                          **params_kwargs)
+            cur_raw = db_raw.generate_spatially_filtered_days(
                 lat_r[0], lat_r[1], lon_r[0], lon_r[1]).to(DEVICE_DW)
-            sl_raw   = [cur_raw[cur_raw[:, TC]==t] for t in torch.unique(cur_raw[:, TC])]
+            sl_raw  = [cur_raw[cur_raw[:, TC]==t] for t in torch.unique(cur_raw[:, TC])]
 
             J_raw, n1, n2, p_time, tap_raw, om_raw = dwl_raw.generate_Jvector_tapered_mv(
                 sl_raw, dwl_raw.cgn_hamming, LC, NC, VC, DEVICE_DW)
-            I_raw   = dwl_raw.calculate_sample_periodogram_vectorized(J_raw)
-            ta_raw  = dwl_raw.calculate_taper_autocorrelation_multivariate(
+            I_raw  = dwl_raw.calculate_sample_periodogram_vectorized(J_raw)
+            ta_raw = dwl_raw.calculate_taper_autocorrelation_multivariate(
                 tap_raw, om_raw, n1, n2, DEVICE_DW)
             del om_raw
 
-            # 2-1-1-0 slices (model 2)
-            # dw_2110.generate_spatially_filtered_days always applies 2-1-1-0 filter (no kernel_type arg)
-            db_old  = dw_2110.debiased_whittle_preprocess([reg_agg], [reg_map], day_idx=0,
-                                                           **params_kwargs)
-            cur_old = db_old.generate_spatially_filtered_days(
+            # ── 2-1-1-0 preprocessing ─────────────────────────────────────────
+            db_2110  = dw_2110.debiased_whittle_preprocess([reg_agg], [reg_map], day_idx=0,
+                                                            **params_kwargs)
+            cur_2110 = db_2110.generate_spatially_filtered_days(
                 lat_r[0], lat_r[1], lon_r[0], lon_r[1]).to(DEVICE_DW)
-            sl_old  = [cur_old[cur_old[:, TC]==t] for t in torch.unique(cur_old[:, TC])]
+            sl_2110  = [cur_2110[cur_2110[:, TC]==t] for t in torch.unique(cur_2110[:, TC])]
 
-            J_old, n1o, n2o, _, tap_old, om_old = dwl_raw.generate_Jvector_tapered_mv(
-                sl_old, dwl_raw.cgn_hamming, LC, NC, VC, DEVICE_DW)
-            I_old   = dwl_raw.calculate_sample_periodogram_vectorized(J_old)
-            ta_old  = dwl_raw.calculate_taper_autocorrelation_multivariate(
-                tap_old, om_old, n1o, n2o, DEVICE_DW)
-            del om_old
+            J_2110, n1_2, n2_2, _, tap_2110, om_2110 = dwl_raw.generate_Jvector_tapered_mv(
+                sl_2110, dwl_raw.cgn_hamming, LC, NC, VC, DEVICE_DW)
+            I_2110  = dwl_raw.calculate_sample_periodogram_vectorized(J_2110)
+            ta_2110 = dwl_raw.calculate_taper_autocorrelation_multivariate(
+                tap_2110, om_2110, n1_2, n2_2, DEVICE_DW)
+            del om_2110
 
-            # Lat-1 slices (model 3)
+            # ── Lat-1 preprocessing ───────────────────────────────────────────
             db_lat1  = dw_lat1.debiased_whittle_preprocess([reg_agg], [reg_map], day_idx=0,
                                                             **params_kwargs)
             cur_lat1 = db_lat1.generate_spatially_filtered_days(
@@ -548,7 +515,7 @@ def cli(
                 tap_lat1, om_lat1, n1_l, n2_l, DEVICE_DW)
             del om_lat1
 
-            # Lon-1 slices (model 4)
+            # ── Lon-1 preprocessing ───────────────────────────────────────────
             db_lon1  = dw_lon1.debiased_whittle_preprocess([reg_agg], [reg_map], day_idx=0,
                                                             **params_kwargs)
             cur_lon1 = db_lon1.generate_spatially_filtered_days(
@@ -562,9 +529,8 @@ def cli(
                 tap_lon1, om_lon1, n1_o, n2_o, DEVICE_DW)
             del om_lon1
 
-            print(f"  Raw:{n1}×{n2}  2110:{n1o}×{n2o}  lat1:{n1_l}×{n2_l}  lon1:{n1_o}×{n2_o}  p={p_time}")
+            print(f"  Raw:{n1}×{n2}  2110:{n1_2}×{n2_2}  lat1:{n1_l}×{n2_l}  lon1:{n1_o}×{n2_o}  p={p_time}")
 
-            # ─────────────────────────────────────────────────────────────────
             # ── Model 1: Raw ──────────────────────────────────────────────────
             p1 = [torch.tensor([v], device=DEVICE_DW, dtype=DTYPE, requires_grad=True)
                   for v in initial_vals]
@@ -578,7 +544,7 @@ def cli(
                 max_steps=dw_steps, device=DEVICE_DW)
             t1 = time.time() - t0
             rmsre1, est1 = calculate_rmsre([p.item() for p in p1], true_dict)
-            print(f"  [raw]    RMSRE={rmsre1:.4f}  ({t1:.1f}s)")
+            print(f"  [raw]      RMSRE={rmsre1:.4f}  ({t1:.1f}s)")
 
             # ── Model 2: 2-1-1-0 ─────────────────────────────────────────────
             p2 = [torch.tensor([v], device=DEVICE_DW, dtype=DTYPE, requires_grad=True)
@@ -588,8 +554,8 @@ def cli(
                                       tolerance_grad=1e-5)
             t0 = time.time()
             _, _, _, loss2, _ = dwl_2110.run_lbfgs_tapered(
-                params_list=p2, optimizer=opt2, I_sample=I_old,
-                n1=n1o, n2=n2o, p_time=p_time, taper_autocorr_grid=ta_old,
+                params_list=p2, optimizer=opt2, I_sample=I_2110,
+                n1=n1_2, n2=n2_2, p_time=p_time, taper_autocorr_grid=ta_2110,
                 max_steps=dw_steps, device=DEVICE_DW)
             t2 = time.time() - t0
             rmsre2, est2 = calculate_rmsre([p.item() for p in p2], true_dict)
@@ -635,7 +601,7 @@ def cli(
         # ── Record ───────────────────────────────────────────────────────────
         for m, est, rmsre, loss, t_s, n1_, n2_ in [
             ('raw',      est1, rmsre1, loss1, t1, n1,    n2),
-            ('filt_2110',est2, rmsre2, loss2, t2, n1o,   n2o),
+            ('filt_2110',est2, rmsre2, loss2, t2, n1_2,  n2_2),
             ('lat1',     est3, rmsre3, loss3, t3, n1_l,  n2_l),
             ('lon1',     est4, rmsre4, loss4, t4, n1_o,  n2_o),
         ]:
@@ -737,66 +703,20 @@ def cli(
         summary_rows.append({
             'model': ml, 'param': 'Overall', 'true': float('nan'),
             'mean': float('nan'), 'median': float('nan'), 'bias': float('nan'),
-            'std': float('nan'),
-            'RMSRE': round(float(np.mean(rv)), 6),
+            'std': float('nan'), 'RMSRE': round(float(np.mean(rv)), 6),
             'RMSRE_median': round(float(np.median(rv)), 6),
-            'P10': float('nan'), 'P90': float('nan'),
-            'P90_P10': round(p9p1_rv, 6),
+            'P10': float('nan'), 'P90': float('nan'), 'P90_P10': round(p9p1_rv, 6),
         })
 
-    # ── Distribution: Q1 / Q2(median) / Q3 / min / max ──────────────────────
-    print(f"\n{'='*60}")
-    print(f"  FINAL DISTRIBUTION — Q1 / Median / Q3 / Min / Max")
-    print(f"{'='*60}")
-    cw2 = 9
-    for m, ml in zip(MODELS, MODEL_LABELS):
-        print(f"\n  ── [{ml}] ──")
-        print(f"  {'param':<12} {'true':>{cw2}}  {'Q1':>{cw2}}  {'median':>{cw2}}  "
-              f"{'Q3':>{cw2}}  {'min':>{cw2}}  {'max':>{cw2}}")
-        print(f"  {'-'*80}")
-        for lbl, tv in zip(P_LABELS, TRUE_VALS):
-            col  = f'range_t_est_{m}' if lbl == 'range_t' else f'{lbl}_est_{m}'
-            if col not in df_final.columns:
-                continue
-            vals = df_final[col].values
-            q1   = float(np.percentile(vals, 25))
-            med  = float(np.median(vals))
-            q3   = float(np.percentile(vals, 75))
-            vmin = float(np.min(vals))
-            vmax = float(np.max(vals))
-            print(f"  {lbl:<12} {tv:>{cw2}.4f}  {q1:>{cw2}.4f}  {med:>{cw2}.4f}  "
-                  f"{q3:>{cw2}.4f}  {vmin:>{cw2}.4f}  {vmax:>{cw2}.4f}")
-        # also update summary_rows with Q1/Q2/Q3/min/max
-        for sr in summary_rows:
-            if sr.get('model') != ml:
-                continue
-            p = sr.get('param')
-            if p == 'Overall':
-                continue
-            col = f'range_t_est_{m}' if p == 'range_t' else f'{p}_est_{m}'
-            if col not in df_final.columns:
-                continue
-            vals = df_final[col].values
-            sr['Q1']     = round(float(np.percentile(vals, 25)), 6)
-            sr['median'] = round(float(np.median(vals)), 6)
-            sr['Q3']     = round(float(np.percentile(vals, 75)), 6)
-            sr['min']    = round(float(np.min(vals)), 6)
-            sr['max']    = round(float(np.max(vals)), 6)
+    pd.DataFrame(summary_rows).to_csv(output_path / csv_summary, index=False)
+    print(f"\n  Summary saved: {csv_summary}")
 
-    df_summary = pd.DataFrame(summary_rows)
-    df_summary.to_csv(output_path / csv_summary, index=False)
-    print(f"\nSaved:\n  {output_path / csv_raw}\n  {output_path / csv_summary}")
-
-    # ── Plots ─────────────────────────────────────────────────────────────────
     try:
-        plot_dir = output_path / "plots" / "dw_4model"
+        plot_dir = output_path / "plots"
         plot_dir.mkdir(parents=True, exist_ok=True)
         make_plots(df_final, true_dict, plot_dir, len(records))
-        print(f"\n  Plots saved to: {plot_dir}")
     except Exception as e:
-        import traceback
-        print(f"  [Plot error] {e}")
-        traceback.print_exc()
+        print(f"  [WARN] Plotting failed: {e}")
 
 
 if __name__ == "__main__":
