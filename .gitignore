@@ -22,3 +22,5 @@ dist/
 
 *.lprof
 output.png
+
+.claude/worktrees/
