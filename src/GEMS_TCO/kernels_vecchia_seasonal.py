@@ -280,15 +280,25 @@ class VecchiaAR1Daily(_CovBase):
 
     # ── Likelihood ────────────────────────────────────────────────────────────
 
-    def vecchia_likelihood(self, params: torch.Tensor) -> torch.Tensor:
-        """
-        Returns normalized negative log-likelihood (divided by n_obs).
-        Compatible with autograd for L-BFGS.
-        """
+    def _check_precomputed(self):
         if not self.is_precomputed:
             raise RuntimeError("Call precompute_conditioning_sets() first.")
 
-        n_f = self.n_features
+    def _batch_groups(self):
+        return [
+            (self.G1_X, self.G1_Y, self.G1_Locs),
+            (self.G2_X, self.G2_Y, self.G2_Locs),
+            (self.G3_X, self.G3_Y, self.G3_Locs),
+        ]
+
+    def _failure_penalty(self, params):
+        return torch.sum(params * 0) + 1e8
+
+    def _gls_jitter(self):
+        return torch.eye(self.n_features, device=self.device, dtype=torch.float64) * 1e-6
+
+    def _accumulate_gls_stats(self, params: torch.Tensor):
+        self._check_precomputed()
         XSX: torch.Tensor | None = None
         XSy: torch.Tensor | None = None
         ySy: torch.Tensor | None = None
@@ -296,12 +306,10 @@ class VecchiaAR1Daily(_CovBase):
 
         # Differentiable penalty returned when cholesky fails.
         # Keeps computation graph alive so L-BFGS can update params.
-        _penalty = torch.sum(params * 0) + 1e8
+        _penalty = self._failure_penalty(params)
 
         chunk = 4096
-        for X_b, Y_b, L_b in [(self.G1_X, self.G1_Y, self.G1_Locs),
-                               (self.G2_X, self.G2_Y, self.G2_Locs),
-                               (self.G3_X, self.G3_Y, self.G3_Locs)]:
+        for X_b, Y_b, L_b in self._batch_groups():
             if X_b is None or X_b.shape[0] == 0:
                 continue
             for s in range(0, X_b.shape[0], chunk):
@@ -331,11 +339,22 @@ class VecchiaAR1Daily(_CovBase):
         if ld is None:
             return _penalty
 
-        jitter = torch.eye(n_f, device=self.device, dtype=torch.float64) * 1e-6
+        return XSX, XSy, ySy, ld
+
+    def vecchia_likelihood(self, params: torch.Tensor) -> torch.Tensor:
+        """
+        Returns normalized negative log-likelihood (divided by n_obs).
+        Compatible with autograd for L-BFGS.
+        """
+        stats = self._accumulate_gls_stats(params)
+        if torch.is_tensor(stats):
+            return stats
+
+        XSX, XSy, ySy, ld = stats
         try:
-            beta = torch.linalg.solve(XSX + jitter, XSy)
+            beta = torch.linalg.solve(XSX + self._gls_jitter(), XSy)
         except torch.linalg.LinAlgError:
-            return _penalty
+            return self._failure_penalty(params)
 
         quad = ySy - 2*(beta.T @ XSy) + (beta.T @ XSX @ beta)
         return 0.5 * (ld + quad.squeeze()) / self.n_obs

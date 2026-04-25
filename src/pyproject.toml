@@ -1,3 +1,22 @@
 [build-system]
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "GEMS_TCO"
+version = "0.1.0"
+dependencies = [
+    "requests",
+]
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["GEMS_TCO*"]
+exclude = [
+    "GEMS_TCO.backup_426*",
+    "GEMS_TCO.not used*",
+    "GEMS_TCO.GEMS_TCO.egg-info*",
+]

@@ -296,9 +296,40 @@ class VecchiaBatched(SpatioTemporalModel):
                 Y = Y.masked_fill(is_dummy, 0.0)
                 setattr(self, attr, Y.contiguous())
 
-    def vecchia_batched_likelihood(self, params):
+    def _check_precomputed(self):
         if not self.is_precomputed:
             raise RuntimeError("Run precompute_conditioning_sets() first!")
+
+    def _head_design_response(self):
+        ones = torch.ones((self.Heads_data.shape[0], 1), device=self.device, dtype=torch.float64)
+        lat = (self.Heads_data[:, 0] - self.lat_mean_val).unsqueeze(-1)
+        dums = self.Heads_data[:, 4:11]
+        X_h = torch.cat([ones, lat, dums], dim=1)
+        y_h = self.Heads_data[:, 2].unsqueeze(-1)
+        return X_h, y_h
+
+    def _tail_batches(self):
+        return [
+            (self.X_A, self.Y_A, self.Locs_A),
+            (self.X_AB, self.Y_AB, self.Locs_AB),
+            (self.X_ABC, self.Y_ABC, self.Locs_ABC),
+        ]
+
+    def _log_cholesky_failure(self, params, label):
+        with torch.no_grad():
+            phi2 = torch.exp(params[1])
+            range_lon = 1.0 / phi2
+            range_lat = range_lon / torch.exp(params[2]).sqrt()
+            range_t = range_lon / torch.exp(params[3]).sqrt()
+            nugget = torch.exp(params[6])
+            sigmasq = torch.exp(params[0]) / phi2
+            print(f"[Cholesky FAIL | {label}] "
+                  f"sigmasq={sigmasq.item():.4f}  "
+                  f"range_lon={range_lon.item():.4f}  range_lat={range_lat.item():.4f}  "
+                  f"range_t={range_t.item():.4f}  nugget={nugget.item():.4e}")
+
+    def _accumulate_gls_stats(self, params, include_y_quad=True, catch_cholesky=False):
+        self._check_precomputed()
 
         XT_Sinv_X = torch.zeros((self.n_features, self.n_features), device=self.device, dtype=torch.float64)
         XT_Sinv_y = torch.zeros((self.n_features, 1),               device=self.device, dtype=torch.float64)
@@ -307,41 +338,27 @@ class VecchiaBatched(SpatioTemporalModel):
 
         # PART 1: Heads (Exact GP)
         if self.Heads_data.shape[0] > 0:
-            ones  = torch.ones((self.Heads_data.shape[0], 1), device=self.device, dtype=torch.float64)
-            lat   = (self.Heads_data[:, 0] - self.lat_mean_val).unsqueeze(-1)
-            dums  = self.Heads_data[:, 4:11]
-            X_h   = torch.cat([ones, lat, dums], dim=1)
-            y_h   = self.Heads_data[:, 2].unsqueeze(-1)
-
+            X_h, y_h = self._head_design_response()
             cov = self.matern_cov_aniso_STABLE_log_reparam(params, self.Heads_data, self.Heads_data)
             try:
                 L = torch.linalg.cholesky(cov)
             except torch.linalg.LinAlgError:
-                with torch.no_grad():
-                    phi2      = torch.exp(params[1])
-                    range_lon = 1.0 / phi2
-                    range_lat = range_lon / torch.exp(params[2]).sqrt()
-                    range_t   = range_lon / torch.exp(params[3]).sqrt()
-                    nugget    = torch.exp(params[6])
-                    sigmasq   = torch.exp(params[0]) / phi2
-                    print(f"[Cholesky FAIL | Heads] "
-                          f"sigmasq={sigmasq.item():.4f}  "
-                          f"range_lon={range_lon.item():.4f}  range_lat={range_lat.item():.4f}  "
-                          f"range_t={range_t.item():.4f}  nugget={nugget.item():.4e}")
-                return torch.tensor(float('inf'), device=self.device)
+                if catch_cholesky:
+                    self._log_cholesky_failure(params, "Heads")
+                    return None
+                raise
 
             log_det   += 2 * torch.sum(torch.log(torch.diag(L)))
             Z_X = torch.linalg.solve_triangular(L, X_h, upper=False)
             Z_y = torch.linalg.solve_triangular(L, y_h, upper=False)
             XT_Sinv_X += Z_X.T @ Z_X
             XT_Sinv_y += Z_X.T @ Z_y
-            yT_Sinv_y += (Z_y.T @ Z_y).squeeze()
+            if include_y_quad:
+                yT_Sinv_y += (Z_y.T @ Z_y).squeeze()
 
         # PART 2: Tails (3-group sequential batching)
         chunk_size = 4096
-        for X_b, Y_b, Locs_b in [(self.X_A,   self.Y_A,   self.Locs_A),
-                                   (self.X_AB,  self.Y_AB,  self.Locs_AB),
-                                   (self.X_ABC, self.Y_ABC, self.Locs_ABC)]:
+        for X_b, Y_b, Locs_b in self._tail_batches():
             if X_b is None or X_b.shape[0] == 0:
                 continue
             for start in range(0, X_b.shape[0], chunk_size):
@@ -350,18 +367,10 @@ class VecchiaBatched(SpatioTemporalModel):
                 try:
                     L_chunk = torch.linalg.cholesky(cov_chunk)
                 except torch.linalg.LinAlgError:
-                    with torch.no_grad():
-                        phi2      = torch.exp(params[1])
-                        range_lon = 1.0 / phi2
-                        range_lat = range_lon / torch.exp(params[2]).sqrt()
-                        range_t   = range_lon / torch.exp(params[3]).sqrt()
-                        nugget    = torch.exp(params[6])
-                        sigmasq   = torch.exp(params[0]) / phi2
-                        print(f"[Cholesky FAIL | Tails] "
-                              f"sigmasq={sigmasq.item():.4f}  "
-                              f"range_lon={range_lon.item():.4f}  range_lat={range_lat.item():.4f}  "
-                              f"range_t={range_t.item():.4f}  nugget={nugget.item():.4e}")
-                    return torch.tensor(float('inf'), device=self.device)
+                    if catch_cholesky:
+                        self._log_cholesky_failure(params, "Tails")
+                        return None
+                    raise
 
                 Z_locs = torch.linalg.solve_triangular(L_chunk, Locs_b[start:end], upper=False)
                 Z_y    = torch.linalg.solve_triangular(L_chunk, Y_b[start:end],    upper=False)
@@ -371,28 +380,30 @@ class VecchiaBatched(SpatioTemporalModel):
                 log_det   += 2 * torch.sum(torch.log(L_chunk[:, -1, -1]))
                 XT_Sinv_X += u_X.T @ u_X
                 XT_Sinv_y += u_X.T @ u_y
-                yT_Sinv_y += (u_y.T @ u_y).squeeze()
+                if include_y_quad:
+                    yT_Sinv_y += (u_y.T @ u_y).squeeze()
+
+        total_N = self.Heads_data.shape[0] + self.n_tails
+        return XT_Sinv_X, XT_Sinv_y, yT_Sinv_y, log_det, total_N
+
+    def _gls_jitter(self):
+        return torch.eye(self.n_features, device=self.device, dtype=torch.float64) * 1e-6
+
+    def vecchia_batched_likelihood(self, params):
+        stats = self._accumulate_gls_stats(params, include_y_quad=True, catch_cholesky=True)
+        if stats is None:
+            return torch.tensor(float('inf'), device=self.device)
+
+        XT_Sinv_X, XT_Sinv_y, yT_Sinv_y, log_det, total_N = stats
 
         # PART 3: Solve beta (GLS)
-        jitter = torch.eye(self.n_features, device=self.device, dtype=torch.float64) * 1e-6
         try:
-            beta = torch.linalg.solve(XT_Sinv_X + jitter, XT_Sinv_y)
+            beta = torch.linalg.solve(XT_Sinv_X + self._gls_jitter(), XT_Sinv_y)
         except torch.linalg.LinAlgError:
-            with torch.no_grad():
-                phi2      = torch.exp(params[1])
-                range_lon = 1.0 / phi2
-                range_lat = range_lon / torch.exp(params[2]).sqrt()
-                range_t   = range_lon / torch.exp(params[3]).sqrt()
-                nugget    = torch.exp(params[6])
-                sigmasq   = torch.exp(params[0]) / phi2
-                print(f"[Cholesky FAIL | GLS beta] "
-                      f"sigmasq={sigmasq.item():.4f}  "
-                      f"range_lon={range_lon.item():.4f}  range_lat={range_lat.item():.4f}  "
-                      f"range_t={range_t.item():.4f}  nugget={nugget.item():.4e}")
+            self._log_cholesky_failure(params, "GLS beta")
             return torch.tensor(float('inf'), device=self.device)
 
         quad = yT_Sinv_y - 2 * (beta.T @ XT_Sinv_y) + (beta.T @ XT_Sinv_X @ beta)
-        total_N = self.Heads_data.shape[0] + self.n_tails
 
         return 0.5 * (log_det + quad.squeeze()) / total_N
 
@@ -403,42 +414,10 @@ class VecchiaBatched(SpatioTemporalModel):
         returns beta = (X' Σ⁻¹ X)⁻¹ X' Σ⁻¹ y instead of the scalar likelihood.
         Used to fix beta before computing per-unit observed-J contributions.
         """
-        if not self.is_precomputed:
-            raise RuntimeError("Run precompute_conditioning_sets() first!")
-
-        XT_Sinv_X = torch.zeros((self.n_features, self.n_features), device=self.device, dtype=torch.float64)
-        XT_Sinv_y = torch.zeros((self.n_features, 1),               device=self.device, dtype=torch.float64)
-
-        if self.Heads_data.shape[0] > 0:
-            ones = torch.ones((self.Heads_data.shape[0], 1), device=self.device, dtype=torch.float64)
-            lat  = (self.Heads_data[:, 0] - self.lat_mean_val).unsqueeze(-1)
-            dums = self.Heads_data[:, 4:11]
-            X_h  = torch.cat([ones, lat, dums], dim=1)
-            y_h  = self.Heads_data[:, 2].unsqueeze(-1)
-            cov  = self.matern_cov_aniso_STABLE_log_reparam(params, self.Heads_data, self.Heads_data)
-            L    = torch.linalg.cholesky(cov)
-            Z_X  = torch.linalg.solve_triangular(L, X_h, upper=False)
-            Z_y  = torch.linalg.solve_triangular(L, y_h, upper=False)
-            XT_Sinv_X += Z_X.T @ Z_X
-            XT_Sinv_y += Z_X.T @ Z_y
-
-        chunk_size = 4096
-        for X_b, Y_b, Locs_b in [(self.X_A,   self.Y_A,   self.Locs_A),
-                                   (self.X_AB,  self.Y_AB,  self.Locs_AB),
-                                   (self.X_ABC, self.Y_ABC, self.Locs_ABC)]:
-            if X_b is None or X_b.shape[0] == 0:
-                continue
-            for start in range(0, X_b.shape[0], chunk_size):
-                end = min(start + chunk_size, X_b.shape[0])
-                cov_chunk = self.matern_cov_batched(params, X_b[start:end])
-                L_chunk   = torch.linalg.cholesky(cov_chunk)
-                Z_locs    = torch.linalg.solve_triangular(L_chunk, Locs_b[start:end], upper=False)
-                Z_y       = torch.linalg.solve_triangular(L_chunk, Y_b[start:end],    upper=False)
-                XT_Sinv_X += Z_locs[:, -1, :].T @ Z_locs[:, -1, :]
-                XT_Sinv_y += Z_locs[:, -1, :].T @ Z_y[:, -1, :]
-
-        jitter = torch.eye(self.n_features, device=self.device, dtype=torch.float64) * 1e-6
-        return torch.linalg.solve(XT_Sinv_X + jitter, XT_Sinv_y)  # (n_features, 1)
+        XT_Sinv_X, XT_Sinv_y, _, _, _ = self._accumulate_gls_stats(
+            params, include_y_quad=False, catch_cholesky=False
+        )
+        return torch.linalg.solve(XT_Sinv_X + self._gls_jitter(), XT_Sinv_y)  # (n_features, 1)
 
     def vecchia_per_unit_nll_terms(self, params, beta):
         """Return per-unit NLL contributions with beta fixed.
@@ -452,18 +431,13 @@ class VecchiaBatched(SpatioTemporalModel):
 
         Returns: 1-D tensor of shape (total_N,). Differentiable w.r.t. params.
         """
-        if not self.is_precomputed:
-            raise RuntimeError("Run precompute_conditioning_sets() first!")
+        self._check_precomputed()
 
         terms = []
 
         # --- Heads (exact GP block) ---
         if self.Heads_data.shape[0] > 0:
-            ones = torch.ones((self.Heads_data.shape[0], 1), device=self.device, dtype=torch.float64)
-            lat  = (self.Heads_data[:, 0] - self.lat_mean_val).unsqueeze(-1)
-            dums = self.Heads_data[:, 4:11]
-            X_h  = torch.cat([ones, lat, dums], dim=1)
-            y_h  = self.Heads_data[:, 2].unsqueeze(-1)
+            X_h, y_h = self._head_design_response()
             cov  = self.matern_cov_aniso_STABLE_log_reparam(params, self.Heads_data, self.Heads_data)
             L    = torch.linalg.cholesky(cov)
             Z_X  = torch.linalg.solve_triangular(L, X_h, upper=False)
@@ -475,9 +449,7 @@ class VecchiaBatched(SpatioTemporalModel):
 
         # --- Tails (A / AB / ABC groups) ---
         chunk_size = 4096
-        for X_b, Y_b, Locs_b in [(self.X_A,   self.Y_A,   self.Locs_A),
-                                   (self.X_AB,  self.Y_AB,  self.Locs_AB),
-                                   (self.X_ABC, self.Y_ABC, self.Locs_ABC)]:
+        for X_b, Y_b, Locs_b in self._tail_batches():
             if X_b is None or X_b.shape[0] == 0:
                 continue
             for start in range(0, X_b.shape[0], chunk_size):

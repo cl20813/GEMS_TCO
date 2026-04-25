@@ -216,6 +216,65 @@ class debiased_whittle_likelihood:
         return h1 * h2
 
     @staticmethod
+
+    @staticmethod
+    def _fill_grid_from_tensor(tensor, unique_lats, unique_lons, lat_col, lon_col, val_col, n1, n2, device):
+        data_grid = torch.zeros((n1, n2), dtype=torch.float64, device=device)
+        obs_mask = torch.zeros((n1, n2), dtype=torch.bool, device=device)
+
+        if tensor.numel() == 0 or tensor.shape[1] <= max(lat_col, lon_col, val_col):
+            return data_grid, obs_mask
+
+        cols = tensor[:, [lat_col, lon_col, val_col]]
+        finite = torch.isfinite(cols).all(dim=1)
+        if not finite.any():
+            return data_grid, obs_mask
+
+        lat_vals = cols[finite, 0]
+        lon_vals = cols[finite, 1]
+        val_vals = cols[finite, 2].to(device=device, dtype=torch.float64)
+
+        unique_lats_dev = unique_lats.to(lat_vals.device)
+        unique_lons_dev = unique_lons.to(lon_vals.device)
+        lat_idx = torch.searchsorted(unique_lats_dev, lat_vals)
+        lon_idx = torch.searchsorted(unique_lons_dev, lon_vals)
+
+        in_bounds = (
+            (lat_idx >= 0) & (lat_idx < n1) &
+            (lon_idx >= 0) & (lon_idx < n2)
+        )
+        if not in_bounds.any():
+            return data_grid, obs_mask
+
+        lat_idx = lat_idx[in_bounds]
+        lon_idx = lon_idx[in_bounds]
+        lat_vals = lat_vals[in_bounds]
+        lon_vals = lon_vals[in_bounds]
+        val_vals = val_vals[in_bounds]
+
+        matched = (
+            (unique_lats_dev[lat_idx] == lat_vals) &
+            (unique_lons_dev[lon_idx] == lon_vals)
+        )
+        if not matched.any():
+            return data_grid, obs_mask
+
+        lat_idx = lat_idx[matched].to(device=device, dtype=torch.long)
+        lon_idx = lon_idx[matched].to(device=device, dtype=torch.long)
+        val_vals = val_vals[matched]
+
+        linear_idx = lat_idx * n2 + lon_idx
+        if torch.unique(linear_idx).numel() != linear_idx.numel():
+            for i, j, val in zip(lat_idx, lon_idx, val_vals):
+                data_grid[i, j] = val
+                obs_mask[i, j] = True
+            return data_grid, obs_mask
+
+        data_grid[lat_idx, lon_idx] = val_vals
+        obs_mask[lat_idx, lon_idx] = True
+        return data_grid, obs_mask
+
+    @staticmethod
     def generate_Jvector_tapered_mv(tensor_list, tapering_func,
                                     lat_col, lon_col, val_col, device):
         """Tapered DFT with per-variate normalization and obs_masks."""
@@ -233,24 +292,14 @@ class debiased_whittle_likelihood:
         if all_lats.numel()==0 or all_lons.numel()==0: return _empty()
         ulat, ulon = torch.unique(all_lats), torch.unique(all_lons)
         n1, n2 = len(ulat), len(ulon)
-        lat_map = {v.item(): i for i,v in enumerate(ulat)}
-        lon_map = {v.item(): i for i,v in enumerate(ulon)}
         u1m, u2m = torch.meshgrid(torch.arange(n1,dtype=torch.float64),
                                    torch.arange(n2,dtype=torch.float64), indexing='ij')
         taper = tapering_func((u1m, u2m), n1, n2).to(device)
         ffts, masks = [], []
         for tensor in tensor_list:
-            dg = torch.zeros((n1,n2), dtype=torch.float64, device=device)
-            om = torch.zeros((n1,n2), dtype=torch.bool,    device=device)
-            if tensor.numel()>0 and tensor.shape[1]>max(lat_col,lon_col,val_col):
-                for row in tensor:
-                    li, lj = row[lat_col].item(), row[lon_col].item()
-                    if not (np.isnan(li) or np.isnan(lj)):
-                        i = lat_map.get(li); j = lon_map.get(lj)
-                        if i is not None and j is not None:
-                            v = row[val_col].item() if isinstance(row[val_col],torch.Tensor) else row[val_col]
-                            if not (np.isnan(v) or np.isinf(v)):
-                                dg[i,j] = v; om[i,j] = True
+            dg, om = debiased_whittle_likelihood._fill_grid_from_tensor(
+                tensor, ulat, ulon, lat_col, lon_col, val_col, n1, n2, device
+            )
             dgt = dg * taper
             if torch.isnan(dgt).any() or torch.isinf(dgt).any():
                 dgt = torch.nan_to_num(dgt, nan=0., posinf=0., neginf=0.)

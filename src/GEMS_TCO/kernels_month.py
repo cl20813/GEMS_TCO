@@ -296,9 +296,23 @@ class VecchiaBatched(SpatioTemporalModel):
         self.is_precomputed = True
         print(f"✅ Done. (Total Heads: {len(heads_indices)}, Total Tails: {len(batch_indices_list)})")
 
-    def vecchia_batched_likelihood(self, params):
-        if not self.is_precomputed: raise RuntimeError("Run precompute first!")
+    def _check_precomputed(self):
+        if not self.is_precomputed:
+            raise RuntimeError("Run precompute first!")
 
+    def _head_design_response(self):
+        h_ones = torch.ones((self.Heads_data.shape[0], 1), device=self.device, dtype=torch.float64)
+        h_lat = (self.Heads_data[:, 0] - self.lat_mean_val).unsqueeze(-1)
+        h_dummies = self.Heads_data[:, 4:11]
+        X_head = torch.cat([h_ones, h_lat, h_dummies], dim=1).to(torch.float64)
+        y_head = self.Heads_data[:, 2].unsqueeze(-1).to(torch.float64)
+        return X_head, y_head
+
+    def _gls_jitter(self):
+        return torch.eye(self.n_features, device=self.device, dtype=torch.float64) * 1e-6
+
+    def _accumulate_gls_stats(self, params):
+        self._check_precomputed()
         XT_Sinv_X_glob = torch.zeros((self.n_features, self.n_features), device=self.device, dtype=torch.float64)
         XT_Sinv_y_glob = torch.zeros((self.n_features, 1), device=self.device, dtype=torch.float64)
         yT_Sinv_y_glob = torch.tensor(0.0, device=self.device, dtype=torch.float64)
@@ -308,13 +322,7 @@ class VecchiaBatched(SpatioTemporalModel):
         # PART 1: HEADS
         # -------------------------------------------------------
         if self.Heads_data.shape[0] > 0:
-            h_ones = torch.ones((self.Heads_data.shape[0], 1), device=self.device, dtype=torch.float64)
-            h_lat = (self.Heads_data[:, 0] - self.lat_mean_val).unsqueeze(-1)
-            h_dummies = self.Heads_data[:, 4:11]
-            
-            X_head = torch.cat([h_ones, h_lat, h_dummies], dim=1).to(torch.float64)
-            y_head = self.Heads_data[:, 2].unsqueeze(-1).to(torch.float64)
-            
+            X_head, y_head = self._head_design_response()
             cov = self.matern_cov_aniso_STABLE_log_reparam(params, self.Heads_data, self.Heads_data)
             try:
                 L = torch.linalg.cholesky(cov)
@@ -350,16 +358,23 @@ class VecchiaBatched(SpatioTemporalModel):
             XT_Sinv_y_glob += u_X.T @ u_y
             yT_Sinv_y_glob += (u_y.T @ u_y).squeeze()
 
+        total_N = self.Heads_data.shape[0] + self.X_batch.shape[0]
+        return XT_Sinv_X_glob, XT_Sinv_y_glob, yT_Sinv_y_glob, log_det_glob, total_N
+
+    def vecchia_batched_likelihood(self, params):
+        stats = self._accumulate_gls_stats(params)
+        if torch.is_tensor(stats):
+            return stats
+        XT_Sinv_X_glob, XT_Sinv_y_glob, yT_Sinv_y_glob, log_det_glob, total_N = stats
+
         # -------------------------------------------------------
         # PART 3: SOLVE BETA
         # -------------------------------------------------------
-        jitter = torch.eye(self.n_features, device=self.device, dtype=torch.float64) * 1e-6
         try:
-            beta_global = torch.linalg.solve(XT_Sinv_X_glob + jitter, XT_Sinv_y_glob)
+            beta_global = torch.linalg.solve(XT_Sinv_X_glob + self._gls_jitter(), XT_Sinv_y_glob)
         except torch.linalg.LinAlgError: return torch.tensor(float('inf'), device=self.device)
 
         quad_form = yT_Sinv_y_glob - 2 * (beta_global.T @ XT_Sinv_y_glob) + (beta_global.T @ XT_Sinv_X_glob @ beta_global)
-        total_N = self.Heads_data.shape[0] + self.X_batch.shape[0]
         
         return 0.5 * (log_det_glob + quad_form.squeeze()) / total_N
 

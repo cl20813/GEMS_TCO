@@ -316,6 +316,63 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         return c_gn_grid 
 
     @staticmethod
+    def _fill_grid_from_tensor(tensor, unique_lats, unique_lons, lat_col, lon_col, val_col, n1, n2, device):
+        data_grid = torch.zeros((n1, n2), dtype=torch.float64, device=device)
+        obs_mask = torch.zeros((n1, n2), dtype=torch.bool, device=device)
+
+        if tensor.numel() == 0 or tensor.shape[1] <= max(lat_col, lon_col, val_col):
+            return data_grid, obs_mask
+
+        cols = tensor[:, [lat_col, lon_col, val_col]]
+        finite = torch.isfinite(cols).all(dim=1)
+        if not finite.any():
+            return data_grid, obs_mask
+
+        lat_vals = cols[finite, 0]
+        lon_vals = cols[finite, 1]
+        val_vals = cols[finite, 2].to(device=device, dtype=torch.float64)
+
+        unique_lats_dev = unique_lats.to(lat_vals.device)
+        unique_lons_dev = unique_lons.to(lon_vals.device)
+        lat_idx = torch.searchsorted(unique_lats_dev, lat_vals)
+        lon_idx = torch.searchsorted(unique_lons_dev, lon_vals)
+
+        in_bounds = (
+            (lat_idx >= 0) & (lat_idx < n1) &
+            (lon_idx >= 0) & (lon_idx < n2)
+        )
+        if not in_bounds.any():
+            return data_grid, obs_mask
+
+        lat_idx = lat_idx[in_bounds]
+        lon_idx = lon_idx[in_bounds]
+        lat_vals = lat_vals[in_bounds]
+        lon_vals = lon_vals[in_bounds]
+        val_vals = val_vals[in_bounds]
+
+        matched = (
+            (unique_lats_dev[lat_idx] == lat_vals) &
+            (unique_lons_dev[lon_idx] == lon_vals)
+        )
+        if not matched.any():
+            return data_grid, obs_mask
+
+        lat_idx = lat_idx[matched].to(device=device, dtype=torch.long)
+        lon_idx = lon_idx[matched].to(device=device, dtype=torch.long)
+        val_vals = val_vals[matched]
+
+        linear_idx = lat_idx * n2 + lon_idx
+        if torch.unique(linear_idx).numel() != linear_idx.numel():
+            for i, j, val in zip(lat_idx, lon_idx, val_vals):
+                data_grid[i, j] = val
+                obs_mask[i, j] = True
+            return data_grid, obs_mask
+
+        data_grid[lat_idx, lon_idx] = val_vals
+        obs_mask[lat_idx, lon_idx] = True
+        return data_grid, obs_mask
+
+    @staticmethod
     def generate_Jvector_tapered(tensor_list, tapering_func, lat_col, lon_col, val_col, device):
         """
         Generates J-vector for a single component using the specified taper,
@@ -349,9 +406,6 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
             print("Warning: Grid dimensions are zero.")
             return torch.empty(0, 0, 0, device=device, dtype=torch.complex128), 0, 0, 0, None
 
-        lat_map = {lat.item(): i for i, lat in enumerate(unique_lats_cpu)}
-        lon_map = {lon.item(): i for i, lon in enumerate(unique_lons_cpu)}
-
         u1_mesh_cpu, u2_mesh_cpu = torch.meshgrid(
             torch.arange(n1, dtype=torch.float64),
             torch.arange(n2, dtype=torch.float64),
@@ -361,18 +415,9 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
 
         fft_results = []
         for tensor in tensor_list:
-            data_grid = torch.zeros((n1, n2), dtype=torch.float64, device=device)
-            if tensor.numel() > 0 and tensor.shape[1] > max(lat_col, lon_col, val_col):
-                for row in tensor:
-                    lat_item, lon_item = row[lat_col].item(), row[lon_col].item()
-                    if not (np.isnan(lat_item) or np.isnan(lon_item)):
-                        i = lat_map.get(lat_item)
-                        j = lon_map.get(lon_item)
-                        if i is not None and j is not None:
-                            val = row[val_col]
-                            val_num = val.item() if isinstance(val, torch.Tensor) else val
-                            if not np.isnan(val_num) and not np.isinf(val_num):
-                                data_grid[i, j] = val_num
+            data_grid, _ = debiased_whittle_likelihood._fill_grid_from_tensor(
+                tensor, unique_lats_cpu, unique_lons_cpu, lat_col, lon_col, val_col, n1, n2, device
+            )
 
             data_grid_tapered = data_grid * taper_grid
 
@@ -427,9 +472,6 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
 
         unique_lats_cpu, unique_lons_cpu = torch.unique(all_lats_cpu), torch.unique(all_lons_cpu)
         n1, n2 = len(unique_lats_cpu), len(unique_lons_cpu)
-        lat_map = {lat.item(): i for i, lat in enumerate(unique_lats_cpu)}
-        lon_map = {lon.item(): i for i, lon in enumerate(unique_lons_cpu)}
-
         u1_mesh_cpu, u2_mesh_cpu = torch.meshgrid(
             torch.arange(n1, dtype=torch.float64),
             torch.arange(n2, dtype=torch.float64), indexing='ij')
@@ -438,20 +480,9 @@ class debiased_whittle_likelihood: # (full_vecc_dw_likelihoods):
         fft_results = []
         obs_masks_list = []
         for tensor in tensor_list:
-            data_grid = torch.zeros((n1, n2), dtype=torch.float64, device=device)
-            obs_mask  = torch.zeros((n1, n2), dtype=torch.bool,    device=device)
-            if tensor.numel() > 0 and tensor.shape[1] > max(lat_col, lon_col, val_col):
-                for row in tensor:
-                    lat_item, lon_item = row[lat_col].item(), row[lon_col].item()
-                    if not (np.isnan(lat_item) or np.isnan(lon_item)):
-                        i = lat_map.get(lat_item)
-                        j = lon_map.get(lon_item)
-                        if i is not None and j is not None:
-                            val = row[val_col]
-                            val_num = val.item() if isinstance(val, torch.Tensor) else val
-                            if not np.isnan(val_num) and not np.isinf(val_num):
-                                data_grid[i, j] = val_num
-                                obs_mask[i, j]  = True
+            data_grid, obs_mask = debiased_whittle_likelihood._fill_grid_from_tensor(
+                tensor, unique_lats_cpu, unique_lons_cpu, lat_col, lon_col, val_col, n1, n2, device
+            )
 
             data_grid_tapered = data_grid * taper_grid
             if torch.isnan(data_grid_tapered).any() or torch.isinf(data_grid_tapered).any():
