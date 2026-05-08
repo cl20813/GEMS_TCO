@@ -10,9 +10,13 @@ import sklearn.neighbors
 
 import sys
 import os
-gems_tco_path = "/Users/joonwonlee/Documents/GEMS_TCO-1/src/"
-
-sys.path.append(gems_tco_path)
+for _p in [
+    "/Users/joonwonlee/Documents/GEMS_TCO-1/src/",
+    "/home/jl2815/tco",
+    "/home/ec2-user/gems_tco/src",
+]:
+    if os.path.exists(_p) and _p not in sys.path:
+        sys.path.append(_p)
 
 # original code from .maxmin_ancestor_cpp import maxmin_ancestor_cpp as _maxmin_ancestor_cpp
 from .maxmin_ancestor_cpp import maxmin_ancestor_cpp as _maxmin_ancestor_cpp
