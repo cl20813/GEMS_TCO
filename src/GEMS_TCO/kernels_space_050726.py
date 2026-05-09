@@ -246,12 +246,13 @@ class _PureSpaceVecchiaBase:
     def vecchia_batched_likelihood(self, params: torch.Tensor) -> torch.Tensor:
         stats = self._accumulate_gls_stats(params, include_y_quad=True, catch_cholesky=True)
         if stats is None:
-            return torch.tensor(float("inf"), device=self.device, dtype=torch.float64)
+            # params.sum() * 0 preserves grad_fn so loss.backward() works
+            return params.sum() * 0.0 + 1e10
         XT_Sinv_X, XT_Sinv_y, yT_Sinv_y, log_det, total_N = stats
         try:
             beta = torch.linalg.solve(XT_Sinv_X + self._gls_jitter(), XT_Sinv_y)
         except torch.linalg.LinAlgError:
-            return torch.tensor(float("inf"), device=self.device, dtype=torch.float64)
+            return params.sum() * 0.0 + 1e10
         quad = yT_Sinv_y - 2.0 * (beta.T @ XT_Sinv_y).squeeze() + (beta.T @ XT_Sinv_X @ beta).squeeze()
         return 0.5 * (log_det + quad) / total_N
 

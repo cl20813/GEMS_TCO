@@ -392,7 +392,8 @@ class VecchiaBatched(SpatioTemporalModel):
     def vecchia_batched_likelihood(self, params):
         stats = self._accumulate_gls_stats(params, include_y_quad=True, catch_cholesky=True)
         if stats is None:
-            return torch.tensor(float('inf'), device=self.device)
+            # params.sum() * 0 preserves grad_fn so loss.backward() works
+            return params.sum() * 0.0 + 1e10
 
         XT_Sinv_X, XT_Sinv_y, yT_Sinv_y, log_det, total_N = stats
 
@@ -401,7 +402,7 @@ class VecchiaBatched(SpatioTemporalModel):
             beta = torch.linalg.solve(XT_Sinv_X + self._gls_jitter(), XT_Sinv_y)
         except torch.linalg.LinAlgError:
             self._log_cholesky_failure(params, "GLS beta")
-            return torch.tensor(float('inf'), device=self.device)
+            return params.sum() * 0.0 + 1e10
 
         quad = yT_Sinv_y - 2 * (beta.T @ XT_Sinv_y) + (beta.T @ XT_Sinv_X @ beta)
 
