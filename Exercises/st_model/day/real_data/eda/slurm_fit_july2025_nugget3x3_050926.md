@@ -1,4 +1,4 @@
-# July 2024 spatial nugget 3x3 EDA
+# July 2025 spatial nugget 3x3 EDA
 
 ### Update packages (mac -> Amarel)
 ```bash
@@ -18,7 +18,7 @@ scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/real_data/eda
 ```bash
 mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda"
 
-scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/2024_july_summary \
+scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/2025_july_summary \
     "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/"
 ```
 
@@ -36,9 +36,9 @@ conda activate faiss_env
 ```bash
 python /home/jl2815/tco/exercise_25/st_model/real_data/eda/fit_july2024_spatial_nugget_tiles.py \
     --mode manifest \
-    --input /home/jl2815/tco/data/pickle_2024/tco_grid_24_07.pkl \
-    --output-dir /home/jl2815/tco/exercise_output/eda/2024_july_summary \
-    --month 2024-07 \
+    --input /home/jl2815/tco/data/pickle_2025/tco_grid_25_07.pkl \
+    --output-dir /home/jl2815/tco/exercise_output/eda/2025_july_summary \
+    --month 2025-07 \
     --expected-hours 248 \
     --time-col hour \
     --x-col Source_Longitude \
@@ -48,19 +48,19 @@ python /home/jl2815/tco/exercise_25/st_model/real_data/eda/fit_july2024_spatial_
 
 ---
 
-### July 2024 nugget 3x3 single-node (sbatch)
+### July 2025 nugget 3x3 single-node (sbatch)
 
 ```bash
 cd ./jobscript/tco/gp_exercise
-nano fit_july2024_nugget3x3_050926.sh
-sbatch fit_july2024_nugget3x3_050926.sh
+nano fit_july2025_nugget3x3_050926.sh
+sbatch fit_july2025_nugget3x3_050926.sh
 ```
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name=nug3x3
-#SBATCH --output=/home/jl2815/tco/exercise_output/nug3x3_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/nug3x3_%j.err
+#SBATCH --job-name=nug25_3x3
+#SBATCH --output=/home/jl2815/tco/exercise_output/nug25_3x3_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/nug25_3x3_%j.err
 #SBATCH --time=24:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -88,8 +88,8 @@ echo "Current date and time: $(date)"
 export PYTHONPATH="/home/jl2815/tco:${PYTHONPATH:-}"
 
 SCRIPT="/home/jl2815/tco/exercise_25/st_model/real_data/eda/fit_july2024_spatial_nugget_tiles.py"
-DATA_PATH="/home/jl2815/tco/data/pickle_2024/tco_grid_24_07.pkl"
-OUTDIR="/home/jl2815/tco/exercise_output/eda/2024_july_summary"
+DATA_PATH="/home/jl2815/tco/data/pickle_2025/tco_grid_25_07.pkl"
+OUTDIR="/home/jl2815/tco/exercise_output/eda/2025_july_summary"
 
 mkdir -p "${OUTDIR}"
 export MPLCONFIGDIR="${OUTDIR}/.mplconfig"
@@ -102,7 +102,7 @@ export NUMEXPR_NUM_THREADS=1
 common_args=(
     --input "${DATA_PATH}"
     --output-dir "${OUTDIR}"
-    --month 2024-07
+    --month 2025-07
     --expected-hours 248
     --time-col hour
     --x-col Source_Longitude
@@ -124,7 +124,7 @@ echo "Current date and time: $(date)"
 ```
 
 ```bash
-sbatch fit_july2024_nugget3x3_050926.sh
+sbatch fit_july2025_nugget3x3_050926.sh
 ```
 
 ---
@@ -132,14 +132,14 @@ sbatch fit_july2024_nugget3x3_050926.sh
 ### Expected outputs
 
 ```bash
-ls /home/jl2815/tco/exercise_output/eda/2024_july_summary
+ls /home/jl2815/tco/exercise_output/eda/2025_july_summary
 ```
 
 Key files:
 
 | file | meaning |
 |---|---|
-| `july2024_spatial_fit_248.csv` | one row per fitted hour: day/hour/n_raw/n_used/sigmasq/sigma/range/nugget/loss |
+| `july2025_spatial_fit_248.csv` | one row per fitted hour: day/hour/n_raw/n_used/sigmasq/sigma/range/nugget/loss |
 | `running_summary.txt` | compact text summary also printed in the `.out` log |
 | `tile_nugget_mean_3x3.csv` | 9-row 3x3 regional nugget mean table |
 | `tile_nugget_mean_heatmap_3x3.png` | 3x3 regional mean nugget heatmap |

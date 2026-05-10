@@ -53,7 +53,7 @@ TWO_PI_LOG = float(np.log(2.0 * np.pi))
 # ---------------------------------------------------------------------------
 
 class EDASpaceVecchiaFit(_HybridBase):
-    """Isotropic spatial Vecchia: 3 params (sigmasq, range, nugget), intercept+lat+lon trend."""
+    """Isotropic spatial Vecchia: 3 params (sigmasq, range, nugget), intercept+lat GLS mean."""
 
     def __init__(self, smooth, input_map, nns_map, limit_A=10, target_chunk_size=4096):
         if smooth not in (0.5, 1.5):
@@ -62,7 +62,7 @@ class EDASpaceVecchiaFit(_HybridBase):
             smooth=smooth, input_map=input_map, nns_map=nns_map,
             limit_A=limit_A, target_chunk_size=target_chunk_size,
         )
-        self.n_features = 3  # intercept, lat, lon
+        self.n_features = 2  # intercept, lat
 
     def _raw_params(self, params: torch.Tensor):
         # params: [log_sigmasq, log_range, log_nugget]  (isotropic: range_lat = range_lon)
@@ -84,8 +84,7 @@ class EDASpaceVecchiaFit(_HybridBase):
         flat = rows.reshape(-1, rows.shape[-1])
         ones = torch.ones((flat.shape[0], 1), device=self.device, dtype=torch.float64)
         lat = (flat[:, 0:1] - self.lat_mean_val).to(torch.float64)
-        lon = flat[:, 1:2].to(torch.float64)
-        X = torch.cat([ones, lat, lon], dim=1)
+        X = torch.cat([ones, lat], dim=1)
         return X.reshape(*orig_shape, self.n_features)
 
 
@@ -153,7 +152,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--coords", choices=["lonlat", "raw"], default=os.environ.get("COORDS", "lonlat"))
     parser.add_argument("--smooth", type=float, default=float(os.environ.get("SMOOTH", "0.5")))
-    parser.add_argument("--neighbors", type=int, default=int(os.environ.get("NEIGHBORS", "10")))
+    parser.add_argument("--neighbors", type=int, default=int(os.environ.get("NEIGHBORS", "8")))
     parser.add_argument("--max-points", type=int, default=int(os.environ.get("MAX_POINTS", "0")))
     parser.add_argument("--min-tile-points", type=int, default=int(os.environ.get("MIN_TILE_POINTS", "80")))
     parser.add_argument("--tiles", type=int, default=int(os.environ.get("TILES", "3")))
@@ -483,11 +482,16 @@ def fit_global(
     if smooth not in (0.5, 1.5):
         raise ValueError(f"GPU Vecchia requires smooth 0.5 or 1.5, got {smooth}")
 
+    y_mean, y_std = float(np.nanmean(y)), float(np.nanstd(y))
+    print(f"[fit_global] n={len(y)} | y mean={y_mean:.2f} std={y_std:.2f} min={float(np.nanmin(y)):.2f} max={float(np.nanmax(y)):.2f}", flush=True)
+    if y_std > 500:
+        print(f"[fit_global] WARNING: y_std={y_std:.1f} is unusually large — check data units/columns", flush=True)
+
     model = _build_gpu_model(y, coords, smooth, args.neighbors, device)
 
-    # Fixed init informed by pure-space EDA (sigma~10 DU, range~0.2°, nugget~1.0 DU)
+    # Fixed init informed by pure-space EDA (sigmasq~10 DU^2, range~0.2°, nugget~1.0 DU^2)
     params_list = [
-        torch.tensor(math.log(100.0), requires_grad=True, dtype=torch.float64, device=device),  # sigmasq=100
+        torch.tensor(math.log(10.0),  requires_grad=True, dtype=torch.float64, device=device),  # sigmasq=10
         torch.tensor(math.log(0.2),   requires_grad=True, dtype=torch.float64, device=device),  # range=0.2°
         torch.tensor(math.log(1.0),   requires_grad=True, dtype=torch.float64, device=device),  # nugget=1.0
     ]
@@ -690,6 +694,7 @@ def fit_hour_record(
         "n_raw": int(len(df_hour)),
         "n_used": int(len(values)),
         "sigmasq": global_fit.sigmasq,
+        "sigma": global_fit.sigma,
         "range": global_fit.range,
         "nugget": global_fit.nugget,
         "loss": global_fit.nll,
@@ -760,10 +765,12 @@ def global_nugget_by_hour_slot(global_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def global_params_by_hour_slot(global_df: pd.DataFrame) -> pd.DataFrame:
+    global_df = ensure_sigma_column(global_df)
     agg = {
         "n_days": ("day", "nunique"),
         "n_hours": ("day", "count"),
         "sigmasq_mean": ("sigmasq", "mean"),
+        "sigma_mean": ("sigma", "mean"),
         "range_mean": ("range", "mean"),
         "nugget_mean": ("nugget", "mean"),
         "loss_mean": ("loss", "mean"),
@@ -803,7 +810,7 @@ def save_global_nugget_hour_slot_plot(hour_slot_df: pd.DataFrame, path: Path) ->
     ax.set_xticklabels(labels)
     ax.set_xlabel("hour slot within day / UTC hour")
     ax.set_ylabel("global fitted nugget")
-    ax.set_title("July 2024 global fitted nugget by hour slot")
+    ax.set_title("Global fitted nugget by hour slot")
     ax.grid(True, alpha=0.25)
     fig.tight_layout()
     fig.savefig(path, dpi=180)
@@ -830,15 +837,19 @@ def running_summary_text(
 def write_compact_outputs(global_df: pd.DataFrame, tile_df: pd.DataFrame, args: argparse.Namespace) -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    month_start = pd.Timestamp(f"{args.month}-01")
+    month_label = f"{month_start.strftime('%B').lower()}{month_start.year}"
+    global_df = ensure_sigma_column(global_df)
 
     global_cols = ["day", "hour_slot", "hour_utc", "hour_key", "n_raw", "n_used",
-                   "sigmasq", "range", "nugget", "loss"]
+                   "sigmasq", "sigma", "range", "nugget", "loss"]
     global_cols_avail = [c for c in global_cols if c in global_df.columns]
     global_out = round_numeric(global_df[global_cols_avail], 4)
-    global_path = output_dir / "july2024_spatial_fit_248.csv"
+    global_path = output_dir / f"{month_label}_spatial_fit_{len(global_out)}.csv"
     global_out.to_csv(global_path, index=False, float_format="%.4f")
 
     tile_summary, tile_mat = tile_mean_summary(tile_df, int(args.tiles))
+    tile_median_mat = heatmap_matrix(tile_summary, "tile_nugget_median", int(args.tiles))
     tile_summary = round_numeric(tile_summary, 4)
     tile_summary_path = output_dir / "tile_nugget_mean_3x3.csv"
     tile_summary.to_csv(tile_summary_path, index=False, float_format="%.4f")
@@ -847,12 +858,24 @@ def write_compact_outputs(global_df: pd.DataFrame, tile_df: pd.DataFrame, args: 
     hour_slot_params = round_numeric(global_params_by_hour_slot(global_df), 4)
     hour_slot_path = output_dir / "global_params_by_hour_slot.csv"
     hour_slot_params.to_csv(hour_slot_path, index=False, float_format="%.4f")
+    global_with_time, global_by_day, global_by_hour_slot = summarize_global_by_time(global_df)
+    round_numeric(global_by_day, 4).to_csv(
+        output_dir / "global_params_by_day.csv", index=False, float_format="%.4f"
+    )
 
     save_heatmap(
-        tile_mat, "July 2024 mean tile nugget, 3x3", "mean tile nugget",
+        tile_mat, f"{args.month} mean tile nugget, 3x3", "mean tile nugget",
         output_dir / "tile_nugget_mean_heatmap_3x3.png",
     )
+    save_heatmap(
+        tile_median_mat, f"{args.month} median tile nugget, 3x3", "median tile nugget",
+        output_dir / "tile_nugget_median_heatmap_3x3.png",
+    )
     save_global_nugget_hour_slot_plot(hour_slot_nugget, output_dir / "global_nugget_by_hour_slot.png")
+    save_global_timeseries(global_df, output_dir / "global_params_timeseries.png")
+    save_daily_param_plot(global_by_day, output_dir / "global_params_daily_mean.png")
+    save_hour_slot_param_plot(global_by_hour_slot, output_dir / "global_params_hour_slot_mean.png")
+    save_day_hour_heatmaps(global_with_time, output_dir)
 
     summary_text = "\n\n".join([
         "FINAL RUNNING SUMMARY",
@@ -952,6 +975,13 @@ def heatmap_matrix(summary: pd.DataFrame, value_col: str, tiles: int) -> np.ndar
     return mat
 
 
+def ensure_sigma_column(global_df: pd.DataFrame) -> pd.DataFrame:
+    out = global_df.copy()
+    if "sigma" not in out.columns and "sigmasq" in out.columns:
+        out["sigma"] = np.sqrt(out["sigmasq"].clip(lower=0.0))
+    return out
+
+
 def save_heatmap(mat: np.ndarray, title: str, cbar_label: str, path: Path) -> None:
     import matplotlib
     matplotlib.use("Agg")
@@ -998,14 +1028,14 @@ def save_global_timeseries(global_df: pd.DataFrame, path: Path) -> None:
         ax.set_ylabel(label)
         ax.grid(True, alpha=0.25)
     axes[-1].set_xlabel("hour")
-    fig.suptitle("July 2024 hourly global Matern fits")
+    fig.suptitle("Hourly global Matern fits")
     fig.tight_layout()
     fig.savefig(path, dpi=180)
     plt.close(fig)
 
 
 def add_global_time_features(global_df: pd.DataFrame) -> pd.DataFrame:
-    d = global_df.copy()
+    d = ensure_sigma_column(global_df)
     d["hour_dt"] = pd.to_datetime(d["hour"], utc=True)
     d = d.sort_values("hour_dt")
     d["day"] = d["hour_dt"].dt.strftime("%Y-%m-%d")
@@ -1017,7 +1047,7 @@ def add_global_time_features(global_df: pd.DataFrame) -> pd.DataFrame:
 
 def summarize_global_by_time(global_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     d = add_global_time_features(global_df)
-    param_cols = ["sigmasq", "sigma", "range", "nugget", "nll", "resid_var"]
+    param_cols = ["sigmasq", "sigma", "range", "nugget", "loss", "nll", "resid_var"]
     param_cols = [c for c in param_cols if c in d.columns]
     agg_map = {col: ["mean", "median", "std", "min", "max"] for col in param_cols}
 
@@ -1041,9 +1071,9 @@ def save_daily_param_plot(by_day: pd.DataFrame, path: Path) -> None:
     import matplotlib.pyplot as plt
 
     plot_specs = [
-        ("sigmasq", "global sigmasq"),
-        ("range",   "global range (deg)"),
-        ("nugget",  "global nugget"),
+        ("sigma", "global sigma"),
+        ("range", "global range"),
+        ("nugget", "global nugget"),
     ]
     plot_specs = [(c, l) for c, l in plot_specs if f"{c}_mean" in by_day.columns]
     fig, axes = plt.subplots(len(plot_specs), 1, figsize=(11, 2.5 * len(plot_specs)), sharex=True)
@@ -1058,7 +1088,7 @@ def save_daily_param_plot(by_day: pd.DataFrame, path: Path) -> None:
         ax.fill_between(x, mean - sd, mean + sd, alpha=0.18)
         ax.set_ylabel(label)
         ax.grid(True, alpha=0.25)
-    axes[-1].set_xlabel("July 2024 day")
+    axes[-1].set_xlabel("day of month")
     fig.suptitle("Daily mean global spatial parameters, averaged over hourly fits")
     fig.tight_layout()
     fig.savefig(path, dpi=180)
@@ -1071,9 +1101,9 @@ def save_hour_slot_param_plot(by_hour_slot: pd.DataFrame, path: Path) -> None:
     import matplotlib.pyplot as plt
 
     plot_specs = [
-        ("sigmasq", "global sigmasq"),
-        ("range",   "global range (deg)"),
-        ("nugget",  "global nugget"),
+        ("sigma", "global sigma"),
+        ("range", "global range"),
+        ("nugget", "global nugget"),
     ]
     plot_specs = [(c, l) for c, l in plot_specs if f"{c}_mean" in by_hour_slot.columns]
     fig, axes = plt.subplots(len(plot_specs), 1, figsize=(9, 2.5 * len(plot_specs)), sharex=True)
@@ -1106,9 +1136,9 @@ def save_day_hour_heatmaps(global_with_time: pd.DataFrame, summary_dir: Path) ->
     import matplotlib.pyplot as plt
 
     panels = [
-        ("sigmasq", "global sigmasq"),
-        ("range",   "global range (deg)"),
-        ("nugget",  "global nugget"),
+        ("sigma", "global sigma"),
+        ("range", "global range"),
+        ("nugget", "global nugget"),
     ]
     for col, label in panels:
         if col not in global_with_time.columns:
@@ -1118,7 +1148,7 @@ def save_day_hour_heatmaps(global_with_time: pd.DataFrame, summary_dir: Path) ->
         ).sort_index()
         fig, ax = plt.subplots(figsize=(8, 8))
         im = ax.imshow(pivot.to_numpy(), origin="lower", aspect="auto", cmap="viridis")
-        ax.set_title(f"July 2024 {label}: day x hour slot")
+        ax.set_title(f"{label}: day x hour slot")
         ax.set_xlabel("hour slot within day")
         ax.set_ylabel("day of month")
         ax.set_xticks(np.arange(len(pivot.columns)))
@@ -1192,17 +1222,17 @@ def summarize(args: argparse.Namespace) -> None:
     tiles = int(args.tiles)
     save_heatmap(
         heatmap_matrix(tile_summary, "mean_tile_nugget", tiles),
-        "July 2024 mean tile nugget, 3x3", "mean tile nugget",
+        "Mean tile nugget, 3x3", "mean tile nugget",
         summary_dir / "tile_nugget_mean_heatmap_3x3.png",
     )
     save_heatmap(
         heatmap_matrix(tile_summary, "median_tile_nugget", tiles),
-        "July 2024 median tile nugget, 3x3", "median tile nugget",
+        "Median tile nugget, 3x3", "median tile nugget",
         summary_dir / "tile_nugget_median_heatmap_3x3.png",
     )
     save_heatmap(
         heatmap_matrix(tile_summary, "mean_ratio_to_global", tiles),
-        "July 2024 mean tile/global nugget ratio, 3x3", "mean tile/global nugget",
+        "Mean tile/global nugget ratio, 3x3", "mean tile/global nugget",
         summary_dir / "tile_to_global_nugget_ratio_mean_heatmap_3x3.png",
     )
     save_global_timeseries(global_df, summary_dir / "global_params_timeseries.png")
@@ -1228,7 +1258,7 @@ def run_all(args: argparse.Namespace) -> None:
     tile_frames: list[pd.DataFrame] = []
     running_cols = [
         "day", "hour_slot", "hour_utc", "hour_key",
-        "n_raw", "n_used", "sigmasq", "range", "nugget", "loss",
+        "n_raw", "n_used", "sigmasq", "sigma", "range", "nugget", "loss",
     ]
     print("\nFITTED PARAMETERS EACH HOUR", flush=True)
     print(",".join(running_cols), flush=True)
