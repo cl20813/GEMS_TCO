@@ -1,4 +1,4 @@
-# July 2022-2025 spatial nugget 3x3 EDA
+# July 2022-2025 spatial nugget 3x3 EDA, nu=0.3
 
 ### Update packages (mac -> Amarel)
 ```bash
@@ -7,10 +7,10 @@ scp -r "/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO" jl2815@amarel.rutge
 
 ### Transfer run file (mac -> Amarel)
 ```bash
-ssh jl2815@amarel.rutgers.edu "mkdir -p /home/jl2815/tco/exercise_25/st_model/real_data/eda"
+ssh jl2815@amarel.rutgers.edu "mkdir -p /home/jl2815/tco/exercise_25/st_model/day/real_data/eda"
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/real_data/eda/fit_july2024_spatial_nugget_tiles.py" \
-    jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/real_data/eda/
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/real_data/eda/fit_july_spatial_nugget_tiles.py" \
+    jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/day/real_data/eda/
 ```
 
 ### Transfer data (mac -> Amarel)
@@ -23,35 +23,33 @@ scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/tco_grid_24_07.pkl" jl281
 scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2025/tco_grid_25_07.pkl" jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_2025/
 ```
 
+
 ### Transfer results (Amarel -> mac)
 ```bash
 mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda"
 
-scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/2022_july_summary \
-    "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/"
-scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/2023_july_summary \
-    "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/"
-scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/2024_july_summary \
-    "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/"
-scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/2025_july_summary \
-    "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/"
+SMOOTH_TAG=0p3
+for YEAR in 2022 2023 2024 2025; do
+    scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/${YEAR}_july_summary_nu${SMOOTH_TAG} \
+        "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/"
+done
 ```
 
 ---
 
-### July 2022-2025 nugget 3x3 GPU (sbatch)
+### July 2022-2025 nugget 3x3 GPU, nu=0.3 (sbatch)
 
 ```bash
 cd ./jobscript/tco/gp_exercise
-nano fit_july2022_2025_nugget3x3_050926.sh
-sbatch fit_july2022_2025_nugget3x3_050926.sh
+nano fit_july2022_2025_nugget3x3_nu0p3_050926.sh
+sbatch fit_july2022_2025_nugget3x3_nu0p3_050926.sh
 ```
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name=nug3x3_22_25
-#SBATCH --output=/home/jl2815/tco/exercise_output/nug3x3_22_25_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/nug3x3_22_25_%j.err
+#SBATCH --job-name=nug3x3_nu0p3
+#SBATCH --output=/home/jl2815/tco/exercise_output/nug3x3_nu0p3_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/nug3x3_nu0p3_%j.err
 #SBATCH --time=6:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -80,13 +78,21 @@ export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
-SCRIPT="/home/jl2815/tco/exercise_25/st_model/real_data/eda/fit_july2024_spatial_nugget_tiles.py"
+SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/real_data/eda/fit_july_spatial_nugget_tiles.py"
 BASE_OUT="/home/jl2815/tco/exercise_output/eda"
+SMOOTH=0.3
+SMOOTH_TAG="${SMOOTH/./p}"
 
 for YEAR in 2022 2023 2024 2025; do
     YY="${YEAR:2:2}"
     DATA_PATH="/home/jl2815/tco/data/pickle_${YEAR}/tco_grid_${YY}_07.pkl"
-    OUTDIR="${BASE_OUT}/${YEAR}_july_summary"
+    OUTDIR="${BASE_OUT}/${YEAR}_july_summary_nu${SMOOTH_TAG}"
+    case "${YEAR}" in
+        2022) EXPECTED_HOURS=240 ;;
+        2023) EXPECTED_HOURS=248 ;;
+        2024) EXPECTED_HOURS=248 ;;
+        2025) EXPECTED_HOURS=247 ;;
+    esac
     mkdir -p "${OUTDIR}"
     export MPLCONFIGDIR="${OUTDIR}/.mplconfig"
     mkdir -p "${MPLCONFIGDIR}"
@@ -100,13 +106,13 @@ for YEAR in 2022 2023 2024 2025; do
         --input "${DATA_PATH}" \
         --output-dir "${OUTDIR}" \
         --month "${YEAR}-07" \
-        --expected-hours 248 \
+        --expected-hours "${EXPECTED_HOURS}" \
         --time-col hour \
         --x-col Source_Longitude \
         --y-col Source_Latitude \
         --value-col ColumnAmountO3 \
         --coords raw \
-        --smooth 0.5 \
+        --smooth "${SMOOTH}" \
         --neighbors 8 \
         --max-points 0 \
         --min-tile-points 80 \
@@ -121,20 +127,20 @@ echo "Current date and time: $(date)"
 
 ### Output folders
 
-Each year is written to a separate folder:
+Each year is written to a separate smooth-labelled folder:
 
 ```bash
-/home/jl2815/tco/exercise_output/eda/2022_july_summary
-/home/jl2815/tco/exercise_output/eda/2023_july_summary
-/home/jl2815/tco/exercise_output/eda/2024_july_summary
-/home/jl2815/tco/exercise_output/eda/2025_july_summary
+/home/jl2815/tco/exercise_output/eda/2022_july_summary_nu0p3
+/home/jl2815/tco/exercise_output/eda/2023_july_summary_nu0p3
+/home/jl2815/tco/exercise_output/eda/2024_july_summary_nu0p3
+/home/jl2815/tco/exercise_output/eda/2025_july_summary_nu0p3
 ```
 
 Key files in each folder:
 
 | file | meaning |
 |---|---|
-| `july2022_spatial_fit_248.csv`, ..., `july2025_spatial_fit_248.csv` | one row per fitted hour: day/hour/sigmasq/sigma/range/nugget/loss |
+| `julyYYYY_spatial_fit_<observed_hours>.csv` | one row per fitted hour: day/hour/sigmasq/sigma/range/nugget/loss |
 | `running_summary.txt` | compact text summary also printed in `.out` |
 | `tile_nugget_mean_3x3.csv` | 9-row 3x3 regional nugget table |
 | `tile_nugget_mean_heatmap_3x3.png` | 3x3 regional mean nugget heatmap |

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Fit July 2024 hourly spatial Matern nugget profiles.
+"""Fit hourly July spatial Matern nugget profiles for a selected year.
 
 Workflow:
-  1. manifest: scan July 2024 data and write one row per observed hour.
+  1. manifest: scan the requested July data and write one row per observed hour.
   2. fit:      fit one hourly global spatial model and 3x3 tile nuggets.
   3. summarize: aggregate hourly outputs and write diagnostic plots.
 
 The global model estimates sigmasq, range (isotropic), and a global nugget
-for a fixed Matern smoothness using GPU-batched Vecchia (HybridSpaceVecchiaFit,
-spatial-only t-conditioning, no t-1/t-2).  Tile nuggets are then profiled with
+for a fixed Matern smoothness using GPU-batched Vecchia with spline Matérn
+correlation for non-half-integer smoothness values such as 0.3. Tile nuggets are then profiled with
 global sigmasq and range held fixed, using equal-width 3x3 spatial tiles.
 """
 
@@ -32,7 +32,7 @@ from scipy.spatial import cKDTree
 
 # Locate GEMS_TCO package (local dev tree or Amarel via PYTHONPATH)
 try:
-    from GEMS_TCO.kernels_space_050726 import HybridSpaceVecchiaFit as _HybridBase
+    from GEMS_TCO.kernels_space_iso_050826 import HybridSpaceIsoTrendVecchiaFit as _HybridBase
 except ImportError:
     _candidates = [
         Path(__file__).parents[5] / "src",
@@ -42,7 +42,7 @@ except ImportError:
         if (_p / "GEMS_TCO").is_dir() and str(_p) not in sys.path:
             sys.path.insert(0, str(_p))
             break
-    from GEMS_TCO.kernels_space_050726 import HybridSpaceVecchiaFit as _HybridBase
+    from GEMS_TCO.kernels_space_iso_050826 import HybridSpaceIsoTrendVecchiaFit as _HybridBase
 
 
 TWO_PI_LOG = float(np.log(2.0 * np.pi))
@@ -56,28 +56,13 @@ class EDASpaceVecchiaFit(_HybridBase):
     """Isotropic spatial Vecchia: 3 params (sigmasq, range, nugget), intercept+lat GLS mean."""
 
     def __init__(self, smooth, input_map, nns_map, limit_A=10, target_chunk_size=4096):
-        if smooth not in (0.5, 1.5):
-            raise ValueError(f"smooth must be 0.5 or 1.5, got {smooth}")
+        if float(smooth) <= 0.0:
+            raise ValueError(f"smooth must be positive, got {smooth}")
         super().__init__(
             smooth=smooth, input_map=input_map, nns_map=nns_map,
-            limit_A=limit_A, target_chunk_size=target_chunk_size,
+            limit_A=limit_A, target_chunk_size=target_chunk_size, mean_design="base",
         )
         self.n_features = 2  # intercept, lat
-
-    def _raw_params(self, params: torch.Tensor):
-        # params: [log_sigmasq, log_range, log_nugget]  (isotropic: range_lat = range_lon)
-        sigmasq = torch.exp(params[0])
-        range_  = torch.exp(params[1])
-        nugget  = torch.exp(params[2])
-        return sigmasq, range_, range_, nugget
-
-    def _convert_params(self, raw):
-        # raw = [log_sigmasq, log_range, log_nugget, final_loss]
-        return {
-            "sigmasq": float(np.exp(raw[0])),
-            "range":   float(np.exp(raw[1])),
-            "nugget":  float(np.exp(raw[2])),
-        }
 
     def _design_from_rows(self, rows: torch.Tensor) -> torch.Tensor:
         orig_shape = rows.shape[:-1]
@@ -133,12 +118,12 @@ class FitResult:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="July 2024 hourly spatial Matern global/tile nugget fits (GPU batched Vecchia)."
+        description="Hourly July spatial Matern global/tile nugget fits (GPU batched Vecchia)."
     )
     parser.add_argument("--mode", choices=["manifest", "fit", "summarize", "all"], required=True)
     parser.add_argument("--input", default=os.environ.get("DATA_PATH"))
     parser.add_argument("--input-glob", default=os.environ.get("INPUT_GLOB", "*.parquet"))
-    parser.add_argument("--output-dir", default=os.environ.get("OUTDIR", "results/july2024_nugget_3x3"))
+    parser.add_argument("--output-dir", default=os.environ.get("OUTDIR", "results/july_nugget_3x3"))
     parser.add_argument("--manifest", default=None)
     parser.add_argument("--month", default=os.environ.get("MONTH", "2024-07"))
     parser.add_argument("--expected-hours", type=int, default=int(os.environ.get("EXPECTED_HOURS", "248")))
@@ -479,8 +464,8 @@ def fit_global(
     if len(y) < 5:
         raise ValueError("Need at least 5 observations for global fit.")
     smooth = float(args.smooth)
-    if smooth not in (0.5, 1.5):
-        raise ValueError(f"GPU Vecchia requires smooth 0.5 or 1.5, got {smooth}")
+    if smooth <= 0.0:
+        raise ValueError(f"smooth must be positive, got {smooth}")
 
     y_mean, y_std = float(np.nanmean(y)), float(np.nanstd(y))
     print(f"[fit_global] n={len(y)} | y mean={y_mean:.2f} std={y_std:.2f} min={float(np.nanmin(y)):.2f} max={float(np.nanmax(y)):.2f}", flush=True)
@@ -541,7 +526,7 @@ def profile_tile_nuggets(
     high = math.log(var_y * 1e3)
     log_sigmasq = math.log(global_fit.sigmasq)
     log_range   = math.log(global_fit.range)
-    smooth = float(args.smooth) if float(args.smooth) in (0.5, 1.5) else 0.5
+    smooth = float(args.smooth)
 
     for tid in range(args.tiles * args.tiles):
         mask = tile_id == tid
@@ -1291,11 +1276,8 @@ def run_all(args: argparse.Namespace) -> None:
 def main() -> None:
     args = parse_args()
     smooth = float(args.smooth)
-    if smooth not in (0.5, 1.5):
-        raise SystemExit(
-            f"ERROR: --smooth {smooth} not supported by GPU Vecchia kernel. "
-            "Use 0.5 (Matern-1/2) or 1.5 (Matern-3/2)."
-        )
+    if smooth <= 0.0:
+        raise SystemExit(f"ERROR: --smooth must be positive, got {smooth}.")
     try:
         if args.mode == "manifest":
             make_manifest(args)

@@ -8,10 +8,10 @@ scp -r "/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO" jl2815@amarel.rutge
 
 ### Transfer run file (mac -> Amarel)
 ```bash
-ssh jl2815@amarel.rutgers.edu "mkdir -p /home/jl2815/tco/exercise_25/st_model/real_data/eda"
+ssh jl2815@amarel.rutgers.edu "mkdir -p /home/jl2815/tco/exercise_25/st_model/day/real_data/eda"
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/real_data/eda/fit_july2024_spatial_nugget_tiles.py" \
-    jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/real_data/eda/
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/real_data/eda/fit_july_spatial_nugget_tiles.py" \
+    jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/day/real_data/eda/
 ```
 
 ### Transfer estimate results (Amarel -> mac)
@@ -34,7 +34,7 @@ conda activate faiss_env
 
 ### Quick manifest test
 ```bash
-python /home/jl2815/tco/exercise_25/st_model/real_data/eda/fit_july2024_spatial_nugget_tiles.py \
+python /home/jl2815/tco/exercise_25/st_model/day/real_data/eda/fit_july_spatial_nugget_tiles.py \
     --mode manifest \
     --input /home/jl2815/tco/data/pickle_2024/tco_grid_24_07.pkl \
     --output-dir /home/jl2815/tco/exercise_output/eda/2024_july_summary \
@@ -87,7 +87,7 @@ echo "Current date and time: $(date)"
 
 export PYTHONPATH="/home/jl2815/tco:${PYTHONPATH:-}"
 
-SCRIPT="/home/jl2815/tco/exercise_25/st_model/real_data/eda/fit_july2024_spatial_nugget_tiles.py"
+SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/real_data/eda/fit_july_spatial_nugget_tiles.py"
 DATA_PATH="/home/jl2815/tco/data/pickle_2024/tco_grid_24_07.pkl"
 OUTDIR="/home/jl2815/tco/exercise_output/eda/2024_july_summary"
 

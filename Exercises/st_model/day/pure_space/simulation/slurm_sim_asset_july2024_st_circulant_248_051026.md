@@ -44,10 +44,10 @@ scp -r "/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO" jl2815@amarel.rutge
 ```bash
 ssh jl2815@amarel.rutgers.edu "mkdir -p /home/jl2815/tco/exercise_25/st_model/day/pure_space/simulation /home/jl2815/tco/exercise_25/st_model/day/real_data/eda"
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/pure_space/simulation/fit_sim_july2024_spatial_nugget_tiles.py" \
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/pure_space/simulation/fit_sim_july_spatial_nugget_tiles.py" \
     jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/day/pure_space/simulation/
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/real_data/eda/fit_july2024_spatial_nugget_tiles.py" \
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/real_data/eda/fit_july_spatial_nugget_tiles.py" \
     jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/day/real_data/eda/
 ```
 
@@ -106,7 +106,7 @@ YEAR=2024
 EXPECTED_HOURS=248
 DATA_KIND="real_locations"
 
-SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/pure_space/simulation/fit_sim_july2024_spatial_nugget_tiles.py"
+SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/pure_space/simulation/fit_sim_july_spatial_nugget_tiles.py"
 DATA_PATH="/home/jl2815/tco/exercise_output/sim_data/july_st_circulant_realpattern/${YEAR}_july_st_circulant/sim_july${YEAR}_st_circulant_${DATA_KIND}.pkl"
 OUTDIR="/home/jl2815/tco/exercise_output/eda/simulation/${YEAR}_july_st_circulant_${DATA_KIND}_nugget3x3"
 
@@ -235,7 +235,7 @@ export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
-SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/pure_space/simulation/fit_sim_july2024_spatial_nugget_tiles.py"
+SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/pure_space/simulation/fit_sim_july_spatial_nugget_tiles.py"
 BASE="/home/jl2815/tco/exercise_output/sim_data/july_st_circulant_realpattern"
 DATA_KIND="real_locations"
 N_RANDOM_DAYS=30

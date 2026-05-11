@@ -33,16 +33,16 @@ def add_real_data_eda_to_path() -> None:
     ])
 
     for path in candidates:
-        if (path / "fit_july2024_spatial_nugget_tiles.py").exists():
+        if (path / "fit_july_spatial_nugget_tiles.py").exists():
             sys.path.insert(0, str(path))
             return
     checked = "\n".join(str(p) for p in candidates)
-    raise SystemExit(f"Could not find fit_july2024_spatial_nugget_tiles.py. Checked:\n{checked}")
+    raise SystemExit(f"Could not find fit_july_spatial_nugget_tiles.py. Checked:\n{checked}")
 
 
 def main() -> None:
     add_real_data_eda_to_path()
-    from fit_july2024_spatial_nugget_tiles import main as real_fit_main
+    from fit_july_spatial_nugget_tiles import main as real_fit_main
 
     real_fit_main()
 
