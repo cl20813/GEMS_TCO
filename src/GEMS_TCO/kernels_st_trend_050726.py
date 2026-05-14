@@ -13,7 +13,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from GEMS_TCO.kernel_vecchia_col_ver3 import ReverseLColumnVecchiaFitV3
+from GEMS_TCO.kernel_vecchia_col_batch import ReverseLColumnVecchiaFitBatch
 from GEMS_TCO.kernels_vecchia_hybrid import HybridVecchiaFit
 
 
@@ -77,7 +77,7 @@ class _STMeanDesignMixin:
         return X.reshape(*orig_shape, self.n_features)
 
 
-class ColumnSTTrendVecchiaFit(_STMeanDesignMixin, ReverseLColumnVecchiaFitV3):
+class ColumnSTTrendVecchiaFit(_STMeanDesignMixin, ReverseLColumnVecchiaFitBatch):
     def __init__(self, *args, mean_design: str = "base", **kwargs):
         super().__init__(*args, **kwargs)
         self._init_mean_design(mean_design)

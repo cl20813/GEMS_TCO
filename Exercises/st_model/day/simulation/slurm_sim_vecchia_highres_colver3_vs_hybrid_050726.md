@@ -10,7 +10,7 @@ Purpose: compare equal-sized conditioning on a complete regular-grid simulation.
 Local source files:
 
 ```bash
-/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/kernel_vecchia_col_ver3.py
+/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/kernel_vecchia_col_batch.py
 /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_vecchia_highres_colver3_vs_hybrid_050726.py
 /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_vecchia_highres_colver3_vs_hybrid_050726.sh
 ```
@@ -18,7 +18,7 @@ Local source files:
 Amarel target paths:
 
 ```bash
-/home/jl2815/tco/GEMS_TCO/kernel_vecchia_col_ver3.py
+/home/jl2815/tco/GEMS_TCO/kernel_vecchia_col_batch.py
 /home/jl2815/tco/exercise_25/st_model/sim_vecchia_highres_colver3_vs_hybrid_050726.py
 /home/jl2815/tco/exercise_25/st_model/sim_vecchia_highres_colver3_vs_hybrid_050726.sh
 ```
@@ -28,7 +28,7 @@ Amarel target paths:
 Run these from the local Mac terminal, not inside Amarel:
 
 ```bash
-scp /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/kernel_vecchia_col_ver3.py jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO/
+scp /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/kernel_vecchia_col_batch.py jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO/
 
 scp /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_vecchia_highres_colver3_vs_hybrid_050726.py jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/
 

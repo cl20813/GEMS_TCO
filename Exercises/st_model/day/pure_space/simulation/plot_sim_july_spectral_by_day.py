@@ -465,7 +465,7 @@ def plot_day(day_label: str, smooth: float, rows: list[dict], out_path: Path, ar
             ax.set_ylim(*ylim)
             ax.set_xlim(0, k_plot_max)
             ax.grid(alpha=0.22)
-            ax.set_title(f"{title}, x{stride}  (data k <= {k_cut:.1f})")
+            ax.set_title(f"{title}, x{stride}  (data k <= {k_cut:.4f})")
             ax.set_xlabel("radial frequency on full-grid scale")
             if j == 0:
                 ax.set_ylabel("spectrum")
@@ -541,7 +541,7 @@ def main() -> None:
                 plot_day(day_label, smooth, plot_rows, out_path, args, k_max)
                 print(f"  saved {out_path}")
                 if args.save_fit_csv:
-                    pd.DataFrame(fit_rows).round(ROUND_DECIMALS).to_csv(csv_path, index=False)
+                    pd.DataFrame(fit_rows).round(ROUND_DECIMALS).to_csv(csv_path, index=False, float_format="%.4f")
                     print(f"  saved {csv_path}")
 
 

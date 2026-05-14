@@ -5,7 +5,7 @@ Spatio-temporal Column V3 wrapper with lag-specific reverse-L conditioning caps.
 
 This isolates whether real-data ST differences are driven by the amount of
 conditioning information taken from t-1 and t-2.  The scan geometry is the same
-as ReverseLColumnVecchiaFitV3, but each lag can have its own cap, e.g.
+as ReverseLColumnVecchiaFitBatch, but each lag can have its own cap, e.g.
     (14, 14, 14): baseline
     (14,  6, 14): keep only the nearest 6 reverse-L candidates at t-1
     (14,  0, 14): remove t-1 conditioning
@@ -19,11 +19,11 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import torch
 
-from GEMS_TCO.kernel_vecchia_col_ver3 import ReverseLColumnVecchiaFitV3
+from GEMS_TCO.kernel_vecchia_col_batch import ReverseLColumnVecchiaFitBatch
 from GEMS_TCO.kernels_st_trend_050726 import _STMeanDesignMixin
 
 
-class ReverseLColumnLagCapVecchiaFitV3(ReverseLColumnVecchiaFitV3):
+class ReverseLColumnLagCapVecchiaFitV3(ReverseLColumnVecchiaFitBatch):
     """Batched reverse-L Vecchia with separate conditioning caps by lag."""
 
     def __init__(

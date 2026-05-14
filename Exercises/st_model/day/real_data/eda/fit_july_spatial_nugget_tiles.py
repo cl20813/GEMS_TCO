@@ -3,13 +3,16 @@
 
 Workflow:
   1. manifest: scan the requested July data and write one row per observed hour.
-  2. fit:      fit one hourly global spatial model and 3x3 tile nuggets.
+  2. fit:      fit one hourly global spatial model and tile nuggets.
   3. summarize: aggregate hourly outputs and write diagnostic plots.
 
 The global model estimates sigmasq, range (isotropic), and a global nugget
 for a fixed Matern smoothness using GPU-batched Vecchia with spline Matérn
-correlation for non-half-integer smoothness values such as 0.3. Tile nuggets are then profiled with
-global sigmasq and range held fixed, using equal-width 3x3 spatial tiles.
+correlation for non-half-integer smoothness values such as 0.3. The global
+spatial scale is fitted with the phi1/phi2 reparameterization used by the
+hybrid kernels: sigmasq = phi1 / phi2 and range = 1 / phi2. Tile nuggets are
+then profiled with global sigmasq and range held fixed, using equal-width
+spatial tiles. The expanded July grid defaults to 4x8 tiles.
 """
 
 from __future__ import annotations
@@ -53,7 +56,7 @@ TWO_PI_LOG = float(np.log(2.0 * np.pi))
 # ---------------------------------------------------------------------------
 
 class EDASpaceVecchiaFit(_HybridBase):
-    """Isotropic spatial Vecchia: 3 params (sigmasq, range, nugget), intercept+lat GLS mean."""
+    """Isotropic spatial Vecchia with microergodic-style phi1/phi2 parameterization."""
 
     def __init__(self, smooth, input_map, nns_map, limit_A=10, target_chunk_size=4096):
         if float(smooth) <= 0.0:
@@ -63,6 +66,25 @@ class EDASpaceVecchiaFit(_HybridBase):
             limit_A=limit_A, target_chunk_size=target_chunk_size, mean_design="base",
         )
         self.n_features = 2  # intercept, lat
+
+    def _raw_params(self, params: torch.Tensor):
+        phi1 = torch.exp(params[0])
+        phi2 = torch.exp(params[1])
+        sigmasq = phi1 / phi2
+        range_space = 1.0 / phi2
+        nugget = torch.exp(params[2])
+        return sigmasq, range_space, range_space, nugget
+
+    def _convert_params(self, raw):
+        phi1 = float(np.exp(raw[0]))
+        phi2 = float(np.exp(raw[1]))
+        sigmasq = phi1 / phi2
+        range_space = 1.0 / phi2
+        return {
+            "sigmasq": sigmasq,
+            "range": range_space,
+            "nugget": float(np.exp(raw[2])),
+        }
 
     def _design_from_rows(self, rows: torch.Tensor) -> torch.Tensor:
         orig_shape = rows.shape[:-1]
@@ -123,7 +145,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mode", choices=["manifest", "fit", "summarize", "all"], required=True)
     parser.add_argument("--input", default=os.environ.get("DATA_PATH"))
     parser.add_argument("--input-glob", default=os.environ.get("INPUT_GLOB", "*.parquet"))
-    parser.add_argument("--output-dir", default=os.environ.get("OUTDIR", "results/july_nugget_3x3"))
+    parser.add_argument("--output-dir", default=os.environ.get("OUTDIR", "results/july_nugget_4x8_expanded"))
     parser.add_argument("--manifest", default=None)
     parser.add_argument("--month", default=os.environ.get("MONTH", "2024-07"))
     parser.add_argument("--expected-hours", type=int, default=int(os.environ.get("EXPECTED_HOURS", "248")))
@@ -140,7 +162,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--neighbors", type=int, default=int(os.environ.get("NEIGHBORS", "8")))
     parser.add_argument("--max-points", type=int, default=int(os.environ.get("MAX_POINTS", "0")))
     parser.add_argument("--min-tile-points", type=int, default=int(os.environ.get("MIN_TILE_POINTS", "80")))
-    parser.add_argument("--tiles", type=int, default=int(os.environ.get("TILES", "3")))
+    parser.add_argument("--tiles", type=int, default=int(os.environ["TILES"]) if os.environ.get("TILES") else None,
+                        help="Legacy square tile count. Use --tile-y/--tile-x for rectangular grids.")
+    parser.add_argument("--tile-y", type=int, default=int(os.environ["TILE_Y"]) if os.environ.get("TILE_Y") else None,
+                        help="Number of south-north tile rows (default: 4 for expanded grid).")
+    parser.add_argument("--tile-x", type=int, default=int(os.environ["TILE_X"]) if os.environ.get("TILE_X") else None,
+                        help="Number of west-east tile columns (default: 8 for expanded grid).")
     parser.add_argument("--n-restarts", type=int, default=int(os.environ.get("N_RESTARTS", "5")))
     parser.add_argument("--sample-seed", type=int, default=int(os.environ.get("SAMPLE_SEED", "202407")))
     parser.add_argument("--device", default=os.environ.get("DEVICE", "auto"),
@@ -153,6 +180,41 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--range-min", type=float, default=None)
     parser.add_argument("--range-max", type=float, default=None)
     return parser.parse_args()
+
+
+def normalize_tile_args(args: argparse.Namespace) -> argparse.Namespace:
+    tile_y = args.tile_y
+    tile_x = args.tile_x
+    legacy_tiles = args.tiles
+
+    if tile_y is None and tile_x is None:
+        if legacy_tiles is None:
+            tile_y, tile_x = 4, 8
+        else:
+            tile_y = tile_x = int(legacy_tiles)
+    elif tile_y is None:
+        tile_y = int(legacy_tiles) if legacy_tiles is not None else int(tile_x)
+    elif tile_x is None:
+        tile_x = int(legacy_tiles) if legacy_tiles is not None else int(tile_y)
+
+    tile_y = int(tile_y)
+    tile_x = int(tile_x)
+    if tile_y <= 0 or tile_x <= 0:
+        raise SystemExit(f"ERROR: tile dimensions must be positive, got {tile_y}x{tile_x}.")
+
+    args.tile_y = tile_y
+    args.tile_x = tile_x
+    args.tile_count = tile_y * tile_x
+    args.tile_tag = f"{tile_y}x{tile_x}"
+    return args
+
+
+def tile_shape(args: argparse.Namespace) -> tuple[int, int]:
+    return int(args.tile_y), int(args.tile_x)
+
+
+def tile_tag(args: argparse.Namespace) -> str:
+    return str(args.tile_tag)
 
 
 # ---------------------------------------------------------------------------
@@ -468,23 +530,30 @@ def fit_global(
         raise ValueError(f"smooth must be positive, got {smooth}")
 
     y_mean, y_std = float(np.nanmean(y)), float(np.nanstd(y))
-    print(f"[fit_global] n={len(y)} | y mean={y_mean:.2f} std={y_std:.2f} min={float(np.nanmin(y)):.2f} max={float(np.nanmax(y)):.2f}", flush=True)
+    print(f"[fit_global] n={len(y)} | y mean={y_mean:.4f} std={y_std:.4f} min={float(np.nanmin(y)):.4f} max={float(np.nanmax(y)):.4f}", flush=True)
     if y_std > 500:
-        print(f"[fit_global] WARNING: y_std={y_std:.1f} is unusually large — check data units/columns", flush=True)
+        print(f"[fit_global] WARNING: y_std={y_std:.4f} is unusually large — check data units/columns", flush=True)
 
     model = _build_gpu_model(y, coords, smooth, args.neighbors, device)
 
-    # Fixed init informed by pure-space EDA (sigmasq~10 DU^2, range~0.2°, nugget~1.0 DU^2)
+    # Fixed init informed by pure-space EDA. The optimizer sees
+    # log(phi1), log(phi2), log(nugget), with sigmasq=phi1/phi2 and range=1/phi2.
+    init_sigmasq = 10.0
+    init_range = 0.2
+    init_phi2 = 1.0 / init_range
+    init_phi1 = init_sigmasq * init_phi2
     params_list = [
-        torch.tensor(math.log(10.0),  requires_grad=True, dtype=torch.float64, device=device),  # sigmasq=10
-        torch.tensor(math.log(0.2),   requires_grad=True, dtype=torch.float64, device=device),  # range=0.2°
-        torch.tensor(math.log(1.0),   requires_grad=True, dtype=torch.float64, device=device),  # nugget=1.0
+        torch.tensor(math.log(init_phi1), requires_grad=True, dtype=torch.float64, device=device),
+        torch.tensor(math.log(init_phi2), requires_grad=True, dtype=torch.float64, device=device),
+        torch.tensor(math.log(1.0),       requires_grad=True, dtype=torch.float64, device=device),
     ]
     opt = model.set_optimizer(params_list, lr=1.0, max_iter=150, tolerance_grad=1e-5)
     raw, iters = model.fit_vecc_lbfgs(params_list, opt, max_steps=60, grad_tol=1e-5)
 
-    sigmasq = math.exp(raw[0])
-    range_  = math.exp(raw[1])
+    phi1 = math.exp(raw[0])
+    phi2 = math.exp(raw[1])
+    sigmasq = phi1 / phi2
+    range_  = 1.0 / phi2
     nugget  = math.exp(raw[2])
     return FitResult(
         success=True,
@@ -493,22 +562,28 @@ def fit_global(
         sigma=math.sqrt(sigmasq),
         range=range_,
         nugget=nugget,
-        message="lbfgs_gpu",
+        message="lbfgs_gpu_phi1_phi2",
         n_eval=iters,
     )
 
 
-def assign_tiles(coords: np.ndarray, tiles: int) -> tuple[np.ndarray, dict]:
+def assign_tiles(coords: np.ndarray, tile_y_count: int, tile_x_count: int) -> tuple[np.ndarray, dict]:
     x = coords[:, 1]   # x_km (lon dir) for west-east
     y = coords[:, 0]   # y_km (lat dir) for south-north
     eps_x = max((float(x.max()) - float(x.min())) * 1e-12, 1e-12)
     eps_y = max((float(y.max()) - float(y.min())) * 1e-12, 1e-12)
-    x_edges = np.linspace(float(x.min()), float(x.max()) + eps_x, tiles + 1)
-    y_edges = np.linspace(float(y.min()), float(y.max()) + eps_y, tiles + 1)
-    x_idx = np.clip(np.searchsorted(x_edges, x, side="right") - 1, 0, tiles - 1)
-    y_idx = np.clip(np.searchsorted(y_edges, y, side="right") - 1, 0, tiles - 1)
-    tile_id = y_idx * tiles + x_idx
-    meta = {"x_edges": x_edges.tolist(), "y_edges": y_edges.tolist(), "tiles": tiles}
+    x_edges = np.linspace(float(x.min()), float(x.max()) + eps_x, tile_x_count + 1)
+    y_edges = np.linspace(float(y.min()), float(y.max()) + eps_y, tile_y_count + 1)
+    x_idx = np.clip(np.searchsorted(x_edges, x, side="right") - 1, 0, tile_x_count - 1)
+    y_idx = np.clip(np.searchsorted(y_edges, y, side="right") - 1, 0, tile_y_count - 1)
+    tile_id = y_idx * tile_x_count + x_idx
+    meta = {
+        "x_edges": x_edges.tolist(),
+        "y_edges": y_edges.tolist(),
+        "tile_y": int(tile_y_count),
+        "tile_x": int(tile_x_count),
+        "tile_count": int(tile_y_count * tile_x_count),
+    }
     return tile_id.astype(int), meta
 
 
@@ -524,15 +599,16 @@ def profile_tile_nuggets(
     var_y = max(float(np.nanvar(y, ddof=1)), 1e-8)
     low  = math.log(var_y * 1e-8)
     high = math.log(var_y * 1e3)
-    log_sigmasq = math.log(global_fit.sigmasq)
-    log_range   = math.log(global_fit.range)
+    log_phi2 = -math.log(global_fit.range)
+    log_phi1 = math.log(global_fit.sigmasq) + log_phi2
     smooth = float(args.smooth)
+    tile_y_count, tile_x_count = tile_shape(args)
 
-    for tid in range(args.tiles * args.tiles):
+    for tid in range(tile_y_count * tile_x_count):
         mask = tile_id == tid
         n_tile = int(mask.sum())
-        y_idx = tid // args.tiles
-        x_idx = tid % args.tiles
+        y_idx = tid // tile_x_count
+        x_idx = tid % tile_x_count
         if n_tile < args.min_tile_points:
             rows.append({
                 "tile_id": tid, "tile_x": x_idx, "tile_y": y_idx, "n": n_tile,
@@ -548,7 +624,7 @@ def profile_tile_nuggets(
 
         def objective(log_nugget: float) -> float:
             params = torch.tensor(
-                [log_sigmasq, log_range, log_nugget],
+                [log_phi1, log_phi2, log_nugget],
                 dtype=torch.float64, device=device,
             )
             with torch.no_grad():
@@ -666,7 +742,7 @@ def fit_hour_record(
 
     coords, values, _, _ = prepare_hour_data(df_hour, args)
     global_fit = fit_global(values, coords, args, device)
-    tile_id, _ = assign_tiles(coords, args.tiles)
+    tile_id, _ = assign_tiles(coords, *tile_shape(args))
     tile_df = profile_tile_nuggets(values, coords, tile_id, global_fit, args, device)
 
     global_row = {
@@ -706,6 +782,21 @@ def round_numeric(df: pd.DataFrame, digits: int = 4) -> pd.DataFrame:
     return out
 
 
+
+
+def round_json_numbers(obj, digits: int = 4):
+    if isinstance(obj, dict):
+        return {k: round_json_numbers(v, digits) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [round_json_numbers(v, digits) for v in obj]
+    if isinstance(obj, tuple):
+        return [round_json_numbers(v, digits) for v in obj]
+    if isinstance(obj, (float, np.floating)):
+        if np.isfinite(obj):
+            return round(float(obj), digits)
+        return None
+    return obj
+
 def csv_line_from_row(row: dict, columns: list[str]) -> str:
     vals = []
     for col in columns:
@@ -717,24 +808,55 @@ def csv_line_from_row(row: dict, columns: list[str]) -> str:
     return ",".join(vals)
 
 
-def tile_mean_summary(tile_df: pd.DataFrame, tiles: int) -> tuple[pd.DataFrame, np.ndarray]:
-    summary = (
-        tile_df.groupby(["tile_y", "tile_x", "tile_id"], as_index=False)
-        .agg(
-            n_hours=("tile_nugget", "count"),
-            tile_nugget_mean=("tile_nugget", "mean"),
-            tile_nugget_sd=("tile_nugget", "std"),
-            tile_nugget_median=("tile_nugget", "median"),
+def tile_mean_summary(tile_df: pd.DataFrame, tile_y_count: int, tile_x_count: int) -> tuple[pd.DataFrame, np.ndarray]:
+    keys = ["tile_y", "tile_x", "tile_id"]
+    d = tile_df.dropna(subset=["tile_nugget"]).copy()
+    if d.empty:
+        summary = pd.DataFrame(columns=keys + [
+            "n_days", "n_hours", "tile_nugget_mean", "tile_nugget_sd", "tile_nugget_median",
+        ])
+    elif "day_index" in d.columns:
+        day_key = "day_index"
+        daily = (
+            d.groupby(keys + [day_key], as_index=False)
+            .agg(
+                daily_tile_nugget=("tile_nugget", "mean"),
+                daily_n_hours=("tile_nugget", "count"),
+            )
         )
-        .sort_values(["tile_y", "tile_x"])
-    )
-    mat = np.full((tiles, tiles), np.nan)
+        summary = (
+            daily.groupby(keys, as_index=False)
+            .agg(
+                n_days=("daily_tile_nugget", "count"),
+                n_hours=("daily_n_hours", "sum"),
+                tile_nugget_mean=("daily_tile_nugget", "mean"),
+                tile_nugget_sd=("daily_tile_nugget", "std"),
+                tile_nugget_median=("daily_tile_nugget", "median"),
+            )
+            .sort_values(["tile_y", "tile_x"])
+        )
+    else:
+        summary = (
+            d.groupby(keys, as_index=False)
+            .agg(
+                n_days=("tile_nugget", "count"),
+                n_hours=("tile_nugget", "count"),
+                tile_nugget_mean=("tile_nugget", "mean"),
+                tile_nugget_sd=("tile_nugget", "std"),
+                tile_nugget_median=("tile_nugget", "median"),
+            )
+            .sort_values(["tile_y", "tile_x"])
+        )
+
+    mat = np.full((tile_y_count, tile_x_count), np.nan)
     for _, row in summary.iterrows():
         mat[int(row["tile_y"]), int(row["tile_x"])] = row["tile_nugget_mean"]
     return summary, mat
 
 
 def global_nugget_by_hour_slot(global_df: pd.DataFrame) -> pd.DataFrame:
+    if "day" not in global_df.columns:
+        global_df = add_global_time_features(global_df)
     return (
         global_df.groupby(["hour_slot", "hour_utc"], as_index=False)
         .agg(
@@ -751,6 +873,8 @@ def global_nugget_by_hour_slot(global_df: pd.DataFrame) -> pd.DataFrame:
 
 def global_params_by_hour_slot(global_df: pd.DataFrame) -> pd.DataFrame:
     global_df = ensure_sigma_column(global_df)
+    if "day" not in global_df.columns:
+        global_df = add_global_time_features(global_df)
     agg = {
         "n_days": ("day", "nunique"),
         "n_hours": ("day", "count"),
@@ -808,11 +932,12 @@ def running_summary_text(
     args: argparse.Namespace,
     label: str,
 ) -> str:
-    _, tile_mat = tile_mean_summary(tile_df, int(args.tiles))
+    tile_y_count, tile_x_count = tile_shape(args)
+    _, tile_mat = tile_mean_summary(tile_df, tile_y_count, tile_x_count)
     hour_slot_params = global_params_by_hour_slot(global_df)
     return "\n\n".join([
         label,
-        "running avg over fitted hours: 3x3 tile nuggets (rows=south->north, cols=west->east)",
+        f"running day-normalized avg: {tile_tag(args)} tile nuggets (rows=south->north, cols=west->east)",
         matrix_to_text(tile_mat),
         "running hourly avg parameters over different days",
         table_to_text(hour_slot_params),
@@ -833,14 +958,17 @@ def write_compact_outputs(global_df: pd.DataFrame, tile_df: pd.DataFrame, args: 
     global_path = output_dir / f"{month_label}_spatial_fit_{len(global_out)}.csv"
     global_out.to_csv(global_path, index=False, float_format="%.4f")
 
-    tile_summary, tile_mat = tile_mean_summary(tile_df, int(args.tiles))
-    tile_median_mat = heatmap_matrix(tile_summary, "tile_nugget_median", int(args.tiles))
+    tile_y_count, tile_x_count = tile_shape(args)
+    tag = tile_tag(args)
+    tile_summary, tile_mat = tile_mean_summary(tile_df, tile_y_count, tile_x_count)
+    tile_median_mat = heatmap_matrix(tile_summary, "tile_nugget_median", tile_y_count, tile_x_count)
     tile_summary = round_numeric(tile_summary, 4)
-    tile_summary_path = output_dir / "tile_nugget_mean_3x3.csv"
+    tile_summary_path = output_dir / f"tile_nugget_mean_{tag}.csv"
     tile_summary.to_csv(tile_summary_path, index=False, float_format="%.4f")
 
     hour_slot_nugget = round_numeric(global_nugget_by_hour_slot(global_df), 4)
     hour_slot_params = round_numeric(global_params_by_hour_slot(global_df), 4)
+    hour_slot_nugget.to_csv(output_dir / "global_nugget_by_hour_slot.csv", index=False, float_format="%.4f")
     hour_slot_path = output_dir / "global_params_by_hour_slot.csv"
     hour_slot_params.to_csv(hour_slot_path, index=False, float_format="%.4f")
     global_with_time, global_by_day, global_by_hour_slot = summarize_global_by_time(global_df)
@@ -849,12 +977,12 @@ def write_compact_outputs(global_df: pd.DataFrame, tile_df: pd.DataFrame, args: 
     )
 
     save_heatmap(
-        tile_mat, f"{args.month} mean tile nugget, 3x3", "mean tile nugget",
-        output_dir / "tile_nugget_mean_heatmap_3x3.png",
+        tile_mat, f"{args.month} mean tile nugget, {tag}", "mean tile nugget",
+        output_dir / f"tile_nugget_mean_heatmap_{tag}.png",
     )
     save_heatmap(
-        tile_median_mat, f"{args.month} median tile nugget, 3x3", "median tile nugget",
-        output_dir / "tile_nugget_median_heatmap_3x3.png",
+        tile_median_mat, f"{args.month} median tile nugget, {tag}", "median tile nugget",
+        output_dir / f"tile_nugget_median_heatmap_{tag}.png",
     )
     save_global_nugget_hour_slot_plot(hour_slot_nugget, output_dir / "global_nugget_by_hour_slot.png")
     save_global_timeseries(global_df, output_dir / "global_params_timeseries.png")
@@ -899,7 +1027,7 @@ def fit_one_hour(args: argparse.Namespace) -> None:
 
     coords, values, _, coord_meta = prepare_hour_data(df_hour, args)
     global_fit = fit_global(values, coords, args, device)
-    tile_id, tile_meta = assign_tiles(coords, args.tiles)
+    tile_id, tile_meta = assign_tiles(coords, *tile_shape(args))
     tile_df = profile_tile_nuggets(values, coords, tile_id, global_fit, args, device)
 
     global_row = {
@@ -928,8 +1056,8 @@ def fit_one_hour(args: argparse.Namespace) -> None:
     tile_df["global_nugget"]  = global_fit.nugget
     tile_df["tile_to_global_nugget"] = tile_df["tile_nugget"] / global_fit.nugget
 
-    global_df.to_csv(global_path, index=False)
-    tile_df.to_csv(tile_path, index=False)
+    round_numeric(global_df, 4).to_csv(global_path, index=False, float_format="%.4f")
+    round_numeric(tile_df, 4).to_csv(tile_path, index=False, float_format="%.4f")
     meta = {
         "args": vars(args),
         "coord_meta": coord_meta,
@@ -937,7 +1065,7 @@ def fit_one_hour(args: argparse.Namespace) -> None:
         "hour": hour.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "device": str(device),
     }
-    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    meta_path.write_text(json.dumps(round_json_numbers(meta, 4), indent=2), encoding="utf-8")
     print(f"Wrote {global_path}")
     print(f"Wrote {tile_path}")
 
@@ -953,8 +1081,8 @@ def read_hourly_outputs(output_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     return global_df, tile_df
 
 
-def heatmap_matrix(summary: pd.DataFrame, value_col: str, tiles: int) -> np.ndarray:
-    mat = np.full((tiles, tiles), np.nan)
+def heatmap_matrix(summary: pd.DataFrame, value_col: str, tile_y_count: int, tile_x_count: int) -> np.ndarray:
+    mat = np.full((tile_y_count, tile_x_count), np.nan)
     for _, row in summary.iterrows():
         mat[int(row["tile_y"]), int(row["tile_x"])] = row[value_col]
     return mat
@@ -972,7 +1100,11 @@ def save_heatmap(mat: np.ndarray, title: str, cbar_label: str, path: Path) -> No
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(figsize=(6.5, 5.4))
+    n_rows, n_cols = mat.shape
+    fig_w = max(6.5, 1.0 * n_cols + 2.0)
+    fig_h = max(5.4, 0.75 * n_rows + 2.0)
+    text_size = 9 if n_rows * n_cols <= 16 else 7
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     im = ax.imshow(mat, origin="lower", cmap="viridis")
     ax.set_title(title)
     ax.set_xlabel("tile x: west to east")
@@ -983,7 +1115,7 @@ def save_heatmap(mat: np.ndarray, title: str, cbar_label: str, path: Path) -> No
         for x in range(mat.shape[1]):
             val = mat[y, x]
             label = "NA" if not np.isfinite(val) else f"{val:.4f}"
-            ax.text(x, y, label, ha="center", va="center", color="white", fontsize=9)
+            ax.text(x, y, label, ha="center", va="center", color="white", fontsize=text_size)
     cbar = fig.colorbar(im, ax=ax, shrink=0.86)
     cbar.set_label(cbar_label)
     fig.tight_layout()
@@ -1109,7 +1241,7 @@ def save_hour_slot_param_plot(by_hour_slot: pd.DataFrame, path: Path) -> None:
     axes[-1].set_xticks(x)
     axes[-1].set_xticklabels(labels)
     axes[-1].set_xlabel("hour slot within day / UTC hour")
-    fig.suptitle("Mean global spatial parameters by hour slot, averaged over 31 days")
+    fig.suptitle("Mean global spatial parameters by hour slot, averaged over observed days")
     fig.tight_layout()
     fig.savefig(path, dpi=180)
     plt.close(fig)
@@ -1170,27 +1302,50 @@ def save_tile_boxplot(tile_df: pd.DataFrame, path: Path) -> None:
     plt.close(fig)
 
 
-def summarize(args: argparse.Namespace) -> None:
-    output_dir = Path(args.output_dir)
-    summary_dir = output_dir / "summary"
-    summary_dir.mkdir(parents=True, exist_ok=True)
-    global_df, tile_df = read_hourly_outputs(output_dir)
+def make_summary_tile_table(tile_df: pd.DataFrame) -> pd.DataFrame:
+    keys = ["tile_y", "tile_x", "tile_id"]
+    d = tile_df.dropna(subset=["tile_nugget"]).copy()
+    if d.empty:
+        return pd.DataFrame(columns=keys + [
+            "n_days", "n_hours", "mean_tile_nugget", "median_tile_nugget",
+            "sd_tile_nugget", "mean_ratio_to_global", "median_ratio_to_global",
+            "mean_tile_n",
+        ])
 
-    global_all = summary_dir / "global_results_all.csv"
-    tile_all   = summary_dir / "tile_results_all.csv"
-    global_df.to_csv(global_all, index=False)
-    tile_df.to_csv(tile_all, index=False)
+    if "tile_to_global_nugget" not in d.columns and "global_nugget" in d.columns:
+        d["tile_to_global_nugget"] = d["tile_nugget"] / d["global_nugget"]
+    if "tile_to_global_nugget" not in d.columns:
+        d["tile_to_global_nugget"] = np.nan
 
-    global_with_time, global_by_day, global_by_hour_slot = summarize_global_by_time(global_df)
-    global_with_time.to_csv(summary_dir / "global_results_all_with_time_features.csv", index=False)
-    global_by_day_path       = summary_dir / "global_params_by_day.csv"
-    global_by_hour_slot_path = summary_dir / "global_params_by_hour_slot.csv"
-    global_by_day.to_csv(global_by_day_path, index=False)
-    global_by_hour_slot.to_csv(global_by_hour_slot_path, index=False)
+    if "day_index" in d.columns:
+        daily = (
+            d.groupby(keys + ["day_index"], as_index=False)
+            .agg(
+                daily_tile_nugget=("tile_nugget", "mean"),
+                daily_ratio_to_global=("tile_to_global_nugget", "mean"),
+                daily_tile_n=("n", "mean"),
+                daily_n_hours=("tile_nugget", "count"),
+            )
+        )
+        return (
+            daily.groupby(keys, as_index=False)
+            .agg(
+                n_days=("daily_tile_nugget", "count"),
+                n_hours=("daily_n_hours", "sum"),
+                mean_tile_nugget=("daily_tile_nugget", "mean"),
+                median_tile_nugget=("daily_tile_nugget", "median"),
+                sd_tile_nugget=("daily_tile_nugget", "std"),
+                mean_ratio_to_global=("daily_ratio_to_global", "mean"),
+                median_ratio_to_global=("daily_ratio_to_global", "median"),
+                mean_tile_n=("daily_tile_n", "mean"),
+            )
+            .sort_values(["tile_y", "tile_x"])
+        )
 
-    tile_summary = (
-        tile_df.groupby(["tile_y", "tile_x", "tile_id"], as_index=False)
+    return (
+        d.groupby(keys, as_index=False)
         .agg(
+            n_days=("tile_nugget", "count"),
             n_hours=("tile_nugget", "count"),
             mean_tile_nugget=("tile_nugget", "mean"),
             median_tile_nugget=("tile_nugget", "median"),
@@ -1201,33 +1356,60 @@ def summarize(args: argparse.Namespace) -> None:
         )
         .sort_values(["tile_y", "tile_x"])
     )
-    tile_summary_path = summary_dir / "tile_nugget_summary_3x3.csv"
-    tile_summary.to_csv(tile_summary_path, index=False)
 
-    tiles = int(args.tiles)
+
+def summarize(args: argparse.Namespace) -> None:
+    output_dir = Path(args.output_dir)
+    summary_dir = output_dir / "summary"
+    summary_dir.mkdir(parents=True, exist_ok=True)
+    global_df, tile_df = read_hourly_outputs(output_dir)
+
+    global_all = summary_dir / "global_results_all.csv"
+    tile_all   = summary_dir / "tile_results_all.csv"
+    round_numeric(global_df, 4).to_csv(global_all, index=False, float_format="%.4f")
+    round_numeric(tile_df, 4).to_csv(tile_all, index=False, float_format="%.4f")
+
+    global_with_time, global_by_day, global_by_hour_slot = summarize_global_by_time(global_df)
+    round_numeric(global_with_time, 4).to_csv(summary_dir / "global_results_all_with_time_features.csv", index=False, float_format="%.4f")
+    global_nugget_by_hour_slot_path = summary_dir / "global_nugget_by_hour_slot.csv"
+    global_by_day_path       = summary_dir / "global_params_by_day.csv"
+    global_by_hour_slot_path = summary_dir / "global_params_by_hour_slot.csv"
+    round_numeric(global_nugget_by_hour_slot(global_df), 4).to_csv(
+        global_nugget_by_hour_slot_path, index=False, float_format="%.4f"
+    )
+    round_numeric(global_by_day, 4).to_csv(global_by_day_path, index=False, float_format="%.4f")
+    round_numeric(global_by_hour_slot, 4).to_csv(global_by_hour_slot_path, index=False, float_format="%.4f")
+
+    tile_summary = make_summary_tile_table(tile_df)
+    tag = tile_tag(args)
+    tile_y_count, tile_x_count = tile_shape(args)
+    tile_summary_path = summary_dir / f"tile_nugget_summary_{tag}.csv"
+    round_numeric(tile_summary, 4).to_csv(tile_summary_path, index=False, float_format="%.4f")
+
     save_heatmap(
-        heatmap_matrix(tile_summary, "mean_tile_nugget", tiles),
-        "Mean tile nugget, 3x3", "mean tile nugget",
-        summary_dir / "tile_nugget_mean_heatmap_3x3.png",
+        heatmap_matrix(tile_summary, "mean_tile_nugget", tile_y_count, tile_x_count),
+        f"Mean tile nugget, {tag}", "mean tile nugget",
+        summary_dir / f"tile_nugget_mean_heatmap_{tag}.png",
     )
     save_heatmap(
-        heatmap_matrix(tile_summary, "median_tile_nugget", tiles),
-        "Median tile nugget, 3x3", "median tile nugget",
-        summary_dir / "tile_nugget_median_heatmap_3x3.png",
+        heatmap_matrix(tile_summary, "median_tile_nugget", tile_y_count, tile_x_count),
+        f"Median tile nugget, {tag}", "median tile nugget",
+        summary_dir / f"tile_nugget_median_heatmap_{tag}.png",
     )
     save_heatmap(
-        heatmap_matrix(tile_summary, "mean_ratio_to_global", tiles),
-        "Mean tile/global nugget ratio, 3x3", "mean tile/global nugget",
-        summary_dir / "tile_to_global_nugget_ratio_mean_heatmap_3x3.png",
+        heatmap_matrix(tile_summary, "mean_ratio_to_global", tile_y_count, tile_x_count),
+        f"Mean tile/global nugget ratio, {tag}", "mean tile/global nugget",
+        summary_dir / f"tile_to_global_nugget_ratio_mean_heatmap_{tag}.png",
     )
     save_global_timeseries(global_df, summary_dir / "global_params_timeseries.png")
     save_daily_param_plot(global_by_day, summary_dir / "global_params_daily_mean.png")
     save_hour_slot_param_plot(global_by_hour_slot, summary_dir / "global_params_hour_slot_mean.png")
     save_day_hour_heatmaps(global_with_time, summary_dir)
-    save_tile_boxplot(tile_df, summary_dir / "tile_nugget_boxplot_3x3.png")
+    save_tile_boxplot(tile_df, summary_dir / f"tile_nugget_boxplot_{tag}.png")
 
     print(f"Wrote {global_all}")
     print(f"Wrote {tile_all}")
+    print(f"Wrote {global_nugget_by_hour_slot_path}")
     print(f"Wrote {global_by_day_path}")
     print(f"Wrote {global_by_hour_slot_path}")
     print(f"Wrote {tile_summary_path}")
@@ -1274,7 +1456,7 @@ def run_all(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    args = parse_args()
+    args = normalize_tile_args(parse_args())
     smooth = float(args.smooth)
     if smooth <= 0.0:
         raise SystemExit(f"ERROR: --smooth must be positive, got {smooth}.")

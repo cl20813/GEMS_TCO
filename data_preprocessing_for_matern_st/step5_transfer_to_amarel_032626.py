@@ -15,10 +15,20 @@ Transfers TWO sets of files by default:
       GEMS_DATA/pickle_{year}/tco_grid_{yy}_{mm}.pkl     (~200 MB each)
       → Amarel: /home/jl2815/tco/data/pickle_{year}/
 
+  [C] Extra monthly grid pkl with expanded bounds
+      GEMS_DATA/pickle_{year}/tco_grid_lat-3to7_lon111to131_{yy}_{mm}.pkl
+      → Amarel: /home/jl2815/tco/data/pickle_{year}/
+
 Usage
 -----
+
+cd /Users/joonwonlee/Documents/GEMS_TCO-1/data_preprocessing_for_matern_st
+
+
 # Dry-run (print commands only):
 python step5_transfer_to_amarel_032626.py --dry-run
+
+
 
 # Transfer everything (both A and B), all years, Apr-Sep:
 python step5_transfer_to_amarel_032626.py
@@ -32,6 +42,13 @@ python step5_transfer_to_amarel_032626.py --skip-monthly
 # Monthly pkl only (skip merged):
 python step5_transfer_to_amarel_032626.py --skip-merged
 
+# New expanded-bounds July pkl only:
+python step5_transfer_to_amarel_032626.py --only-extra-bounds
+
+cd /Users/joonwonlee/Documents/GEMS_TCO-1/data_preprocessing_for_matern_st
+python step5_transfer_to_amarel_032626.py --years 2022 2023 2024 2025 --months 7 --only-extra-bounds
+
+
 Prerequisites
 -------------
   - SSH key auth to Amarel: ssh-copy-id jl2815@amarel.rutgers.edu
@@ -39,13 +56,15 @@ Prerequisites
   - step3/step4 must have run so pkl files exist locally
 """
 
-import sys
 import subprocess
 import argparse
+import importlib.util
 from pathlib import Path
 
-sys.path.append("/Users/joonwonlee/Documents/GEMS_TCO-1/src")
-from GEMS_TCO import configuration as config
+GEMS_TCO_SRC = Path("/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO")
+spec = importlib.util.spec_from_file_location("gems_tco_configuration", GEMS_TCO_SRC / "configuration.py")
+config = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(config)
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 MAC_DATA    = Path(config.mac_data_load_path)           # /Users/.../GEMS_DATA/
@@ -54,9 +73,33 @@ AMAREL_DATA = config.amarel_data_load_path.rstrip("/")  # /home/jl2815/tco/data
 
 DEFAULT_YEARS  = [2022, 2023, 2024, 2025]
 DEFAULT_MONTHS = [4, 5, 6, 7, 8, 9]
+DEFAULT_LAT_LON_BOUNDS = (-3, 2, 121, 131)
+EXTRA_LAT_LON_BOUNDS = (-3, 7, 111, 131)
+EXTRA_BOUNDS_MONTHS = [7]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _format_bound_token(value):
+    value = float(value)
+    if value.is_integer():
+        return str(int(value))
+    return str(value).replace(".", "p")
+
+
+def tco_grid_filename(year: int, month: int, lat_lon_bounds=DEFAULT_LAT_LON_BOUNDS) -> str:
+    yy = str(year)[2:]
+    mm = f"{month:02d}"
+
+    if tuple(lat_lon_bounds) == DEFAULT_LAT_LON_BOUNDS:
+        return f"tco_grid_{yy}_{mm}.pkl"
+
+    lat_start, lat_end, lon_start, lon_end = lat_lon_bounds
+    bounds_tag = (
+        f"lat{_format_bound_token(lat_start)}to{_format_bound_token(lat_end)}_"
+        f"lon{_format_bound_token(lon_start)}to{_format_bound_token(lon_end)}"
+    )
+    return f"tco_grid_{bounds_tag}_{yy}_{mm}.pkl"
 
 def _size_str(path: Path) -> str:
     if not path.exists():
@@ -86,13 +129,20 @@ def _rsync(src: Path, remote_dir: str, dry_run: bool) -> bool:
 
 def _transfer_list(files: list, remote_dir: str, dry_run: bool) -> tuple:
     """Transfer a list of (Path, label) tuples to remote_dir. Returns (ok, fail)."""
+    existing = [(path, label) for path, label in files if path.exists()]
+    missing = [(path, label) for path, label in files if not path.exists()]
+
+    if not existing:
+        for _, label in missing:
+            print(f"    [SKIP]  {label}  — not found locally")
+        return 0, len(missing)
+
     _ensure_remote_dir(remote_dir, dry_run)
     ok = fail = 0
-    for path, label in files:
-        if not path.exists():
-            print(f"    [SKIP]  {label}  — not found locally")
-            fail += 1
-            continue
+    for _, label in missing:
+        print(f"    [SKIP]  {label}  — not found locally")
+        fail += 1
+    for path, label in existing:
         print(f"    → {label}  ({_size_str(path)})")
         if _rsync(path, remote_dir, dry_run):
             ok += 1
@@ -122,20 +172,30 @@ def transfer_merged(years: list, dry_run: bool) -> tuple:
 
 # ── Section B: individual monthly pkl ─────────────────────────────────────────
 
-def transfer_monthly(years: list, months: list, dry_run: bool) -> tuple:
+def transfer_monthly(years: list, months: list, dry_run: bool, only_extra_bounds: bool = False) -> tuple:
     ok = fail = 0
     for year in years:
         remote_dir = f"{AMAREL_DATA}/pickle_{year}"
         local_dir  = MAC_DATA / f"pickle_{year}"
-        yy = str(year)[2:]
 
-        files = [
-            (local_dir / f"tco_grid_{yy}_{m:02d}.pkl",
-             f"pickle_{year}/tco_grid_{yy}_{m:02d}.pkl")
+        files = []
+        if not only_extra_bounds:
+            files = [
+                (local_dir / tco_grid_filename(year, m),
+                 f"pickle_{year}/{tco_grid_filename(year, m)}")
+                for m in months
+            ]
+
+        extra_files = [
+            (local_dir / tco_grid_filename(year, m, EXTRA_LAT_LON_BOUNDS),
+             f"pickle_{year}/{tco_grid_filename(year, m, EXTRA_LAT_LON_BOUNDS)}")
             for m in months
+            if m in EXTRA_BOUNDS_MONTHS
         ]
+        files += extra_files
 
-        print(f"\n  [B] {year} monthly pkl  →  {AMAREL_HOST}:{remote_dir}/")
+        label = "expanded-bounds monthly pkl" if only_extra_bounds else "monthly pkl"
+        print(f"\n  [B] {year} {label}  →  {AMAREL_HOST}:{remote_dir}/")
         a, b = _transfer_list(files, remote_dir, dry_run)
         ok += a; fail += b
 
@@ -144,13 +204,18 @@ def transfer_monthly(years: list, months: list, dry_run: bool) -> tuple:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-def main(years, months, dry_run, skip_merged, skip_monthly):
+def main(years, months, dry_run, skip_merged, skip_monthly, only_extra_bounds):
+    if only_extra_bounds:
+        skip_merged = True
+        skip_monthly = False
+
     print(f"\n{'='*62}")
     print(f"  step5: Transfer TCO data → Amarel")
     print(f"  years        : {years}")
     print(f"  months       : {months}  (Apr–Sep)")
     print(f"  transfer [A] merged pkl : {not skip_merged}")
     print(f"  transfer [B] monthly pkl: {not skip_monthly}")
+    print(f"  only extra bounds       : {only_extra_bounds}")
     print(f"  dry-run      : {dry_run}")
     print(f"{'='*62}")
 
@@ -161,7 +226,7 @@ def main(years, months, dry_run, skip_merged, skip_monthly):
         total_ok += ok; total_fail += fail
 
     if not skip_monthly:
-        ok, fail = transfer_monthly(years, months, dry_run)
+        ok, fail = transfer_monthly(years, months, dry_run, only_extra_bounds=only_extra_bounds)
         total_ok += ok; total_fail += fail
 
     print(f"\n{'='*62}")
@@ -191,5 +256,8 @@ if __name__ == "__main__":
                         help="Skip section A (merged Apr-Sep pkl)")
     parser.add_argument("--skip-monthly", action="store_true",
                         help="Skip section B (individual monthly pkl)")
+    parser.add_argument("--only-extra-bounds", action="store_true",
+                        help="Transfer only the expanded-bounds monthly pkl files")
     args = parser.parse_args()
-    main(args.years, args.months, args.dry_run, args.skip_merged, args.skip_monthly)
+    main(args.years, args.months, args.dry_run, args.skip_merged, args.skip_monthly,
+         args.only_extra_bounds)

@@ -1,0 +1,2 @@
+day_idx,date,loss,fit_iter,n_intersection,intersection_fraction,n_heads,n_tails,n_templates,head_right_cols,above_count,right_col_count,per_lag_m,lag_count,sigmasq,range_lon,range_lat,range_time,advec_lat,advec_lon,nugget
+18,2024-07-19,1.495199,13,17260,0.952223,2616,135464,48,3,4,3,50,2,11.792328,0.3386,0.036604,1.289639,0.000933,-0.137191,2.716957

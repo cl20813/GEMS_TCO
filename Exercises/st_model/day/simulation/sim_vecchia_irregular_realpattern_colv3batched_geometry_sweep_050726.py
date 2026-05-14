@@ -45,7 +45,7 @@ sys.path.insert(0, SRC)
 from GEMS_TCO import configuration as config
 from GEMS_TCO import orderings as _orderings
 from GEMS_TCO.data_loader import load_data_dynamic_processed
-from GEMS_TCO.kernel_vecchia_col_ver3 import ReverseLColumnVecchiaFitV3
+from GEMS_TCO.kernel_vecchia_col_batch import ReverseLColumnVecchiaFitBatch
 from GEMS_TCO.kernels_vecchia_hybrid import HybridVecchiaFit
 
 
@@ -450,7 +450,7 @@ def fit_column(source_map_ord, ordered_grid_coords_np, initial_vals, args, spec:
         f"ColumnV3Batched_Up{above_count}_Right{right_col_count}_"
         f"Down{per_lag_count}_Lag{lag_count}_head{head_right_cols}_realloc"
     )
-    model = ReverseLColumnVecchiaFitV3(
+    model = ReverseLColumnVecchiaFitBatch(
         smooth=SMOOTH,
         input_map=source_map_ord,
         mm_cond_number=args.mm_cond_number,

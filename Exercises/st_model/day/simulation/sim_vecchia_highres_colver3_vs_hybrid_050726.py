@@ -32,7 +32,7 @@ sys.path.insert(0, SRC)
 
 from GEMS_TCO import orderings as _orderings
 from GEMS_TCO.kernels_vecchia_hybrid import HybridVecchiaFit
-from GEMS_TCO.kernel_vecchia_col_ver3 import ReverseLColumnVecchiaFitV3
+from GEMS_TCO.kernel_vecchia_col_batch import ReverseLColumnVecchiaFitBatch
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -287,7 +287,7 @@ def finish_row(model_name, kernel, out, n_iter, pre_s, fit_s, metrics, extra):
 
 def fit_column_v3(reg_map_ord, ordered_grid_coords_np, initial_vals, truth, args):
     params = [torch.tensor([v], device=DEVICE, dtype=DTYPE, requires_grad=True) for v in initial_vals]
-    model = ReverseLColumnVecchiaFitV3(
+    model = ReverseLColumnVecchiaFitBatch(
         smooth=SMOOTH,
         input_map=reg_map_ord,
         mm_cond_number=args.mm_cond_number,

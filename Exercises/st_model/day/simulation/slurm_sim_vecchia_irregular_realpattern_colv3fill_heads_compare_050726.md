@@ -18,7 +18,8 @@ Column details:
 ## Local Files
 
 ```bash
-/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/kernel_vecchia_col_ver3_fill.py
+/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/kernel_vecchia_col_batch.py
+/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/kernel_vecchia_col_batch_fill.py  # DEPRECATED/REMOVED
 /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_vecchia_irregular_realpattern_colv3fill_heads_compare_050726.py
 /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_vecchia_irregular_realpattern_colv3fill_heads_compare_050726.sh
 ```
@@ -28,7 +29,8 @@ Column details:
 Run from the local Mac terminal, not inside Amarel:
 
 ```bash
-scp /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/kernel_vecchia_col_ver3_fill.py jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO/
+scp /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/kernel_vecchia_col_batch.py jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO/
+# DEPRECATED/REMOVED: scp /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/kernel_vecchia_col_batch_fill.py  # DEPRECATED/REMOVED jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO/
 scp /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_vecchia_irregular_realpattern_colv3fill_heads_compare_050726.py jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/
 scp /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_vecchia_irregular_realpattern_colv3fill_heads_compare_050726.sh jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/
 ```

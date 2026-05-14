@@ -25,7 +25,7 @@ Column details:
 ## Local Files
 
 ```bash
-/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/kernel_vecchia_col_ver3.py
+/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/kernel_vecchia_col_batch.py
 /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_vecchia_irregular_realpattern_colv3batched_geometry_sweep_050726.py
 /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_vecchia_irregular_realpattern_colv3batched_geometry_sweep_050726.sh
 ```
@@ -35,7 +35,7 @@ Column details:
 Run from the local Mac terminal, not inside Amarel:
 
 ```bash
-scp /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/kernel_vecchia_col_ver3.py jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO/
+scp /Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO/kernel_vecchia_col_batch.py jl2815@amarel.rutgers.edu:/home/jl2815/tco/GEMS_TCO/
 
 scp /Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/simulation/sim_vecchia_irregular_realpattern_colv3batched_geometry_sweep_050726.py jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/
 

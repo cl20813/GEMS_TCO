@@ -31,9 +31,10 @@ SRC = AMAREL_SRC if os.path.exists(AMAREL_SRC) else LOCAL_SRC
 sys.path.insert(0, SRC)
 
 from GEMS_TCO import orderings as _orderings
-from GEMS_TCO.kernels_vecchia_column import ReverseLColumnVecchiaFit
+from GEMS_TCO.kernels_vecchia_grid_col_template_reuse import ReverseLColumnVecchiaFit
 from GEMS_TCO.kernels_vecchia_hybrid import HybridVecchiaFit
-from GEMS_TCO.kernel_vecchia_col_ver2 import ReverseLColumnVecchiaFitV2
+# DEPRECATED: kernel_vecchia_col_ver2.py was removed; use kernel_vecchia_col_batch.py for current column tests.
+# from GEMS_TCO.kernel_vecchia_col_ver2 import ReverseLColumnVecchiaFitV2
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
