@@ -16,6 +16,7 @@ the two partial-profile rows:
 
 ```text
 /home/jl2815/tco/exercise_output/eda/simulation/spectral_2024_july/
+  spectral_plot_line_meanings.txt
   nu0p3/
     sim_spectral_20240701_nu0p3.png
     ...
@@ -26,7 +27,36 @@ the two partial-profile rows:
 
 The fit uses per-hour pure-space isotropic Hybrid Vecchia with neighbor 8 and
 GLS mean `base`, which is effectively intercept + centered latitude for these
-one-hour tensors.
+one-hour tensors. The optimizer uses the same microergodic-style
+reparameterization as the expanded-grid nugget runs:
+
+```text
+phi2 = 1 / range
+phi1 = sigmasq * phi2
+sigmasq = phi1 / phi2
+range = 1 / phi2
+```
+
+For `smooth=0.3`, the Matérn correlation uses spline evaluation. For
+`smooth=0.5`, it uses the closed-form exponential correlation.
+
+### How to read the red and black lines
+
+Each PNG panel is one day, one smooth value, one fitting variant, and one grid
+thinning stride.
+
+| line | meaning |
+|---|---|
+| thin gray lines | one radial residual periodogram per observed hour in that day |
+| thick black line | daily mean of those hourly empirical residual spectra |
+| dashed red line | fitted Matérn theoretical spectrum for the full-fit row, averaged across hours and vertically rescaled to the empirical spectrum |
+| dashed blue/green lines | optional partial-profile theory curves: blue for sigma-only, green for range-only |
+| dotted gray vertical line | approximate maximum radial frequency supported by the thinned data grid |
+
+Important: the dashed theory line is **vertically median-rescaled** to the
+empirical black spectrum before plotting. So the plot is mainly checking
+whether the fitted Matérn model has the right frequency-shape/slope, not whether
+the absolute spectral level matches exactly.
 
 ---
 

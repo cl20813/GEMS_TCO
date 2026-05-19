@@ -117,6 +117,8 @@ for SMOOTH in "${SMOOTHS[@]}"; do
             --min-tile-points 80 \
             --tile-y 4 \
             --tile-x 8 \
+            --nadir-lat 0 \
+            --nadir-lon 128 \
             --n-restarts 5 \
             --device cuda \
             --summary-every 8
@@ -150,12 +152,14 @@ Key files in each folder:
 | `tile_nugget_mean_4x8.csv` | 32-row 4x8 regional nugget table, day-normalized over observed July days |
 | `tile_nugget_mean_heatmap_4x8.png` | 4x8 regional mean nugget heatmap |
 | `tile_nugget_median_heatmap_4x8.png` | 4x8 regional median nugget heatmap |
+| `tile_nugget_vs_nadir_distance_4x8.csv` | tile centers and distance to GEMS nadir at 0N, 128E |
+| `tile_nugget_vs_nadir_distance_4x8.png` | tile nugget vs nadir-distance scatter/line diagnostic |
 | `global_nugget_by_hour_slot.csv` | hour-slot global nugget mean/median/sd over observed July days |
 | `global_params_by_day.csv` | daily mean/median/sd global parameters |
 | `global_params_by_hour_slot.csv` | hour-slot global parameter summary |
 | `global_params_timeseries.png` | hourly global sigma/range/nugget time series |
-| `global_params_daily_mean.png` | daily mean sigma/range/nugget with sd band |
-| `global_params_hour_slot_mean.png` | hour-slot mean sigma/range/nugget with error bars |
+| `global_params_daily_mean.png` | daily mean sigma/range/nugget with readable capped y-scale and spike annotations (caps: sigma 50, range 10, nugget 5) |
+| `global_params_hour_slot_mean.png` | hour-slot mean sigma/range/nugget with readable capped y-scale and spike annotations (caps: sigma 50, range 10, nugget 5) |
 | `global_sigma_day_hour_heatmap.png` | sigma day x hour-slot heatmap |
 | `global_range_day_hour_heatmap.png` | range day x hour-slot heatmap |
 | `global_nugget_day_hour_heatmap.png` | nugget day x hour-slot heatmap |

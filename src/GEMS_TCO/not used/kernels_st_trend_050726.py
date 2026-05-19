@@ -14,7 +14,7 @@ import numpy as np
 import torch
 
 from GEMS_TCO.kernel_vecchia_col_batch import ReverseLColumnVecchiaFitBatch
-from GEMS_TCO.kernels_vecchia_hybrid import HybridVecchiaFit
+from GEMS_TCO.vecchia_candidate.kernels_vecchia_hybrid import HybridVecchiaFit
 
 
 def _n_features_for_mean_design(mean_design: str) -> int:

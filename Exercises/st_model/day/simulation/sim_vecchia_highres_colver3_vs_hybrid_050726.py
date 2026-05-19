@@ -31,7 +31,7 @@ SRC = AMAREL_SRC if os.path.exists(AMAREL_SRC) else LOCAL_SRC
 sys.path.insert(0, SRC)
 
 from GEMS_TCO import orderings as _orderings
-from GEMS_TCO.kernels_vecchia_hybrid import HybridVecchiaFit
+from GEMS_TCO.vecchia_candidate.kernels_vecchia_hybrid import HybridVecchiaFit
 from GEMS_TCO.kernel_vecchia_col_batch import ReverseLColumnVecchiaFitBatch
 
 

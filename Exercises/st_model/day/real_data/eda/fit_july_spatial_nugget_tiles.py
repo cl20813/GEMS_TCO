@@ -179,6 +179,10 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--range-min", type=float, default=None)
     parser.add_argument("--range-max", type=float, default=None)
+    parser.add_argument("--nadir-lat", type=float, default=float(os.environ.get("NADIR_LAT", "0.0")),
+                        help="GEMS nadir latitude for tile-distance diagnostics.")
+    parser.add_argument("--nadir-lon", type=float, default=float(os.environ.get("NADIR_LON", "128.0")),
+                        help="GEMS nadir longitude for tile-distance diagnostics.")
     return parser.parse_args()
 
 
@@ -587,6 +591,36 @@ def assign_tiles(coords: np.ndarray, tile_y_count: int, tile_x_count: int) -> tu
     return tile_id.astype(int), meta
 
 
+def add_tile_geometry(tile_df: pd.DataFrame, tile_meta: dict, args: argparse.Namespace) -> pd.DataFrame:
+    """Attach tile centers and nadir-distance diagnostics to per-tile fit rows."""
+    out = tile_df.copy()
+    x_edges = np.asarray(tile_meta["x_edges"], dtype=float)
+    y_edges = np.asarray(tile_meta["y_edges"], dtype=float)
+    x_centers = 0.5 * (x_edges[:-1] + x_edges[1:])
+    y_centers = 0.5 * (y_edges[:-1] + y_edges[1:])
+
+    tile_x = out["tile_x"].astype(int).to_numpy()
+    tile_y = out["tile_y"].astype(int).to_numpy()
+    center_x = x_centers[tile_x]
+    center_y = y_centers[tile_y]
+    out["tile_center_x"] = center_x
+    out["tile_center_y"] = center_y
+
+    if args.coords == "raw":
+        nadir_lat = float(args.nadir_lat)
+        nadir_lon = float(args.nadir_lon)
+        out["tile_center_lon"] = center_x
+        out["tile_center_lat"] = center_y
+        dlat = center_y - nadir_lat
+        dlon = (center_x - nadir_lon) * math.cos(math.radians(nadir_lat))
+        out["dist_to_nadir_deg"] = np.hypot(dlat, dlon)
+        out["dist_to_nadir_km"] = np.hypot(dlat * 110.574, dlon * 111.320)
+    else:
+        out["dist_to_nadir_coord"] = np.hypot(center_y - float(args.nadir_lat),
+                                              center_x - float(args.nadir_lon))
+    return out
+
+
 def profile_tile_nuggets(
     y: np.ndarray,
     coords: np.ndarray,
@@ -742,8 +776,9 @@ def fit_hour_record(
 
     coords, values, _, _ = prepare_hour_data(df_hour, args)
     global_fit = fit_global(values, coords, args, device)
-    tile_id, _ = assign_tiles(coords, *tile_shape(args))
+    tile_id, tile_meta = assign_tiles(coords, *tile_shape(args))
     tile_df = profile_tile_nuggets(values, coords, tile_id, global_fit, args, device)
+    tile_df = add_tile_geometry(tile_df, tile_meta, args)
 
     global_row = {
         "day": hour.strftime("%Y-%m-%d"),
@@ -808,6 +843,18 @@ def csv_line_from_row(row: dict, columns: list[str]) -> str:
     return ",".join(vals)
 
 
+def merge_tile_geometry_summary(summary: pd.DataFrame, tile_df: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
+    geometry_cols = [
+        "tile_center_x", "tile_center_y", "tile_center_lon", "tile_center_lat",
+        "dist_to_nadir_deg", "dist_to_nadir_km", "dist_to_nadir_coord",
+    ]
+    geometry_cols = [c for c in geometry_cols if c in tile_df.columns]
+    if summary.empty or not geometry_cols:
+        return summary
+    geom = tile_df.groupby(keys, as_index=False)[geometry_cols].mean()
+    return summary.merge(geom, on=keys, how="left")
+
+
 def tile_mean_summary(tile_df: pd.DataFrame, tile_y_count: int, tile_x_count: int) -> tuple[pd.DataFrame, np.ndarray]:
     keys = ["tile_y", "tile_x", "tile_id"]
     d = tile_df.dropna(subset=["tile_nugget"]).copy()
@@ -847,6 +894,8 @@ def tile_mean_summary(tile_df: pd.DataFrame, tile_y_count: int, tile_x_count: in
             )
             .sort_values(["tile_y", "tile_x"])
         )
+
+    summary = merge_tile_geometry_summary(summary, d, keys)
 
     mat = np.full((tile_y_count, tile_x_count), np.nan)
     for _, row in summary.iterrows():
@@ -965,6 +1014,19 @@ def write_compact_outputs(global_df: pd.DataFrame, tile_df: pd.DataFrame, args: 
     tile_summary = round_numeric(tile_summary, 4)
     tile_summary_path = output_dir / f"tile_nugget_mean_{tag}.csv"
     tile_summary.to_csv(tile_summary_path, index=False, float_format="%.4f")
+    nadir_cols = [
+        c for c in [
+            "tile_y", "tile_x", "tile_id", "tile_center_lat", "tile_center_lon",
+            "dist_to_nadir_deg", "dist_to_nadir_km",
+            "n_days", "n_hours", "tile_nugget_mean", "tile_nugget_median", "tile_nugget_sd",
+        ]
+        if c in tile_summary.columns
+    ]
+    if nadir_cols:
+        tile_summary[nadir_cols].to_csv(
+            output_dir / f"tile_nugget_vs_nadir_distance_{tag}.csv",
+            index=False, float_format="%.4f",
+        )
 
     hour_slot_nugget = round_numeric(global_nugget_by_hour_slot(global_df), 4)
     hour_slot_params = round_numeric(global_params_by_hour_slot(global_df), 4)
@@ -983,6 +1045,13 @@ def write_compact_outputs(global_df: pd.DataFrame, tile_df: pd.DataFrame, args: 
     save_heatmap(
         tile_median_mat, f"{args.month} median tile nugget, {tag}", "median tile nugget",
         output_dir / f"tile_nugget_median_heatmap_{tag}.png",
+    )
+    save_tile_nugget_vs_nadir_plot(
+        tile_summary,
+        output_dir / f"tile_nugget_vs_nadir_distance_{tag}.png",
+        f"{args.month} tile nugget vs GEMS nadir distance ({tag})",
+        mean_col="tile_nugget_mean",
+        median_col="tile_nugget_median",
     )
     save_global_nugget_hour_slot_plot(hour_slot_nugget, output_dir / "global_nugget_by_hour_slot.png")
     save_global_timeseries(global_df, output_dir / "global_params_timeseries.png")
@@ -1029,6 +1098,7 @@ def fit_one_hour(args: argparse.Namespace) -> None:
     global_fit = fit_global(values, coords, args, device)
     tile_id, tile_meta = assign_tiles(coords, *tile_shape(args))
     tile_df = profile_tile_nuggets(values, coords, tile_id, global_fit, args, device)
+    tile_df = add_tile_geometry(tile_df, tile_meta, args)
 
     global_row = {
         "hour_index": hour_index,
@@ -1182,6 +1252,64 @@ def summarize_global_by_time(global_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.
     return d, by_day, by_hour_slot
 
 
+PLOT_PARAM_CAPS = {
+    "sigma": 50.0,
+    "range": 10.0,
+    "nugget": 5.0,
+}
+
+
+def _readable_ymax(col: str, mean: np.ndarray, sd: np.ndarray | None = None) -> float:
+    hard_cap = PLOT_PARAM_CAPS.get(col, 50.0)
+    arrays = [mean]
+    if sd is not None:
+        arrays.append(mean + np.nan_to_num(sd, nan=0.0))
+    vals = np.concatenate([np.asarray(a, dtype=float).reshape(-1) for a in arrays])
+    vals = vals[np.isfinite(vals) & (vals >= 0.0)]
+    if vals.size == 0:
+        return 1.0
+
+    in_view = vals[vals <= hard_cap]
+    if in_view.size == 0:
+        return hard_cap
+
+    robust = float(np.nanpercentile(in_view, 95) * 1.18)
+    largest = float(np.nanmax(in_view) * 1.08)
+    floor = 1.0 if col in {"sigma", "range", "nugget"} else 1e-6
+    return min(max(robust, largest, floor), hard_cap)
+
+
+def _plot_capped_mean_band(ax, x: np.ndarray, mean: np.ndarray, sd: np.ndarray, col: str, label: str) -> None:
+    ymax = _readable_ymax(col, mean, sd)
+    lower = np.clip(mean - sd, 0.0, ymax)
+    upper = np.clip(mean + sd, 0.0, ymax)
+    mean_plot = np.clip(mean, 0.0, ymax)
+    clipped = np.isfinite(mean) & (mean > ymax)
+
+    ax.plot(x, mean_plot, marker="o", ms=3.5, lw=1.4)
+    ax.fill_between(x, lower, upper, alpha=0.18)
+    if clipped.any():
+        ax.scatter(x[clipped], np.full(int(clipped.sum()), ymax), marker="^", s=42, color="crimson", zorder=4)
+        for xi, actual in zip(x[clipped], mean[clipped]):
+            ax.annotate(
+                f"{actual:.1f}",
+                (xi, ymax),
+                textcoords="offset points",
+                xytext=(0, -13),
+                ha="center",
+                fontsize=7,
+                color="crimson",
+            )
+        ax.text(
+            0.99, 0.92, f"^ values exceed plotted cap ({ymax:.1f})",
+            transform=ax.transAxes, ha="right", va="top", fontsize=8, color="crimson",
+        )
+
+    ax.set_ylim(0.0, ymax * 1.04)
+    ax.set_ylabel(label)
+    ax.grid(True, alpha=0.25)
+
+
 def save_daily_param_plot(by_day: pd.DataFrame, path: Path) -> None:
     import matplotlib
     matplotlib.use("Agg")
@@ -1201,12 +1329,9 @@ def save_daily_param_plot(by_day: pd.DataFrame, path: Path) -> None:
         mean = by_day[f"{col}_mean"].to_numpy(dtype=float)
         sd_col = f"{col}_std"
         sd = by_day[sd_col].fillna(0.0).to_numpy(dtype=float) if sd_col in by_day else np.zeros_like(mean)
-        ax.plot(x, mean, marker="o", ms=3.5, lw=1.4)
-        ax.fill_between(x, mean - sd, mean + sd, alpha=0.18)
-        ax.set_ylabel(label)
-        ax.grid(True, alpha=0.25)
+        _plot_capped_mean_band(ax, x, mean, sd, col, label)
     axes[-1].set_xlabel("day of month")
-    fig.suptitle("Daily mean global spatial parameters, averaged over hourly fits")
+    fig.suptitle("Daily mean global spatial parameters, averaged over hourly fits (readable capped scale)")
     fig.tight_layout()
     fig.savefig(path, dpi=180)
     plt.close(fig)
@@ -1235,9 +1360,7 @@ def save_hour_slot_param_plot(by_hour_slot: pd.DataFrame, path: Path) -> None:
         mean = by_hour_slot[f"{col}_mean"].to_numpy(dtype=float)
         sd_col = f"{col}_std"
         sd = by_hour_slot[sd_col].fillna(0.0).to_numpy(dtype=float) if sd_col in by_hour_slot else np.zeros_like(mean)
-        ax.errorbar(x, mean, yerr=sd, marker="o", ms=4, lw=1.4, capsize=3)
-        ax.set_ylabel(label)
-        ax.grid(True, alpha=0.25)
+        _plot_capped_mean_band(ax, x, mean, sd, col, label)
     axes[-1].set_xticks(x)
     axes[-1].set_xticklabels(labels)
     axes[-1].set_xlabel("hour slot within day / UTC hour")
@@ -1302,6 +1425,72 @@ def save_tile_boxplot(tile_df: pd.DataFrame, path: Path) -> None:
     plt.close(fig)
 
 
+def nadir_distance_column(df: pd.DataFrame) -> tuple[str | None, str]:
+    if "dist_to_nadir_km" in df.columns:
+        return "dist_to_nadir_km", "distance to nadir (km)"
+    if "dist_to_nadir_deg" in df.columns:
+        return "dist_to_nadir_deg", "distance to nadir (degree-equivalent)"
+    if "dist_to_nadir_coord" in df.columns:
+        return "dist_to_nadir_coord", "distance to nadir (coordinate units)"
+    return None, ""
+
+
+def save_tile_nugget_vs_nadir_plot(
+    tile_summary: pd.DataFrame,
+    path: Path,
+    title: str,
+    mean_col: str,
+    median_col: str,
+) -> bool:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    dist_col, x_label = nadir_distance_column(tile_summary)
+    cols = [dist_col, mean_col, median_col, "tile_x", "tile_y"]
+    if dist_col is None or any(c not in tile_summary.columns for c in cols):
+        return False
+
+    d = tile_summary[cols].replace([np.inf, -np.inf], np.nan).dropna(subset=[dist_col])
+    d = d.sort_values(dist_col)
+    if d.empty:
+        return False
+
+    fig, ax = plt.subplots(figsize=(8.5, 5.2))
+    if mean_col in d.columns:
+        ax.scatter(d[dist_col], d[mean_col], s=46, label="mean tile nugget", alpha=0.85)
+        ax.plot(d[dist_col], d[mean_col], lw=1.0, alpha=0.35)
+    if median_col in d.columns:
+        ax.scatter(d[dist_col], d[median_col], s=42, marker="s", label="median tile nugget", alpha=0.85)
+        ax.plot(d[dist_col], d[median_col], lw=1.0, alpha=0.35)
+
+    for _, row in d.iterrows():
+        ax.annotate(
+            f"{int(row['tile_y'])},{int(row['tile_x'])}",
+            (row[dist_col], row[median_col] if np.isfinite(row[median_col]) else row[mean_col]),
+            textcoords="offset points",
+            xytext=(3, 3),
+            fontsize=6.5,
+            alpha=0.75,
+        )
+
+    corr_bits = []
+    for label, col in [("mean", mean_col), ("median", median_col)]:
+        valid = d[[dist_col, col]].dropna()
+        if len(valid) >= 3:
+            corr_bits.append(f"{label} Spearman={valid[dist_col].corr(valid[col], method='spearman'):.3f}")
+    subtitle = " | ".join(corr_bits)
+    ax.set_title(title if not subtitle else f"{title}\n{subtitle}")
+    ax.set_xlabel(x_label)
+    ax.set_ylabel("tile nugget")
+    ax.grid(True, alpha=0.25)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(path, dpi=180)
+    plt.close(fig)
+    return True
+
+
 def make_summary_tile_table(tile_df: pd.DataFrame) -> pd.DataFrame:
     keys = ["tile_y", "tile_x", "tile_id"]
     d = tile_df.dropna(subset=["tile_nugget"]).copy()
@@ -1327,7 +1516,7 @@ def make_summary_tile_table(tile_df: pd.DataFrame) -> pd.DataFrame:
                 daily_n_hours=("tile_nugget", "count"),
             )
         )
-        return (
+        summary = (
             daily.groupby(keys, as_index=False)
             .agg(
                 n_days=("daily_tile_nugget", "count"),
@@ -1341,8 +1530,9 @@ def make_summary_tile_table(tile_df: pd.DataFrame) -> pd.DataFrame:
             )
             .sort_values(["tile_y", "tile_x"])
         )
+        return merge_tile_geometry_summary(summary, d, keys)
 
-    return (
+    summary = (
         d.groupby(keys, as_index=False)
         .agg(
             n_days=("tile_nugget", "count"),
@@ -1356,6 +1546,7 @@ def make_summary_tile_table(tile_df: pd.DataFrame) -> pd.DataFrame:
         )
         .sort_values(["tile_y", "tile_x"])
     )
+    return merge_tile_geometry_summary(summary, d, keys)
 
 
 def summarize(args: argparse.Namespace) -> None:
@@ -1385,6 +1576,19 @@ def summarize(args: argparse.Namespace) -> None:
     tile_y_count, tile_x_count = tile_shape(args)
     tile_summary_path = summary_dir / f"tile_nugget_summary_{tag}.csv"
     round_numeric(tile_summary, 4).to_csv(tile_summary_path, index=False, float_format="%.4f")
+    nadir_cols = [
+        c for c in [
+            "tile_y", "tile_x", "tile_id", "tile_center_lat", "tile_center_lon",
+            "dist_to_nadir_deg", "dist_to_nadir_km",
+            "n_days", "n_hours", "mean_tile_nugget", "median_tile_nugget", "sd_tile_nugget",
+        ]
+        if c in tile_summary.columns
+    ]
+    if nadir_cols:
+        round_numeric(tile_summary[nadir_cols], 4).to_csv(
+            summary_dir / f"tile_nugget_vs_nadir_distance_{tag}.csv",
+            index=False, float_format="%.4f",
+        )
 
     save_heatmap(
         heatmap_matrix(tile_summary, "mean_tile_nugget", tile_y_count, tile_x_count),
@@ -1400,6 +1604,13 @@ def summarize(args: argparse.Namespace) -> None:
         heatmap_matrix(tile_summary, "mean_ratio_to_global", tile_y_count, tile_x_count),
         f"Mean tile/global nugget ratio, {tag}", "mean tile/global nugget",
         summary_dir / f"tile_to_global_nugget_ratio_mean_heatmap_{tag}.png",
+    )
+    save_tile_nugget_vs_nadir_plot(
+        tile_summary,
+        summary_dir / f"tile_nugget_vs_nadir_distance_{tag}.png",
+        f"{args.month} tile nugget vs GEMS nadir distance ({tag})",
+        mean_col="mean_tile_nugget",
+        median_col="median_tile_nugget",
     )
     save_global_timeseries(global_df, summary_dir / "global_params_timeseries.png")
     save_daily_param_plot(global_by_day, summary_dir / "global_params_daily_mean.png")

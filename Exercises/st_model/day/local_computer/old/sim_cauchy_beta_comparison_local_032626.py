@@ -48,7 +48,7 @@ sys.path.append("/Users/joonwonlee/Documents/GEMS_TCO-1/src")
 sys.path.append("/Users/joonwonlee/Documents/GEMS_TCO-1")
 
 from GEMS_TCO import kernels_vecchia
-from GEMS_TCO import kernels_vecchia_cauchy
+from GEMS_TCO.vecchia_candidate import kernels_vecchia_cauchy
 from GEMS_TCO import orderings as _orderings
 from GEMS_TCO import configuration as config
 from GEMS_TCO.data_loader import load_data_dynamic_processed

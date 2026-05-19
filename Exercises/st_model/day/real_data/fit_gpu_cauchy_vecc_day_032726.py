@@ -27,7 +27,7 @@ from typing import List
 
 sys.path.append("/cache/home/jl2815/tco")
 
-from GEMS_TCO import kernels_vecchia_cauchy
+from GEMS_TCO.vecchia_candidate import kernels_vecchia_cauchy
 from GEMS_TCO import orderings as _orderings
 from GEMS_TCO import BaseLogger, configuration as config
 from GEMS_TCO.data_loader import load_data_dynamic_processed

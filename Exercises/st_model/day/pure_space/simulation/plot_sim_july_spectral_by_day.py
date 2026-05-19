@@ -37,8 +37,8 @@ import matplotlib.pyplot as plt
 try:
     from GEMS_TCO import orderings
     from GEMS_TCO.kernels_space_iso_050826 import (
-        HybridSpaceIsoTrendVecchiaFit,
-        HybridSpaceIsoNoNuggetTrendVecchiaFit,
+        HybridSpaceIsoTrendVecchiaFit as _HybridSpaceIsoTrendVecchiaFit,
+        HybridSpaceIsoNoNuggetTrendVecchiaFit as _HybridSpaceIsoNoNuggetTrendVecchiaFit,
     )
 except ImportError:
     for candidate in [Path(__file__).parents[5] / "src", Path("/home/jl2815/tco")]:
@@ -47,13 +47,55 @@ except ImportError:
             break
     from GEMS_TCO import orderings
     from GEMS_TCO.kernels_space_iso_050826 import (
-        HybridSpaceIsoTrendVecchiaFit,
-        HybridSpaceIsoNoNuggetTrendVecchiaFit,
+        HybridSpaceIsoTrendVecchiaFit as _HybridSpaceIsoTrendVecchiaFit,
+        HybridSpaceIsoNoNuggetTrendVecchiaFit as _HybridSpaceIsoNoNuggetTrendVecchiaFit,
     )
 
 DTYPE = torch.float64
 EPS = 1e-12
 ROUND_DECIMALS = 4
+
+
+class MicroergodicIsoTrendVecchiaFit(_HybridSpaceIsoTrendVecchiaFit):
+    """Same isotropic model, but optimizer sees log(phi1), log(phi2), log(nugget)."""
+
+    def _raw_params(self, params: torch.Tensor):
+        phi1 = torch.exp(params[0])
+        phi2 = torch.exp(params[1])
+        sigmasq = phi1 / phi2
+        range_space = 1.0 / phi2
+        nugget = torch.exp(params[2])
+        return sigmasq, range_space, range_space, nugget
+
+    def _convert_params(self, raw):
+        phi1 = float(np.exp(raw[0]))
+        phi2 = float(np.exp(raw[1]))
+        return {
+            "sigmasq": phi1 / phi2,
+            "range": 1.0 / phi2,
+            "nugget": float(np.exp(raw[2])),
+        }
+
+
+class MicroergodicIsoNoNuggetTrendVecchiaFit(_HybridSpaceIsoNoNuggetTrendVecchiaFit):
+    """Nugget-free model with log(phi1), log(phi2) optimization."""
+
+    def _raw_params(self, params: torch.Tensor):
+        phi1 = torch.exp(params[0])
+        phi2 = torch.exp(params[1])
+        sigmasq = phi1 / phi2
+        range_space = 1.0 / phi2
+        nugget = params.new_tensor(0.0)
+        return sigmasq, range_space, range_space, nugget
+
+    def _convert_params(self, raw):
+        phi1 = float(np.exp(raw[0]))
+        phi2 = float(np.exp(raw[1]))
+        return {
+            "sigmasq": phi1 / phi2,
+            "range": 1.0 / phi2,
+            "nugget": 0.0,
+        }
 
 
 @dataclass
@@ -68,13 +110,13 @@ class GridTemplate:
 
 VARIANTS = {
     "nugget0": {
-        "class": HybridSpaceIsoNoNuggetTrendVecchiaFit,
-        "labels": ["sigmasq", "range"],
+        "class": MicroergodicIsoNoNuggetTrendVecchiaFit,
+        "n_params": 2,
         "title": "full: nugget fixed 0",
     },
     "nugget_free": {
-        "class": HybridSpaceIsoTrendVecchiaFit,
-        "labels": ["sigmasq", "range", "nugget"],
+        "class": MicroergodicIsoTrendVecchiaFit,
+        "n_params": 3,
         "title": "full: nugget free",
     },
 }
@@ -263,16 +305,26 @@ def build_model(variant: str, smooth: float, input_tensor: torch.Tensor, nns_map
 
 
 def init_params(variant: str, args: argparse.Namespace, device: torch.device) -> list[torch.Tensor]:
-    vals = [args.sigmasq_init, args.range_init]
-    if variant == "nugget_free":
+    init_sigmasq = float(args.sigmasq_init)
+    init_range = float(args.range_init)
+    init_phi2 = 1.0 / max(init_range, EPS)
+    init_phi1 = init_sigmasq * init_phi2
+    vals = [init_phi1, init_phi2]
+    if VARIANTS[variant]["n_params"] == 3:
         vals.append(args.nugget_init)
     return [torch.tensor(math.log(float(v)), device=device, dtype=DTYPE, requires_grad=True) for v in vals]
 
 
 def backmap(raw: list[float], variant: str) -> dict:
-    labels = VARIANTS[variant]["labels"]
-    out = {name: float(math.exp(raw[i])) for i, name in enumerate(labels)}
-    out.setdefault("nugget", 0.0)
+    phi1 = float(math.exp(raw[0]))
+    phi2 = float(math.exp(raw[1]))
+    out = {
+        "sigmasq": phi1 / phi2,
+        "range": 1.0 / phi2,
+        "phi1": phi1,
+        "phi2": phi2,
+    }
+    out["nugget"] = float(math.exp(raw[2])) if VARIANTS[variant]["n_params"] == 3 else 0.0
     return out
 
 
@@ -295,12 +347,15 @@ def log_tensor(x: float, like: torch.Tensor) -> torch.Tensor:
 
 
 def profile_param_tensor(profile_type: str, theta: torch.Tensor, anchor: dict) -> torch.Tensor:
-    vals = {
-        "sigmasq": log_tensor(anchor["sigmasq"], theta),
-        "range": log_tensor(anchor["range"], theta),
-    }
-    vals["sigmasq" if profile_type == "sigma_only" else "range"] = theta.reshape(())
-    return torch.stack([vals["sigmasq"], vals["range"]])
+    sigmasq = log_tensor(anchor["sigmasq"], theta).exp()
+    range_ = log_tensor(anchor["range"], theta).exp()
+    if profile_type == "sigma_only":
+        sigmasq = theta.reshape(()).exp()
+    else:
+        range_ = theta.reshape(()).exp()
+    phi2 = 1.0 / range_.clamp_min(EPS)
+    phi1 = sigmasq * phi2
+    return torch.stack([torch.log(phi1.clamp_min(EPS)), torch.log(phi2.clamp_min(EPS))])
 
 
 def fit_profile(profile_type: str, smooth: float, anchor: dict, input_tensor: torch.Tensor, coords: np.ndarray, args: argparse.Namespace, device: torch.device) -> tuple[dict, float]:
@@ -422,6 +477,41 @@ def spectra_for_est(input_tensor, tmpl, thin_idx, row_keep, col_keep, est, smoot
     return merged, float(data["k_mid"].max()) if not data.empty else np.nan
 
 
+def write_plot_readme(out_root: Path) -> None:
+    text = """Simulation spectral plot line meanings
+======================================
+
+Each panel compares residual spatial-frequency content for one day, one smooth value,
+one fitting variant, and one thinning stride.
+
+Gray thin lines:
+  Individual hourly radial residual periodograms for that day.
+
+Black solid line:
+  The daily mean of the gray hourly residual periodograms. This is the empirical
+  residual spectrum after removing the fitted mean trend from each hour and taking
+  a 2-D FFT on the regular grid.
+
+Colored dashed line:
+  The Matérn spectral shape implied by the Vecchia-fitted parameters for the same
+  hours/variant/stride, averaged across hours. In the full-fit rows this line is
+  red. For optional partial-profile rows it is blue for sigma-only and green for
+  range-only.
+
+Important:
+  The colored theory spectrum is vertically rescaled to the empirical spectrum
+  by a median data/theory ratio before plotting. Therefore the plot is mainly a
+  shape diagnostic over spatial frequency, not an absolute spectrum-level check.
+
+Vertical gray dotted line:
+  Approximate maximum radial frequency available from the thinned data grid in
+  that panel. The full-grid frequency axis is kept fixed so different strides can
+  be compared on the same x-scale.
+"""
+    out_root.mkdir(parents=True, exist_ok=True)
+    (out_root / "spectral_plot_line_meanings.txt").write_text(text, encoding="utf-8")
+
+
 def plot_day(day_label: str, smooth: float, rows: list[dict], out_path: Path, args: argparse.Namespace, k_plot_max: float) -> None:
     strides = [int(s) for s in parse_int_list_or_range(args.strides)]
     labels = [f"x{s}" for s in strides]
@@ -454,10 +544,20 @@ def plot_day(day_label: str, smooth: float, rows: list[dict], out_path: Path, ar
             data_stack = pd.concat([d[["k_bin", "k_mid", "data"]].assign(hour=h) for h, d in enumerate(hour_curves)], ignore_index=True)
             data_mean = data_stack.groupby(["k_bin"], as_index=False).agg(k_mid=("k_mid", "mean"), data=("data", "mean"))
             theory_mean = pd.concat([d[["k_bin", "k_mid", "theory_scaled"]] for d in hour_curves], ignore_index=True).groupby("k_bin", as_index=False).agg(k_mid=("k_mid", "mean"), theory_scaled=("theory_scaled", "mean"))
-            for d in hour_curves:
-                ax.plot(d["k_mid"], d["data"], color="0.75", alpha=0.20, linewidth=0.7)
-            ax.plot(data_mean["k_mid"], data_mean["data"], color="black", linewidth=2.0, label="data residual spectrum")
-            ax.plot(theory_mean["k_mid"], theory_mean["theory_scaled"], color=color, linestyle="--", linewidth=1.8, label="fitted theory")
+            for h, d in enumerate(hour_curves):
+                ax.plot(
+                    d["k_mid"], d["data"], color="0.75", alpha=0.20, linewidth=0.7,
+                    label="hourly residual spectra" if h == 0 else None,
+                )
+            ax.plot(
+                data_mean["k_mid"], data_mean["data"], color="black", linewidth=2.0,
+                label="black: mean empirical residual spectrum",
+            )
+            ax.plot(
+                theory_mean["k_mid"], theory_mean["theory_scaled"], color=color,
+                linestyle="--", linewidth=1.8,
+                label="colored dashed: fitted Matérn spectrum, scaled",
+            )
             k_cut = np.nanmean([r["data_k_max"] for r in sub])
             if np.isfinite(k_cut):
                 ax.axvline(k_cut, color="0.55", linestyle=":", linewidth=1.0)
@@ -473,6 +573,11 @@ def plot_day(day_label: str, smooth: float, rows: list[dict], out_path: Path, ar
                 ax.legend(fontsize=8)
     title_tail = "full-fit and partial-profile spectra" if args.include_partials else "full-fit spectra"
     fig.suptitle(f"simulation {day_label}, smooth={smooth}: {title_tail}")
+    fig.text(
+        0.5, 0.005,
+        "Black = daily mean empirical residual spectrum. Colored dashed = fitted Matérn theory after vertical median-rescaling; compare shape, not absolute level.",
+        ha="center", va="bottom", fontsize=9,
+    )
     fig.tight_layout()
     fig.savefig(out_path, dpi=180, bbox_inches="tight")
     plt.close(fig)
@@ -481,6 +586,7 @@ def plot_day(day_label: str, smooth: float, rows: list[dict], out_path: Path, ar
 def main() -> None:
     args = parse_args()
     device = select_device(args.device, args.cuda_fallback)
+    write_plot_readme(Path(args.output_root))
     hours = load_ordered_hours(Path(args.input), args.year, args.month)
     tmpl = build_grid_template(hours[0][2], args.y_col, args.x_col)
     full_k, full_omega2 = frequency_grid(tmpl.lat_vals.astype(float), tmpl.lon_vals.astype(float))

@@ -13,8 +13,8 @@ locations.
 
 Default conditioning budget for a target cluster:
   A at t:     6 previous spatial neighbor clusters
-  B at t-1:  same cluster + 1 local cluster + 1 shifted fresh cluster
-  C at t-2:  same cluster + 0 local clusters + 1 shifted fresh cluster
+  B at t-1:  same cluster + 3 local clusters + 1 shifted fresh cluster
+  C at t-2:  same cluster + 2 local clusters + 1 shifted fresh cluster
 """
 
 from __future__ import annotations
@@ -67,13 +67,14 @@ class ClusterHybridVecchiaFit(kernels_vecchia.fit_vecchia_lbfgs):
         block_shape: Tuple[int, int] = (3, 3),
         n_neighbor_blocks_t: int = 6,
         lag1_same_block: bool = True,
-        lag1_local_blocks: int = 1,
+        lag1_local_blocks: int = 3,
         lag1_shifted_blocks: int = 1,
         lag2_same_block: bool = True,
-        lag2_local_blocks: int = 0,
+        lag2_local_blocks: int = 2,
         lag2_shifted_blocks: int = 1,
         daily_stride: int = 2,
         lag1_lon_offset: float = 0.063,
+        lag2_lon_offset: Optional[float] = None,
         target_chunk_size: int = 128,
         min_target_points: int = 1,
         max_neighbor_search: Optional[int] = None,
@@ -105,6 +106,11 @@ class ClusterHybridVecchiaFit(kernels_vecchia.fit_vecchia_lbfgs):
         self.lag2_shifted_blocks = int(lag2_shifted_blocks)
         self.daily_stride = int(daily_stride)
         self.lag1_lon_offset = float(abs(lag1_lon_offset))
+        self.lag2_lon_offset = (
+            float(abs(lag2_lon_offset))
+            if lag2_lon_offset is not None
+            else 2.0 * self.lag1_lon_offset
+        )
         self.target_chunk_size = int(target_chunk_size)
         self.min_target_points = int(min_target_points)
         self.max_neighbor_search = max_neighbor_search
@@ -231,10 +237,10 @@ class ClusterHybridVecchiaFit(kernels_vecchia.fit_vecchia_lbfgs):
                 1,
             ) + 8
         self.cluster_nns = orderings.find_nns_l2(self.cluster_centroids, max_nn=int(max_blocks))
-        self.shift_lookup_lag1 = self._build_shift_lookup(multiplier=1.0)
-        self.shift_lookup_lag2 = self._build_shift_lookup(multiplier=2.0)
+        self.shift_lookup_lag1 = self._build_shift_lookup(lon_offset=self.lag1_lon_offset)
+        self.shift_lookup_lag2 = self._build_shift_lookup(lon_offset=self.lag2_lon_offset)
 
-    def _build_shift_lookup(self, multiplier: float) -> np.ndarray:
+    def _build_shift_lookup(self, lon_offset: float) -> np.ndarray:
         if self.cluster_centroids is None:
             raise RuntimeError("Clusters must be built before shift lookup")
         coords = self.cluster_centroids
@@ -244,7 +250,7 @@ class ClusterHybridVecchiaFit(kernels_vecchia.fit_vecchia_lbfgs):
         lon_min = float(np.nanmin(lons))
         lon_max = float(np.nanmax(lons))
         base_ids = np.arange(coords.shape[0], dtype=np.int64)
-        target_lons = lons + multiplier * self.lag1_lon_offset
+        target_lons = lons + float(lon_offset)
         outside = (target_lons < lon_min) | (target_lons > lon_max)
         query = np.column_stack([np.radians(lats), np.radians(target_lons)])
         _, idx = tree.query(query, k=1)
@@ -273,8 +279,6 @@ class ClusterHybridVecchiaFit(kernels_vecchia.fit_vecchia_lbfgs):
             if cand in out:
                 continue
             out.append(cand)
-            if len(out) >= count:
-                break
         return out
 
     def _conditioning_blocks(self, block_idx: int, time_idx: int) -> Tuple[str, int, List[Tuple[int, int]]]:
@@ -342,7 +346,8 @@ class ClusterHybridVecchiaFit(kernels_vecchia.fit_vecchia_lbfgs):
             f"(smooth={self.smooth}, block={self.block_shape}, "
             f"A={self.n_neighbor_blocks_t}, "
             f"B=same{int(self.lag1_same_block)}+local{self.lag1_local_blocks}+fresh{self.lag1_shifted_blocks}, "
-            f"C=same{int(self.lag2_same_block)}+local{self.lag2_local_blocks}+fresh{self.lag2_shifted_blocks})..."
+            f"C=same{int(self.lag2_same_block)}+local{self.lag2_local_blocks}+fresh{self.lag2_shifted_blocks}, "
+            f"offsets={self.lag1_lon_offset:.4f}/{self.lag2_lon_offset:.4f})..."
         )
 
     def precompute_conditioning_sets(self):
