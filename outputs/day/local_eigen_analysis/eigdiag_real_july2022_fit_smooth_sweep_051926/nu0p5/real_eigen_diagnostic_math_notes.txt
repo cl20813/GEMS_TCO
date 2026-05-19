@@ -1,0 +1,19 @@
+Real-data eigenvalue diagnostic math notes
+=========================================
+
+This run uses the real July tco_grid pickle, not a simulated ozone field.
+
+If Z ~ N(mu, Sigma) and Sigma = S Lambda S', then
+    Y = Lambda^{-1/2} S' (Z - mu) ~ N(0, I).
+
+For mu = M beta, this script residualizes first:
+    R = I - M (M'M)^{-1} M'
+and decomposes
+    R Sigma_hat R = S_+ Lambda_+ S_+'.
+The plotted scores are
+    Y_hat = Lambda_+^{-1/2} S_+' R Z.
+
+Eigenvalues are sorted largest to smallest before cumulating Y_hat_k^2.
+Small index means broad high-variance spatial modes; large index means finer
+spatial modes. Dashed lines are approximate Brownian-bridge bands and should
+be read as diagnostics, not exact tests, because parameters are fitted.

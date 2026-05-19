@@ -42,7 +42,7 @@ from pathlib import Path
 
 sys.path.append("/Users/joonwonlee/Documents/GEMS_TCO-1/src")
 
-from GEMS_TCO import kernels_vecchia
+from GEMS_TCO import matern_vecchia_engine as kernels_vecchia
 from GEMS_TCO import orderings as _orderings
 from GEMS_TCO import debiased_whittle_raw as dw_raw_module
 from GEMS_TCO import configuration as config

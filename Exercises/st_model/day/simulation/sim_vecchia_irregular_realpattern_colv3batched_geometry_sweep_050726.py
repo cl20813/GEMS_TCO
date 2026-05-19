@@ -45,8 +45,8 @@ sys.path.insert(0, SRC)
 from GEMS_TCO import configuration as config
 from GEMS_TCO import orderings as _orderings
 from GEMS_TCO.data_loader import load_data_dynamic_processed
-from GEMS_TCO.kernel_vecchia_col_batch import ReverseLColumnVecchiaFitBatch
-from GEMS_TCO.vecchia_candidate.kernels_vecchia_hybrid import HybridVecchiaFit
+from GEMS_TCO.matern_vecchia_col_batch import ReverseLColumnVecchiaFitBatch
+from GEMS_TCO.matern_vecchia_hybrid import HybridVecchiaFit
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

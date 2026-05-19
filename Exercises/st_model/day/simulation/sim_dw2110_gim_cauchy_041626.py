@@ -36,7 +36,7 @@ from typing import List
 
 sys.path.append("/cache/home/jl2815/tco")
 
-from GEMS_TCO import kernels_vecchia
+from GEMS_TCO import matern_vecchia_engine as kernels_vecchia
 from GEMS_TCO.vecchia_candidate import kernels_vecchia_cauchy
 from GEMS_TCO import orderings as _orderings
 from GEMS_TCO import debiased_whittle_2110 as debiased_whittle

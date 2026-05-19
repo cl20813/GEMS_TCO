@@ -31,8 +31,8 @@ SRC = AMAREL_SRC if os.path.exists(AMAREL_SRC) else LOCAL_SRC
 sys.path.insert(0, SRC)
 
 from GEMS_TCO import orderings as _orderings
-from GEMS_TCO.vecchia_candidate.kernels_vecchia_hybrid import HybridVecchiaFit
-from GEMS_TCO.kernel_vecchia_col_batch import ReverseLColumnVecchiaFitBatch
+from GEMS_TCO.matern_vecchia_hybrid import HybridVecchiaFit
+from GEMS_TCO.matern_vecchia_col_batch import ReverseLColumnVecchiaFitBatch
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

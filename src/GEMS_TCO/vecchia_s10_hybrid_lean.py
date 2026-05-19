@@ -29,8 +29,8 @@ import torch
 from scipy.special import kv as _scipy_kv
 from scipy.interpolate import CubicSpline as _CubicSpline
 
-from GEMS_TCO import kernels_vecchia
-from GEMS_TCO.vecchia_candidate.kernels_vecchia_hybrid import HybridVecchiaFit
+from GEMS_TCO import matern_vecchia_engine as kernels_vecchia
+from GEMS_TCO.matern_vecchia_hybrid import HybridVecchiaFit
 
 
 class HybridVecchiaS10Lean(HybridVecchiaFit):

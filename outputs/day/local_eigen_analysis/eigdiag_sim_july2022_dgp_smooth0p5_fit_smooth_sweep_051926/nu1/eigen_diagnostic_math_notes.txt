@@ -1,0 +1,32 @@
+Eigenvalue diagnostic math notes
+================================
+
+Model check:
+  If Z ~ N(mu, Sigma) and Sigma = S Lambda S', then
+      Y = Lambda^{-1/2} S' (Z - mu) ~ N(0, I).
+  Hence Y_k^2 should behave like independent chi-square(1) increments, and
+      C_k = Y_1^2 + ... + Y_k^2
+  should stay close to k.
+
+Mean handling used here:
+  For a mean model mu = M beta, this script does not plug in beta_hat directly.
+  It uses
+      R = I - M (M'M)^{-1} M'
+  and decomposes the fitted covariance of R Z:
+      R Sigma_hat R = S_+ Lambda_+ S_+'.
+  Eigencomponents with zero numerical variance are discarded, and the plotted
+  scores are
+      Y_hat = Lambda_+^{-1/2} S_+' R Z.
+
+Ordering:
+  Eigenvalues are sorted from largest to smallest before cumulating Y_hat_k^2.
+  Small k therefore corresponds to the largest-variance, broad spatial modes;
+  large k corresponds to increasingly fine-scale modes.
+
+Dashed bands:
+  The gray dashed lines use the Brownian-bridge approximation
+      |C_k - k| <= q_0.95 sqrt(2m),
+  where m is the number of retained eigencomponents and q_0.95 = 1.3581.
+  Because covariance parameters are estimated from the same data, these bands
+  should be read as approximate and usually conservative diagnostics, not exact
+  hypothesis-test cutoffs.

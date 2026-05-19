@@ -44,7 +44,7 @@ _src = AMAREL_SRC if os.path.exists(AMAREL_SRC) else LOCAL_SRC
 sys.path.insert(0, _src)
 
 from GEMS_TCO import configuration as config
-from GEMS_TCO import kernels_vecchia
+from GEMS_TCO import matern_vecchia_engine as kernels_vecchia
 from GEMS_TCO import kernels_vecchia_advec
 from GEMS_TCO import orderings as _orderings
 

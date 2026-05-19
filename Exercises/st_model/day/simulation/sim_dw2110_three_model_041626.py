@@ -52,7 +52,7 @@ LOCAL_SRC  = "/Users/joonwonlee/Documents/GEMS_TCO-1/src"
 _src = AMAREL_SRC if os.path.exists(AMAREL_SRC) else LOCAL_SRC
 sys.path.insert(0, _src)
 
-from GEMS_TCO import kernels_vecchia
+from GEMS_TCO import matern_vecchia_engine as kernels_vecchia
 from GEMS_TCO import orderings as _orderings
 from GEMS_TCO import debiased_whittle_2110 as debiased_whittle
 from GEMS_TCO import configuration as config

@@ -24,3 +24,7 @@ dist/
 output.png
 
 .claude/worktrees/
+
+# Large generated simulation assets live outside the repo:
+# /Users/joonwonlee/Documents/GEMS_DATA/simulation
+outputs/day/simulation/

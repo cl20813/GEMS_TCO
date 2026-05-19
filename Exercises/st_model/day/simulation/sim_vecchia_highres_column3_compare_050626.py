@@ -32,7 +32,7 @@ sys.path.insert(0, SRC)
 
 from GEMS_TCO import orderings as _orderings
 from GEMS_TCO.vecchia_candidate.kernels_vecchia_grid_col_template_reuse import ReverseLColumnVecchiaFit
-from GEMS_TCO.vecchia_candidate.kernels_vecchia_hybrid import HybridVecchiaFit
+from GEMS_TCO.matern_vecchia_hybrid import HybridVecchiaFit
 # DEPRECATED: kernel_vecchia_col_ver2.py was removed; use kernel_vecchia_col_batch.py for current column tests.
 # from GEMS_TCO.kernel_vecchia_col_ver2 import ReverseLColumnVecchiaFitV2
 

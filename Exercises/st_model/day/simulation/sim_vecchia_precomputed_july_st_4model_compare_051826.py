@@ -8,10 +8,10 @@ pickles created by:
   Exercises/st_model/simulate_data/generate_july_st_circulant_real_locations_2022_2025.py
 
 Models:
-  1. kernels_vecchia_hybrid.HybridVecchiaFit
-  2. kernels_vecchia_cluster_hybrid.ClusterHybridVecchiaFit
-  3. kernel_vecchia_col_batch.ReverseLColumnVecchiaFitBatch
-  4. kernels_vecchia_cluster_column_batch.ClusterColumnVecchiaFitBatch
+  1. matern_vecchia_hybrid.HybridVecchiaFit
+  2. matern_vecchia_cluster_hybrid.ClusterHybridVecchiaFit
+  3. matern_vecchia_col_batch.ReverseLColumnVecchiaFitBatch
+  4. matern_vecchia_cluster_column_batch.ClusterColumnVecchiaFitBatch
 """
 
 from __future__ import annotations
@@ -40,10 +40,10 @@ SRC = AMAREL_SRC if os.path.exists(AMAREL_SRC) else LOCAL_SRC
 sys.path.insert(0, SRC)
 
 from GEMS_TCO import orderings as _orderings
-from GEMS_TCO.kernel_vecchia_col_batch import ReverseLColumnVecchiaFitBatch
-from GEMS_TCO.kernels_vecchia_cluster_column_batch import ClusterColumnVecchiaFitBatch
-from GEMS_TCO.kernels_vecchia_cluster_hybrid import ClusterHybridVecchiaFit
-from GEMS_TCO.vecchia_candidate.kernels_vecchia_hybrid import HybridVecchiaFit
+from GEMS_TCO.matern_vecchia_col_batch import ReverseLColumnVecchiaFitBatch
+from GEMS_TCO.matern_vecchia_cluster_column_batch import ClusterColumnVecchiaFitBatch
+from GEMS_TCO.matern_vecchia_cluster_hybrid import ClusterHybridVecchiaFit
+from GEMS_TCO.matern_vecchia_hybrid import HybridVecchiaFit
 
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -622,7 +622,7 @@ def fit_hybrid(source_map_ord, nns_grid, initial_vals, args, truth: dict[str, fl
     metrics, est = calculate_metrics(out, truth)
     row = {
         "model": HYBRID_SPEC["model"],
-        "kernel": "kernels_vecchia_hybrid",
+        "kernel": "matern_vecchia_hybrid",
         "model_family": "point",
         "block_shape": "",
         "coords_used": "real_source_offsets_regular_grid_ordering",
@@ -693,7 +693,7 @@ def fit_cluster_hybrid(source_map_ord, ordered_grid_coords_np, initial_vals, arg
             f"F{args.cluster_hybrid_lag2_shifted_blocks}_"
             f"O1{args.cluster_hybrid_lag1_lon_offset:.3f}_O2{args.cluster_hybrid_lag2_lon_offset:.3f}".replace(".", "p")
         ),
-        "kernel": "kernels_vecchia_cluster_hybrid",
+        "kernel": "matern_vecchia_cluster_hybrid",
         "model_family": "group",
         "block_shape": f"{args.block_shape[0]}x{args.block_shape[1]}",
         "coords_used": "real_source_offsets_regular_grid_blocks",
@@ -754,7 +754,7 @@ def fit_column(source_map_ord, ordered_grid_coords_np, initial_vals, args, truth
     metrics, est = calculate_metrics(out, truth)
     row = {
         "model": model_name,
-        "kernel": "kernel_vecchia_col_batch",
+        "kernel": "matern_vecchia_col_batch",
         "model_family": "point",
         "block_shape": "",
         "head_right_cols": int(args.column_head_right_cols),
@@ -823,7 +823,7 @@ def fit_cluster_column(source_map_ord, ordered_grid_coords_np, initial_vals, arg
             f"Csame{int(args.cluster_column_lag2_same_block)}R{args.cluster_column_lag2_block_count}_"
             f"stencilU{args.cluster_column_above_blocks}R{args.cluster_column_right_blocks}"
         ),
-        "kernel": "kernels_vecchia_cluster_column_batch",
+        "kernel": "matern_vecchia_cluster_column_batch",
         "model_family": "group",
         "block_shape": f"{args.block_shape[0]}x{args.block_shape[1]}",
         "coords_used": "real_source_offsets_regular_grid_reverse_l_blocks",

@@ -45,7 +45,7 @@ import numpy as np
 import torch
 from typing import Dict, Any, List
 
-from GEMS_TCO.kernels_vecchia import VecchiaBatched
+from GEMS_TCO.matern_vecchia_engine import VecchiaBatched
 
 
 # ── Covariance override ────────────────────────────────────────────────────────
