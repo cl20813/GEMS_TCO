@@ -626,6 +626,11 @@ def plot_tile_overview(curves: list[tuple[str, pd.DataFrame]], title: str, out_p
     for ax in axes.ravel():
         ax.set_visible(False)
     for ax, (label, curve) in zip(axes.ravel(), curves):
+        panel_title = label
+        d_label = None
+        if "\nD=" in label:
+            panel_title, d_value = label.rsplit("\nD=", 1)
+            d_label = f"D={d_value}"
         m = int(curve["index"].max())
         y_max = 1.03 * max(float(m), float(np.nanmax(curve["cumsum_y2"].to_numpy(dtype=float))))
         ax.set_visible(True)
@@ -635,7 +640,19 @@ def plot_tile_overview(curves: list[tuple[str, pd.DataFrame]], title: str, out_p
         ax.plot(curve["index"], curve["band_upper"], color="0.65", linestyle=(0, (4, 4)), linewidth=0.8)
         ax.set_xlim(0, m)
         ax.set_ylim(0, y_max)
-        ax.set_title(label, fontsize=8)
+        ax.set_title(panel_title, fontsize=8)
+        if d_label is not None:
+            ax.text(
+                0.03,
+                0.93,
+                d_label,
+                transform=ax.transAxes,
+                ha="left",
+                va="top",
+                fontsize=7,
+                color="0.15",
+                bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.65, "pad": 1.0},
+            )
         ax.tick_params(labelsize=7)
         ax.grid(alpha=0.16)
     fig.suptitle(title)
@@ -778,7 +795,11 @@ def main() -> None:
                 if args.save_curves:
                     all_curve_rows.append(curve.assign(**row_base))
                 if unit.family == "tiles4x4":
-                    overview_curves.setdefault((variant, unit.family), []).append((unit.name.replace("_of_", "\nof "), curve))
+                    tile_label = (
+                        f"{unit.name.replace('_of_', '\nof ')}\n"
+                        f"D={summary['max_abs_bridge_scaled']:.2f}"
+                    )
+                    overview_curves.setdefault((variant, unit.family), []).append((tile_label, curve))
                 print(
                     f"    {variant}: sigmasq={est['sigmasq']:.4g}, range={est['range']:.4g}, "
                     f"nugget={est['nugget']:.4g}, D={summary['max_abs_bridge_scaled']:.3f}, "

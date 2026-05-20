@@ -1,4 +1,4 @@
-# Real-data Eigenvalue Diagnostics: July 2024, Pure Space, nu=0.3 / 0.5
+# Real-data Eigenvalue Diagnostics: July 2024, Pure Space, nu=0.3 / 0.5 / 1.0
 
 This runbook launches the real-data eigenvalue diagnostic:
 
@@ -14,7 +14,7 @@ Default first pass:
 1. July 1, first observed hour only.
 2. 4x4 geographic tiles.
 3. Whole-domain sparse x8 and x4.
-4. `nu=0.3` and `nu=0.5`, `nugget0`, pure-space isotropic covariance.
+4. `nu=0.3`, `nu=0.5`, and `nu=1.0`, `nugget0`, pure-space isotropic covariance.
 
 ---
 
@@ -101,7 +101,7 @@ YEAR=2024
 MONTH=7
 DAY_RANGE="1,1"
 HOURS="first"
-SMOOTHS=(0.3 0.5)
+SMOOTHS=(0.3 0.5 1.0)
 VARIANTS="nugget0"
 
 SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/real_data/eda/eig_diag_real_july_pure_space.py"
