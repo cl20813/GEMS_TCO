@@ -4,6 +4,8 @@ kernels_space_trend_050726.py
 Pure-space Vecchia kernels with selectable GLS mean designs.
 
 Mean designs:
+  lat:
+    intercept + centered latitude
   base:
     intercept + centered latitude + hour dummies
   latlon:
@@ -25,6 +27,8 @@ from GEMS_TCO.kernels_space_050726 import ColumnSpaceVecchiaFit, HybridSpaceVecc
 
 
 def _n_features_for_mean_design(mean_design: str) -> int:
+    if mean_design == "lat":
+        return 2
     if mean_design == "base":
         return 9
     if mean_design == "latlon":
@@ -36,8 +40,8 @@ def _n_features_for_mean_design(mean_design: str) -> int:
 
 class _MeanDesignMixin:
     def _init_mean_design(self, mean_design: str):
-        if mean_design not in ("base", "latlon", "hour_spatial"):
-            raise ValueError("mean_design must be one of: base, latlon, hour_spatial")
+        if mean_design not in ("lat", "base", "latlon", "hour_spatial"):
+            raise ValueError("mean_design must be one of: lat, base, latlon, hour_spatial")
         self.mean_design = str(mean_design)
         self.n_features = _n_features_for_mean_design(self.mean_design)
         self.lon_mean_val = 0.0
@@ -71,7 +75,9 @@ class _MeanDesignMixin:
         lon = (flat[:, 1:2] - self.lon_mean_val).to(torch.float64)
         dums = self._hour_dummies(flat)
 
-        if self.mean_design == "base":
+        if self.mean_design == "lat":
+            X = torch.cat([ones, lat], dim=1)
+        elif self.mean_design == "base":
             X = torch.cat([ones, lat, dums], dim=1)
         elif self.mean_design == "latlon":
             X = torch.cat([ones, lat, lon, dums], dim=1)
