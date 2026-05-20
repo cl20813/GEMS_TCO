@@ -142,8 +142,7 @@ for SMOOTH in "${SMOOTHS[@]}"; do
         --lbfgs-steps 8 \
         --lbfgs-eval 20 \
         --min-points 80 \
-        --cov-jitter 1e-8 \
-        --skip-existing
+        --cov-jitter 1e-8
 done
 
 echo "Current date and time: $(date)"

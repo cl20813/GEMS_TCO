@@ -513,15 +513,6 @@ def fitted_covariance_torch(
     return cov
 
 
-def kolmogorov_bridge_sf(d: float, terms: int = 200) -> float:
-    if not np.isfinite(d) or d <= 0:
-        return 1.0
-    total = 0.0
-    for j in range(1, terms + 1):
-        total += ((-1.0) ** (j - 1)) * math.exp(-2.0 * (j * d) ** 2)
-    return float(min(max(2.0 * total, 0.0), 1.0))
-
-
 def eigen_diagnostic(
     z: np.ndarray,
     coords: np.ndarray,
@@ -591,7 +582,6 @@ def eigen_diagnostic(
         "sum_y2": float(csum_np[-1]),
         "mean_y2": float(np.mean(y2_np)),
         "max_abs_bridge_scaled": bridge_d,
-        "brown_bridge_pvalue_approx": kolmogorov_bridge_sf(bridge_d),
         "brown_bridge_width": width,
     }
     del sigma, a, k_mat, evals, evecs, scores, y2, csum, q, rz, z_t, m_t
@@ -762,7 +752,7 @@ def main() -> None:
                 title = (
                     f"{day_label} {hour_label}, {variant}, {unit.label}\n"
                     f"nu={args.smooth}, n={summary['n_obs']}, m={summary['n_eigen']}, "
-                    f"D={summary['max_abs_bridge_scaled']:.3f}, p~{summary['brown_bridge_pvalue_approx']:.3g}"
+                    f"D={summary['max_abs_bridge_scaled']:.3f}"
                 )
                 plot_eigen_curve(curve, title, png_path)
                 if args.save_curves:
@@ -792,7 +782,7 @@ def main() -> None:
                 print(
                     f"    {variant}: sigmasq={est['sigmasq']:.4g}, range={est['range']:.4g}, "
                     f"nugget={est['nugget']:.4g}, D={summary['max_abs_bridge_scaled']:.3f}, "
-                    f"p~{summary['brown_bridge_pvalue_approx']:.3g}, saved {png_path.name}",
+                    f"saved {png_path.name}",
                     flush=True,
                 )
 
