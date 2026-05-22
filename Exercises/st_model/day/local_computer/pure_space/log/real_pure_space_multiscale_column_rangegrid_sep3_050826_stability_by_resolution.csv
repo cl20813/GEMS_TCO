@@ -1,5 +1,0 @@
-resolution_label,loss_mean,loss_sd,range_short_median,range_long_median,short_fraction_mean,short_fraction_sd,sigmasq_total_mean
-x8,1.7113,0.0606,0.0150,0.2500,0.2146,0.1100,15.8378
-x4,1.6057,0.0708,0.0150,0.2500,0.1977,0.0904,15.2648
-x2,1.4899,0.0424,0.0350,0.2500,0.2089,0.0738,15.0892
-x1,1.3919,0.0271,0.0350,0.2500,0.2318,0.1255,15.9384
