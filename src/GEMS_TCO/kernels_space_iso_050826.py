@@ -10,7 +10,7 @@ Nugget-free diagnostic variants estimate:
   log(sigmasq), log(range)
 
 This reuses the same pure-space conditioning machinery as
-kernels_space_050726.py, but constrains the spatial covariance to a single
+kernels_space_base_engine_052126.py, but constrains the spatial covariance to a single
 isotropic range instead of separate latitude/longitude ranges.
 """
 
@@ -19,9 +19,12 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from GEMS_TCO.kernels_space_050726 import ColumnSpaceVecchiaFit, HybridSpaceVecchiaFit
-from GEMS_TCO.kernels_space_trend_050726 import _MeanDesignMixin
-from GEMS_TCO.kernels_space_multiscale_050826 import _build_matern_spline_coeffs
+from GEMS_TCO.kernels_space_base_engine_052126 import (
+    ColumnSpaceVecchiaFit,
+    HybridSpaceVecchiaFit,
+    _MeanDesignMixin,
+    _build_matern_spline_coeffs,
+)
 
 
 def _replace_smooth_arg(args, kwargs, fallback_smooth=0.5):

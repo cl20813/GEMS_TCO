@@ -36,7 +36,7 @@ import matplotlib.pyplot as plt
 
 try:
     from GEMS_TCO import orderings
-    from GEMS_TCO.kernels_space_multiscale_050826 import _build_matern_spline_coeffs
+    from GEMS_TCO.kernels_space_base_engine_052126 import _build_matern_spline_coeffs
     from GEMS_TCO.kernels_space_iso_050826 import (
         HybridSpaceIsoTrendVecchiaFit as _HybridSpaceIsoTrendVecchiaFit,
         HybridSpaceIsoNoNuggetTrendVecchiaFit as _HybridSpaceIsoNoNuggetTrendVecchiaFit,
@@ -47,7 +47,7 @@ except ImportError:
             sys.path.insert(0, str(candidate))
             break
     from GEMS_TCO import orderings
-    from GEMS_TCO.kernels_space_multiscale_050826 import _build_matern_spline_coeffs
+    from GEMS_TCO.kernels_space_base_engine_052126 import _build_matern_spline_coeffs
     from GEMS_TCO.kernels_space_iso_050826 import (
         HybridSpaceIsoTrendVecchiaFit as _HybridSpaceIsoTrendVecchiaFit,
         HybridSpaceIsoNoNuggetTrendVecchiaFit as _HybridSpaceIsoNoNuggetTrendVecchiaFit,

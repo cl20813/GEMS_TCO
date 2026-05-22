@@ -1,7 +1,7 @@
 """
-kernels_space_050726.py
+kernels_space_base_engine_052126.py
 
-Pure-spatial Vecchia kernels for isolating same-time conditioning behavior.
+Base pure-spatial Vecchia engine for same-time conditioning experiments.
 
 Estimated covariance parameters:
   log(sigmasq), log(range_lat), log(range_lon), log(nugget)
@@ -10,6 +10,16 @@ The likelihood treats time slots as independent spatial replicates that share
 the same covariance parameters.  There is no advection and no temporal range.
 Regression coefficients are profiled by GLS, as in the spatio-temporal Vecchia
 kernels used elsewhere in the project.
+
+This file also owns the selectable GLS mean-design mixin that used to live in
+the former mean-design module.  Keeping the base conditioning engine and
+mean-function design in one place makes the pure-space stack easier to follow:
+
+  - _PureSpaceVecchiaBase: covariance, GLS profiling, optimizer helpers.
+  - HybridSpaceVecchiaFit / ColumnSpaceVecchiaFit: conditioning structures.
+  - _MeanDesignMixin: intercept + centered covariates for the mean function.
+  - HybridSpaceTrendVecchiaFit / ColumnSpaceTrendVecchiaFit: base engines with
+    a selectable mean design.
 """
 
 from __future__ import annotations
@@ -19,6 +29,42 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
+from scipy.interpolate import CubicSpline
+from scipy.special import gamma, kv
+
+
+_MATERN_SPLINE_CACHE = {}
+
+
+def _build_matern_spline_coeffs(smooth: float, n_points: int = 1200, r_max: float = 20.0):
+    """Build natural-cubic spline coefficients for a unit Matérn correlation."""
+    key = (round(float(smooth), 8), int(n_points), float(r_max))
+    if key in _MATERN_SPLINE_CACHE:
+        return _MATERN_SPLINE_CACHE[key]
+
+    nu = float(smooth)
+    if nu <= 0:
+        raise ValueError(f"smooth must be positive, got {smooth}")
+
+    r_arr = np.linspace(0.0, float(r_max), int(n_points), dtype=np.float64)
+    f_arr = np.empty_like(r_arr)
+    f_arr[0] = 1.0
+    z = np.sqrt(2.0 * nu) * r_arr[1:]
+    f_arr[1:] = (2.0 ** (1.0 - nu) / gamma(nu)) * (z ** nu) * kv(nu, z)
+    f_arr = np.nan_to_num(f_arr, nan=0.0, posinf=1.0, neginf=0.0)
+    f_arr = np.clip(f_arr, 0.0, 1.0)
+
+    cs = CubicSpline(r_arr, f_arr, bc_type="natural")
+    coeffs = {
+        "knots": r_arr,
+        "a": cs.c[3].copy(),
+        "b": cs.c[2].copy(),
+        "c": cs.c[1].copy(),
+        "d": cs.c[0].copy(),
+        "r_max": float(r_max),
+    }
+    _MATERN_SPLINE_CACHE[key] = coeffs
+    return coeffs
 
 
 class _PureSpaceVecchiaBase:
@@ -539,4 +585,86 @@ class ColumnSpaceVecchiaFit(_PureSpaceVecchiaBase):
         return self
 
 
-__all__ = ["HybridSpaceVecchiaFit", "ColumnSpaceVecchiaFit"]
+def _n_features_for_mean_design(mean_design: str) -> int:
+    if mean_design == "lat":
+        return 2
+    if mean_design == "base":
+        return 9
+    if mean_design == "latlon":
+        return 10
+    if mean_design == "hour_spatial":
+        return 24
+    raise ValueError(f"Unknown mean_design={mean_design!r}")
+
+
+class _MeanDesignMixin:
+    def _init_mean_design(self, mean_design: str):
+        if mean_design not in ("lat", "base", "latlon", "hour_spatial"):
+            raise ValueError("mean_design must be one of: lat, base, latlon, hour_spatial")
+        self.mean_design = str(mean_design)
+        self.n_features = _n_features_for_mean_design(self.mean_design)
+        self.lon_mean_val = 0.0
+
+    def _make_full_data(self, max_m: int):
+        out = super()._make_full_data(max_m)
+        _, full_data, n_real, _, _, _, _ = out
+        real_data = full_data[:n_real]
+        y = real_data[:, 2]
+        coord_ok = ~torch.isnan(real_data[:, 0]) & ~torch.isnan(real_data[:, 1])
+        obs_ok = (~torch.isnan(y)) & coord_ok
+        valid_lons = real_data[obs_ok, 1]
+        self.lon_mean_val = (
+            float(valid_lons.mean().item()) if valid_lons.numel()
+            else float(torch.nanmean(real_data[:, 1]).item())
+        )
+        return out
+
+    def _hour_dummies(self, flat: torch.Tensor) -> torch.Tensor:
+        dums = flat[:, 4:11].to(torch.float64)
+        if dums.shape[1] < 7:
+            pad = torch.zeros((dums.shape[0], 7 - dums.shape[1]), device=self.device, dtype=torch.float64)
+            dums = torch.cat([dums, pad], dim=1)
+        return dums
+
+    def _design_from_rows(self, rows: torch.Tensor) -> torch.Tensor:
+        orig_shape = rows.shape[:-1]
+        flat = rows.reshape(-1, rows.shape[-1])
+        ones = torch.ones((flat.shape[0], 1), device=self.device, dtype=torch.float64)
+        lat = (flat[:, 0:1] - self.lat_mean_val).to(torch.float64)
+        lon = (flat[:, 1:2] - self.lon_mean_val).to(torch.float64)
+        dums = self._hour_dummies(flat)
+
+        if self.mean_design == "lat":
+            X = torch.cat([ones, lat], dim=1)
+        elif self.mean_design == "base":
+            X = torch.cat([ones, lat, dums], dim=1)
+        elif self.mean_design == "latlon":
+            X = torch.cat([ones, lat, lon, dums], dim=1)
+        else:
+            first_hour = (1.0 - dums.sum(dim=1, keepdim=True)).clamp(min=0.0, max=1.0)
+            hour_onehot = torch.cat([first_hour, dums], dim=1)
+            X = torch.cat([hour_onehot, hour_onehot * lat, hour_onehot * lon], dim=1)
+
+        return X.reshape(*orig_shape, self.n_features)
+
+
+class HybridSpaceTrendVecchiaFit(_MeanDesignMixin, HybridSpaceVecchiaFit):
+    def __init__(self, *args, mean_design: str = "base", **kwargs):
+        super().__init__(*args, **kwargs)
+        self._init_mean_design(mean_design)
+
+
+class ColumnSpaceTrendVecchiaFit(_MeanDesignMixin, ColumnSpaceVecchiaFit):
+    def __init__(self, *args, mean_design: str = "base", **kwargs):
+        super().__init__(*args, **kwargs)
+        self._init_mean_design(mean_design)
+
+
+__all__ = [
+    "HybridSpaceVecchiaFit",
+    "ColumnSpaceVecchiaFit",
+    "_MeanDesignMixin",
+    "_build_matern_spline_coeffs",
+    "HybridSpaceTrendVecchiaFit",
+    "ColumnSpaceTrendVecchiaFit",
+]
