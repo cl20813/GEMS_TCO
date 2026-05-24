@@ -1,0 +1,3 @@
+source,n_pairs,mean_v_lat_kmh,mean_v_lon_kmh,median_speed_kmh,mean_peak_corr,median_valid_pixels,vector_mean_speed_kmh,bearing_to_deg,wind_from_deg,toward_compass,wind_from_compass
+GEOS-CF,23,0.0,0.0,0.0,0.631435545402697,861.0,0.0,0.0,180.0,N,S
+GEMS,217,0.02257179723502305,-7.568181922285329,0.0,0.0810597203225551,17785.0,7.568215581947761,270.1708818440575,90.17088184405748,W,E
