@@ -47,6 +47,7 @@ class DayIntersectionResult:
     kept_locals: np.ndarray
     late_locals: np.ndarray
     intersection_mask: np.ndarray
+    row_subset_mask: np.ndarray
     scan_order_all: np.ndarray
     diagnostics: Dict[str, Any]
 
@@ -112,19 +113,34 @@ def pack_scan_order_coords(
     east_lon: float,
     delta_lat: float = DELTA_LAT_DEFAULT,
     delta_lon: float = DELTA_LON_DEFAULT,
+    order: str = "row",
+    n_rows: Optional[int] = None,
 ) -> np.ndarray:
-    """Place observations on a compact row-major regular grid in scan order.
+    """Place observations on a compact regular grid in scan order.
 
-    The first observation is assigned to the north-east corner.  The next
-    observations move west within that row; after `n_cols` points the next row
-    starts one latitude step south.  This intentionally removes holes from the
-    intersection support so reverse-L templates repeat.
+    The first observation is assigned to the north-east corner.  With
+    ``order="row"``, subsequent observations move west within a row; after
+    ``n_cols`` points the next row starts one latitude step south.  With
+    ``order="column"``, subsequent observations move south within a column;
+    after ``n_rows`` points the next longitude column starts one step west.
+    This intentionally removes holes from the intersection support so reverse-L
+    templates repeat.
     """
     n_points = int(n_points)
-    n_cols = max(1, int(n_cols))
+    order = str(order).lower()
     seq = np.arange(n_points, dtype=np.int64)
-    row_from_top = seq // n_cols
-    col_from_east = seq % n_cols
+    if order == "row":
+        n_cols = max(1, int(n_cols))
+        row_from_top = seq // n_cols
+        col_from_east = seq % n_cols
+    elif order == "column":
+        if n_rows is None:
+            raise ValueError("n_rows is required when order='column'")
+        n_rows = max(1, int(n_rows))
+        row_from_top = seq % n_rows
+        col_from_east = seq // n_rows
+    else:
+        raise ValueError("order must be 'row' or 'column'")
     lat = float(north_lat) - row_from_top.astype(np.float64) * float(delta_lat)
     lon = float(east_lon) - col_from_east.astype(np.float64) * float(delta_lon)
     return np.column_stack([lat, lon]).astype(np.float64)
@@ -195,7 +211,11 @@ def make_day_intersection_input_map(
     require_source_coordinates: bool = True,
     truncate_to_intersection: bool = True,
     compact_intersection_grid: bool = False,
+    compact_pack_order: str = "row",
     packed_grid_n_lon: Optional[int] = None,
+    packed_grid_n_lat: Optional[int] = None,
+    lat_stride: int = 1,
+    lat_stride_offset: int = 0,
     dtype: torch.dtype = torch.float64,
     device: torch.device | str = "cpu",
     lat_round_decimals: int = 6,
@@ -210,11 +230,24 @@ def make_day_intersection_input_map(
     `coord_mode="source"` is available only for diagnostics; fitting source
     coordinates with template reuse is not recommended because the relative
     displacement vectors are no longer shared by template.
+
+    `lat_stride=2` keeps every second latitude row, starting from the northern
+    scan edge when `lat_stride_offset=0`.  This reduces latitude resolution
+    before the nonmissing intersection and compact-grid packing are applied.
     """
     if coord_mode not in ("grid", "source"):
         raise ValueError("coord_mode must be 'grid' or 'source'")
     if compact_intersection_grid and coord_mode != "grid":
         raise ValueError("compact_intersection_grid=True is only compatible with coord_mode='grid'")
+    compact_pack_order = str(compact_pack_order).lower()
+    if compact_pack_order not in ("row", "column"):
+        raise ValueError("compact_pack_order must be 'row' or 'column'")
+    lat_stride = int(lat_stride)
+    lat_stride_offset = int(lat_stride_offset)
+    if lat_stride < 1:
+        raise ValueError("lat_stride must be >= 1")
+    if not (0 <= lat_stride_offset < lat_stride):
+        raise ValueError("lat_stride_offset must satisfy 0 <= offset < lat_stride")
 
     keys, frames = _as_frame_list(hourly_frames)
     if len(frames) == 0:
@@ -233,9 +266,13 @@ def make_day_intersection_input_map(
         lon_round_decimals=lon_round_decimals,
     )
     scan_all = column_scan_order(local_to_row, local_to_col)
+    north_row = int(local_to_row.max()) if len(local_to_row) else 0
+    row_subset_mask = ((north_row - local_to_row) % lat_stride) == lat_stride_offset
 
     observed_masks = []
+    observed_masks_full_grid = []
     per_hour_valid = []
+    per_hour_valid_full_grid = []
     for df in frames:
         y = pd.to_numeric(df[value_col], errors="coerce").to_numpy(dtype=float)
         grid_lat = pd.to_numeric(df[grid_lat_col], errors="coerce").to_numpy(dtype=float)
@@ -245,9 +282,13 @@ def make_day_intersection_input_map(
             src_lat = pd.to_numeric(df[source_lat_col], errors="coerce").to_numpy(dtype=float)
             src_lon = pd.to_numeric(df[source_lon_col], errors="coerce").to_numpy(dtype=float)
             obs &= np.isfinite(src_lat) & np.isfinite(src_lon)
+        observed_masks_full_grid.append(obs.copy())
+        per_hour_valid_full_grid.append(int(obs.sum()))
+        obs &= row_subset_mask
         observed_masks.append(obs)
         per_hour_valid.append(int(obs.sum()))
 
+    full_grid_intersection_mask = np.logical_and.reduce(observed_masks_full_grid)
     intersection_mask = np.logical_and.reduce(observed_masks)
     core_order = scan_all[intersection_mask[scan_all]]
     late_order = scan_all[~intersection_mask[scan_all]]
@@ -257,13 +298,24 @@ def make_day_intersection_input_map(
     packed_n_cols = None
     packed_n_rows = None
     packed_last_row_count = None
+    packed_last_col_count = None
     if compact_intersection_grid:
         if not truncate_to_intersection:
             raise ValueError("compact_intersection_grid=True requires truncate_to_intersection=True")
-        packed_n_cols = int(packed_grid_n_lon) if packed_grid_n_lon is not None else int(len(lons))
-        packed_n_cols = max(1, packed_n_cols)
-        dlat = _median_positive_step(lats, DELTA_LAT_DEFAULT)
+        kept_lats = grid_coords[row_subset_mask, 0]
+        dlat = _median_positive_step(kept_lats, DELTA_LAT_DEFAULT)
         dlon = _median_positive_step(lons, DELTA_LON_DEFAULT)
+        if compact_pack_order == "row":
+            packed_n_cols = int(packed_grid_n_lon) if packed_grid_n_lon is not None else int(len(lons))
+            packed_n_cols = max(1, packed_n_cols)
+            packed_n_rows = int(np.ceil(len(kept_locals) / packed_n_cols)) if len(kept_locals) else 0
+            packed_last_row_count = int(len(kept_locals) - (packed_n_rows - 1) * packed_n_cols) if packed_n_rows else 0
+        else:
+            n_lat_after_stride = int(np.unique(local_to_row[row_subset_mask]).size)
+            packed_n_rows = int(packed_grid_n_lat) if packed_grid_n_lat is not None else n_lat_after_stride
+            packed_n_rows = max(1, packed_n_rows)
+            packed_n_cols = int(np.ceil(len(kept_locals) / packed_n_rows)) if len(kept_locals) else 0
+            packed_last_col_count = int(len(kept_locals) - (packed_n_cols - 1) * packed_n_rows) if packed_n_cols else 0
         packed_coords = pack_scan_order_coords(
             len(kept_locals),
             n_cols=packed_n_cols,
@@ -271,9 +323,9 @@ def make_day_intersection_input_map(
             east_lon=float(np.nanmax(lons)),
             delta_lat=dlat,
             delta_lon=dlon,
+            order=compact_pack_order,
+            n_rows=packed_n_rows,
         )
-        packed_n_rows = int(np.ceil(len(kept_locals) / packed_n_cols)) if len(kept_locals) else 0
-        packed_last_row_count = int(len(kept_locals) - (packed_n_rows - 1) * packed_n_cols) if packed_n_rows else 0
 
     input_map: Dict[str, torch.Tensor] = {}
     for t_idx, (key, df) in enumerate(zip(keys, frames)):
@@ -299,16 +351,28 @@ def make_day_intersection_input_map(
     diagnostics = {
         "n_hours": int(len(frames)),
         "n_grid_total": int(n),
+        "n_full_grid_intersection": int(full_grid_intersection_mask.sum()),
         "n_intersection": int(intersection_mask.sum()),
         "n_late_or_dropped": int((~intersection_mask).sum()),
+        "n_missing_or_source_dropped_after_lat_stride": int(row_subset_mask.sum() - intersection_mask.sum()),
+        "full_grid_intersection_fraction": float(full_grid_intersection_mask.mean()),
         "intersection_fraction": float(intersection_mask.mean()),
+        "intersection_fraction_after_lat_stride": float(intersection_mask.sum() / max(1, row_subset_mask.sum())),
+        "per_hour_valid_full_grid": per_hour_valid_full_grid,
         "per_hour_valid": per_hour_valid,
         "coord_mode": coord_mode,
         "truncate_to_intersection": bool(truncate_to_intersection),
         "compact_intersection_grid": bool(compact_intersection_grid),
+        "compact_pack_order": compact_pack_order,
+        "lat_stride": int(lat_stride),
+        "lat_stride_offset": int(lat_stride_offset),
+        "n_lat_stride_kept": int(row_subset_mask.sum()),
+        "n_lat_stride_dropped": int((~row_subset_mask).sum()),
+        "n_lat_after_stride": int(np.unique(local_to_row[row_subset_mask]).size),
         "packed_grid_n_lon": int(packed_n_cols) if packed_n_cols is not None else None,
         "packed_grid_n_rows": int(packed_n_rows) if packed_n_rows is not None else None,
         "packed_last_row_count": int(packed_last_row_count) if packed_last_row_count is not None else None,
+        "packed_last_col_count": int(packed_last_col_count) if packed_last_col_count is not None else None,
         "scan_order": "north_row_east_to_west_then_south",
         "n_lat": int(len(lats)),
         "n_lon": int(len(lons)),
@@ -320,6 +384,7 @@ def make_day_intersection_input_map(
         kept_locals=kept_locals.astype(np.int64),
         late_locals=late_order.astype(np.int64),
         intersection_mask=intersection_mask,
+        row_subset_mask=row_subset_mask,
         scan_order_all=scan_all,
         diagnostics=diagnostics,
     )
@@ -372,6 +437,7 @@ class ReverseLIntersectionColumnVecchiaFit:
         self.Full_Data_Grid = None
         self.Heads_data = None
         self.Grouped_Batches: List[Dict[str, Any]] = []
+        self.conditioning_summary: Dict[str, Any] = {}
         self.n_tails = 0
         self._n_real = 0
         self._n_grid = 0
@@ -543,7 +609,14 @@ class ReverseLIntersectionColumnVecchiaFit:
         row_order = range(self._n_lat - 1, -1, -1)
         col_order = range(self._n_lon - 1, -1, -1)
 
-        def add_group(target_global: int, neigh_globals: List[int], deltas: List[Tuple[float, float, float]]):
+        lag_count_rows: List[Tuple[int, ...]] = []
+
+        def add_group(
+            target_global: int,
+            neigh_globals: List[int],
+            deltas: List[Tuple[float, float, float]],
+            lag_counts: Sequence[int],
+        ):
             if len(neigh_globals) == 0:
                 key = tuple()
                 delta_tensor = torch.empty((0, 3), device=self.device, dtype=torch.float64)
@@ -555,6 +628,7 @@ class ReverseLIntersectionColumnVecchiaFit:
             groups[key]["batch_idx"].append(neigh_globals)
             groups[key]["target_idx"].append(target_global)
             m_sizes.append(len(neigh_globals))
+            lag_count_rows.append(tuple(int(x) for x in lag_counts))
 
         for time_idx in range(self._n_time):
             time_start = int(cumulative_len[time_idx])
@@ -574,6 +648,7 @@ class ReverseLIntersectionColumnVecchiaFit:
                     target_lon = float(coords_np[local_idx, 1])
                     neigh_globals: List[int] = []
                     delta_list: List[Tuple[float, float, float]] = []
+                    lag_counts = [0] * (self.lag_count + 1)
                     seen = set()
                     spatial_locals = self._spatial_stencil_locals(row, col)
 
@@ -589,6 +664,7 @@ class ReverseLIntersectionColumnVecchiaFit:
                             if g not in seen and valid_y_np[g]:
                                 neigh_globals.append(g)
                                 delta_list.append((0.0, 0.0, dt))
+                                lag_counts[lag] += 1
                                 seen.add(g)
 
                         for nb_local in spatial_locals:
@@ -599,9 +675,10 @@ class ReverseLIntersectionColumnVecchiaFit:
                             nb_lon = float(coords_np[nb_local, 1])
                             neigh_globals.append(g)
                             delta_list.append((target_lat - nb_lat, target_lon - nb_lon, dt))
+                            lag_counts[lag] += 1
                             seen.add(g)
 
-                    add_group(target_global, neigh_globals, delta_list)
+                    add_group(target_global, neigh_globals, delta_list, lag_counts)
 
         self.Heads_data = self.Full_Data_Grid[torch.tensor(heads_indices, device=self.device, dtype=torch.long)].contiguous() if heads_indices else torch.empty((0, num_cols), device=self.device, dtype=torch.float64)
 
@@ -616,14 +693,71 @@ class ReverseLIntersectionColumnVecchiaFit:
 
         self.n_tails = int(sum(len(g["target_idx"]) for g in self.Grouped_Batches))
         self.is_precomputed = True
+        self.conditioning_summary = {
+            "template_count": int(len(self.Grouped_Batches)),
+            "per_lag_conditioning_count": int(self.per_lag_conditioning_count),
+            "lag_count": int(self.lag_count),
+            "include_lag_self": bool(self.include_lag_self),
+            "conditioning_total_cap": int(self.per_lag_conditioning_count * (self.lag_count + 1)),
+        }
+        if self.Grouped_Batches:
+            template_batch_sizes = np.asarray([len(g["target_idx"]) for g in self.Grouped_Batches])
+            self.conditioning_summary.update(
+                {
+                    "template_targets_mean": float(template_batch_sizes.mean()),
+                    "template_targets_median": float(np.median(template_batch_sizes)),
+                    "template_targets_max": int(template_batch_sizes.max()),
+                }
+            )
+            template_reuse_msg = (
+                f", targets/template mean/med/max={template_batch_sizes.mean():.1f}/"
+                f"{np.median(template_batch_sizes):.0f}/{template_batch_sizes.max()}"
+            )
+        else:
+            self.conditioning_summary.update(
+                {
+                    "template_targets_mean": 0.0,
+                    "template_targets_median": 0.0,
+                    "template_targets_max": 0,
+                }
+            )
+            template_reuse_msg = ""
         if m_sizes:
             m_arr = np.asarray(m_sizes)
+            self.conditioning_summary.update(
+                {
+                    "conditioning_m_mean": float(m_arr.mean()),
+                    "conditioning_m_median": float(np.median(m_arr)),
+                    "conditioning_m_max": int(m_arr.max()),
+                }
+            )
             m_msg = f"m mean/med/max={m_arr.mean():.1f}/{np.median(m_arr):.0f}/{m_arr.max()}"
         else:
+            self.conditioning_summary.update(
+                {
+                    "conditioning_m_mean": 0.0,
+                    "conditioning_m_median": 0.0,
+                    "conditioning_m_max": 0,
+                }
+            )
             m_msg = "m empty"
+        if lag_count_rows:
+            lag_arr = np.asarray(lag_count_rows, dtype=np.int64)
+            lag_labels = ["t"] + [f"t-{lag}" for lag in range(1, self.lag_count + 1)]
+            lag_msg_parts = []
+            for lag, label in enumerate(lag_labels):
+                vals = lag_arr[:, lag]
+                self.conditioning_summary[f"conditioning_{label}_mean"] = float(vals.mean())
+                self.conditioning_summary[f"conditioning_{label}_median"] = float(np.median(vals))
+                self.conditioning_summary[f"conditioning_{label}_max"] = int(vals.max())
+                lag_msg_parts.append(f"{label} med/max={np.median(vals):.0f}/{vals.max()}")
+            lag_msg = "; " + ", ".join(lag_msg_parts)
+        else:
+            lag_msg = ""
         print(
             f"Done in {time.time() - t0:.1f}s. grid={self._n_lat}x{self._n_lon}, "
-            f"heads={len(heads_indices)}, tails={self.n_tails}, templates={len(self.Grouped_Batches)}, {m_msg}"
+            f"heads={len(heads_indices)}, tails={self.n_tails}, templates={len(self.Grouped_Batches)}, "
+            f"{m_msg}{lag_msg}{template_reuse_msg}"
         )
         return self
 
