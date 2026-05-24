@@ -40,7 +40,10 @@ The five intended strategies are:
       block footprints cover a longitude corridor around the target block,
       e.g. 0.5x--1.5x of a reference one-step advection at t-1 and 0x--2x at
       t-2.  This is meant to test robust coverage when the true displacement
-      varies day to day.
+      varies day to day.  Two anchor modes are supported: "budget" places one
+      anchor per requested lagged block, while "width" places only enough
+      anchors to cover the corridor given the 4x4 block width and fills the
+      remaining budget near the corridor midpoint.
 
 Important geometry convention:
   Current-time conditioning must use only clusters that precede the target in
@@ -93,6 +96,7 @@ class StrategyClusterVecchiaFit(ClusterHybridVecchiaFit):
         lag2_lon_offset: Optional[float] = 0.252,
         lag1_lon_interval: Optional[Tuple[float, float]] = None,
         lag2_lon_interval: Optional[Tuple[float, float]] = None,
+        corridor_anchor_mode: str = "budget",
         target_chunk_size: int = 128,
         min_target_points: int = 1,
         max_neighbor_search: Optional[int] = None,
@@ -109,6 +113,9 @@ class StrategyClusterVecchiaFit(ClusterHybridVecchiaFit):
         self.use_lon_corridor = self.strategy == "offset_corridor_tapered"
         if self.use_lon_corridor:
             self.temporal_basis = "corridor"
+        self.corridor_anchor_mode = str(corridor_anchor_mode)
+        if self.corridor_anchor_mode not in {"budget", "width"}:
+            raise ValueError("corridor_anchor_mode must be 'budget' or 'width'")
         self.lag0_block_count = int(lag0_block_count)
         if self.lag0_block_count <= 0:
             raise ValueError("lag0_block_count must be positive")
@@ -168,6 +175,8 @@ class StrategyClusterVecchiaFit(ClusterHybridVecchiaFit):
         self.cluster_lat_max: Optional[np.ndarray] = None
         self.cluster_lon_min: Optional[np.ndarray] = None
         self.cluster_lon_max: Optional[np.ndarray] = None
+        self.grid_lon_step: float = float("nan")
+        self.corridor_block_lon_width: float = float("nan")
 
         super().__init__(
             smooth=smooth,
@@ -205,7 +214,13 @@ class StrategyClusterVecchiaFit(ClusterHybridVecchiaFit):
     def _build_clusters(self, n_points: int):
         coords = self._grid_coords_np(n_points)
         _, row_idx = self._unique_inverse(coords[:, 0])
-        _, col_idx = self._unique_inverse(coords[:, 1])
+        unique_lons, col_idx = self._unique_inverse(coords[:, 1])
+        if len(unique_lons) > 1:
+            self.grid_lon_step = float(np.median(np.diff(unique_lons)))
+            self.corridor_block_lon_width = float(self.block_shape[1] * self.grid_lon_step)
+        else:
+            self.grid_lon_step = float("nan")
+            self.corridor_block_lon_width = float("nan")
 
         # The target clusters are non-overlapping grid blocks.  For odd shapes
         # like 3x3 this feels naturally centered.  For even shapes like 4x4
@@ -328,12 +343,21 @@ class StrategyClusterVecchiaFit(ClusterHybridVecchiaFit):
         corridor_lo = target_lon + lo
         corridor_hi = target_lon + hi
         corridor_mid = 0.5 * (corridor_lo + corridor_hi)
+        corridor_len = max(0.0, hi - lo)
 
         lon_min = float(np.nanmin(self.cluster_lon_min))
         lon_max = float(np.nanmax(self.cluster_lon_max))
         n = int(self.cluster_centroids.shape[0])
         k_anchor = min(n, max(1, self.all_neighbor_search + 1))
-        anchors = np.linspace(corridor_lo, corridor_hi, num=max(1, int(count)))
+        anchor_count = int(count)
+        if self.corridor_anchor_mode == "width":
+            block_width = float(self.corridor_block_lon_width)
+            if np.isfinite(block_width) and block_width > 0:
+                anchor_count = max(1, min(int(count), int(math.ceil(corridor_len / block_width))))
+        if anchor_count <= 1:
+            anchors = np.asarray([corridor_mid], dtype=np.float64)
+        else:
+            anchors = np.linspace(corridor_lo, corridor_hi, num=anchor_count)
         out: List[int] = []
         anchor_rows: List[np.ndarray] = []
 
@@ -343,6 +367,14 @@ class StrategyClusterVecchiaFit(ClusterHybridVecchiaFit):
             idx = np.asarray(idx, dtype=np.int64).reshape(-1)
             anchor_rows.append(idx)
             self._append_unique_int(out, idx[:1])
+            if len(out) >= int(count):
+                return out[: int(count)]
+
+        if self.corridor_anchor_mode == "width":
+            query = np.array([target_lat, np.clip(corridor_mid, lon_min, lon_max)], dtype=np.float64)
+            _, idx = self.cluster_all_tree.query(query, k=k_anchor)
+            idx = np.asarray(idx, dtype=np.int64).reshape(-1)
+            self._append_unique_int(out, idx)
             if len(out) >= int(count):
                 return out[: int(count)]
 
@@ -440,7 +472,8 @@ class StrategyClusterVecchiaFit(ClusterHybridVecchiaFit):
             f"lag_blocks={self.lag0_block_count}/{self.lag1_max_blocks}/{self.lag2_max_blocks}, "
             f"basis={self.temporal_basis}, force_center={int(self.force_target_center)}, "
             f"offsets={self.lag1_lon_offset:.4f}/{self.lag2_lon_offset:.4f}, "
-            f"corridors={self.lag1_lon_interval}/{self.lag2_lon_interval})..."
+            f"corridors={self.lag1_lon_interval}/{self.lag2_lon_interval}, "
+            f"anchor_mode={self.corridor_anchor_mode})..."
         )
 
     def cluster_summary(self):
@@ -461,6 +494,9 @@ class StrategyClusterVecchiaFit(ClusterHybridVecchiaFit):
                 "lag1_lon_interval_hi": self.lag1_lon_interval[1],
                 "lag2_lon_interval_lo": self.lag2_lon_interval[0],
                 "lag2_lon_interval_hi": self.lag2_lon_interval[1],
+                "corridor_anchor_mode": self.corridor_anchor_mode,
+                "grid_lon_step": self.grid_lon_step,
+                "corridor_block_lon_width": self.corridor_block_lon_width,
                 "block_row_offset": self.block_row_offset,
                 "block_col_offset": self.block_col_offset,
             }

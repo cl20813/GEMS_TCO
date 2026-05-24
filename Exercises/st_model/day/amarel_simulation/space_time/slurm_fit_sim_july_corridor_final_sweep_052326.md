@@ -3,20 +3,22 @@
 Created 2026-05-23.
 
 This is the final focused Amarel comparison after the cluster offset-taper
-sweeps.  It runs exactly five 4x4 candidates:
+sweeps.  The script now runs eight active 4x4 candidates:
 
-- corridor `6/4/3`: `t-1` covers `0.5x--1.5x |advec_lon|`, `t-2` covers `0x--2x |advec_lon|`
-- corridor `6/5/3`: same corridor, one extra `t-1` block
-- half-offset reuse `6/5/3`: `t-1=0.5x`, `t-2=0.5x`
-- half-offset reuse `6/5/4`: `t-1=0.5x`, `t-2=0.5x`, one extra `t-2` block
+- updated width-anchor corridor `6/4/3`
 - half-offset step2 `6/5/3`: `t-1=0.5x`, `t-2=1.0x`
+- exact-truth step2 `6/5/3`: `t-1=1.0x`, `t-2=2.0x`
+- width-anchor corridor lightweight variants: `6/4/2`, `6/4/1`, `5/4/2`, `4/3/2`
+- wide robust corridor `6/4/3`: `t-1=0.2x--2.0x`, `t-2=0x--3.0x`
 
 Default reference magnitude is `|advec_lon| = 0.2`, so the actual defaults are:
 
 - `t-1` corridor: `0.10--0.30`
 - `t-2` corridor: `0.00--0.40`
 - half offset: `0.10`
-- full one-step offset for the added `t-2` variant: `0.20`
+- full one-step `t-2` offset: `0.20`
+- exact-truth offsets: `t-1=0.20`, `t-2=0.40`
+- wide robust corridor: `t-1=0.04--0.40`, `t-2=0.00--0.60`
 
 Only this Markdown runbook is needed locally; do not keep a duplicate local
 `.sh` unless you specifically want a separate scratch copy.
@@ -65,14 +67,14 @@ sbatch fit_sim_july_corridor_final_sweep_052326.sh
 #SBATCH --job-name=corr_final
 #SBATCH --output=/home/jl2815/tco/exercise_output/logs/corr_final_%j.out
 #SBATCH --error=/home/jl2815/tco/exercise_output/logs/corr_final_%j.err
-#SBATCH --time=48:00:00
+#SBATCH --time=30:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 #SBATCH --mem=64G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu021
+#SBATCH --nodelist=gpu022
 
 set -euo pipefail
 

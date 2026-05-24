@@ -19,27 +19,28 @@ Question being tested:
   In cluster form, that means covering a corridor of plausible advected
   locations rather than only snapping to one offset point.
 
-The five default candidates are:
+The active candidate set is focused on eight models:
 
-  1. corridor_4x4_lag643
-     t uses six previous max-min ordered same-time blocks.
-     t-1 uses four blocks covering 0.5x--1.5x of |advec_lon|.
-     t-2 uses three blocks covering 0x--2x of |advec_lon|.
+  1. corridor_width_4x4_lag643
+     The updated corridor anchor rule.  For each lag, choose only enough corridor
+     anchors to cover the plausible displacement interval given the 4x4
+     longitude width, then fill remaining blocks around the corridor midpoint.
 
-  2. corridor_4x4_lag653
-     Same corridor geometry, but t-1 gets five blocks.
+  2. half_step2_4x4_lag653
+     The current best simulation baseline: t-1 offset = 0.5x |advec_lon| and
+     t-2 offset = 1.0x |advec_lon|.
 
-  3. half_reuse_4x4_lag653
-     Point-offset baseline with t-1 offset = 0.5x |advec_lon| and t-2 reusing
-     the same half offset.
+  3. exact_step2_4x4_lag653
+     Simulation-only reference using the known one-step truth: t-1 offset =
+     1.0x |advec_lon| and t-2 offset = 2.0x |advec_lon|.
 
-  4. half_reuse_4x4_lag654
-     Same half-offset reuse, but t-2 gets four blocks.
+  4--7. corridor_width lightweight variants
+     Same updated corridor rule with smaller budgets: 6/4/2, 6/4/1, 5/4/2,
+     and 4/3/2.
 
-  5. half_step2_4x4_lag653
-     Point-offset baseline with t-1 offset = 0.5x |advec_lon| and t-2 offset =
-     1.0x |advec_lon|.  This is the added check where t-2 does not reuse the
-     lag-1 half offset.
+  8. corridor_wide_4x4_lag643
+     A more conservative robust corridor: t-1 covers 0.2x--2.0x and t-2 covers
+     0x--3.0x of the reference one-step displacement.
 
 Sign convention:
   The simulation truth has negative advec_lon, but the existing hybrid Vecchia
@@ -189,28 +190,42 @@ def make_specs(args: argparse.Namespace) -> list[dict[str, Any]]:
 
     specs: list[dict[str, Any]] = []
 
-    def add_corridor(lag_counts: tuple[int, int, int]) -> None:
+    def add_corridor(
+        lag_counts: tuple[int, int, int],
+        anchor_mode: str,
+        name_prefix: str = "corridor",
+        lag1_interval_override: tuple[float, float] | None = None,
+        lag2_interval_override: tuple[float, float] | None = None,
+        lag2_center_mode: str = "corridor_0x_2x",
+    ) -> None:
         lag0, lag1, lag2 = lag_counts
+        use_lag1_interval = lag1_interval if lag1_interval_override is None else lag1_interval_override
+        use_lag2_interval = lag2_interval if lag2_interval_override is None else lag2_interval_override
+        if name_prefix == "corridor":
+            prefix = "corridor" if anchor_mode == "budget" else f"corridor_{anchor_mode}"
+        else:
+            prefix = name_prefix
         specs.append(
             {
                 "spec_name": (
-                    f"corridor_4x4_lag{lag0}{lag1}{lag2}"
+                    f"{prefix}_4x4_lag{lag0}{lag1}{lag2}"
                     f"_v{code_float(v)}"
-                    f"_t1_{code_float(lag1_interval[0])}_{code_float(lag1_interval[1])}"
-                    f"_t2_{code_float(lag2_interval[0])}_{code_float(lag2_interval[1])}"
+                    f"_t1_{code_float(use_lag1_interval[0])}_{code_float(use_lag1_interval[1])}"
+                    f"_t2_{code_float(use_lag2_interval[0])}_{code_float(use_lag2_interval[1])}"
                 ),
                 "conditioning_mode": "corridor",
+                "corridor_anchor_mode": anchor_mode,
                 "block_design": "4x4_default",
                 "block_shape": (4, 4),
                 "block_row_offset": 0,
                 "block_col_offset": 0,
                 "lag_counts": lag_counts,
                 "lag_pattern": f"{lag0}/{lag1}/{lag2}",
-                "lag2_center_mode": "corridor_0x_2x",
+                "lag2_center_mode": lag2_center_mode,
                 "lag1_lon_offset": full,
                 "lag2_lon_offset": 2.0 * full,
-                "lag1_lon_interval": lag1_interval,
-                "lag2_lon_interval": lag2_interval,
+                "lag1_lon_interval": use_lag1_interval,
+                "lag2_lon_interval": use_lag2_interval,
             }
         )
 
@@ -224,6 +239,7 @@ def make_specs(args: argparse.Namespace) -> list[dict[str, Any]]:
                     f"_t1_{code_float(lag1_offset)}_t2_{code_float(lag2_offset)}"
                 ),
                 "conditioning_mode": "point_offset",
+                "corridor_anchor_mode": "none",
                 "block_design": "4x4_default",
                 "block_shape": (4, 4),
                 "block_row_offset": 0,
@@ -238,11 +254,27 @@ def make_specs(args: argparse.Namespace) -> list[dict[str, Any]]:
             }
         )
 
-    add_corridor((6, 4, 3))
-    add_corridor((6, 5, 3))
-    add_point("half_reuse", (6, 5, 3), half, half)
-    add_point("half_reuse", (6, 5, 4), half, half)
+    # Updated width-anchor corridor rule.  The 6/4/3 row preserves its previous
+    # spec name so an existing partially completed run can resume cleanly.
+    add_corridor((6, 4, 3), anchor_mode="width")
+    for lag_counts in [(6, 4, 2), (6, 4, 1), (5, 4, 2), (4, 3, 2)]:
+        add_corridor(lag_counts, anchor_mode="width")
+
+    # Best current point-offset baseline and simulation-only exact-truth
+    # reference.  exact_step2 uses t-1=delta and t-2=2*delta.
     add_point("half_step2", (6, 5, 3), half, full)
+    add_point("exact_step2", (6, 5, 3), full, 2.0 * full)
+
+    # Robustness stress test for real-data uncertainty: broader one-step and
+    # two-step corridors than the default [0.5, 1.5] / [0, 2] multipliers.
+    add_corridor(
+        (6, 4, 3),
+        anchor_mode="width",
+        name_prefix="corridor_width_wide",
+        lag1_interval_override=(0.2 * v, 2.0 * v),
+        lag2_interval_override=(0.0, 3.0 * v),
+        lag2_center_mode="corridor_0x_3x",
+    )
     return specs
 
 
@@ -258,6 +290,9 @@ def fit_spec(
     lag0, lag1, lag2 = spec["lag_counts"]
     params = new_params(initial_vals)
     strategy = "offset_corridor_tapered" if spec["conditioning_mode"] == "corridor" else "offset_tapered"
+    corridor_anchor_mode = spec.get("corridor_anchor_mode", "budget")
+    if strategy != "offset_corridor_tapered":
+        corridor_anchor_mode = "budget"
     model = StrategyClusterVecchiaFit(
         smooth=smooth,
         input_map=source_map,
@@ -272,6 +307,7 @@ def fit_spec(
         lag2_lon_offset=spec["lag2_lon_offset"],
         lag1_lon_interval=spec["lag1_lon_interval"],
         lag2_lon_interval=spec["lag2_lon_interval"],
+        corridor_anchor_mode=corridor_anchor_mode,
         target_chunk_size=args.target_chunk_size,
         min_target_points=args.min_target_points,
         block_row_offset=spec["block_row_offset"],
@@ -350,10 +386,13 @@ def refresh_outputs(
     error_csv: Path,
     txt_path: Path,
     truth: dict[str, float],
+    active_spec_names: set[str] | None = None,
 ) -> None:
     if not raw_csv.exists():
         return
     df = pd.read_csv(raw_csv)
+    if active_spec_names is not None and "spec_name" in df.columns:
+        df = df[df["spec_name"].isin(active_spec_names)].copy()
     model_summary = make_model_summary(df)
     param_summary = make_param_summary(df, truth)
     errors = df[df["error"].fillna("") != ""] if "error" in df else pd.DataFrame()
@@ -457,6 +496,7 @@ def main() -> None:
     smooth = float(truth.get("smooth", 0.5))
     true_log = true_to_log_params(truth)
     specs = make_specs(args)
+    active_spec_names = {str(spec["spec_name"]) for spec in specs}
     truth_json.write_text(json.dumps(truth, indent=2), encoding="utf-8")
     config_json.write_text(
         json.dumps(
@@ -562,7 +602,7 @@ def main() -> None:
 
             append_row_csv(raw_csv, row, ROW_COLUMNS)
             if int(args.summary_every) > 0 and fit_id % int(args.summary_every) == 0:
-                refresh_outputs(raw_csv, model_csv, param_csv, error_csv, txt_path, truth)
+                refresh_outputs(raw_csv, model_csv, param_csv, error_csv, txt_path, truth, active_spec_names)
             gc.collect()
             if DEVICE.type == "cuda":
                 torch.cuda.empty_cache()
@@ -572,7 +612,7 @@ def main() -> None:
         if DEVICE.type == "cuda":
             torch.cuda.empty_cache()
 
-    refresh_outputs(raw_csv, model_csv, param_csv, error_csv, txt_path, truth)
+    refresh_outputs(raw_csv, model_csv, param_csv, error_csv, txt_path, truth, active_spec_names)
     print("Saved outputs under:", args.out_dir, flush=True)
 
 
