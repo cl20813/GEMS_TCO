@@ -177,11 +177,40 @@ tail -f /home/jl2815/tco/exercise_output/sim_july_st_s03_051926_<JOBID>.err
 ```
 
 ### Transfer generated assets (Amarel -> mac)
+
+Use this when the smooth=0.3 assets already exist on Amarel and you only want
+to copy them back to the local computer.  `rsync` is preferred because it can
+resume and only transfers changed files.
+
+```bash
+mkdir -p "/Users/joonwonlee/Documents/GEMS_DATA/simulation"
+
+rsync -avh --progress \
+    jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/sim_data/july_st_circulant_realpattern_smooth0p3 \
+    "/Users/joonwonlee/Documents/GEMS_DATA/simulation/"
+```
+
+Equivalent `scp` fallback:
+
 ```bash
 mkdir -p "/Users/joonwonlee/Documents/GEMS_DATA/simulation"
 
 scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/sim_data/july_st_circulant_realpattern_smooth0p3 \
     "/Users/joonwonlee/Documents/GEMS_DATA/simulation/"
+```
+
+After transfer, the local root should be:
+
+```bash
+/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p3
+```
+
+Quick local check:
+
+```bash
+find "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p3" \
+    -maxdepth 2 -type f \( -name "*truth.json" -o -name "*real_locations.pkl" -o -name "*gridded.pkl" \) \
+    | sort
 ```
 
 ### Expected outputs
