@@ -62,10 +62,23 @@ scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2025/tco_grid_25_07.pkl" jl281
 
 ### Transfer generated assets (Amarel -> mac)
 ```bash
-mkdir -p "/Users/joonwonlee/Documents/GEMS_DATA/simulation"
+LOCAL_SIM_ROOT="/Users/joonwonlee/Documents/GEMS_DATA/simulation"
+AMAREL_SIM_ROOT="/home/jl2815/tco/exercise_output/sim_data/july_st_circulant_realpattern"
 
-scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/sim_data/july_st_circulant_realpattern \
-    "/Users/joonwonlee/Documents/GEMS_DATA/simulation/"
+mkdir -p "${LOCAL_SIM_ROOT}"
+
+# Preferred: resumable copy from Amarel to local mac.
+rsync -avh --progress \
+    jl2815@amarel.rutgers.edu:${AMAREL_SIM_ROOT} \
+    "${LOCAL_SIM_ROOT}/"
+
+# Fallback if rsync is unavailable.
+scp -r jl2815@amarel.rutgers.edu:${AMAREL_SIM_ROOT} \
+    "${LOCAL_SIM_ROOT}/"
+
+# Quick local check.
+find "${LOCAL_SIM_ROOT}/july_st_circulant_realpattern" -maxdepth 2 -type f \
+    \( -name "*truth.json" -o -name "*real_locations.pkl" -o -name "*gridded.pkl" \) | sort
 ```
 
 ---
