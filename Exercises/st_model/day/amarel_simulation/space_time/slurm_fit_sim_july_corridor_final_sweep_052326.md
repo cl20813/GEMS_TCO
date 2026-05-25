@@ -74,7 +74,7 @@ sbatch fit_sim_july_corridor_final_sweep_052326.sh
 #SBATCH --mem=64G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu022
+#SBATCH --nodelist=gpu028
 
 set -euo pipefail
 

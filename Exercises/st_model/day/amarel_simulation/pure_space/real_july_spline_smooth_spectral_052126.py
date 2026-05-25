@@ -50,10 +50,9 @@ for candidate in (AMAREL_SRC, LOCAL_SRC):
         break
 
 from GEMS_TCO import configuration as config
-from GEMS_TCO import orderings
-from GEMS_TCO.vecchia_mm_space_spline import (
-    HybridMMSpaceSplineNoNuggetTrendVecchiaFit,
-    HybridMMSpaceSplineTrendVecchiaFit,
+from GEMS_TCO.kernels_space_iso_cluster_052426 import (
+    ClusterSpaceIsoNoNuggetTrendVecchiaFit,
+    ClusterSpaceIsoTrendVecchiaFit,
 )
 
 
@@ -64,12 +63,12 @@ ROUND_DECIMALS = 6
 
 VARIANTS = {
     "nugget0": {
-        "class": HybridMMSpaceSplineNoNuggetTrendVecchiaFit,
+        "class": ClusterSpaceIsoNoNuggetTrendVecchiaFit,
         "n_params": 2,
         "row_title": "full: nugget fixed 0",
     },
     "nugget_free": {
-        "class": HybridMMSpaceSplineTrendVecchiaFit,
+        "class": ClusterSpaceIsoTrendVecchiaFit,
         "n_params": 3,
         "row_title": "full: nugget free",
     },
@@ -119,7 +118,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--smooths", default="0.2,0.25,0.3,0.35,0.4,0.45")
     p.add_argument("--resolutions", default="8,4,2,1")
     p.add_argument("--variants", default="nugget0,nugget_free")
-    p.add_argument("--neighbors", type=int, default=8)
+    p.add_argument("--neighbors", type=int, default=2, help="Deprecated alias; cluster B2 uses --cluster-neighbor-blocks.")
+    p.add_argument("--cluster-neighbor-blocks", type=int, default=2)
+    p.add_argument("--cluster-block-shape", default="4x4")
     p.add_argument("--mean-design", default="lat", choices=["lat", "base", "latlon", "hour_spatial"])
     p.add_argument("--data-root", default=getattr(config, "amarel_data_load_path", "/home/jl2815/tco/data/"))
     p.add_argument("--output-root", default="/home/jl2815/tco/exercise_output/real_data/spline_smooth_spectral_052126")
@@ -412,13 +413,17 @@ def thin_indices(ctx: MonthContext, stride: int) -> np.ndarray:
     return np.flatnonzero(keep).astype(np.int64)
 
 
-def make_hybrid_ordering(ctx: MonthContext, stride: int, neighbors: int):
+def parse_block_shape(text: str) -> tuple[int, int]:
+    vals = [int(x.strip()) for x in str(text).lower().replace("x", ",").split(",") if x.strip()]
+    if len(vals) != 2:
+        raise ValueError(f"block shape must look like 4x4, got {text}")
+    return vals[0], vals[1]
+
+
+def make_cluster_grid(ctx: MonthContext, stride: int):
     idx = thin_indices(ctx, stride)
     coords_regular = np.ascontiguousarray(ctx.grid_coords_full[idx].astype(np.float64))
-    hybrid_order = orderings.maxmin_cpp(coords_regular).astype(np.int64)
-    ordered_coords = np.ascontiguousarray(coords_regular[hybrid_order])
-    nns_map = orderings.find_nns_l2(ordered_coords, max_nn=int(neighbors))
-    return idx, hybrid_order, ordered_coords, nns_map
+    return idx, coords_regular
 
 
 def count_valid(tensor: torch.Tensor) -> int:
@@ -427,6 +432,8 @@ def count_valid(tensor: torch.Tensor) -> int:
 
 
 def space_diag(model) -> dict:
+    if hasattr(model, "cluster_summary"):
+        return dict(model.cluster_summary())
     groups = getattr(model, "Batched_Groups", []) or []
     if not groups:
         return {"n_batches": 0, "n_tails": 0, "mean_m": 0.0, "max_m": 0, "largest_batch_n": 0}
@@ -442,9 +449,7 @@ def space_diag(model) -> dict:
 
 
 def make_params(args: argparse.Namespace, variant: str, device: torch.device):
-    init_phi2 = 1.0 / max(float(args.range_init), EPS)
-    init_phi1 = float(args.sigmasq_init) * init_phi2
-    vals = [init_phi1, init_phi2]
+    vals = [float(args.sigmasq_init), float(args.range_init)]
     if variant == "nugget_free":
         vals.append(max(float(args.nugget_init), EPS))
     return [
@@ -454,14 +459,12 @@ def make_params(args: argparse.Namespace, variant: str, device: torch.device):
 
 
 def convert_raw(raw: list[float], variant: str) -> dict:
-    phi1 = float(math.exp(raw[0]))
-    phi2 = float(math.exp(raw[1]))
     out = {
-        "sigmasq": phi1 / phi2,
-        "range": 1.0 / phi2,
+        "sigmasq": float(math.exp(raw[0])),
+        "range": float(math.exp(raw[1])),
         "nugget": 0.0,
-        "phi1": phi1,
-        "phi2": phi2,
+        "phi1": np.nan,
+        "phi2": np.nan,
     }
     if variant == "nugget_free":
         out["nugget"] = float(math.exp(raw[2]))
@@ -482,10 +485,9 @@ def fit_hour_variant(
     device: torch.device,
 ) -> tuple[dict, dict | None]:
     if stride not in ordering_cache:
-        ordering_cache[stride] = make_hybrid_ordering(ctx, stride, args.neighbors)
-    thin_idx, hybrid_order, thin_grid, nns_map = ordering_cache[stride]
+        ordering_cache[stride] = make_cluster_grid(ctx, stride)
+    thin_idx, thin_grid = ordering_cache[stride]
     thin_t = hour_t[torch.as_tensor(thin_idx, dtype=torch.long, device=device)].contiguous()
-    thin_t = thin_t[torch.as_tensor(hybrid_order, dtype=torch.long, device=device)].contiguous()
 
     n_grid = int(thin_t.shape[0])
     n_valid = count_valid(thin_t)
@@ -501,7 +503,9 @@ def fit_hour_variant(
         "resolution_label": f"x{int(stride)}",
         "variant": variant,
         "mean_design": args.mean_design,
-        "neighbors": int(args.neighbors),
+        "neighbors": int(args.cluster_neighbor_blocks),
+        "cluster_block_shape": str(args.cluster_block_shape),
+        "cluster_neighbor_blocks": int(args.cluster_neighbor_blocks),
         "n_grid": n_grid,
         "n_valid": n_valid,
         "valid_fraction": float(n_valid / n_grid) if n_grid else np.nan,
@@ -512,9 +516,11 @@ def fit_hour_variant(
         model = cls(
             smooth=float(smooth),
             input_map={time_key: thin_t},
-            nns_map=nns_map,
-            limit_A=int(args.neighbors),
+            grid_coords=thin_grid,
+            block_shape=parse_block_shape(args.cluster_block_shape),
+            n_neighbor_blocks=int(args.cluster_neighbor_blocks),
             target_chunk_size=int(args.target_chunk_size),
+            min_target_points=1,
             mean_design=args.mean_design,
         )
         t_pre = time.time()

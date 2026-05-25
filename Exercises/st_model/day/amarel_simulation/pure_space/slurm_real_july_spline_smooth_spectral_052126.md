@@ -154,7 +154,8 @@ for SMOOTH in "${SMOOTHS[@]}"; do
             --smooths "${SMOOTH}" \
             --resolutions "8,4,2,1" \
             --variants "nugget0,nugget_free" \
-            --neighbors 8 \
+            --cluster-neighbor-blocks 2 \
+            --cluster-block-shape 4x4 \
             --mean-design lat \
             --data-root "/home/jl2815/tco/data" \
             --output-root "${OUTROOT}" \
