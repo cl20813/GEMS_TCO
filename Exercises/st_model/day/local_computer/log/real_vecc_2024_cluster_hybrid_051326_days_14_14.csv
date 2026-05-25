@@ -1,0 +1,2 @@
+day_idx,day,smooth,block_shape,loss,steps_raw,precompute_s,fit_s,est_sigmasq,est_range_lat,est_range_lon,est_range_time,est_advec_lat,est_advec_lon,est_nugget,n_clusters,block_shape_lat,block_shape_lon,max_points_per_cluster,n_target_blocks,n_target_points,n_batches,target_chunk_size
+13,2024-07-14,0.5000,3x3,1.0698,1,0.7418,111.6657,7.9257,0.2324,0.2838,1.5171,0.0061,-0.0283,1.1138,2014,3,3,9,16110,144078,17,96
