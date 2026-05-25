@@ -1,0 +1,4 @@
+model,count,mean_norm_bias,median_norm_bias,mean_abs_norm_bias,median_abs_norm_bias,over_rate,mean_err_euclid,median_err_euclid
+Corridor_4x4_lag643,336,-0.0678,-0.0143,0.1551,0.0534,0.4256,0.1830,0.0670
+Vecchia_mm20,336,-0.1129,-0.0504,0.1638,0.0815,0.3244,0.1930,0.1005
+Debiased_Whittle,336,0.0351,0.0019,0.1964,0.0787,0.5804,0.2597,0.1251

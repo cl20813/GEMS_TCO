@@ -1,0 +1,7 @@
+direction,model,n,rmse_mean,rmse_median,mae_mean,mae_median,bias_mean,bias_median
+lat,Corridor_4x4_lag643,112,2.7987,2.3964,2.0266,1.7848,1.5462,1.3828
+lat,Debiased_Whittle,112,4.2627,4.0038,3.3758,3.2508,3.2753,3.1916
+lat,Vecchia_mm20,112,2.1807,1.8132,1.6032,1.3876,0.3641,0.2780
+lon,Corridor_4x4_lag643,112,1.1621,1.0953,0.9844,0.9448,-0.6566,-0.6436
+lon,Debiased_Whittle,112,1.6252,1.4913,1.3491,1.2520,0.9583,0.7995
+lon,Vecchia_mm20,112,1.6609,1.5437,1.4370,1.3593,-1.3636,-1.2942

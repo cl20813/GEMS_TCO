@@ -1,0 +1,4 @@
+model,count,mean,median,std,min,max
+Debiased_Whittle,18,0.7308,0.4152,0.6919,0.0374,2.2729
+Corridor_4x4_lag643,18,0.7351,0.7626,0.4698,0.0541,1.3617
+Vecchia_mm20,18,0.8112,0.8316,0.4550,0.0705,1.6369

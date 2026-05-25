@@ -1,0 +1,105 @@
+{
+  "created": "2026-05-25T10:27:12",
+  "data_root": "/home/jl2815/tco/data",
+  "days": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30
+  ],
+  "device": "cuda",
+  "dtype": "torch.float64",
+  "init_physical": {
+    "advec_lat": 0.0218,
+    "advec_lon": -0.1689,
+    "nugget": 0.247,
+    "range_lat": 0.2,
+    "range_lon": 0.25,
+    "range_time": 1.5,
+    "sigmasq": 13.059
+  },
+  "keep_exact_loc": true,
+  "lat_lon_resolution": [
+    1,
+    1
+  ],
+  "lat_range": [
+    -3.0,
+    2.0
+  ],
+  "lon_range": [
+    121.0,
+    131.0
+  ],
+  "model_spec": {
+    "block_shape": [
+      4,
+      4
+    ],
+    "conditioning_mode": "corridor_width",
+    "corridor_anchor_mode": "width",
+    "lag1_lon_interval": [
+      0.063,
+      0.189
+    ],
+    "lag1_lon_offset": 0.126,
+    "lag2_lon_interval": [
+      0.0,
+      0.252
+    ],
+    "lag2_lon_offset": 0.252,
+    "lag_counts": [
+      6,
+      4,
+      3
+    ],
+    "lag_pattern": "6/4/3",
+    "reference_advec_lon_abs": 0.126,
+    "spec_name": "corridor_width_4x4_lag643_delta0p126",
+    "strategy": "offset_corridor_tapered"
+  },
+  "month": 7,
+  "optimizer": {
+    "grad_tol": 1e-05,
+    "lbfgs_eval": 20,
+    "lbfgs_history": 10,
+    "lbfgs_lr": 1.0,
+    "lbfgs_steps": 5
+  },
+  "output_root": "/home/jl2815/tco/exercise_output/estimates/day/real_july_corridor_width_4x4_lag643_052526",
+  "script": "/cache/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/real_data/fit_real_july_corridor_width_4x4_lag643_052526.py",
+  "smooth": 0.5,
+  "years": [
+    "2022",
+    "2023",
+    "2024",
+    "2025"
+  ]
+}

@@ -1,0 +1,13 @@
+year,tau,model,count,mean,median
+2022,3,Corridor_4x4_lag643,3,0.9636,1.1091
+2022,3,Debiased_Whittle,3,0.6900,0.4213
+2022,3,Vecchia_mm20,3,1.0866,1.0965
+2023,3,Corridor_4x4_lag643,3,0.8878,1.0881
+2023,3,Debiased_Whittle,3,0.7015,0.9736
+2023,3,Vecchia_mm20,3,1.0095,1.0471
+2024,3,Corridor_4x4_lag643,4,0.3850,0.2326
+2024,3,Debiased_Whittle,4,0.7346,0.3140
+2024,3,Vecchia_mm20,4,0.4771,0.4423
+2025,3,Corridor_4x4_lag643,8,0.7672,0.7626
+2025,3,Debiased_Whittle,8,0.7553,0.6005
+2025,3,Vecchia_mm20,8,0.8006,0.8316
