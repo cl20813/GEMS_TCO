@@ -1,0 +1,4 @@
+model,n,rmse_mean,rmse_median,mae_mean,mae_median,bias_mean,bias_median
+Corridor_4x4_lag643,224,1.1446,1.0043,0.9542,0.8634,-0.2470,-0.3074
+Debiased_Whittle,224,1.9907,1.8159,1.6857,1.4966,1.4251,1.3394
+Vecchia_mm20,224,1.5493,1.3809,1.3411,1.2042,-1.1915,-1.1358
