@@ -598,9 +598,10 @@ def prepare_hour_data(df: pd.DataFrame, args: argparse.Namespace) -> tuple[np.nd
             f"{region_meta['finite_value_lat_max']:.4f}], "
             f"lon=[{region_meta['finite_value_lon_min']:.4f}, "
             f"{region_meta['finite_value_lon_max']:.4f}], tol={tol}. "
-            "This usually means the tco_grid was built from a narrow orbit_map."
+            "The regular grid still covers the requested domain; a smaller finite "
+            "retrieval swath can occur for individual hours."
         )
-        if bool(args.require_region_cover):
+        if bool(getattr(args, "require_finite_value_region_cover", False)):
             raise ValueError(msg)
         print("WARNING:", msg, flush=True)
 

@@ -67,16 +67,17 @@ Paste:
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name=sim_gv_seq
-#SBATCH --output=/home/jl2815/tco/exercise_output/logs/sim_gv_seq_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/logs/sim_gv_seq_%j.err
-#SBATCH --time=24:00:00
+#SBATCH --job-name=real_gv_seq
+#SBATCH --output=/home/jl2815/tco/exercise_output/logs/real_gv_seq_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/logs/real_gv_seq_%j.err
+#SBATCH --time=6:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=6
 #SBATCH --mem=64G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
+#SBATCH --nodelist=gpu021
 
 set -euo pipefail
 
@@ -94,12 +95,12 @@ export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
-YEARS=(2022 2023 2024 2025)
+YEARS=(2023 2024 2025)
 SMOOTHS=(0.2 0.5)
 
 SCRIPT=/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/fit_sim_july_spatial_nugget_tiles_group_vecchia_052526.py
 DATA_ROOT=/home/jl2815/tco/data
-BASE_ROOT=/home/jl2815/tco/exercise_output/eda/simulation/july_expanded_bounds_group_vecchia_tiles_052526
+BASE_ROOT=/home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_tiles_052526
 
 expected_hours_for_year() {
   case "$1" in
@@ -243,9 +244,9 @@ sbatch fit_sim_july_group_vecchia_tiles_seq_052526.sh
 
 ```bash
 squeue -u jl2815
-tail -f /home/jl2815/tco/exercise_output/logs/sim_gv_seq_<JOBID>.out
+tail -f /home/jl2815/tco/exercise_output/logs/real_gv_seq_<JOBID>.out
 
-ls -R /home/jl2815/tco/exercise_output/eda/simulation/july_expanded_bounds_group_vecchia_tiles_052526
+ls -R /home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_tiles_052526
 ```
 
 Expected output folders:
@@ -271,8 +272,8 @@ july_expanded_bounds_group_vecchia_tiles_052526/
 ## 4. Copy Results Back
 
 ```bash
-mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/simulation"
+mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/real_data"
 
-scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/simulation/july_expanded_bounds_group_vecchia_tiles_052526 \
-  "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/simulation/"
+scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_tiles_052526 \
+  "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/real_data/"
 ```
