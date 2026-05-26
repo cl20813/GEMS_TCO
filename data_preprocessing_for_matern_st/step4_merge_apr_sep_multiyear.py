@@ -6,6 +6,8 @@ Merge monthly tco_grid pkl files (April–September) into per-year hashmaps.
 Hours_elapsed epoch: Unix (1970-01-01).  477 700 h ≈ 2024-07-01 ✓
 
 Input  : GEMS_DATA/pickle_{year}/tco_grid_{yy}_{mm}.pkl   (from step 3)
+         or bounds-aware files such as
+         tco_grid_lat-3to7_lon111to131_{yy}_{mm}.pkl
 
 Output (saved to GEMS_DATA/):
   Per-year hashmaps (one pkl per year, ~1.4 GB each):
@@ -30,6 +32,9 @@ python step4_merge_apr_sep_multiyear.py
 
 # Subset:
 python step4_merge_apr_sep_multiyear.py --years 2024 2025 --months 7 8 9
+
+# Expanded-bounds July files:
+python step4_merge_apr_sep_multiyear.py --years 2022 2023 2024 2025 --months 7 --lat-lon-bounds=-3,7,111,131
 
 Loading a specific day downstream
 ----------------------------------
@@ -69,22 +74,55 @@ import sys
 import pickle
 import argparse
 import datetime
+import importlib.util
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from collections import defaultdict
 
-sys.path.append("/Users/joonwonlee/Documents/GEMS_TCO-1/src")
-from GEMS_TCO import configuration as config
+GEMS_TCO_SRC = Path("/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO")
+spec = importlib.util.spec_from_file_location("gems_tco_configuration", GEMS_TCO_SRC / "configuration.py")
+config = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(config)
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 DEFAULT_YEARS  = [2022, 2023, 2024, 2025]
 DEFAULT_MONTHS = [4, 5, 6, 7, 8, 9]
+DEFAULT_LAT_LON_BOUNDS = (-3.0, 2.0, 121.0, 131.0)
 
 BASE_PATH = Path(config.mac_data_load_path)
-OUT_DIR   = BASE_PATH / "Apr_to_Sep"
 
 _EPOCH = datetime.datetime(1970, 1, 1)   # Hours_elapsed origin
+
+
+def _format_bound_token(value: float) -> str:
+    value = float(value)
+    if value.is_integer():
+        return str(int(value))
+    return str(value).replace(".", "p")
+
+
+def bounds_tag(bounds: tuple[float, float, float, float]) -> str:
+    lat_start, lat_end, lon_start, lon_end = bounds
+    return (
+        f"lat{_format_bound_token(lat_start)}to{_format_bound_token(lat_end)}_"
+        f"lon{_format_bound_token(lon_start)}to{_format_bound_token(lon_end)}"
+    )
+
+
+def tco_grid_filename(year: int, month: int, bounds: tuple[float, float, float, float]) -> str:
+    yy = str(year)[2:]
+    if tuple(bounds) == DEFAULT_LAT_LON_BOUNDS:
+        return f"tco_grid_{yy}_{month:02d}.pkl"
+    return f"tco_grid_{bounds_tag(bounds)}_{yy}_{month:02d}.pkl"
+
+
+def output_dir_for_bounds(base_path: Path, bounds: tuple[float, float, float, float], output_dir: Path | None) -> Path:
+    if output_dir is not None:
+        return output_dir
+    if tuple(bounds) == DEFAULT_LAT_LON_BOUNDS:
+        return base_path / "Apr_to_Sep"
+    return base_path / f"Apr_to_Sep_{bounds_tag(bounds)}"
 
 
 def _hrs_to_date(hours_elapsed: float) -> str:
@@ -93,12 +131,12 @@ def _hrs_to_date(hours_elapsed: float) -> str:
 
 
 # ── Load one year-month pkl ───────────────────────────────────────────────────
-def load_year_month(year: int, month: int, base_path: Path):
+def load_year_month(year: int, month: int, base_path: Path, bounds: tuple[float, float, float, float]):
     """
     Load tco_grid_{yy}_{mm}.pkl and return {global_key: DataFrame}.
     Returns empty dict if file not found.
     """
-    fname = f"tco_grid_{str(year)[2:]}_{month:02d}.pkl"
+    fname = tco_grid_filename(year, month, bounds)
     fpath = base_path / f"pickle_{year}" / fname
     if not fpath.exists():
         print(f"  [Skip] not found: {fpath}")
@@ -117,7 +155,13 @@ def load_year_month(year: int, month: int, base_path: Path):
 
 
 # ── Per-year merge & save ─────────────────────────────────────────────────────
-def build_and_save_year(year: int, months: list, base_path: Path, out_dir: Path):
+def build_and_save_year(
+    year: int,
+    months: list,
+    base_path: Path,
+    out_dir: Path,
+    bounds: tuple[float, float, float, float],
+):
     """
     Merge all target months for one year → sort → save as single pkl.
     Returns (year_dict, mm_table_for_year).
@@ -126,7 +170,7 @@ def build_and_save_year(year: int, months: list, base_path: Path, out_dir: Path)
     mm_table  = {}
 
     for month in months:
-        month_data = load_year_month(year, month, base_path)
+        month_data = load_year_month(year, month, base_path, bounds)
         if not month_data:
             continue
 
@@ -215,15 +259,25 @@ def day_index_to_df(day_index: dict) -> pd.DataFrame:
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
-def main(years, months):
+def parse_bounds(text: str) -> tuple[float, float, float, float]:
+    vals = [float(x.strip()) for x in text.split(",")]
+    if len(vals) != 4:
+        raise argparse.ArgumentTypeError("bounds must be lat_min,lat_max,lon_min,lon_max")
+    return tuple(vals)  # type: ignore[return-value]
+
+
+def main(years, months, bounds, output_dir):
+    out_dir = output_dir_for_bounds(BASE_PATH, bounds, output_dir)
     print(f"\n{'='*60}")
     print(f"  step4_merge_apr_sep_multiyear")
     print(f"  years  : {years}")
     print(f"  months : {months}")
+    print(f"  bounds : {bounds}")
     print(f"  base   : {BASE_PATH}")
+    print(f"  out    : {out_dir}")
     print(f"{'='*60}\n")
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     all_year_dicts = {}
     all_mm_tables  = {}
@@ -231,7 +285,7 @@ def main(years, months):
     # Process each year independently → separate pkl
     for year in years:
         print(f"\n--- Year {year} ---")
-        year_dict, mm_table = build_and_save_year(year, months, BASE_PATH, OUT_DIR)
+        year_dict, mm_table = build_and_save_year(year, months, BASE_PATH, out_dir, bounds)
         if year_dict:
             all_year_dicts[year] = year_dict
             all_mm_tables.update(mm_table)
@@ -244,7 +298,7 @@ def main(years, months):
     mm_rows = [{"year": y, "month": m, "monthly_mean": v}
                for (y, m), v in sorted(all_mm_tables.items())]
     mm_df  = pd.DataFrame(mm_rows)
-    mm_csv = OUT_DIR / "monthly_means_apr_sep_2022_2025.csv"
+    mm_csv = out_dir / "monthly_means_apr_sep_2022_2025.csv"
     mm_df.to_csv(mm_csv, index=False)
     print(f"\n[Saved] {mm_csv.name}")
     print(mm_df.to_string(index=False))
@@ -253,7 +307,7 @@ def main(years, months):
     print("\nBuilding day index from Hours_elapsed ...")
     day_index  = build_day_index(all_year_dicts)
     idx_df     = day_index_to_df(day_index)
-    idx_csv    = OUT_DIR / "day_index_apr_sep_2022_2025.csv"
+    idx_csv    = out_dir / "day_index_apr_sep_2022_2025.csv"
     idx_df.to_csv(idx_csv, index=False)
 
     n_total = len(idx_df)
@@ -271,5 +325,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--years",  type=int, nargs="+", default=DEFAULT_YEARS)
     parser.add_argument("--months", type=int, nargs="+", default=DEFAULT_MONTHS)
+    parser.add_argument("--lat-lon-bounds", type=parse_bounds, default=DEFAULT_LAT_LON_BOUNDS,
+                        help="lat_min,lat_max,lon_min,lon_max. Use -3,7,111,131 for expanded files.")
+    parser.add_argument("--output-dir", type=Path, default=None,
+                        help="Optional output directory. Defaults to Apr_to_Sep or Apr_to_Sep_<bounds_tag>.")
     args = parser.parse_args()
-    main(args.years, args.months)
+    main(args.years, args.months, args.lat_lon_bounds, args.output_dir)

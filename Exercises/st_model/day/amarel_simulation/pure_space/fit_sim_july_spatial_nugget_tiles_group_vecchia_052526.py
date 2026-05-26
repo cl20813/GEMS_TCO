@@ -422,8 +422,8 @@ def choose_col(df: pd.DataFrame, requested: str, candidates: Iterable[str], role
 def column_names(df: pd.DataFrame, args: argparse.Namespace) -> tuple[str, str, str, str]:
     time_col = choose_col(df, args.time_col,
                           ["time", "datetime", "timestamp", "date_time", "utc_time", "hour"], "time")
-    x_col = choose_col(df, args.x_col, ["source_longitude", "lon", "longitude", "x", "x_km"], "x")
-    y_col = choose_col(df, args.y_col, ["source_latitude", "lat", "latitude", "y", "y_km"], "y")
+    x_col = choose_col(df, args.x_col, ["longitude", "lon", "x", "x_km", "source_longitude"], "x")
+    y_col = choose_col(df, args.y_col, ["latitude", "lat", "y", "y_km", "source_latitude"], "y")
     value_col = choose_col(
         df, args.value_col,
         ["ColumnAmountO3", "value", "y", "residual", "tco", "column", "column_amount", "vcd", "no2"],
@@ -543,13 +543,12 @@ def prepare_hour_data(df: pd.DataFrame, args: argparse.Namespace) -> tuple[np.nd
     _, x_col, y_col, value_col = column_names(df, args)
     cols = [x_col, y_col, value_col]
     d = df[cols].copy()
-    d = d.replace([np.inf, -np.inf], np.nan).dropna()
+    d = d.replace([np.inf, -np.inf], np.nan)
     d[x_col] = pd.to_numeric(d[x_col], errors="coerce")
     d[y_col] = pd.to_numeric(d[y_col], errors="coerce")
-    d[value_col] = pd.to_numeric(d[value_col], errors="coerce")
-    d = d.dropna()
+    d = d.dropna(subset=[x_col, y_col])
     if d.empty:
-        raise ValueError("No finite rows after coordinate/value filtering.")
+        raise ValueError("No finite coordinate rows after coordinate filtering.")
 
     before_region = int(len(d))
     d = d[
@@ -562,8 +561,51 @@ def prepare_hour_data(df: pd.DataFrame, args: argparse.Namespace) -> tuple[np.nd
             f"from {before_region} finite rows."
         )
 
-    d = d.groupby([x_col, y_col], as_index=False)[value_col].mean()
+    # Validate that the input grid itself is the expanded domain.  The finite
+    # retrieval values can cover a smaller swath within that grid for a given
+    # hour, so the coverage check must happen before dropping missing values.
     region_meta = validate_region_extent(d, x_col, y_col, args)
+    n_after_region_filter = int(len(d))
+
+    d[value_col] = pd.to_numeric(d[value_col], errors="coerce")
+    d = d.dropna(subset=[value_col])
+    if d.empty:
+        raise ValueError(
+            f"No finite values after expanded-region filter lat={args.lat_range}, lon={args.lon_range}."
+        )
+
+    value_lat = d[y_col].to_numpy(dtype=float)
+    value_lon = d[x_col].to_numpy(dtype=float)
+    region_meta.update({
+        "finite_value_lat_min": float(np.min(value_lat)),
+        "finite_value_lat_max": float(np.max(value_lat)),
+        "finite_value_lon_min": float(np.min(value_lon)),
+        "finite_value_lon_max": float(np.max(value_lon)),
+    })
+    tol = float(args.region_tol)
+    finite_covers = (
+        region_meta["finite_value_lat_min"] <= region_meta["requested_lat_min"] + tol
+        and region_meta["finite_value_lat_max"] >= region_meta["requested_lat_max"] - tol
+        and region_meta["finite_value_lon_min"] <= region_meta["requested_lon_min"] + tol
+        and region_meta["finite_value_lon_max"] >= region_meta["requested_lon_max"] - tol
+    )
+    region_meta["finite_value_region_cover_ok"] = bool(finite_covers)
+    if not finite_covers:
+        msg = (
+            "Finite values do not cover the requested expanded domain. "
+            f"requested lat={args.lat_range}, lon={args.lon_range}; "
+            f"finite values lat=[{region_meta['finite_value_lat_min']:.4f}, "
+            f"{region_meta['finite_value_lat_max']:.4f}], "
+            f"lon=[{region_meta['finite_value_lon_min']:.4f}, "
+            f"{region_meta['finite_value_lon_max']:.4f}], tol={tol}. "
+            "This usually means the tco_grid was built from a narrow orbit_map."
+        )
+        if bool(args.require_region_cover):
+            raise ValueError(msg)
+        print("WARNING:", msg, flush=True)
+
+    d = d.groupby([x_col, y_col], as_index=False)[value_col].mean()
+    n_after_value_filter = int(len(d))
 
     raw_x = d[x_col].to_numpy(dtype=float)
     raw_y = d[y_col].to_numpy(dtype=float)
@@ -589,7 +631,9 @@ def prepare_hour_data(df: pd.DataFrame, args: argparse.Namespace) -> tuple[np.nd
     coord_meta["value_col"] = value_col
     coord_meta.update(region_meta)
     coord_meta["n_before_region_filter"] = before_region
-    coord_meta["n_after_region_filter"] = int(len(d))
+    coord_meta["n_after_region_filter"] = n_after_region_filter
+    coord_meta["n_after_value_filter"] = n_after_value_filter
+    coord_meta["n_used_for_fit"] = int(len(d))
     return coords, values, d, coord_meta
 
 

@@ -1,12 +1,14 @@
 # Pure-Space Group Vecchia Tile Nugget Fit For July Simulation Assets
 
 This is the updated replacement for the legacy pointwise tile-nugget run.  It
-fits the generated July 2022-2025 ST-circulant simulation assets using
-pure-space isotropic **cluster/group Vecchia**, not pointwise Vecchia.
+fits the July 2022-2025 expanded-bounds GEMS pkl files using pure-space
+isotropic **cluster/group Vecchia**, not pointwise Vecchia.
 
 Key settings:
 
 - data domain: expanded region, latitude `[-3, 7]`, longitude `[111, 131]`
+- source pkl files:
+  `/home/jl2815/tco/data/pickle_{year}/tco_grid_lat-3to7_lon111to131_YY_07.pkl`
 - years: `2022`, `2023`, `2024`, `2025`
 - smoothness values: `nu=0.2` and `nu=0.5`
 - execution style: **one Slurm job, one GPU node, sequential loops**, no job array
@@ -43,6 +45,14 @@ scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simula
   jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/
 ```
 
+The expanded July pkl files should already be on Amarel if this was run
+locally:
+
+```bash
+cd /Users/joonwonlee/Documents/GEMS_TCO-1/data_preprocessing_for_matern_st
+python step5_transfer_to_amarel_032626.py --years 2022 2023 2024 2025 --months 7 --only-extra-bounds
+```
+
 ## 2. Single Sequential Slurm Job
 
 On Amarel:
@@ -50,6 +60,7 @@ On Amarel:
 ```bash
 cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space
 nano fit_sim_july_group_vecchia_tiles_seq_052526.sh
+sbatch fit_sim_july_group_vecchia_tiles_seq_052526.sh
 ```
 
 Paste:
@@ -84,12 +95,11 @@ export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
 YEARS=(2022 2023 2024 2025)
-DATA_KIND=real_locations
 SMOOTHS=(0.2 0.5)
 
 SCRIPT=/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/fit_sim_july_spatial_nugget_tiles_group_vecchia_052526.py
-SIM_ROOT=/home/jl2815/tco/exercise_output/sim_data/july_st_circulant_realpattern
-BASE_ROOT=/home/jl2815/tco/exercise_output/eda/simulation/july_st_circulant_${DATA_KIND}_group_vecchia_tiles_expanded_052526
+DATA_ROOT=/home/jl2815/tco/data
+BASE_ROOT=/home/jl2815/tco/exercise_output/eda/simulation/july_expanded_bounds_group_vecchia_tiles_052526
 
 expected_hours_for_year() {
   case "$1" in
@@ -111,8 +121,9 @@ python -c "import torch; print('torch', torch.__version__); print('cuda availabl
 
 for YEAR in "${YEARS[@]}"; do
   EXPECTED_HOURS=$(expected_hours_for_year "${YEAR}")
-  DATA_PATH=${SIM_ROOT}/${YEAR}_july_st_circulant/sim_july${YEAR}_st_circulant_${DATA_KIND}.pkl
-  YEAR_OUT=${BASE_ROOT}/${YEAR}_july_st_circulant_${DATA_KIND}
+  YY=$(printf "%02d" $((YEAR % 100)))
+  DATA_PATH=${DATA_ROOT}/pickle_${YEAR}/tco_grid_lat-3to7_lon111to131_${YY}_07.pkl
+  YEAR_OUT=${BASE_ROOT}/${YEAR}_july_expanded_bounds
   MANIFEST=${YEAR_OUT}/manifest_hours.csv
 
   mkdir -p "${YEAR_OUT}"
@@ -133,8 +144,8 @@ for YEAR in "${YEARS[@]}"; do
     --month "${YEAR}-07" \
     --expected-hours "${EXPECTED_HOURS}" \
     --time-col hour \
-    --x-col Source_Longitude \
-    --y-col Source_Latitude \
+    --x-col Longitude \
+    --y-col Latitude \
     --value-col ColumnAmountO3 \
     --coords raw \
     --lat-range=-3,7 \
@@ -167,8 +178,8 @@ for YEAR in "${YEARS[@]}"; do
         --expected-hours "${EXPECTED_HOURS}" \
         --array-index "${HOUR_IDX}" \
         --time-col hour \
-        --x-col Source_Longitude \
-        --y-col Source_Latitude \
+        --x-col Longitude \
+        --y-col Latitude \
         --value-col ColumnAmountO3 \
         --coords raw \
         --lat-range=-3,7 \
@@ -198,8 +209,8 @@ for YEAR in "${YEARS[@]}"; do
       --month "${YEAR}-07" \
       --expected-hours "${EXPECTED_HOURS}" \
       --time-col hour \
-      --x-col Source_Longitude \
-      --y-col Source_Latitude \
+      --x-col Longitude \
+      --y-col Latitude \
       --value-col ColumnAmountO3 \
       --coords raw \
       --lat-range=-3,7 \
@@ -234,14 +245,14 @@ sbatch fit_sim_july_group_vecchia_tiles_seq_052526.sh
 squeue -u jl2815
 tail -f /home/jl2815/tco/exercise_output/logs/sim_gv_seq_<JOBID>.out
 
-ls -R /home/jl2815/tco/exercise_output/eda/simulation/july_st_circulant_real_locations_group_vecchia_tiles_expanded_052526
+ls -R /home/jl2815/tco/exercise_output/eda/simulation/july_expanded_bounds_group_vecchia_tiles_052526
 ```
 
 Expected output folders:
 
 ```text
-july_st_circulant_real_locations_group_vecchia_tiles_expanded_052526/
-  2022_july_st_circulant_real_locations/
+july_expanded_bounds_group_vecchia_tiles_052526/
+  2022_july_expanded_bounds/
     manifest_hours.csv
     nu0p2/
       hourly/
@@ -249,11 +260,11 @@ july_st_circulant_real_locations_group_vecchia_tiles_expanded_052526/
     nu0p5/
       hourly/
       summary/
-  2023_july_st_circulant_real_locations/
+  2023_july_expanded_bounds/
     ...
-  2024_july_st_circulant_real_locations/
+  2024_july_expanded_bounds/
     ...
-  2025_july_st_circulant_real_locations/
+  2025_july_expanded_bounds/
     ...
 ```
 
@@ -262,6 +273,6 @@ july_st_circulant_real_locations_group_vecchia_tiles_expanded_052526/
 ```bash
 mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/simulation"
 
-scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/simulation/july_st_circulant_real_locations_group_vecchia_tiles_expanded_052526 \
+scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/simulation/july_expanded_bounds_group_vecchia_tiles_052526 \
   "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/simulation/"
 ```

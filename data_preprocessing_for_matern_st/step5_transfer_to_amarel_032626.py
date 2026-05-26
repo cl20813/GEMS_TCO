@@ -19,6 +19,10 @@ Transfers TWO sets of files by default:
       GEMS_DATA/pickle_{year}/tco_grid_lat-3to7_lon111to131_{yy}_{mm}.pkl
       → Amarel: /home/jl2815/tco/data/pickle_{year}/
 
+  [D] Extra merged pkl with expanded bounds
+      GEMS_DATA/Apr_to_Sep_lat-3to7_lon111to131/
+      → Amarel: /home/jl2815/tco/data/Apr_to_Sep_lat-3to7_lon111to131/
+
 Usage
 -----
 
@@ -44,6 +48,9 @@ python step5_transfer_to_amarel_032626.py --skip-merged
 
 # New expanded-bounds July pkl only:
 python step5_transfer_to_amarel_032626.py --only-extra-bounds
+
+# New expanded-bounds merged pkl only:
+python step5_transfer_to_amarel_032626.py --only-extra-merged
 
 cd /Users/joonwonlee/Documents/GEMS_TCO-1/data_preprocessing_for_matern_st
 python step5_transfer_to_amarel_032626.py --years 2022 2023 2024 2025 --months 7 --only-extra-bounds
@@ -170,6 +177,24 @@ def transfer_merged(years: list, dry_run: bool) -> tuple:
     return _transfer_list(files, remote_dir, dry_run)
 
 
+def transfer_extra_merged(years: list, dry_run: bool) -> tuple:
+    tag = (
+        f"lat{_format_bound_token(EXTRA_LAT_LON_BOUNDS[0])}to{_format_bound_token(EXTRA_LAT_LON_BOUNDS[1])}_"
+        f"lon{_format_bound_token(EXTRA_LAT_LON_BOUNDS[2])}to{_format_bound_token(EXTRA_LAT_LON_BOUNDS[3])}"
+    )
+    remote_dir = f"{AMAREL_DATA}/Apr_to_Sep_{tag}"
+    local_dir = MAC_DATA / f"Apr_to_Sep_{tag}"
+    files = [(local_dir / f"tco_grid_apr_sep_{y}.pkl", f"Apr_to_Sep_{tag}/tco_grid_apr_sep_{y}.pkl")
+             for y in years]
+    files += [
+        (local_dir / "day_index_apr_sep_2022_2025.csv", f"Apr_to_Sep_{tag}/day_index_apr_sep_2022_2025.csv"),
+        (local_dir / "monthly_means_apr_sep_2022_2025.csv", f"Apr_to_Sep_{tag}/monthly_means_apr_sep_2022_2025.csv"),
+    ]
+    print(f"\n  [D] Expanded merged pkl  →  {AMAREL_HOST}:{remote_dir}/")
+    print(f"      {len(files)} files  (missing locally will be skipped)")
+    return _transfer_list(files, remote_dir, dry_run)
+
+
 # ── Section B: individual monthly pkl ─────────────────────────────────────────
 
 def transfer_monthly(years: list, months: list, dry_run: bool, only_extra_bounds: bool = False) -> tuple:
@@ -204,10 +229,13 @@ def transfer_monthly(years: list, months: list, dry_run: bool, only_extra_bounds
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-def main(years, months, dry_run, skip_merged, skip_monthly, only_extra_bounds):
+def main(years, months, dry_run, skip_merged, skip_monthly, only_extra_bounds, only_extra_merged):
     if only_extra_bounds:
         skip_merged = True
         skip_monthly = False
+    if only_extra_merged:
+        skip_merged = True
+        skip_monthly = True
 
     print(f"\n{'='*62}")
     print(f"  step5: Transfer TCO data → Amarel")
@@ -216,6 +244,7 @@ def main(years, months, dry_run, skip_merged, skip_monthly, only_extra_bounds):
     print(f"  transfer [A] merged pkl : {not skip_merged}")
     print(f"  transfer [B] monthly pkl: {not skip_monthly}")
     print(f"  only extra bounds       : {only_extra_bounds}")
+    print(f"  only extra merged       : {only_extra_merged}")
     print(f"  dry-run      : {dry_run}")
     print(f"{'='*62}")
 
@@ -227,6 +256,10 @@ def main(years, months, dry_run, skip_merged, skip_monthly, only_extra_bounds):
 
     if not skip_monthly:
         ok, fail = transfer_monthly(years, months, dry_run, only_extra_bounds=only_extra_bounds)
+        total_ok += ok; total_fail += fail
+
+    if only_extra_merged:
+        ok, fail = transfer_extra_merged(years, dry_run)
         total_ok += ok; total_fail += fail
 
     print(f"\n{'='*62}")
@@ -258,6 +291,8 @@ if __name__ == "__main__":
                         help="Skip section B (individual monthly pkl)")
     parser.add_argument("--only-extra-bounds", action="store_true",
                         help="Transfer only the expanded-bounds monthly pkl files")
+    parser.add_argument("--only-extra-merged", action="store_true",
+                        help="Transfer only the expanded-bounds merged Apr-to-Sep pkl files")
     args = parser.parse_args()
     main(args.years, args.months, args.dry_run, args.skip_merged, args.skip_monthly,
-         args.only_extra_bounds)
+         args.only_extra_bounds, args.only_extra_merged)
