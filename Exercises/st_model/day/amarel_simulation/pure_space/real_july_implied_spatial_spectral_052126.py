@@ -90,8 +90,8 @@ for candidate in (AMAREL_SRC, LOCAL_SRC):
 
 from GEMS_TCO import configuration as config
 from GEMS_TCO.vecchia_st_spline import (
-    ClusterHybridVecchiaNoNuggetSplineFit,
-    ClusterHybridVecchiaSplineFit,
+    RealDataCorridorWidth4x4Lag643NoNuggetSplineFit,
+    RealDataCorridorWidth4x4Lag643SplineFit,
 )
 
 
@@ -102,12 +102,12 @@ ROUND_DECIMALS = 6
 
 VARIANTS = {
     "nugget0": {
-        "class": ClusterHybridVecchiaNoNuggetSplineFit,
+        "class": RealDataCorridorWidth4x4Lag643NoNuggetSplineFit,
         "n_params": 6,
         "row_title": "ST: nugget fixed 0",
     },
     "nugget_free": {
-        "class": ClusterHybridVecchiaSplineFit,
+        "class": RealDataCorridorWidth4x4Lag643SplineFit,
         "n_params": 7,
         "row_title": "ST: nugget free",
     },
@@ -158,10 +158,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--resolutions", default="8,4,2,1")
     p.add_argument("--variants", default="nugget0,nugget_free")
     p.add_argument("--data-root", default=getattr(config, "amarel_data_load_path", "/home/jl2815/tco/data/"))
-    p.add_argument("--output-root", default="/home/jl2815/tco/exercise_output/real_data/implied_spatial_spectral_052126")
+    p.add_argument("--output-root", default="/home/jl2815/tco/exercise_output/real_data/implied_spatial_spectral_corridor_4x4_lag643_lat-3to7_lon121to131_052126")
     p.add_argument("--expanded-bounds", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--lat-range", default="-3,7")
-    p.add_argument("--lon-range", default="111,131")
+    p.add_argument("--lon-range", default="121,131")
     p.add_argument("--x-col", default="Longitude")
     p.add_argument("--y-col", default="Latitude")
     p.add_argument("--source-x-col", default="Source_Longitude")
@@ -171,14 +171,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--time-origin", type=float, default=477700.0)
     p.add_argument("--device", default="auto")
     p.add_argument("--cuda-fallback", default="cpu", choices=["cpu", "error"])
-    p.add_argument("--block-shape", default="3,3")
+    p.add_argument("--block-shape", default="4,4")
     p.add_argument("--n-neighbor-blocks-t", type=int, default=6)
-    p.add_argument("--lag1-local-blocks", type=int, default=3)
+    p.add_argument("--lag1-local-blocks", type=int, default=4)
     p.add_argument("--lag1-shifted-blocks", type=int, default=1)
-    p.add_argument("--lag2-local-blocks", type=int, default=2)
+    p.add_argument("--lag2-local-blocks", type=int, default=3)
     p.add_argument("--lag2-shifted-blocks", type=int, default=1)
     p.add_argument("--daily-stride", type=int, default=2)
-    p.add_argument("--lag1-lon-offset", type=float, default=0.063)
+    p.add_argument("--lag1-lon-offset", type=float, default=0.126)
     p.add_argument("--lag2-lon-offset", type=float, default=None)
     p.add_argument("--target-chunk-size", type=int, default=128)
     p.add_argument("--min-target-points", type=int, default=1)

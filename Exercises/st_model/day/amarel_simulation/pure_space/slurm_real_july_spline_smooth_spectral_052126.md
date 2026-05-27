@@ -16,6 +16,9 @@ columns: x8, x4, x2, x1
 rows:    nugget fixed 0, nugget free
 ```
 
+All hourly pure-space fits use cluster/group Vecchia with `4x4` grid-cell
+target blocks and conditioning on `2` previous max-min cluster blocks.
+
 The black line is the mean of the 8 hourly residual periodograms. The red line
 is the mean of the 8 fitted finite-sample expected periodograms. The blue line
 is the ratio of those two means, not the mean of 8 hourly ratios.
@@ -100,6 +103,7 @@ Paste this sbatch script:
 #SBATCH --mem=64G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
+#SBATCH --nodelist=gpu021
 
 set -euo pipefail
 
@@ -117,7 +121,7 @@ export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
-SMOOTHS=(0.2 0.25 0.3 0.35 0.4 0.45)
+SMOOTHS=(0.2 0.3 0.4 0.5 0.6 0.7)
 YEARS=(2022 2023 2024 2025)
 MONTH=7
 
@@ -196,7 +200,7 @@ Resource request:
 
 ```text
 time: 48:00:00
-cpu:  4
+cpu:  8
 mem:  64G
 gpu:  1
 jobs visible in squeue: 1

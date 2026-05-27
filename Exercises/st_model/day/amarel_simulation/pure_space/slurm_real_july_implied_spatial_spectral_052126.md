@@ -14,13 +14,18 @@ row 2:  nugget free
 ```
 
 Each day/resolution/variant uses one ST fit, not 8 separate pure-space fits.
+The fitted ST model is then evaluated at temporal lag zero to get the implied
+spatial covariance; the expected periodogram is computed separately for each
+hourly mask and then averaged over the 8 hours.  The ST cluster conditioning
+uses the real-data corridor-width Vecchia version with `4x4` grid-cell target
+blocks and spatio-temporal lag pattern `A/B/C = 6/4/3`.
 
 ## Expanded July Data
 
 This run uses the expanded July grid:
 
 ```text
-lat -3..7, lon 111..131
+lat -3..7, lon 121..131
 ```
 
 Expected Amarel files:
@@ -31,6 +36,9 @@ Expected Amarel files:
 /home/jl2815/tco/data/pickle_2024/tco_grid_lat-3to7_lon111to131_24_07.pkl
 /home/jl2815/tco/data/pickle_2025/tco_grid_lat-3to7_lon111to131_25_07.pkl
 ```
+
+The source pkl covers `lon 111..131`; this run filters it to the analysis
+domain `lon 121..131`.
 
 If needed, transfer the expanded files from the Mac:
 
@@ -75,7 +83,7 @@ Paste this sbatch script:
 #SBATCH --mem=64G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu033
+#SBATCH --nodelist=gpu022
 
 set -euo pipefail
 
@@ -93,12 +101,12 @@ export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
-SMOOTHS=(0.2 0.25 0.3 0.35 0.4 0.45)
+SMOOTHS=(0.2 0.25 0.3 0.4 0.5 0.6 0.7)
 YEARS=(2022 2023 2024 2025)
 MONTH=7
 
 SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/real_july_implied_spatial_spectral_052126.py"
-OUTROOT="/home/jl2815/tco/exercise_output/real_data/implied_spatial_spectral_052126"
+OUTROOT="/home/jl2815/tco/exercise_output/real_data/implied_spatial_spectral_corridor_4x4_lag643_lat-3to7_lon121to131_052126"
 LOGROOT="/home/jl2815/tco/exercise_output/logs"
 
 mkdir -p "${OUTROOT}" "${LOGROOT}"
@@ -134,17 +142,17 @@ for SMOOTH in "${SMOOTHS[@]}"; do
             --output-root "${OUTROOT}" \
             --expanded-bounds \
             --lat-range=-3,7 \
-            --lon-range=111,131 \
+            --lon-range=121,131 \
             --device cuda \
             --cuda-fallback cpu \
-            --block-shape "3,3" \
+            --block-shape "4,4" \
             --n-neighbor-blocks-t 6 \
-            --lag1-local-blocks 3 \
+            --lag1-local-blocks 4 \
             --lag1-shifted-blocks 1 \
-            --lag2-local-blocks 2 \
+            --lag2-local-blocks 3 \
             --lag2-shifted-blocks 1 \
             --daily-stride 2 \
-            --lag1-lon-offset 0.063 \
+            --lag1-lon-offset 0.126 \
             --target-chunk-size 128 \
             --lbfgs-steps 8 \
             --lbfgs-eval 20 \
@@ -175,7 +183,7 @@ again; `--skip-existing` skips completed daily outputs.
 Output root:
 
 ```text
-/home/jl2815/tco/exercise_output/real_data/implied_spatial_spectral_052126
+/home/jl2815/tco/exercise_output/real_data/implied_spatial_spectral_corridor_4x4_lag643_lat-3to7_lon121to131_052126
 ```
 
 Folder structure:
@@ -201,6 +209,6 @@ smooth_0p2/
 ```bash
 mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/real_data"
 
-scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/real_data/implied_spatial_spectral_052126 \
+scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/real_data/implied_spatial_spectral_corridor_4x4_lag643_lat-3to7_lon121to131_052126 \
     "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/real_data/"
 ```

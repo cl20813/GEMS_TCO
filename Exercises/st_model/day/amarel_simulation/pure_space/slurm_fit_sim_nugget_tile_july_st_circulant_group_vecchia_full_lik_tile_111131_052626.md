@@ -12,6 +12,7 @@ Key settings:
 - source pkl file:
   `/home/jl2815/tco/data/pickle_2024/tco_grid_lat-3to7_lon111to131_24_07.pkl`
 - year/month: `2024-07`
+- fitted subset: first 7 observed days, i.e. the first 56 July hour slots
 - smoothness values: `nu=0.2` and `nu=0.5`
 - execution style: one Slurm job, one GPU node, sequential loops, no job array
 - global fit: isotropic Matern group Vecchia, `beta0 + beta1 * centered latitude`
@@ -69,7 +70,7 @@ Paste:
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
-#SBATCH --mem=96G
+#SBATCH --mem=64G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
 
@@ -92,6 +93,7 @@ export NUMEXPR_NUM_THREADS=1
 
 YEAR=2024
 EXPECTED_HOURS=248
+FIT_HOURS=56
 SMOOTHS=(0.2 0.5)
 
 # 0 means exact full likelihood over all tile points. 1200 is safer for the
@@ -100,7 +102,7 @@ TILE_FULL_MAX_POINTS=1200
 
 SCRIPT=/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/fit_sim_july_spatial_nugget_tiles_group_vecchia_full_lik_tile_111131_052626.py
 DATA_ROOT=/home/jl2815/tco/data
-BASE_ROOT=/home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_global_full_lik_tile_111131_052626
+BASE_ROOT=/home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_global_full_lik_tile_111131_first7days_052626
 
 YY=$(printf "%02d" $((YEAR % 100)))
 DATA_PATH=${DATA_ROOT}/pickle_${YEAR}/tco_grid_lat-3to7_lon111to131_${YY}_07.pkl
@@ -113,6 +115,7 @@ echo "Host: $(hostname)"
 echo "Started: $(date)"
 echo "Data=${DATA_PATH}"
 echo "Output=${YEAR_OUT}"
+echo "Fitting first ${FIT_HOURS} manifest rows only"
 nvidia-smi
 which python
 python -c "import torch; print('torch', torch.__version__); print('cuda available', torch.cuda.is_available())"
@@ -146,12 +149,13 @@ for SMOOTH in "${SMOOTHS[@]}"; do
 
   echo "============================================================"
   echo "Sequential fit start: year=${YEAR}, smooth=${SMOOTH}, output=${OUTDIR}"
+  echo "Fitting only first ${FIT_HOURS} hour slots from the July manifest"
   echo "Tile full-likelihood max points=${TILE_FULL_MAX_POINTS}"
   echo "Time: $(date)"
   echo "============================================================"
 
-  for HOUR_IDX in $(seq 0 $((EXPECTED_HOURS - 1))); do
-    echo "---- year=${YEAR} smooth=${SMOOTH} hour_idx=${HOUR_IDX}/${EXPECTED_HOURS} $(date) ----"
+  for HOUR_IDX in $(seq 0 $((FIT_HOURS - 1))); do
+    echo "---- year=${YEAR} smooth=${SMOOTH} hour_idx=${HOUR_IDX}/${FIT_HOURS} first-7-days $(date) ----"
     srun python "${SCRIPT}" \
       --mode fit \
       --input "${DATA_PATH}" \
@@ -184,7 +188,7 @@ for SMOOTH in "${SMOOTHS[@]}"; do
       --device cuda
   done
 
-  echo "Summarizing year=${YEAR}, smooth=${SMOOTH}: $(date)"
+  echo "Summarizing first ${FIT_HOURS} fitted hours for year=${YEAR}, smooth=${SMOOTH}: $(date)"
   python "${SCRIPT}" \
     --mode summarize \
     --input "${DATA_PATH}" \
@@ -229,13 +233,13 @@ sbatch fit_sim_july_group_vecchia_global_full_lik_tile_111131_2024_seq_052626.sh
 squeue -u jl2815
 tail -f /home/jl2815/tco/exercise_output/logs/real_gv_fulltile24_<JOBID>.out
 
-ls -R /home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_global_full_lik_tile_111131_052626
+ls -R /home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_global_full_lik_tile_111131_first7days_052626
 ```
 
 Expected output folders:
 
 ```text
-july_expanded_bounds_group_vecchia_global_full_lik_tile_111131_052626/
+july_expanded_bounds_group_vecchia_global_full_lik_tile_111131_first7days_052626/
   2024_july_expanded_bounds/
     manifest_hours.csv
     nu0p2/
@@ -251,6 +255,6 @@ july_expanded_bounds_group_vecchia_global_full_lik_tile_111131_052626/
 ```bash
 mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/real_data"
 
-scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_global_full_lik_tile_111131_052626 \
+scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_global_full_lik_tile_111131_first7days_052626 \
   "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/real_data/"
 ```

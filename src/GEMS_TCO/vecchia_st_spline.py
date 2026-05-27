@@ -35,6 +35,9 @@ from scipy.special import gamma, kv
 
 from GEMS_TCO.matern_vecchia_cluster_hybrid import ClusterHybridVecchiaFit
 from GEMS_TCO.matern_vecchia_hybrid import HybridVecchiaFit
+from GEMS_TCO.vecchia_realdata_corridor_width_4x4_lag643 import (
+    RealDataCorridorWidth4x4Lag643VecchiaFit,
+)
 
 
 _MATERN_SPLINE_CACHE = {}
@@ -333,9 +336,95 @@ class ClusterHybridVecchiaNoNuggetSplineFit(_STNoNuggetSplineMixin, ClusterHybri
         self._init_st_spline(smooth, spline_n_points, spline_r_max)
 
 
+class RealDataCorridorWidth4x4Lag643SplineFit(_STMaternSplineMixin, RealDataCorridorWidth4x4Lag643VecchiaFit):
+    """Corridor-width 4x4 lag-643 ST cluster Vecchia with arbitrary smoothness."""
+
+    def __init__(
+        self,
+        smooth: float,
+        input_map: dict,
+        grid_coords=None,
+        block_shape=(4, 4),
+        n_neighbor_blocks_t: int = 6,
+        lag1_local_blocks: int = 4,
+        lag2_local_blocks: int = 3,
+        daily_stride: int = 2,
+        lag1_lon_offset: float = 0.126,
+        lag2_lon_offset=None,
+        target_chunk_size: int = 128,
+        min_target_points: int = 1,
+        max_neighbor_search=None,
+        spline_n_points: int = 1200,
+        spline_r_max: float = 20.0,
+        **_ignored,
+    ):
+        if tuple(block_shape) != (4, 4):
+            raise ValueError(f"corridor lag643 requires block_shape=(4, 4), got {block_shape}")
+        if int(n_neighbor_blocks_t) != 6 or int(lag1_local_blocks) != 4 or int(lag2_local_blocks) != 3:
+            raise ValueError(
+                "corridor lag643 requires n_neighbor_blocks_t=6, "
+                "lag1_local_blocks=4, lag2_local_blocks=3"
+            )
+        super().__init__(
+            smooth=0.5,
+            input_map=input_map,
+            grid_coords=grid_coords,
+            reference_advec_lon_abs=float(abs(lag1_lon_offset)),
+            daily_stride=daily_stride,
+            target_chunk_size=target_chunk_size,
+            min_target_points=min_target_points,
+            max_neighbor_search=max_neighbor_search,
+        )
+        self._init_st_spline(smooth, spline_n_points, spline_r_max)
+
+
+class RealDataCorridorWidth4x4Lag643NoNuggetSplineFit(_STNoNuggetSplineMixin, RealDataCorridorWidth4x4Lag643VecchiaFit):
+    """Corridor-width 4x4 lag-643 ST cluster Vecchia with nugget fixed at 0."""
+
+    def __init__(
+        self,
+        smooth: float,
+        input_map: dict,
+        grid_coords=None,
+        block_shape=(4, 4),
+        n_neighbor_blocks_t: int = 6,
+        lag1_local_blocks: int = 4,
+        lag2_local_blocks: int = 3,
+        daily_stride: int = 2,
+        lag1_lon_offset: float = 0.126,
+        lag2_lon_offset=None,
+        target_chunk_size: int = 128,
+        min_target_points: int = 1,
+        max_neighbor_search=None,
+        spline_n_points: int = 1200,
+        spline_r_max: float = 20.0,
+        **_ignored,
+    ):
+        if tuple(block_shape) != (4, 4):
+            raise ValueError(f"corridor lag643 requires block_shape=(4, 4), got {block_shape}")
+        if int(n_neighbor_blocks_t) != 6 or int(lag1_local_blocks) != 4 or int(lag2_local_blocks) != 3:
+            raise ValueError(
+                "corridor lag643 requires n_neighbor_blocks_t=6, "
+                "lag1_local_blocks=4, lag2_local_blocks=3"
+            )
+        super().__init__(
+            smooth=0.5,
+            input_map=input_map,
+            grid_coords=grid_coords,
+            reference_advec_lon_abs=float(abs(lag1_lon_offset)),
+            daily_stride=daily_stride,
+            target_chunk_size=target_chunk_size,
+            min_target_points=min_target_points,
+            max_neighbor_search=max_neighbor_search,
+        )
+        self._init_st_spline(smooth, spline_n_points, spline_r_max)
+
+
 __all__ = [
     "HybridVecchiaSplineFit",
     "HybridVecchiaNoNuggetSplineFit",
     "ClusterHybridVecchiaSplineFit",
     "ClusterHybridVecchiaNoNuggetSplineFit",
+    "RealDataCorridorWidth4x4Lag643SplineFit",
+    "RealDataCorridorWidth4x4Lag643NoNuggetSplineFit",
 ]
