@@ -41,7 +41,7 @@ ssh jl2815@amarel.rutgers.edu "mkdir -p /home/jl2815/tco/exercise_25/st_model/da
 scp -r "/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO" \
   jl2815@amarel.rutgers.edu:/home/jl2815/tco/
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/pure_space/fit_sim_july_spatial_nugget_tiles_group_vecchia_052526.py" \
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/pure_space/fit_sim_july_spatial_nugget_tiles_group_vecchia_111131_052526.py" \
   jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/
 ```
 
@@ -59,17 +59,17 @@ On Amarel:
 
 ```bash
 cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space
-nano fit_sim_july_group_vecchia_tiles_seq_052526.sh
-sbatch fit_sim_july_group_vecchia_tiles_seq_052526.sh
+nano fit_sim_july_group_vecchia_tiles_111131_seq_052526.sh
+sbatch fit_sim_july_group_vecchia_tiles_111131_seq_052526.sh
 ```
 
 Paste:
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name=real_gv_seq
-#SBATCH --output=/home/jl2815/tco/exercise_output/logs/real_gv_seq_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/logs/real_gv_seq_%j.err
+#SBATCH --job-name=real_gv_111131_seq
+#SBATCH --output=/home/jl2815/tco/exercise_output/logs/real_gv_111131_seq_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/logs/real_gv_111131_seq_%j.err
 #SBATCH --time=6:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -98,9 +98,9 @@ export NUMEXPR_NUM_THREADS=1
 YEARS=(2023 2024 2025)
 SMOOTHS=(0.2 0.5)
 
-SCRIPT=/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/fit_sim_july_spatial_nugget_tiles_group_vecchia_052526.py
+SCRIPT=/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/fit_sim_july_spatial_nugget_tiles_group_vecchia_111131_052526.py
 DATA_ROOT=/home/jl2815/tco/data
-BASE_ROOT=/home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_tiles_052526
+BASE_ROOT=/home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_tiles_111131_052526
 
 expected_hours_for_year() {
   case "$1" in
@@ -237,22 +237,22 @@ echo "Finished all years and smooth values: $(date)"
 Submit:
 
 ```bash
-sbatch fit_sim_july_group_vecchia_tiles_seq_052526.sh
+sbatch fit_sim_july_group_vecchia_tiles_111131_seq_052526.sh
 ```
 
 ## 3. Monitor
 
 ```bash
 squeue -u jl2815
-tail -f /home/jl2815/tco/exercise_output/logs/real_gv_seq_<JOBID>.out
+tail -f /home/jl2815/tco/exercise_output/logs/real_gv_111131_seq_<JOBID>.out
 
-ls -R /home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_tiles_052526
+ls -R /home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_tiles_111131_052526
 ```
 
 Expected output folders:
 
 ```text
-july_expanded_bounds_group_vecchia_tiles_052526/
+july_expanded_bounds_group_vecchia_tiles_111131_052526/
   2022_july_expanded_bounds/
     manifest_hours.csv
     nu0p2/
@@ -274,6 +274,6 @@ july_expanded_bounds_group_vecchia_tiles_052526/
 ```bash
 mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/real_data"
 
-scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_tiles_052526 \
+scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_tiles_111131_052526 \
   "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/real_data/"
 ```

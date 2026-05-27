@@ -113,7 +113,7 @@ def set_seed(seed: int) -> None:
 def parse_range(s: str) -> list[float]:
     vals = [float(x.strip()) for x in str(s).split(",") if x.strip()]
     if len(vals) != 2:
-        raise argparse.ArgumentTypeError("range must look like -3,2")
+        raise argparse.ArgumentTypeError("range must look like min,max")
     return [min(vals), max(vals)]
 
 
@@ -668,8 +668,8 @@ def add_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--asset-sampling", type=str, default="cycle", choices=["cycle", "random"])
     parser.add_argument("--sim-data-root", type=Path, default=Path("/home/jl2815/tco/exercise_output/sim_data/july_st_circulant_realpattern"))
     parser.add_argument("--data-kind", type=str, default="real_locations", choices=["gridded", "real_locations"])
-    parser.add_argument("--lat-range", type=parse_range, default=parse_range("-3,2"))
-    parser.add_argument("--lon-range", type=parse_range, default=parse_range("121,131"))
+    parser.add_argument("--lat-range", type=parse_range, default=parse_range("-3,7"))
+    parser.add_argument("--lon-range", type=parse_range, default=parse_range("111,131"))
     parser.add_argument("--cluster-neighbor-blocks", type=parse_int_list, default=parse_int_list("2"))
     parser.add_argument("--cluster-block-shape", type=parse_block_shape, default=parse_block_shape("4x4"))
     parser.add_argument("--mean-design", default="latlon", choices=["lat", "base", "latlon", "hour_spatial"])
@@ -686,7 +686,7 @@ def add_args(parser: argparse.ArgumentParser) -> None:
     parser.set_defaults(center_response=True)
     parser.add_argument("--require-cuda", action="store_true")
     parser.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument("--out-dir", type=Path, default=Path("/home/jl2815/tco/exercise_output/estimates/day/pure_space_cluster_b2_052426"))
+    parser.add_argument("--out-dir", type=Path, default=Path("/home/jl2815/tco/exercise_output/estimates/day/pure_space_cluster_b2_111131_052426"))
 
 
 def main() -> None:
