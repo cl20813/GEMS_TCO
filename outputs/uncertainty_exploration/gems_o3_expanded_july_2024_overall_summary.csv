@@ -1,0 +1,2 @@
+year,source_csv,rows,rows_in_region,finite_o3_rows,good_flag_rows,good_finite_o3_rows,lat_min,lat_max,lon_min,lon_max,finite_lat_min,finite_lat_max,finite_lon_min,finite_lon_max,good_finite_fraction
+2024,/Users/joonwonlee/Documents/GEMS_DATA/data_2024/data_24_07_0131_N-37_E111131.csv,34010845,34010845,34010845,34010845,34010845,-3.0,7.0,111.0,131.0,-3.0,7.0,111.0,131.0,1.0
