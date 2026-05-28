@@ -1,0 +1,3 @@
+candidate,raw_source_slots,effective_slots_raw_positive,raw_bbox_pixels,nan_or_fill_pixels,step2_good_pixels,unusable_for_step2_pixels,nan_or_fill_pct,step2_good_pct,unusable_for_step2_pct,step2_rows_from_log,step2_count_delta
+lat1to6_lon129to139,240,240,3901840,0,3614698,287142,0.0,92.6408566214914,7.359143378508601,3614698,0
+lat1to6_lon135to145,240,60,790979,0,722626,68353,0.0,91.35843050194758,8.641569498052414,722626,0
