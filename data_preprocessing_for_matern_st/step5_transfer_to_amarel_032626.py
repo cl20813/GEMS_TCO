@@ -46,11 +46,11 @@ python step5_transfer_to_amarel_032626.py --skip-monthly
 # Monthly pkl only (skip merged):
 python step5_transfer_to_amarel_032626.py --skip-merged
 
-# New expanded-bounds July pkl only:
-python step5_transfer_to_amarel_032626.py --only-extra-bounds
+# New bounds-aware July pkl only:
+python step5_transfer_to_amarel_032626.py --only-extra-bounds --lat-lon-bounds 15,20,121,131
 
-# New expanded-bounds merged pkl only:
-python step5_transfer_to_amarel_032626.py --only-extra-merged
+# New bounds-aware merged pkl only:
+python step5_transfer_to_amarel_032626.py --only-extra-merged --lat-lon-bounds 15,20,121,131
 
 cd /Users/joonwonlee/Documents/GEMS_TCO-1/data_preprocessing_for_matern_st
 python step5_transfer_to_amarel_032626.py --years 2022 2023 2024 2025 --months 7 --only-extra-bounds
@@ -94,6 +94,21 @@ def _format_bound_token(value):
     return str(value).replace(".", "p")
 
 
+def parse_bounds(text: str) -> tuple[float, float, float, float]:
+    vals = [float(x.strip()) for x in text.split(",")]
+    if len(vals) != 4:
+        raise argparse.ArgumentTypeError("bounds must be lat_min,lat_max,lon_min,lon_max")
+    return tuple(vals)
+
+
+def bounds_tag(lat_lon_bounds) -> str:
+    lat_start, lat_end, lon_start, lon_end = lat_lon_bounds
+    return (
+        f"lat{_format_bound_token(lat_start)}to{_format_bound_token(lat_end)}_"
+        f"lon{_format_bound_token(lon_start)}to{_format_bound_token(lon_end)}"
+    )
+
+
 def tco_grid_filename(year: int, month: int, lat_lon_bounds=DEFAULT_LAT_LON_BOUNDS) -> str:
     yy = str(year)[2:]
     mm = f"{month:02d}"
@@ -101,12 +116,7 @@ def tco_grid_filename(year: int, month: int, lat_lon_bounds=DEFAULT_LAT_LON_BOUN
     if tuple(lat_lon_bounds) == DEFAULT_LAT_LON_BOUNDS:
         return f"tco_grid_{yy}_{mm}.pkl"
 
-    lat_start, lat_end, lon_start, lon_end = lat_lon_bounds
-    bounds_tag = (
-        f"lat{_format_bound_token(lat_start)}to{_format_bound_token(lat_end)}_"
-        f"lon{_format_bound_token(lon_start)}to{_format_bound_token(lon_end)}"
-    )
-    return f"tco_grid_{bounds_tag}_{yy}_{mm}.pkl"
+    return f"tco_grid_{bounds_tag(lat_lon_bounds)}_{yy}_{mm}.pkl"
 
 def _size_str(path: Path) -> str:
     if not path.exists():
@@ -177,11 +187,8 @@ def transfer_merged(years: list, dry_run: bool) -> tuple:
     return _transfer_list(files, remote_dir, dry_run)
 
 
-def transfer_extra_merged(years: list, dry_run: bool) -> tuple:
-    tag = (
-        f"lat{_format_bound_token(EXTRA_LAT_LON_BOUNDS[0])}to{_format_bound_token(EXTRA_LAT_LON_BOUNDS[1])}_"
-        f"lon{_format_bound_token(EXTRA_LAT_LON_BOUNDS[2])}to{_format_bound_token(EXTRA_LAT_LON_BOUNDS[3])}"
-    )
+def transfer_extra_merged(years: list, dry_run: bool, lat_lon_bounds=EXTRA_LAT_LON_BOUNDS) -> tuple:
+    tag = bounds_tag(lat_lon_bounds)
     remote_dir = f"{AMAREL_DATA}/Apr_to_Sep_{tag}"
     local_dir = MAC_DATA / f"Apr_to_Sep_{tag}"
     files = [(local_dir / f"tco_grid_apr_sep_{y}.pkl", f"Apr_to_Sep_{tag}/tco_grid_apr_sep_{y}.pkl")
@@ -197,7 +204,13 @@ def transfer_extra_merged(years: list, dry_run: bool) -> tuple:
 
 # ── Section B: individual monthly pkl ─────────────────────────────────────────
 
-def transfer_monthly(years: list, months: list, dry_run: bool, only_extra_bounds: bool = False) -> tuple:
+def transfer_monthly(
+    years: list,
+    months: list,
+    dry_run: bool,
+    only_extra_bounds: bool = False,
+    lat_lon_bounds=EXTRA_LAT_LON_BOUNDS,
+) -> tuple:
     ok = fail = 0
     for year in years:
         remote_dir = f"{AMAREL_DATA}/pickle_{year}"
@@ -212,8 +225,8 @@ def transfer_monthly(years: list, months: list, dry_run: bool, only_extra_bounds
             ]
 
         extra_files = [
-            (local_dir / tco_grid_filename(year, m, EXTRA_LAT_LON_BOUNDS),
-             f"pickle_{year}/{tco_grid_filename(year, m, EXTRA_LAT_LON_BOUNDS)}")
+            (local_dir / tco_grid_filename(year, m, lat_lon_bounds),
+             f"pickle_{year}/{tco_grid_filename(year, m, lat_lon_bounds)}")
             for m in months
             if m in EXTRA_BOUNDS_MONTHS
         ]
@@ -229,7 +242,7 @@ def transfer_monthly(years: list, months: list, dry_run: bool, only_extra_bounds
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-def main(years, months, dry_run, skip_merged, skip_monthly, only_extra_bounds, only_extra_merged):
+def main(years, months, dry_run, skip_merged, skip_monthly, only_extra_bounds, only_extra_merged, lat_lon_bounds):
     if only_extra_bounds:
         skip_merged = True
         skip_monthly = False
@@ -245,6 +258,7 @@ def main(years, months, dry_run, skip_merged, skip_monthly, only_extra_bounds, o
     print(f"  transfer [B] monthly pkl: {not skip_monthly}")
     print(f"  only extra bounds       : {only_extra_bounds}")
     print(f"  only extra merged       : {only_extra_merged}")
+    print(f"  extra lat/lon bounds    : {lat_lon_bounds}")
     print(f"  dry-run      : {dry_run}")
     print(f"{'='*62}")
 
@@ -255,11 +269,17 @@ def main(years, months, dry_run, skip_merged, skip_monthly, only_extra_bounds, o
         total_ok += ok; total_fail += fail
 
     if not skip_monthly:
-        ok, fail = transfer_monthly(years, months, dry_run, only_extra_bounds=only_extra_bounds)
+        ok, fail = transfer_monthly(
+            years,
+            months,
+            dry_run,
+            only_extra_bounds=only_extra_bounds,
+            lat_lon_bounds=lat_lon_bounds,
+        )
         total_ok += ok; total_fail += fail
 
     if only_extra_merged:
-        ok, fail = transfer_extra_merged(years, dry_run)
+        ok, fail = transfer_extra_merged(years, dry_run, lat_lon_bounds=lat_lon_bounds)
         total_ok += ok; total_fail += fail
 
     print(f"\n{'='*62}")
@@ -293,6 +313,8 @@ if __name__ == "__main__":
                         help="Transfer only the expanded-bounds monthly pkl files")
     parser.add_argument("--only-extra-merged", action="store_true",
                         help="Transfer only the expanded-bounds merged Apr-to-Sep pkl files")
+    parser.add_argument("--lat-lon-bounds", type=parse_bounds, default=EXTRA_LAT_LON_BOUNDS,
+                        help="Bounds for --only-extra-bounds/--only-extra-merged as lat_min,lat_max,lon_min,lon_max")
     args = parser.parse_args()
     main(args.years, args.months, args.dry_run, args.skip_merged, args.skip_monthly,
-         args.only_extra_bounds, args.only_extra_merged)
+         args.only_extra_bounds, args.only_extra_merged, args.lat_lon_bounds)

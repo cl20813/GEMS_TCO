@@ -103,7 +103,7 @@ Paste this sbatch script:
 #SBATCH --mem=64G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu021
+#SBATCH --nodelist=gpu020
 
 set -euo pipefail
 
