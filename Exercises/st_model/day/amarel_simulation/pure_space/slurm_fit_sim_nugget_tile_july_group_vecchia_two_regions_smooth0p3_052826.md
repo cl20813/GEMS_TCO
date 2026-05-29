@@ -371,6 +371,21 @@ july_two_open_water_regions_group_vecchia_tiles_smooth0p3_052826/
 
 ## 4. Copy Results Back
 
+To copy only the compact summary/quicklook folders:
+
+```bash
+mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/real_data/july_two_open_water_regions_group_vecchia_tiles_smooth0p3_052826/west_pacific"
+mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/real_data/july_two_open_water_regions_group_vecchia_tiles_smooth0p3_052826/micronesia_open_water"
+
+scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/real_data/july_two_open_water_regions_group_vecchia_tiles_smooth0p3_052826/west_pacific/tile_median_quicklook \
+  "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/real_data/july_two_open_water_regions_group_vecchia_tiles_smooth0p3_052826/west_pacific/"
+
+scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/real_data/july_two_open_water_regions_group_vecchia_tiles_smooth0p3_052826/micronesia_open_water/tile_median_quicklook \
+  "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/real_data/july_two_open_water_regions_group_vecchia_tiles_smooth0p3_052826/micronesia_open_water/"
+```
+
+To copy the full output tree:
+
 ```bash
 mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/real_data"
 
