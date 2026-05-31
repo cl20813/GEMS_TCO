@@ -1,0 +1,5 @@
+direction,model,n,rmse_mean,rmse_median,mae_mean,mae_median,bias_mean,bias_median
+lat,nu=0.3 x1 nugget_free,1,1.0553,1.0553,0.9111,0.9111,-0.8027,-0.8027
+lat,nu=0.5 x1 nugget_free,10,1.7222,1.5976,1.3924,1.3244,0.9042,0.856
+lon,nu=0.3 x1 nugget_free,1,1.141,1.141,1.0106,1.0106,0.0264,0.0264
+lon,nu=0.5 x1 nugget_free,10,1.2867,1.1909,1.0622,1.0068,0.0196,-0.14

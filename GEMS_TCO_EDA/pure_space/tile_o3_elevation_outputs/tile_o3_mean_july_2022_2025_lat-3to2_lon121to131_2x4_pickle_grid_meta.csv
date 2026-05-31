@@ -1,0 +1,5 @@
+year,source_mode,source_path,n_snapshots,rows_in_domain
+2022,pickle_grid,/Users/joonwonlee/Documents/GEMS_DATA/pickle_2022/tco_grid_lat-3to7_lon111to131_22_07.pkl,240,4064645
+2023,pickle_grid,/Users/joonwonlee/Documents/GEMS_DATA/pickle_2023/tco_grid_lat-3to7_lon111to131_23_07.pkl,248,4336492
+2024,pickle_grid,/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/tco_grid_lat-3to7_lon111to131_24_07.pkl,248,4301695
+2025,pickle_grid,/Users/joonwonlee/Documents/GEMS_DATA/pickle_2025/tco_grid_lat-3to7_lon111to131_25_07.pkl,247,4320048

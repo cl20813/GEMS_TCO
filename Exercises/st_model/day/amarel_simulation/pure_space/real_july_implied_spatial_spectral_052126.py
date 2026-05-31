@@ -198,6 +198,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--hann", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--skip-existing", action="store_true")
     p.add_argument("--make-monthly-only", action="store_true")
+    p.add_argument("--fit-only", action="store_true", help="Write daily ST fit CSVs only; skip spectrum CSVs and plots.")
     return p.parse_args(normalize_range_argv(sys.argv[1:]))
 
 
@@ -992,7 +993,7 @@ def process_day(args, ctx: MonthContext, smooth: float, day: int, out_dir: Path,
     fit_path = daily_dir / f"{date_str}_st_fits.csv"
     spec_path = daily_dir / f"{date_str}_implied_spatial_radial_spectrum.csv"
     plot_path = plot_dir / f"{date_str}_implied_spatial_data_vs_expected_periodogram.png"
-    if args.skip_existing and spec_path.exists() and fit_path.exists() and plot_path.exists():
+    if args.skip_existing and fit_path.exists() and (args.fit_only or (spec_path.exists() and plot_path.exists())):
         print(f"Skip existing day {date_str}", flush=True)
         return
     entries = ctx.entries_by_day.get(day, [])
@@ -1009,7 +1010,7 @@ def process_day(args, ctx: MonthContext, smooth: float, day: int, out_dir: Path,
             print(f"\n{date_str} smooth={smooth} {variant} x{stride}: daily ST fit", flush=True)
             fit_row, est = fit_st_variant(args, ctx, day, stride, variant, smooth, input_map, grid_coords, device)
             fit_rows.append(fit_row)
-            if est is None:
+            if args.fit_only or est is None:
                 continue
             try:
                 spectral_rows.extend(compute_spectrum_rows(args, ctx, fit_row, est, full_tensors, thin_idx, stride, smooth, device))
@@ -1019,6 +1020,9 @@ def process_day(args, ctx: MonthContext, smooth: float, day: int, out_dir: Path,
     fit_df = pd.DataFrame(fit_rows)
     spec_df = pd.DataFrame(spectral_rows)
     write_csv(fit_df, fit_path)
+    if args.fit_only:
+        print(f"Saved fit-only day {date_str}: {fit_path}", flush=True)
+        return
     write_csv(spec_df, spec_path)
     if not spec_df.empty:
         title = f"{ctx.year}-{ctx.month:02d}-{day:02d}, smooth={smooth}: ST implied spatial residual spectrum vs expected periodogram"
