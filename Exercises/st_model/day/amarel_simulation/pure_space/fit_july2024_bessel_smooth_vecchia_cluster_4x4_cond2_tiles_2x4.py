@@ -126,7 +126,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--range-max", type=float, default=float(os.environ.get("RANGE_MAX", "5.0")))
     p.add_argument("--jitter", type=float, default=float(os.environ.get("JITTER", "1e-6")))
     p.add_argument("--n-restarts", type=int, default=int(os.environ.get("N_RESTARTS", "1")))
-    p.add_argument("--maxiter", type=int, default=int(os.environ.get("MAXITER", "20")))
+    p.add_argument("--maxiter", type=int, default=int(os.environ.get("MAXITER", "80")))
     p.add_argument("--maxfun", type=int, default=int(os.environ.get("MAXFUN", "0")))
     p.add_argument("--maxls", type=int, default=int(os.environ.get("MAXLS", "20")))
     p.add_argument("--maxcor", type=int, default=int(os.environ.get("MAXCOR", "20")))
@@ -147,6 +147,18 @@ def parse_args() -> argparse.Namespace:
 def _append_message(existing: object, addition: str) -> str:
     msg = "" if existing is None or (isinstance(existing, float) and np.isnan(existing)) else str(existing)
     return addition if not msg else f"{msg}; {addition}"
+
+
+def _fit_has_usable_qc_params(fit: dict) -> bool:
+    raw = fit.get("raw_params")
+    if raw is None:
+        return False
+    try:
+        raw_arr = np.asarray(raw, dtype=float)
+        loss = float(fit.get("loss", fit.get("nll", np.nan)))
+    except (TypeError, ValueError):
+        return False
+    return raw_arr.size > 0 and bool(np.all(np.isfinite(raw_arr))) and bool(np.isfinite(loss))
 
 
 def _build_vecchia_tile_model(y: np.ndarray, coords: np.ndarray, task: dict):
@@ -266,11 +278,19 @@ def fit_vecchia_tile_with_outlier_qc(y: np.ndarray, coords: np.ndarray, task: di
         "n_qc_fit": int(finite_initial.sum()),
         "qc_max_abs_whitened": np.nan,
         "qc_refit": False,
+        "qc_initial_success": bool(initial_fit.get("success", False)),
     }
-    if threshold <= 0.0 or not bool(initial_fit.get("success", False)):
+    if threshold <= 0.0 or not _fit_has_usable_qc_params(initial_fit):
         return initial_fit, initial_model, qc
 
-    w = vecchia_whitened_residuals_by_obs(initial_model, initial_batches, initial_fit, task, n_obs=len(y))
+    try:
+        w = vecchia_whitened_residuals_by_obs(initial_model, initial_batches, initial_fit, task, n_obs=len(y))
+    except Exception as exc:
+        initial_fit["message"] = _append_message(
+            initial_fit.get("message", ""),
+            f"outlier_qc_skipped_whitening_error {exc}",
+        )
+        return initial_fit, initial_model, qc
     abs_w = np.abs(w)
     bad = np.isfinite(abs_w) & (abs_w > threshold)
     qc["qc_max_abs_whitened"] = float(np.nanmax(abs_w)) if np.isfinite(abs_w).any() else np.nan

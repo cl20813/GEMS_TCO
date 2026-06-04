@@ -106,7 +106,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--range-max", type=float, default=float(os.environ.get("RANGE_MAX", "5.0")))
     p.add_argument("--jitter", type=float, default=float(os.environ.get("JITTER", "1e-6")))
     p.add_argument("--n-restarts", type=int, default=int(os.environ.get("N_RESTARTS", "1")))
-    p.add_argument("--maxiter", type=int, default=int(os.environ.get("MAXITER", "20")))
+    p.add_argument("--maxiter", type=int, default=int(os.environ.get("MAXITER", "80")))
     p.add_argument("--maxfun", type=int, default=int(os.environ.get("MAXFUN", "0")))
     p.add_argument("--maxls", type=int, default=int(os.environ.get("MAXLS", "20")))
     p.add_argument("--maxcor", type=int, default=int(os.environ.get("MAXCOR", "20")))
@@ -389,6 +389,18 @@ def _append_message(existing: object, addition: str) -> str:
     return addition if not msg else f"{msg}; {addition}"
 
 
+def _fit_has_usable_qc_params(fit: dict) -> bool:
+    raw = fit.get("raw_params")
+    if raw is None:
+        return False
+    try:
+        raw_arr = np.asarray(raw, dtype=float)
+        loss = float(fit.get("loss", fit.get("nll", np.nan)))
+    except (TypeError, ValueError):
+        return False
+    return raw_arr.size > 0 and bool(np.all(np.isfinite(raw_arr))) and bool(np.isfinite(loss))
+
+
 def full_whitened_residuals(
     y: np.ndarray,
     coords: np.ndarray,
@@ -454,19 +466,27 @@ def fit_full_tile_with_outlier_qc(
         "n_qc_fit": int(len(y)),
         "qc_max_abs_whitened": np.nan,
         "qc_refit": False,
+        "qc_initial_success": bool(initial_fit.get("success", False)),
     }
-    if threshold <= 0.0 or not bool(initial_fit.get("success", False)):
+    if threshold <= 0.0 or not _fit_has_usable_qc_params(initial_fit):
         return initial_fit, np.ones(len(y), dtype=bool), qc
 
-    w = full_whitened_residuals(
-        y=y,
-        coords=coords,
-        fit=initial_fit,
-        nugget_mode=str(task["nugget_mode"]),
-        mean_design=str(task["mean_design"]),
-        smooth_bounds=tuple(task["smooth_bounds"]),
-        jitter=float(task["jitter"]),
-    )
+    try:
+        w = full_whitened_residuals(
+            y=y,
+            coords=coords,
+            fit=initial_fit,
+            nugget_mode=str(task["nugget_mode"]),
+            mean_design=str(task["mean_design"]),
+            smooth_bounds=tuple(task["smooth_bounds"]),
+            jitter=float(task["jitter"]),
+        )
+    except Exception as exc:
+        initial_fit["message"] = _append_message(
+            initial_fit.get("message", ""),
+            f"outlier_qc_skipped_whitening_error {exc}",
+        )
+        return initial_fit, np.ones(len(y), dtype=bool), qc
     abs_w = np.abs(w)
     bad = np.isfinite(abs_w) & (abs_w > threshold)
     keep = ~bad
@@ -594,8 +614,15 @@ def plot_monthly_tile_parameter_maps(
     tag: str,
 ) -> list[Path]:
     specs = [
-        ("nugget_mean", "Monthly mean nugget", "nugget"),
-        ("smooth_mean", "Monthly mean nu", "nu"),
+        ("sigmasq_mean", "sigmasq", "sigmasq"),
+        ("sigma_mean", "sigma", "sigma"),
+        ("range_lat_mean", "range_lat", "range_lat"),
+        ("range_lon_mean", "range_lon", "range_lon"),
+        ("smooth_mean", "nu / smooth", "nu"),
+        ("nugget_mean", "nugget", "nugget"),
+        ("phi1_mean", "phi1", "phi1"),
+        ("phi2_mean", "phi2", "phi2"),
+        ("phi3_mean", "phi3", "phi3"),
     ]
     available = [spec for spec in specs if spec[0] in summary.columns]
     if not available or summary.empty:
@@ -613,23 +640,19 @@ def plot_monthly_tile_parameter_maps(
 
     n_tile_y = int(summary["tile_y"].max()) + 1
     n_tile_x = int(summary["tile_x"].max()) + 1
-    fig, axes = plt.subplots(
-        1,
-        len(available),
-        figsize=(4.8 * len(available), 3.8),
-        squeeze=False,
-        constrained_layout=True,
-    )
     cmap = plt.get_cmap("viridis").copy()
     cmap.set_bad(color="#eeeeee")
 
-    for ax, (col, title, cbar_label) in zip(axes.ravel(), available):
+    def grid_for(col: str) -> np.ndarray:
         grid = np.full((n_tile_y, n_tile_x), np.nan, dtype=float)
         for row in summary.itertuples(index=False):
             value = getattr(row, col)
             if pd.notna(value):
                 grid[int(row.tile_y), int(row.tile_x)] = float(value)
+        return grid
 
+    def draw_one(ax, col: str, title: str, cbar_label: str) -> None:
+        grid = grid_for(col)
         im = ax.imshow(np.ma.masked_invalid(grid), origin="lower", aspect="auto", cmap=cmap)
         ax.set_title(title)
         ax.set_xlabel("tile_x")
@@ -643,16 +666,58 @@ def plot_monthly_tile_parameter_maps(
                     ax.text(ix, iy, f"{val:.3g}", ha="center", va="center", color="white", fontsize=9)
         fig.colorbar(im, ax=ax, shrink=0.82, label=cbar_label)
 
-    fig.suptitle(tag)
-    filename = f"{tag}_tile_monthly_nugget_nu_maps.png"
-    paths = [summary_dir / filename]
-    if monthly_dir.resolve() != summary_dir.resolve():
-        paths.append(monthly_dir / filename)
-    for path in paths:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(path, dpi=180)
+    def save_to_both(fig, filename: str) -> list[Path]:
+        paths = [summary_dir / filename]
+        if monthly_dir.resolve() != summary_dir.resolve():
+            paths.append(monthly_dir / filename)
+        for path in paths:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            fig.savefig(path, dpi=180)
+        return paths
+
+    out_paths: list[Path] = []
+
+    n_cols = min(3, len(available))
+    n_rows = int(math.ceil(len(available) / n_cols))
+    fig, axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(4.5 * n_cols, 3.6 * n_rows),
+        squeeze=False,
+        constrained_layout=True,
+    )
+    for ax, (col, title, cbar_label) in zip(axes.ravel(), available):
+        draw_one(ax, col, f"Monthly mean {title}", cbar_label)
+    for ax in axes.ravel()[len(available):]:
+        ax.axis("off")
+    fig.suptitle(f"{tag}: monthly tile parameter means")
+    out_paths.extend(save_to_both(fig, f"{tag}_tile_monthly_parameter_maps.png"))
     plt.close(fig)
-    return paths
+
+    legacy = [spec for spec in available if spec[0] in {"nugget_mean", "smooth_mean"}]
+    if legacy:
+        fig, axes = plt.subplots(
+            1,
+            len(legacy),
+            figsize=(4.8 * len(legacy), 3.8),
+            squeeze=False,
+            constrained_layout=True,
+        )
+        for ax, (col, title, cbar_label) in zip(axes.ravel(), legacy):
+            draw_one(ax, col, f"Monthly mean {title}", cbar_label)
+        fig.suptitle(tag)
+        out_paths.extend(save_to_both(fig, f"{tag}_tile_monthly_nugget_nu_maps.png"))
+        plt.close(fig)
+
+    for col, title, cbar_label in available:
+        fig, ax = plt.subplots(figsize=(4.8, 3.8), constrained_layout=True)
+        draw_one(ax, col, f"Monthly mean {title}", cbar_label)
+        fig.suptitle(tag)
+        safe_label = cbar_label.replace("/", "_").replace(" ", "_")
+        out_paths.extend(save_to_both(fig, f"{tag}_tile_monthly_{safe_label}_map.png"))
+        plt.close(fig)
+
+    return out_paths
 
 
 def fit_one_hour(args: argparse.Namespace) -> None:

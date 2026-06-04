@@ -171,11 +171,12 @@ for NUGGET_MODE in free fixed0; do
       --range-max 5.0 \
       --jitter 1e-6 \
       --n-restarts 1 \
-      --maxiter 20 \
+      --maxiter 80 \
       --maxfun 0 \
       --maxls 20 \
       --maxcor 20 \
-      --optimizer-method L-BFGS-B
+      --optimizer-method L-BFGS-B \
+      --outlier-whitened-threshold 10
   done
 
   python "${SCRIPT}" \
@@ -201,4 +202,10 @@ Expected monthly output files:
 /home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/monthly_output/
   202407_full_likelihood_free_tile_monthly_summary.csv
   202407_full_likelihood_fixed0_tile_monthly_summary.csv
+  202407_full_likelihood_free_tile_monthly_parameter_maps.png
+  202407_full_likelihood_fixed0_tile_monthly_parameter_maps.png
+  202407_full_likelihood_free_tile_monthly_nugget_nu_maps.png
+  202407_full_likelihood_fixed0_tile_monthly_nugget_nu_maps.png
+  202407_full_likelihood_free_tile_monthly_{sigmasq,sigma,range_lat,range_lon,nu,nugget,phi1,phi2,phi3}_map.png
+  202407_full_likelihood_fixed0_tile_monthly_{sigmasq,sigma,range_lat,range_lon,nu,nugget,phi1,phi2,phi3}_map.png
 ```
