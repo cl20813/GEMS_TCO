@@ -7,16 +7,19 @@ two variants and four 2D thinning resolutions:
   variants:    nugget0, nugget_free
   resolutions: x8, x4, x2, x1
 
-It then makes the same style of radial residual-spectrum diagnostic as the
-reference notebook:
+It then makes the same style of residual-spectrum diagnostic as the reference
+notebook, with no Hann tapering by default. The finite-sample expectation uses
+only the missing-data mask/window autocorrelation, which matches the Vecchia
+fits where tapering is not part of the likelihood.
 
   gray  = hourly data residual spectra
   black = mean data residual spectrum over hours
   red   = mean fitted finite-sample expected periodogram over hours
   blue  = ratio of means, I / E[I]
 
-Daily plots are written first. A year-level plot averages the 30 daily
-eight-hour means, so each day has equal weight.
+Daily radial plots are written first. Year-level plots average the daily
+eight-hour means, so each day has equal weight, and include radial, latitude,
+longitude, and NE-SW diagonal profiles.
 """
 
 from __future__ import annotations
@@ -27,6 +30,7 @@ import math
 import os
 import pickle
 import re
+import shutil
 import sys
 import time
 from dataclasses import dataclass
@@ -105,6 +109,8 @@ class MonthContext:
     radial_bins: np.ndarray
     k_full_radial: np.ndarray
     omega2_full: np.ndarray
+    omega_lat_full: np.ndarray
+    omega_lon_full: np.ndarray
     k_max_full: float
     lat_step: float
     lon_step: float
@@ -115,7 +121,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--years", default="2022,2023,2024,2025")
     p.add_argument("--month", type=int, default=7)
     p.add_argument("--days", default="1,30", help="Inclusive day range or comma list. Default uses July days 1..30.")
-    p.add_argument("--smooths", default="0.2,0.25,0.3,0.35,0.4,0.45")
+    p.add_argument("--smooths", default="0.35,0.4,0.5")
     p.add_argument("--resolutions", default="8,4,2,1")
     p.add_argument("--variants", default="nugget0,nugget_free")
     p.add_argument("--neighbors", type=int, default=2, help="Deprecated alias; cluster B2 uses --cluster-neighbor-blocks.")
@@ -123,10 +129,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--cluster-block-shape", default="4x4")
     p.add_argument("--mean-design", default="lat", choices=["lat", "base", "latlon", "hour_spatial"])
     p.add_argument("--data-root", default=getattr(config, "amarel_data_load_path", "/home/jl2815/tco/data/"))
-    p.add_argument("--output-root", default="/home/jl2815/tco/exercise_output/real_data/spline_smooth_spectral_052126")
+    p.add_argument("--output-root", default="/home/jl2815/tco/exercise_output/summer/real_data/spline_smooth_spectral_060626")
+    p.add_argument("--top-plot-dir", default="", help="Optional top-level folder that receives copies of monthly plot PNGs.")
     p.add_argument("--expanded-bounds", action=argparse.BooleanOptionalAction, default=True)
-    p.add_argument("--lat-range", default="-3,7")
-    p.add_argument("--lon-range", default="111,131")
+    p.add_argument("--lat-range", default="-3,2")
+    p.add_argument("--lon-range", default="121,131")
     p.add_argument("--x-col", default="Longitude")
     p.add_argument("--y-col", default="Latitude")
     p.add_argument("--source-x-col", default="Source_Longitude")
@@ -145,7 +152,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--nugget-init", type=float, default=2.5)
     p.add_argument("--radial-bins", type=int, default=70)
     p.add_argument("--radial-qmax", type=float, default=0.985)
-    p.add_argument("--hann", action=argparse.BooleanOptionalAction, default=True)
+    p.add_argument("--hann", action=argparse.BooleanOptionalAction, default=False)
     p.add_argument("--skip-existing", action="store_true")
     p.add_argument("--make-monthly-only", action="store_true")
     return p.parse_args(normalize_range_argv(sys.argv[1:]))
@@ -251,6 +258,10 @@ def load_month_pickle(args: argparse.Namespace, year: int, lat_range: tuple[floa
     candidates = []
     if args.expanded_bounds:
         candidates.append(month_dir / expanded_grid_filename(year, args.month, lat_range, lon_range))
+        legacy_lat_range = (-3.0, 7.0)
+        legacy_lon_range = (111.0, 131.0)
+        if tuple(lat_range) != legacy_lat_range or tuple(lon_range) != legacy_lon_range:
+            candidates.append(month_dir / expanded_grid_filename(year, args.month, legacy_lat_range, legacy_lon_range))
     candidates.append(month_dir / default_grid_filename(year, args.month))
     for path in candidates:
         if path.exists():
@@ -289,7 +300,7 @@ def frequency_grid_for_axes(lat_axis: np.ndarray, lon_axis: np.ndarray):
     omega_x = 2.0 * np.pi * fx
     ox, oy = np.meshgrid(omega_x, omega_y)
     k = np.sqrt(ox**2 + oy**2)
-    return k, ox**2 + oy**2
+    return k, ox**2 + oy**2, oy, ox
 
 
 def build_month_context(args: argparse.Namespace, year: int, days: list[int]) -> MonthContext:
@@ -338,7 +349,7 @@ def build_month_context(args: argparse.Namespace, year: int, days: list[int]) ->
     local_to_row = np.asarray([lat_to_row[float(v)] for v in lat_key], dtype=np.int64)
     local_to_col = np.asarray([lon_to_col[float(v)] for v in lon_key], dtype=np.int64)
     grid_index = pd.MultiIndex.from_arrays([lat_key, lon_key], names=["_lat_key", "_lon_key"])
-    k_full, omega2_full = frequency_grid_for_axes(lat_vals, lon_vals)
+    k_full, omega2_full, omega_lat_full, omega_lon_full = frequency_grid_for_axes(lat_vals, lon_vals)
     positive_k = k_full[np.isfinite(k_full) & (k_full > 0)]
     k_max_full = float(np.quantile(positive_k, float(args.radial_qmax)))
     radial_bins = np.linspace(0.0, k_max_full, int(args.radial_bins) + 1)
@@ -362,6 +373,8 @@ def build_month_context(args: argparse.Namespace, year: int, days: list[int]) ->
         radial_bins=radial_bins,
         k_full_radial=k_full,
         omega2_full=omega2_full,
+        omega_lat_full=omega_lat_full,
+        omega_lon_full=omega_lon_full,
         k_max_full=k_max_full,
         lat_step=axis_step(lat_vals),
         lon_step=axis_step(lon_vals),
@@ -671,12 +684,12 @@ def matern_covariance_lag(sigmasq, range_, nugget, smooth, lag_lat, lag_lon):
     return float(sigmasq) * corr + max(float(nugget), 0.0) * zero_lag
 
 
-def taper_mask_autocorrelation(mask: np.ndarray, use_hann: bool):
+def mask_window_autocorrelation(mask: np.ndarray, use_hann: bool):
     win = np.outer(np.hanning(mask.shape[0]), np.hanning(mask.shape[1])) if use_hann else np.ones_like(mask)
     g = mask * win
     h_norm = float(np.sum(g**2))
     if h_norm <= EPS:
-        raise ValueError("Taper/mask normalization is zero.")
+        raise ValueError("Mask/window normalization is zero.")
     n1, n2 = g.shape
     g_fft = np.fft.fft2(g, s=(2 * n1 - 1, 2 * n2 - 1))
     ac = np.fft.fftshift(np.fft.ifft2(g_fft * np.conj(g_fft)).real) / h_norm
@@ -720,7 +733,7 @@ def expected_periodogram_dw_style(
     project_mean=True,
 ):
     n1, n2 = mask.shape
-    ac, _ = taper_mask_autocorrelation(mask, args.hann)
+    ac, _ = mask_window_autocorrelation(mask, args.hann)
     dlat = axis_step(lat_axis)
     dlon = axis_step(lon_axis)
     u1, u2 = np.meshgrid(np.arange(n1, dtype=int), np.arange(n2, dtype=int), indexing="ij")
@@ -776,7 +789,7 @@ def expected_periodogram_dw_style(
     return np.maximum(expected_projected, EPS)
 
 
-def matern_spectrum_shape(sigmasq, range_, nugget, smooth, omega2):
+def matern_spectrum_shape(sigmasq, range_, smooth, omega2, nugget=0.0):
     nu = float(smooth)
     alpha = 2.0 * nu / max(float(range_) ** 2, EPS)
     matern = float(sigmasq) * (alpha + omega2) ** (-(nu + 1.0))
@@ -811,6 +824,96 @@ def radial_average(surface, k_radial, radial_bins, k_max):
     return pd.DataFrame(rows)
 
 
+DIRECTION_SPECS = {
+    "radial": {
+        "label": "radial",
+        "frequency_label": "radial frequency",
+    },
+    "lat": {
+        "label": "latitude N-S",
+        "frequency_label": "lat frequency",
+    },
+    "lon": {
+        "label": "longitude E-W",
+        "frequency_label": "lon frequency",
+    },
+    "diag": {
+        "label": "diagonal NE-SW",
+        "frequency_label": "diag frequency",
+    },
+}
+
+
+def min_positive_step(values: np.ndarray) -> float:
+    vals = np.unique(np.round(np.abs(np.asarray(values, dtype=float).ravel()), 12))
+    vals = vals[np.isfinite(vals) & (vals > EPS)]
+    if len(vals) <= 1:
+        return 0.0
+    return float(np.nanmin(np.diff(np.sort(vals))))
+
+
+def directional_average(surface, omega_lat, omega_lon, radial_bins, k_max, direction: str):
+    vals = np.asarray(surface, dtype=float).ravel()
+    wy = np.asarray(omega_lat, dtype=float)
+    wx = np.asarray(omega_lon, dtype=float)
+    if direction == "lat":
+        coord = np.abs(wy)
+        perp = np.abs(wx)
+        step = min_positive_step(wx)
+    elif direction == "lon":
+        coord = np.abs(wx)
+        perp = np.abs(wy)
+        step = min_positive_step(wy)
+    elif direction == "diag":
+        coord = np.abs((wy + wx) / np.sqrt(2.0))
+        perp = np.abs((wy - wx) / np.sqrt(2.0))
+        step = min(min_positive_step(wx), min_positive_step(wy))
+    else:
+        raise ValueError(f"Unknown direction {direction!r}")
+
+    coord_flat = coord.ravel()
+    perp_flat = perp.ravel()
+    bin_width = float(radial_bins[1] - radial_bins[0]) if len(radial_bins) > 1 else 0.0
+    band_tol = max(0.5 * step, 0.5 * bin_width, EPS)
+    good = (
+        np.isfinite(vals)
+        & np.isfinite(coord_flat)
+        & np.isfinite(perp_flat)
+        & (coord_flat > 0)
+        & (coord_flat <= k_max)
+        & (perp_flat <= band_tol)
+    )
+    if not np.any(good):
+        return pd.DataFrame(columns=["k_bin", "k_mid", "k_mean", "spectrum", "n_freq"])
+
+    bin_idx = np.digitize(coord_flat[good], radial_bins, right=False) - 1
+    valid_bin = (bin_idx >= 0) & (bin_idx < len(radial_bins) - 1)
+    bin_idx = bin_idx[valid_bin]
+    vg = vals[good][valid_bin]
+    kg = coord_flat[good][valid_bin]
+    rows = []
+    for b in range(len(radial_bins) - 1):
+        m = bin_idx == b
+        if not np.any(m):
+            continue
+        rows.append(
+            {
+                "k_bin": int(b),
+                "k_mid": float(0.5 * (radial_bins[b] + radial_bins[b + 1])),
+                "k_mean": float(np.nanmean(kg[m])),
+                "spectrum": float(np.nanmean(vg[m])),
+                "n_freq": int(m.sum()),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def profile_average(surface, k_radial, omega_lat, omega_lon, radial_bins, k_max, direction: str):
+    if direction == "radial":
+        return radial_average(surface, k_radial, radial_bins, k_max)
+    return directional_average(surface, omega_lat, omega_lon, radial_bins, k_max, direction)
+
+
 def compute_spectrum_rows(
     args: argparse.Namespace,
     ctx: MonthContext,
@@ -823,8 +926,7 @@ def compute_spectrum_rows(
 ) -> list[dict]:
     grid, mask, n_valid_spectrum, lat_axis, lon_axis = detrended_residual_grid(args, ctx, hour_t, stride, device)
     data_p = masked_periodogram(grid, mask, args.hann)
-    k_data, _ = frequency_grid_for_axes(lat_axis, lon_axis)
-    data_rad = radial_average(data_p, k_data, ctx.radial_bins, ctx.k_max_full).rename(columns={"spectrum": "data_spectrum"})
+    k_data, _, omega_lat_data, omega_lon_data = frequency_grid_for_axes(lat_axis, lon_axis)
     expected_p = expected_periodogram_dw_style(
         args,
         est["sigmasq"],
@@ -835,51 +937,119 @@ def compute_spectrum_rows(
         lat_axis,
         lon_axis,
     )
-    expected_rad = radial_average(expected_p, k_data, ctx.radial_bins, ctx.k_max_full).rename(
-        columns={"spectrum": "theory_spectrum_expected"}
+    expected_latent_p = expected_periodogram_dw_style(
+        args,
+        est["sigmasq"],
+        est["range"],
+        0.0,
+        smooth,
+        mask,
+        lat_axis,
+        lon_axis,
     )
-    shape_p = matern_spectrum_shape(est["sigmasq"], est["range"], est["nugget"], smooth, ctx.omega2_full)
-    shape_rad = radial_average(shape_p, ctx.k_full_radial, ctx.radial_bins, ctx.k_max_full).rename(
-        columns={"spectrum": "theory_spectrum_continuous"}
+    shape_latent_p = matern_spectrum_shape(est["sigmasq"], est["range"], smooth, ctx.omega2_full, nugget=0.0)
+    shape_observed_p = matern_spectrum_shape(
+        est["sigmasq"],
+        est["range"],
+        smooth,
+        ctx.omega2_full,
+        nugget=est["nugget"],
     )
-    merged = shape_rad[["k_bin", "k_mid", "k_mean", "theory_spectrum_continuous"]].merge(
-        expected_rad[["k_bin", "theory_spectrum_expected", "n_freq"]], on="k_bin", how="left"
-    )
-    merged = merged.merge(data_rad[["k_bin", "data_spectrum"]], on="k_bin", how="left")
-    data_k_max = float(data_rad["k_mid"].max()) if not data_rad.empty else np.nan
+
+    directions = ["radial", "lat", "lon", "diag"]
     rows = []
-    for m in merged.itertuples(index=False):
-        rows.append(
-            {
-                **{k: fit_row[k] for k in [
-                    "date_str",
-                    "year",
-                    "month",
-                    "day",
-                    "hour_idx",
-                    "time_key",
-                    "smooth",
-                    "resolution_stride",
-                    "resolution_label",
-                    "variant",
-                    "mean_design",
-                    "neighbors",
-                    "est_sigmasq",
-                    "est_range",
-                    "est_nugget",
-                    "est_phi1",
-                    "est_phi2",
-                ]},
-                "n_valid_spectrum": int(n_valid_spectrum),
-                "k_bin": int(m.k_bin),
-                "k_mid": float(m.k_mid),
-                "k_mean": float(m.k_mean),
-                "n_freq": int(m.n_freq) if pd.notna(m.n_freq) else 0,
-                "data_k_max": data_k_max,
-                "data_spectrum": float(m.data_spectrum) if pd.notna(m.data_spectrum) else np.nan,
-                "theory_spectrum_expected": float(m.theory_spectrum_expected) if pd.notna(m.theory_spectrum_expected) else np.nan,
-                "theory_spectrum_continuous": float(m.theory_spectrum_continuous) if pd.notna(m.theory_spectrum_continuous) else np.nan,
-            }
+    base_keys = [
+        "date_str",
+        "year",
+        "month",
+        "day",
+        "hour_idx",
+        "time_key",
+        "smooth",
+        "resolution_stride",
+        "resolution_label",
+        "variant",
+        "mean_design",
+        "neighbors",
+        "est_sigmasq",
+        "est_range",
+        "est_nugget",
+        "est_phi1",
+        "est_phi2",
+    ]
+    for direction in directions:
+        spec = DIRECTION_SPECS[direction]
+        data_prof = profile_average(
+            data_p, k_data, omega_lat_data, omega_lon_data, ctx.radial_bins, ctx.k_max_full, direction
+        ).rename(columns={"spectrum": "data_spectrum"})
+        expected_prof = profile_average(
+            expected_p, k_data, omega_lat_data, omega_lon_data, ctx.radial_bins, ctx.k_max_full, direction
+        ).rename(columns={"spectrum": "theory_spectrum_expected"})
+        expected_latent_prof = profile_average(
+            expected_latent_p, k_data, omega_lat_data, omega_lon_data, ctx.radial_bins, ctx.k_max_full, direction
+        ).rename(columns={"spectrum": "theory_spectrum_expected_latent"})
+        shape_prof = profile_average(
+            shape_latent_p,
+            ctx.k_full_radial,
+            ctx.omega_lat_full,
+            ctx.omega_lon_full,
+            ctx.radial_bins,
+            ctx.k_max_full,
+            direction,
+        ).rename(columns={"spectrum": "theory_spectrum_continuous"})
+        shape_obs_prof = profile_average(
+            shape_observed_p,
+            ctx.k_full_radial,
+            ctx.omega_lat_full,
+            ctx.omega_lon_full,
+            ctx.radial_bins,
+            ctx.k_max_full,
+            direction,
+        ).rename(columns={"spectrum": "theory_spectrum_continuous_observed"})
+        if shape_prof.empty and expected_prof.empty and data_prof.empty:
+            continue
+        merged = shape_prof[["k_bin", "k_mid", "k_mean", "theory_spectrum_continuous"]].merge(
+            shape_obs_prof[["k_bin", "theory_spectrum_continuous_observed"]],
+            on="k_bin",
+            how="outer",
+        )
+        merged = merged.merge(
+            expected_prof[["k_bin", "theory_spectrum_expected", "n_freq"]], on="k_bin", how="outer"
+        )
+        merged = merged.merge(
+            expected_latent_prof[["k_bin", "theory_spectrum_expected_latent"]],
+            on="k_bin",
+            how="outer",
+        )
+        merged = merged.merge(data_prof[["k_bin", "data_spectrum"]], on="k_bin", how="outer")
+        for col in ("k_mid", "k_mean"):
+            if col in merged.columns:
+                merged[col] = pd.to_numeric(merged[col], errors="coerce")
+        if "k_mid" in merged.columns and merged["k_mid"].isna().any():
+            fallback = 0.5 * (ctx.radial_bins[:-1] + ctx.radial_bins[1:])
+            missing = merged["k_mid"].isna() & merged["k_bin"].notna()
+            merged.loc[missing, "k_mid"] = [float(fallback[int(b)]) for b in merged.loc[missing, "k_bin"]]
+        data_k_max = float(data_prof["k_mid"].max()) if not data_prof.empty else np.nan
+        for m in merged.sort_values("k_bin").itertuples(index=False):
+            rows.append(
+                {
+                    **{k: fit_row[k] for k in base_keys},
+                    "profile": direction,
+                    "direction": direction,
+                    "direction_label": spec["label"],
+                    "frequency_label": spec["frequency_label"],
+                    "n_valid_spectrum": int(n_valid_spectrum),
+                    "k_bin": int(m.k_bin),
+                    "k_mid": float(m.k_mid) if pd.notna(m.k_mid) else np.nan,
+                    "k_mean": float(m.k_mean) if pd.notna(m.k_mean) else np.nan,
+                    "n_freq": int(m.n_freq) if pd.notna(m.n_freq) else 0,
+                    "data_k_max": data_k_max,
+                    "data_spectrum": float(m.data_spectrum) if pd.notna(m.data_spectrum) else np.nan,
+                    "theory_spectrum_expected": float(m.theory_spectrum_expected) if pd.notna(m.theory_spectrum_expected) else np.nan,
+                    "theory_spectrum_expected_latent": float(m.theory_spectrum_expected_latent) if pd.notna(m.theory_spectrum_expected_latent) else np.nan,
+                    "theory_spectrum_continuous": float(m.theory_spectrum_continuous) if pd.notna(m.theory_spectrum_continuous) else np.nan,
+                    "theory_spectrum_continuous_observed": float(m.theory_spectrum_continuous_observed) if pd.notna(m.theory_spectrum_continuous_observed) else np.nan,
+                }
         )
     return rows
 
@@ -899,7 +1069,7 @@ def positive_ylim(*series_list, fallback=(1e0, 1e4)):
     return 10 ** np.floor(np.log10(float(x.min()))), 10 ** np.ceil(np.log10(float(x.max())))
 
 
-def ratio_frame(numerator_df, denominator_df, numerator_col, denominator_col):
+def ratio_frame(numerator_df, denominator_df, numerator_col, denominator_col, normalize_mean=False, sigma_sq=None):
     if numerator_df.empty or denominator_df.empty:
         return pd.DataFrame(columns=["k_bin", "k_mid", "ratio"])
     left = numerator_df[["k_bin", "k_mid", numerator_col]].copy()
@@ -907,8 +1077,47 @@ def ratio_frame(numerator_df, denominator_df, numerator_col, denominator_col):
     merged = left.merge(right, on="k_bin", how="inner").replace([np.inf, -np.inf], np.nan)
     good = merged[numerator_col].notna() & merged[denominator_col].notna() & (merged[numerator_col] > 0) & (merged[denominator_col] > 0)
     out = merged.loc[good, ["k_bin", "k_mid"]].copy()
-    out["ratio"] = merged.loc[good, numerator_col].to_numpy(dtype=float) / merged.loc[good, denominator_col].to_numpy(dtype=float)
+    raw_ratio = merged.loc[good, numerator_col].to_numpy(dtype=float) / merged.loc[good, denominator_col].to_numpy(dtype=float)
+    scale = float(np.nanmean(raw_ratio)) if normalize_mean and len(raw_ratio) else 1.0
+    if not np.isfinite(scale) or scale <= 0:
+        scale = 1.0
+    out["ratio_raw"] = raw_ratio
+    out["ratio_scale_mean"] = scale
+    out["ratio"] = raw_ratio / scale if normalize_mean else raw_ratio
+    if sigma_sq is not None and np.isfinite(float(sigma_sq)):
+        out["sigma_profile"] = float(sigma_sq) * scale
+    else:
+        out["sigma_profile"] = np.nan
     return out.sort_values("k_bin")
+
+
+def median_sigmasq(source_df, variant, resolution_label):
+    required = {"variant", "resolution_label", "est_sigmasq"}
+    if source_df is None or source_df.empty or not required.issubset(source_df.columns):
+        return np.nan
+    df = source_df[
+        (source_df["variant"].astype(str) == str(variant))
+        & (source_df["resolution_label"].astype(str) == str(resolution_label))
+    ].copy()
+    if df.empty:
+        return np.nan
+    key_cols = [c for c in ["date_str", "hour_idx", "variant", "resolution_label"] if c in df.columns]
+    if key_cols:
+        df = df.drop_duplicates(key_cols)
+    return float(pd.to_numeric(df["est_sigmasq"], errors="coerce").median())
+
+
+def profile_ratio_label(ratio_df):
+    if ratio_df is None or ratio_df.empty or "ratio_scale_mean" not in ratio_df.columns:
+        return None
+    scale = float(pd.to_numeric(ratio_df["ratio_scale_mean"], errors="coerce").dropna().iloc[0])
+    sigma_profile = np.nan
+    if "sigma_profile" in ratio_df.columns and ratio_df["sigma_profile"].notna().any():
+        sigma_profile = float(pd.to_numeric(ratio_df["sigma_profile"], errors="coerce").dropna().iloc[0])
+    label = f"ratio mean scale={scale:.3g}"
+    if np.isfinite(sigma_profile):
+        label += f"\nprofile sigma^2={sigma_profile:.3g}"
+    return label
 
 
 def add_ratio_axis(ax, ratio_df, ylabel=None, color="tab:blue"):
@@ -959,10 +1168,40 @@ def format_fit_label(source_df, variant, resolution_label):
     return label
 
 
+def ensure_profile_columns(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return df
+    out = df.copy()
+    if "profile" not in out.columns:
+        out["profile"] = "radial"
+    if "direction" not in out.columns:
+        out["direction"] = out["profile"].astype(str)
+    if "direction_label" not in out.columns:
+        out["direction_label"] = out["direction"].map(lambda x: DIRECTION_SPECS.get(str(x), DIRECTION_SPECS["radial"])["label"])
+    if "frequency_label" not in out.columns:
+        out["frequency_label"] = out["direction"].map(lambda x: DIRECTION_SPECS.get(str(x), DIRECTION_SPECS["radial"])["frequency_label"])
+    if "theory_spectrum_continuous_observed" not in out.columns:
+        out["theory_spectrum_continuous_observed"] = out.get("theory_spectrum_continuous", np.nan)
+    if "theory_spectrum_expected_latent" not in out.columns:
+        out["theory_spectrum_expected_latent"] = out.get("theory_spectrum_expected", np.nan)
+    return out
+
+
 def aggregate_daily(spectral_df: pd.DataFrame):
+    spectral_df = ensure_profile_columns(spectral_df)
+    group_cols = [
+        "profile",
+        "direction",
+        "direction_label",
+        "frequency_label",
+        "variant",
+        "resolution_label",
+        "resolution_stride",
+        "k_bin",
+    ]
     avg_data = (
         spectral_df.dropna(subset=["data_spectrum"])
-        .groupby(["variant", "resolution_label", "resolution_stride", "k_bin"], observed=True)
+        .groupby(group_cols, observed=True)
         .agg(
             k_mid=("k_mid", "mean"),
             data_spectrum=("data_spectrum", "mean"),
@@ -973,11 +1212,13 @@ def aggregate_daily(spectral_df: pd.DataFrame):
     )
     avg_theory = (
         spectral_df.dropna(subset=["theory_spectrum_expected"])
-        .groupby(["variant", "resolution_label", "resolution_stride", "k_bin"], observed=True)
+        .groupby(group_cols, observed=True)
         .agg(
             k_mid=("k_mid", "mean"),
             theory_spectrum_expected=("theory_spectrum_expected", "mean"),
+            theory_spectrum_expected_latent=("theory_spectrum_expected_latent", "mean"),
             theory_spectrum_continuous=("theory_spectrum_continuous", "mean"),
+            theory_spectrum_continuous_observed=("theory_spectrum_continuous_observed", "mean"),
         )
         .reset_index()
     )
@@ -985,6 +1226,10 @@ def aggregate_daily(spectral_df: pd.DataFrame):
 
 
 def plot_daily(args, ctx: MonthContext, smooth: float, day: int, spectral_df: pd.DataFrame, out_path: Path):
+    if spectral_df.empty:
+        return
+    spectral_df = ensure_profile_columns(spectral_df)
+    spectral_df = spectral_df[spectral_df["profile"].astype(str) == "radial"].copy()
     if spectral_df.empty:
         return
     labels_order = [f"x{s}" for s in parse_int_list_or_range(args.resolutions)]
@@ -1024,9 +1269,20 @@ def plot_daily(args, ctx: MonthContext, smooth: float, day: int, spectral_df: pd
                 hour_label = "hourly data spectra" if (i == 0 and j == 0 and h_i == 0) else None
                 ax.plot(hs["k_mid"], hs["data_spectrum"], color="0.35", alpha=0.55, linewidth=1.05, label=hour_label, zorder=1)
             ax.plot(sub_data["k_mid"], sub_data["data_spectrum"], color="black", linewidth=2.2, label="data residual spectrum (mean over 8 h)", zorder=4)
-            ratio_df = ratio_frame(sub_data, sub_theory, "data_spectrum", "theory_spectrum_expected")
+            sigma_sq = median_sigmasq(spectral_df, variant, label)
+            ratio_df = ratio_frame(
+                sub_data,
+                sub_theory,
+                "data_spectrum",
+                "theory_spectrum_expected",
+                normalize_mean=True,
+                sigma_sq=sigma_sq,
+            )
+            ratio_label = profile_ratio_label(ratio_df)
+            if ratio_label:
+                ax.plot([], [], color="none", label=ratio_label)
             add_ratio_axis(ax, ratio_df, ylabel="I / E[I]" if j == len(labels_order) - 1 else None)
-            ax.plot([], [], color="tab:blue", linewidth=1.35, linestyle=":", label="I / E[I] (ratio of means)")
+            ax.plot([], [], color="tab:blue", linewidth=1.35, linestyle=":", label="profiled I / E[I] (mean=1)")
             ax.axvline(k_cut, color="0.45", linewidth=1.0, linestyle=":", alpha=0.95, zorder=2)
             ax.set_xlim(0, ctx.k_max_full)
             ax.set_ylim(*ylim)
@@ -1065,7 +1321,7 @@ def process_day(
     daily_dir = out_dir / "daily_csv"
     plot_dir = out_dir / "daily_plots"
     fit_path = daily_dir / f"{date_str}_fits.csv"
-    spec_path = daily_dir / f"{date_str}_radial_spectrum.csv"
+    spec_path = daily_dir / f"{date_str}_spectral_profiles.csv"
     plot_path = plot_dir / f"{date_str}_data_vs_expected_periodogram.png"
     if args.skip_existing and spec_path.exists() and fit_path.exists() and plot_path.exists():
         print(f"Skip existing day {date_str}", flush=True)
@@ -1104,9 +1360,271 @@ def process_day(
     print(f"Saved day {date_str}: {fit_path}, {spec_path}, {plot_path}", flush=True)
 
 
+def publish_monthly_plot(args: argparse.Namespace, ctx: MonthContext, smooth: float, plot_path: Path):
+    top_dir = Path(args.top_plot_dir) if str(args.top_plot_dir).strip() else Path(args.output_root) / "monthly_plots_top"
+    top_dir.mkdir(parents=True, exist_ok=True)
+    dest = top_dir / f"smooth_{smooth_tag(smooth)}_{plot_path.name}"
+    shutil.copy2(plot_path, dest)
+    print(f"Copied monthly plot to top folder: {dest}", flush=True)
+
+
+def add_continuous_scaled_to_expected(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    out = df.copy()
+    out["theory_spectrum_continuous_scaled"] = np.nan
+    out["theory_spectrum_continuous_observed_scaled"] = np.nan
+    out["continuous_scale_to_expected"] = np.nan
+    out["continuous_observed_scale_to_expected"] = np.nan
+    group_cols = ["profile", "variant", "resolution_label"]
+    for _, idx in out.groupby(group_cols, observed=True).groups.items():
+        sub = out.loc[idx]
+        for expected_col, source_col, scaled_col, scale_col in [
+            (
+                "theory_spectrum_expected_latent",
+                "theory_spectrum_continuous",
+                "theory_spectrum_continuous_scaled",
+                "continuous_scale_to_expected",
+            ),
+            (
+                "theory_spectrum_expected",
+                "theory_spectrum_continuous_observed",
+                "theory_spectrum_continuous_observed_scaled",
+                "continuous_observed_scale_to_expected",
+            ),
+        ]:
+            if expected_col not in sub.columns or source_col not in sub.columns:
+                continue
+            expected = pd.to_numeric(sub[expected_col], errors="coerce")
+            continuous = pd.to_numeric(sub[source_col], errors="coerce")
+            good = expected.notna() & continuous.notna() & (expected > 0) & (continuous > 0)
+            if not good.any():
+                continue
+            scale = float(np.nanmean((expected[good] / continuous[good]).to_numpy(dtype=float)))
+            if not np.isfinite(scale) or scale <= 0:
+                continue
+            out.loc[idx, scale_col] = scale
+            out.loc[idx, scaled_col] = continuous.to_numpy(dtype=float) * scale
+    return out
+
+
+def plot_monthly_directional_data_expected(
+    args: argparse.Namespace,
+    ctx: MonthContext,
+    smooth: float,
+    monthly: pd.DataFrame,
+    daily_means: pd.DataFrame,
+    fit_df: pd.DataFrame,
+    out_dir: Path,
+):
+    directional = monthly[monthly["profile"].astype(str).isin(["lat", "lon", "diag"])].copy()
+    if directional.empty:
+        return
+    labels_order = [f"x{s}" for s in parse_int_list_or_range(args.resolutions)]
+    row_specs = []
+    for variant in parse_names(args.variants):
+        if variant not in VARIANTS:
+            continue
+        for direction in ["lat", "lon", "diag"]:
+            row_specs.append((variant, direction))
+    if not row_specs:
+        return
+    ylim = positive_ylim(directional.get("data_spectrum"), directional.get("theory_spectrum_expected"))
+    fig, axes = plt.subplots(len(row_specs), len(labels_order), figsize=(4.4 * len(labels_order), 2.85 * len(row_specs)), sharey=True)
+    axes = np.asarray(axes).reshape(len(row_specs), len(labels_order))
+    for i, (variant, direction) in enumerate(row_specs):
+        for j, label in enumerate(labels_order):
+            ax = axes[i, j]
+            sub_data = monthly[
+                (monthly["variant"] == variant)
+                & (monthly["profile"].astype(str) == direction)
+                & (monthly["resolution_label"].astype(str) == label)
+                & (monthly["k_mid"] > 0)
+            ]
+            daily_sub = daily_means[
+                (daily_means["variant"] == variant)
+                & (daily_means["profile"].astype(str) == direction)
+                & (daily_means["resolution_label"].astype(str) == label)
+                & (daily_means["k_mid"] > 0)
+                & daily_means["data_spectrum"].notna()
+            ]
+            if sub_data.empty:
+                ax.set_visible(False)
+                continue
+            k_cut = float(sub_data["data_k_max"].dropna().iloc[0]) if sub_data["data_k_max"].notna().any() else float(sub_data["k_mid"].max())
+            param_label = format_fit_label(fit_df, variant, label)
+            if param_label:
+                ax.plot([], [], color="none", label=param_label)
+            ax.plot(sub_data["k_mid"], sub_data["theory_spectrum_expected"], color="tab:red", linewidth=1.9, linestyle="--", label="expected periodogram", zorder=3)
+            for d_i, (_, ds) in enumerate(daily_sub.groupby("date_str")):
+                day_label = "daily mean spectra" if (i == 0 and j == 0 and d_i == 0) else None
+                ax.plot(ds["k_mid"], ds["data_spectrum"], color="0.35", alpha=0.32, linewidth=0.8, label=day_label, zorder=1)
+            ax.plot(sub_data["k_mid"], sub_data["data_spectrum"], color="black", linewidth=2.05, label="data residual spectrum", zorder=4)
+            sigma_sq = median_sigmasq(fit_df, variant, label)
+            ratio_df = ratio_frame(
+                sub_data,
+                sub_data,
+                "data_spectrum",
+                "theory_spectrum_expected",
+                normalize_mean=True,
+                sigma_sq=sigma_sq,
+            )
+            ratio_label = profile_ratio_label(ratio_df)
+            if ratio_label:
+                ax.plot([], [], color="none", label=ratio_label)
+            add_ratio_axis(ax, ratio_df, ylabel="I / E[I]" if j == len(labels_order) - 1 else None)
+            ax.plot([], [], color="tab:blue", linewidth=1.35, linestyle=":", label="profiled I / E[I] (mean=1)")
+            ax.axvline(k_cut, color="0.45", linewidth=1.0, linestyle=":", alpha=0.95, zorder=2)
+            ax.set_xlim(0, ctx.k_max_full)
+            ax.set_ylim(*ylim)
+            direction_label = DIRECTION_SPECS[direction]["label"]
+            freq_label = DIRECTION_SPECS[direction]["frequency_label"]
+            ax.set_title(f"{VARIANTS[variant]['row_title']}: {direction_label}, {label}")
+            ax.set_xlabel(freq_label)
+            if j == 0:
+                ax.set_ylabel("directional spectrum")
+            ax.set_yscale("log")
+            ax.grid(alpha=0.2)
+            ax.legend(fontsize=6.5, handlelength=1.4)
+    fig.suptitle(f"{ctx.year}-{ctx.month:02d}, smooth={smooth}: 30-day mean directional residual spectra vs fitted expected periodogram")
+    fig.tight_layout()
+    plot_path = out_dir / "monthly_average" / f"{ctx.year}{ctx.month:02d}_30day_mean_directional_data_vs_expected_periodogram.png"
+    plot_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(plot_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved monthly directional plot: {plot_path}", flush=True)
+    publish_monthly_plot(args, ctx, smooth, plot_path)
+
+
+def plot_monthly_expected_vs_continuous(
+    args: argparse.Namespace,
+    ctx: MonthContext,
+    smooth: float,
+    monthly: pd.DataFrame,
+    out_dir: Path,
+):
+    scaled = add_continuous_scaled_to_expected(monthly)
+    if scaled.empty or (
+        scaled["theory_spectrum_continuous_scaled"].notna().sum() == 0
+        and scaled["theory_spectrum_continuous_observed_scaled"].notna().sum() == 0
+    ):
+        return
+    labels_order = [f"x{s}" for s in parse_int_list_or_range(args.resolutions)]
+    profiles = ["radial", "lat", "lon", "diag"]
+    row_specs = []
+    for variant in parse_names(args.variants):
+        if variant not in VARIANTS:
+            continue
+        for profile in profiles:
+            row_specs.append((variant, profile))
+    ylim = positive_ylim(
+        scaled.get("theory_spectrum_expected"),
+        scaled.get("theory_spectrum_expected_latent"),
+        scaled.get("theory_spectrum_continuous_scaled"),
+        scaled.get("theory_spectrum_continuous_observed_scaled"),
+    )
+    fig, axes = plt.subplots(len(row_specs), len(labels_order), figsize=(4.4 * len(labels_order), 2.55 * len(row_specs)), sharey=True)
+    axes = np.asarray(axes).reshape(len(row_specs), len(labels_order))
+    for i, (variant, profile) in enumerate(row_specs):
+        for j, label in enumerate(labels_order):
+            ax = axes[i, j]
+            sub = scaled[
+                (scaled["variant"] == variant)
+                & (scaled["profile"].astype(str) == profile)
+                & (scaled["resolution_label"].astype(str) == label)
+                & (scaled["k_mid"] > 0)
+            ].copy()
+            sub = sub.dropna(subset=["theory_spectrum_expected"])
+            sub = sub[sub["theory_spectrum_expected"] > 0]
+            has_latent = sub["theory_spectrum_continuous_scaled"].notna().any()
+            has_observed = sub["theory_spectrum_continuous_observed_scaled"].notna().any()
+            if has_latent:
+                sub = sub[
+                    sub["theory_spectrum_continuous_scaled"].isna()
+                    | (sub["theory_spectrum_continuous_scaled"] > 0)
+                ]
+            if has_observed:
+                sub = sub[
+                    sub["theory_spectrum_continuous_observed_scaled"].isna()
+                    | (sub["theory_spectrum_continuous_observed_scaled"] > 0)
+                ]
+            if sub.empty:
+                ax.set_visible(False)
+                continue
+            scale_val = float(sub["continuous_scale_to_expected"].dropna().iloc[0]) if sub["continuous_scale_to_expected"].notna().any() else np.nan
+            if np.isfinite(scale_val):
+                ax.plot([], [], color="none", label=f"latent profile scale={scale_val:.3g}")
+            obs_scale_val = float(sub["continuous_observed_scale_to_expected"].dropna().iloc[0]) if sub["continuous_observed_scale_to_expected"].notna().any() else np.nan
+            if np.isfinite(obs_scale_val):
+                ax.plot([], [], color="none", label=f"observed profile scale={obs_scale_val:.3g}")
+            if has_latent:
+                latent = sub.dropna(subset=["theory_spectrum_expected_latent", "theory_spectrum_continuous_scaled"])
+                ax.plot(
+                    latent["k_mid"],
+                    latent["theory_spectrum_expected_latent"],
+                    color="tab:red",
+                    linewidth=2.0,
+                    linestyle="--",
+                    label="finite-sample E[I] latent",
+                    zorder=3,
+                )
+                ax.plot(
+                    latent["k_mid"],
+                    latent["theory_spectrum_continuous_scaled"],
+                    color="tab:green",
+                    linewidth=1.8,
+                    label="latent continuous S (no nugget, profiled)",
+                    zorder=4,
+                )
+                ratio_df = ratio_frame(latent, latent, "theory_spectrum_expected_latent", "theory_spectrum_continuous_scaled")
+                add_ratio_axis(ax, ratio_df, ylabel="E[I] / scaled S" if j == len(labels_order) - 1 else None, color="tab:blue")
+                ax.plot([], [], color="tab:blue", linewidth=1.35, linestyle=":", label="E[I] / scaled latent S")
+            if has_observed:
+                observed = sub.dropna(subset=["theory_spectrum_expected", "theory_spectrum_continuous_observed_scaled"])
+                ax.plot(
+                    observed["k_mid"],
+                    observed["theory_spectrum_expected"],
+                    color="tab:orange",
+                    linewidth=1.85,
+                    linestyle="--",
+                    label="finite-sample E[I] observed",
+                    zorder=3,
+                )
+                ax.plot(
+                    observed["k_mid"],
+                    observed["theory_spectrum_continuous_observed_scaled"],
+                    color="tab:purple",
+                    linewidth=1.55,
+                    linestyle="-.",
+                    label="observed continuous S+nugget (profiled)",
+                    zorder=4,
+                )
+            profile_label = DIRECTION_SPECS.get(profile, DIRECTION_SPECS["radial"])["label"]
+            freq_label = DIRECTION_SPECS.get(profile, DIRECTION_SPECS["radial"])["frequency_label"]
+            ax.set_xlim(0, ctx.k_max_full)
+            ax.set_ylim(*ylim)
+            ax.set_title(f"{VARIANTS[variant]['row_title']}: {profile_label}, {label}")
+            ax.set_xlabel(freq_label)
+            if j == 0:
+                ax.set_ylabel("spectrum")
+            ax.set_yscale("log")
+            ax.grid(alpha=0.2)
+            ax.legend(fontsize=6.5, handlelength=1.4)
+    fig.suptitle(f"{ctx.year}-{ctx.month:02d}, smooth={smooth}: expected periodogram vs continuous theoretical spectrum")
+    fig.tight_layout()
+    plot_path = out_dir / "monthly_average" / f"{ctx.year}{ctx.month:02d}_expected_periodogram_vs_continuous_theoretical_scaled.png"
+    plot_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(plot_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved expected-vs-continuous plot: {plot_path}", flush=True)
+    publish_monthly_plot(args, ctx, smooth, plot_path)
+
+
 def make_monthly_average(args: argparse.Namespace, ctx: MonthContext, smooth: float, out_dir: Path):
     daily_dir = out_dir / "daily_csv"
-    paths = sorted(daily_dir.glob("*_radial_spectrum.csv"))
+    paths = sorted(daily_dir.glob("*_spectral_profiles.csv"))
+    if not paths:
+        paths = sorted(daily_dir.glob("*_radial_spectrum.csv"))
     if not paths:
         print(f"No daily spectra found in {daily_dir}; skipping monthly average.", flush=True)
         return
@@ -1119,7 +1637,7 @@ def make_monthly_average(args: argparse.Namespace, ctx: MonthContext, smooth: fl
     if not frames:
         print("No non-empty daily spectra; skipping monthly average.", flush=True)
         return
-    spectral_df = pd.concat(frames, ignore_index=True)
+    spectral_df = ensure_profile_columns(pd.concat(frames, ignore_index=True))
     fit_paths = sorted(daily_dir.glob("*_fits.csv"))
     fit_frames = []
     for path in fit_paths:
@@ -1129,14 +1647,37 @@ def make_monthly_average(args: argparse.Namespace, ctx: MonthContext, smooth: fl
             continue
     fit_df = pd.concat(fit_frames, ignore_index=True) if fit_frames else spectral_df
 
+    group_cols_daily = [
+        "date_str",
+        "profile",
+        "direction",
+        "direction_label",
+        "frequency_label",
+        "variant",
+        "resolution_label",
+        "resolution_stride",
+        "k_bin",
+    ]
+    group_cols_month = [
+        "profile",
+        "direction",
+        "direction_label",
+        "frequency_label",
+        "variant",
+        "resolution_label",
+        "resolution_stride",
+        "k_bin",
+    ]
     daily_means = (
         spectral_df
-        .groupby(["date_str", "variant", "resolution_label", "resolution_stride", "k_bin"], observed=True)
+        .groupby(group_cols_daily, observed=True)
         .agg(
             k_mid=("k_mid", "mean"),
             data_spectrum=("data_spectrum", "mean"),
             theory_spectrum_expected=("theory_spectrum_expected", "mean"),
+            theory_spectrum_expected_latent=("theory_spectrum_expected_latent", "mean"),
             theory_spectrum_continuous=("theory_spectrum_continuous", "mean"),
+            theory_spectrum_continuous_observed=("theory_spectrum_continuous_observed", "mean"),
             data_k_max=("data_k_max", "mean"),
             n_hours=("hour_idx", "nunique"),
         )
@@ -1144,12 +1685,14 @@ def make_monthly_average(args: argparse.Namespace, ctx: MonthContext, smooth: fl
     )
     monthly = (
         daily_means
-        .groupby(["variant", "resolution_label", "resolution_stride", "k_bin"], observed=True)
+        .groupby(group_cols_month, observed=True)
         .agg(
             k_mid=("k_mid", "mean"),
             data_spectrum=("data_spectrum", "mean"),
             theory_spectrum_expected=("theory_spectrum_expected", "mean"),
+            theory_spectrum_expected_latent=("theory_spectrum_expected_latent", "mean"),
             theory_spectrum_continuous=("theory_spectrum_continuous", "mean"),
+            theory_spectrum_continuous_observed=("theory_spectrum_continuous_observed", "mean"),
             data_k_max=("data_k_max", "mean"),
             n_days=("date_str", "nunique"),
         )
@@ -1158,57 +1701,81 @@ def make_monthly_average(args: argparse.Namespace, ctx: MonthContext, smooth: fl
     write_csv(daily_means, out_dir / "monthly_average" / f"{ctx.year}{ctx.month:02d}_daily_mean_curves.csv")
     write_csv(monthly, out_dir / "monthly_average" / f"{ctx.year}{ctx.month:02d}_30day_mean_curves.csv")
 
+    monthly_radial = monthly[monthly["profile"].astype(str) == "radial"].copy()
+    daily_radial = daily_means[daily_means["profile"].astype(str) == "radial"].copy()
+    if monthly_radial.empty:
+        print("No radial monthly spectra; skipping radial monthly plot.", flush=True)
+    else:
+        monthly_for_radial_plot = monthly_radial
+        daily_for_radial_plot = daily_radial
+
     labels_order = [f"x{s}" for s in parse_int_list_or_range(args.resolutions)]
     row_specs = [(v, VARIANTS[v]["row_title"]) for v in parse_names(args.variants) if v in VARIANTS]
-    ylim = positive_ylim(monthly.get("data_spectrum"), monthly.get("theory_spectrum_expected"))
-    fig, axes = plt.subplots(len(row_specs), len(labels_order), figsize=(4.4 * len(labels_order), 3.4 * len(row_specs)), sharey=True)
-    axes = np.asarray(axes).reshape(len(row_specs), len(labels_order))
-    for i, (variant, row_title) in enumerate(row_specs):
-        for j, label in enumerate(labels_order):
-            ax = axes[i, j]
-            sub_data = monthly[
-                (monthly["variant"] == variant)
-                & (monthly["resolution_label"].astype(str) == label)
-                & (monthly["k_mid"] > 0)
-            ]
-            daily_sub = daily_means[
-                (daily_means["variant"] == variant)
-                & (daily_means["resolution_label"].astype(str) == label)
-                & (daily_means["k_mid"] > 0)
-                & daily_means["data_spectrum"].notna()
-            ]
-            if sub_data.empty:
-                ax.set_visible(False)
-                continue
-            k_cut = float(sub_data["data_k_max"].dropna().iloc[0]) if sub_data["data_k_max"].notna().any() else float(sub_data["k_mid"].max())
-            param_label = format_fit_label(fit_df, variant, label)
-            if param_label:
-                ax.plot([], [], color="none", label=param_label)
-            ax.plot(sub_data["k_mid"], sub_data["theory_spectrum_expected"], color="tab:red", linewidth=1.9, linestyle="--", label="expected periodogram (30-day mean)", zorder=3)
-            for d_i, (_, ds) in enumerate(daily_sub.groupby("date_str")):
-                day_label = "daily mean spectra" if (i == 0 and j == 0 and d_i == 0) else None
-                ax.plot(ds["k_mid"], ds["data_spectrum"], color="0.35", alpha=0.35, linewidth=0.85, label=day_label, zorder=1)
-            ax.plot(sub_data["k_mid"], sub_data["data_spectrum"], color="black", linewidth=2.2, label="data residual spectrum (30-day mean)", zorder=4)
-            ratio_df = ratio_frame(sub_data, sub_data, "data_spectrum", "theory_spectrum_expected")
-            add_ratio_axis(ax, ratio_df, ylabel="I / E[I]" if j == len(labels_order) - 1 else None)
-            ax.plot([], [], color="tab:blue", linewidth=1.35, linestyle=":", label="I / E[I] (ratio of means)")
-            ax.axvline(k_cut, color="0.45", linewidth=1.0, linestyle=":", alpha=0.95, zorder=2)
-            ax.set_xlim(0, ctx.k_max_full)
-            ax.set_ylim(*ylim)
-            ax.set_title(f"{row_title}, {label}  (data k <= {k_cut:.1f})")
-            ax.set_xlabel("radial frequency on full-grid scale")
-            if j == 0:
-                ax.set_ylabel("spectrum")
-            ax.set_yscale("log")
-            ax.grid(alpha=0.2)
-            ax.legend(fontsize=7, handlelength=1.5)
-    fig.suptitle(f"{ctx.year}-{ctx.month:02d}, smooth={smooth}: 30-day mean radial residual spectrum vs fitted expected periodogram")
-    fig.tight_layout()
-    plot_path = out_dir / "monthly_average" / f"{ctx.year}{ctx.month:02d}_30day_mean_data_vs_expected_periodogram.png"
-    plot_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(plot_path, dpi=180, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved monthly average plot: {plot_path}", flush=True)
+    if not monthly_radial.empty:
+        ylim = positive_ylim(monthly_for_radial_plot.get("data_spectrum"), monthly_for_radial_plot.get("theory_spectrum_expected"))
+        fig, axes = plt.subplots(len(row_specs), len(labels_order), figsize=(4.4 * len(labels_order), 3.4 * len(row_specs)), sharey=True)
+        axes = np.asarray(axes).reshape(len(row_specs), len(labels_order))
+        for i, (variant, row_title) in enumerate(row_specs):
+            for j, label in enumerate(labels_order):
+                ax = axes[i, j]
+                sub_data = monthly_for_radial_plot[
+                    (monthly_for_radial_plot["variant"] == variant)
+                    & (monthly_for_radial_plot["resolution_label"].astype(str) == label)
+                    & (monthly_for_radial_plot["k_mid"] > 0)
+                ]
+                daily_sub = daily_for_radial_plot[
+                    (daily_for_radial_plot["variant"] == variant)
+                    & (daily_for_radial_plot["resolution_label"].astype(str) == label)
+                    & (daily_for_radial_plot["k_mid"] > 0)
+                    & daily_for_radial_plot["data_spectrum"].notna()
+                ]
+                if sub_data.empty:
+                    ax.set_visible(False)
+                    continue
+                k_cut = float(sub_data["data_k_max"].dropna().iloc[0]) if sub_data["data_k_max"].notna().any() else float(sub_data["k_mid"].max())
+                param_label = format_fit_label(fit_df, variant, label)
+                if param_label:
+                    ax.plot([], [], color="none", label=param_label)
+                ax.plot(sub_data["k_mid"], sub_data["theory_spectrum_expected"], color="tab:red", linewidth=1.9, linestyle="--", label="expected periodogram (30-day mean)", zorder=3)
+                for d_i, (_, ds) in enumerate(daily_sub.groupby("date_str")):
+                    day_label = "daily mean spectra" if (i == 0 and j == 0 and d_i == 0) else None
+                    ax.plot(ds["k_mid"], ds["data_spectrum"], color="0.35", alpha=0.35, linewidth=0.85, label=day_label, zorder=1)
+                ax.plot(sub_data["k_mid"], sub_data["data_spectrum"], color="black", linewidth=2.2, label="data residual spectrum (30-day mean)", zorder=4)
+                sigma_sq = median_sigmasq(fit_df, variant, label)
+                ratio_df = ratio_frame(
+                    sub_data,
+                    sub_data,
+                    "data_spectrum",
+                    "theory_spectrum_expected",
+                    normalize_mean=True,
+                    sigma_sq=sigma_sq,
+                )
+                ratio_label = profile_ratio_label(ratio_df)
+                if ratio_label:
+                    ax.plot([], [], color="none", label=ratio_label)
+                add_ratio_axis(ax, ratio_df, ylabel="I / E[I]" if j == len(labels_order) - 1 else None)
+                ax.plot([], [], color="tab:blue", linewidth=1.35, linestyle=":", label="profiled I / E[I] (mean=1)")
+                ax.axvline(k_cut, color="0.45", linewidth=1.0, linestyle=":", alpha=0.95, zorder=2)
+                ax.set_xlim(0, ctx.k_max_full)
+                ax.set_ylim(*ylim)
+                ax.set_title(f"{row_title}, {label}  (data k <= {k_cut:.1f})")
+                ax.set_xlabel("radial frequency on full-grid scale")
+                if j == 0:
+                    ax.set_ylabel("spectrum")
+                ax.set_yscale("log")
+                ax.grid(alpha=0.2)
+                ax.legend(fontsize=7, handlelength=1.5)
+        fig.suptitle(f"{ctx.year}-{ctx.month:02d}, smooth={smooth}: 30-day mean radial residual spectrum vs fitted expected periodogram")
+        fig.tight_layout()
+        plot_path = out_dir / "monthly_average" / f"{ctx.year}{ctx.month:02d}_30day_mean_data_vs_expected_periodogram.png"
+        plot_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(plot_path, dpi=180, bbox_inches="tight")
+        plt.close(fig)
+        print(f"Saved monthly average plot: {plot_path}", flush=True)
+        publish_monthly_plot(args, ctx, smooth, plot_path)
+
+    plot_monthly_directional_data_expected(args, ctx, smooth, monthly, daily_means, fit_df, out_dir)
+    plot_monthly_expected_vs_continuous(args, ctx, smooth, monthly, out_dir)
 
 
 def output_dir_for(args: argparse.Namespace, smooth: float, year: int) -> Path:
@@ -1225,7 +1792,8 @@ def main() -> None:
     print(
         f"Run config: years={years}, month={args.month}, days={days[0]}..{days[-1]}, "
         f"smooths={smooths}, resolutions={parse_int_list_or_range(args.resolutions)}, "
-        f"variants={parse_names(args.variants)}, device={device}",
+        f"variants={parse_names(args.variants)}, region=lat {args.lat_range} lon {args.lon_range}, "
+        f"hann_taper={bool(args.hann)}, device={device}",
         flush=True,
     )
 
