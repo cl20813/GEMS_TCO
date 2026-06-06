@@ -1,10 +1,11 @@
-# Pure-Space Group Vecchia Global Fit With Full-Likelihood Tile Nuggets
+# Pure-Space Group Vecchia Global And Tile Nugget Fits
 
 This is a separate 2024-only expanded-area diagnostic.  The hourly global
-spatial fit is unchanged: pure-space isotropic cluster/group Vecchia with
-`cluster_block_shape=4x4` and `cluster_neighbor_blocks=2`.  After the global
-fit, the tile step holds the global `sigma^2` and range fixed and estimates
-only the tile nugget with a dense Gaussian full likelihood.
+spatial fit uses pure-space anisotropic cluster/group Vecchia with
+`cluster_block_shape=4x4` and `cluster_neighbor_blocks=2`.  Each hour first
+runs a Vecchia QC pass, removes observations with `|whitened residual| > 10`,
+and then refits on the cleaned observations.  After the post-QC global fit,
+each tile is fitted with the same torch/autograd group Vecchia likelihood.
 
 Key settings:
 
@@ -12,19 +13,17 @@ Key settings:
 - source pkl file:
   `/home/jl2815/tco/data/pickle_2024/tco_grid_lat-3to7_lon111to131_24_07.pkl`
 - year/month: `2024-07`
-- fitted subset: first 7 observed days, i.e. the first 56 July hour slots
+- fitted subset: first 10 observed days, i.e. the first 80 July hour slots
 - smoothness values: `nu=0.2` and `nu=0.5`
 - execution style: one Slurm job, one GPU node, sequential loops, no job array
-- global fit: isotropic Matern group Vecchia, `beta0 + beta1 * centered latitude`
-- tile fit: full Gaussian likelihood for each tile nugget, with global
-  `sigma^2` and range fixed
+- global fit: anisotropic Matern group Vecchia, `beta0 + beta1 * centered latitude`
+- tile fit: torch/autograd anisotropic Matern group Vecchia, estimating
+  `sigma^2`, `range_lat`, `range_lon`, and nugget per tile
 - tile plots: longitude/latitude axes plus GEMS nadir marker at `(lon=128, lat=0)`
 
-The Python script defaults to exact full likelihood inside each tile
-(`--tile-full-max-points 0`).  That can be expensive for the expanded 4x8 grid,
-so the Slurm script below uses deterministic thinning at `1200` points per tile
-by default.  Set `TILE_FULL_MAX_POINTS=0` in the Slurm script if you want truly
-all tile points in the dense Cholesky likelihood.
+The Python script keeps the legacy option name `--tile-full-max-points` for
+compatibility, but it now means deterministic thinning before tile Vecchia.
+Set `TILE_FULL_MAX_POINTS=0` if you want all tile points.
 
 ## 1. Transfer Files
 
@@ -93,16 +92,16 @@ export NUMEXPR_NUM_THREADS=1
 
 YEAR=2024
 EXPECTED_HOURS=248
-FIT_HOURS=56
+FIT_HOURS=80
 SMOOTHS=(0.2 0.5)
+QC_WHITENED_THRESHOLD=10
 
-# 0 means exact full likelihood over all tile points. 1200 is safer for the
-# expanded area while preserving deterministic tile comparisons.
+# Legacy name: now controls deterministic thinning before tile Vecchia.
 TILE_FULL_MAX_POINTS=1200
 
 SCRIPT=/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/fit_sim_july_spatial_nugget_tiles_group_vecchia_full_lik_tile_111131_052626.py
 DATA_ROOT=/home/jl2815/tco/data
-BASE_ROOT=/home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_global_full_lik_tile_111131_first7days_052626
+BASE_ROOT=/home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_global_tile_vecchia_111131_first10days_060526
 
 YY=$(printf "%02d" $((YEAR % 100)))
 DATA_PATH=${DATA_ROOT}/pickle_${YEAR}/tco_grid_lat-3to7_lon111to131_${YY}_07.pkl
@@ -116,6 +115,7 @@ echo "Started: $(date)"
 echo "Data=${DATA_PATH}"
 echo "Output=${YEAR_OUT}"
 echo "Fitting first ${FIT_HOURS} manifest rows only"
+echo "QC whitened threshold=${QC_WHITENED_THRESHOLD}"
 nvidia-smi
 which python
 python -c "import torch; print('torch', torch.__version__); print('cuda available', torch.cuda.is_available())"
@@ -150,12 +150,13 @@ for SMOOTH in "${SMOOTHS[@]}"; do
   echo "============================================================"
   echo "Sequential fit start: year=${YEAR}, smooth=${SMOOTH}, output=${OUTDIR}"
   echo "Fitting only first ${FIT_HOURS} hour slots from the July manifest"
-  echo "Tile full-likelihood max points=${TILE_FULL_MAX_POINTS}"
+  echo "Tile Vecchia deterministic max points=${TILE_FULL_MAX_POINTS}"
+  echo "Vecchia QC threshold=${QC_WHITENED_THRESHOLD}"
   echo "Time: $(date)"
   echo "============================================================"
 
   for HOUR_IDX in $(seq 0 $((FIT_HOURS - 1))); do
-    echo "---- year=${YEAR} smooth=${SMOOTH} hour_idx=${HOUR_IDX}/${FIT_HOURS} first-7-days $(date) ----"
+    echo "---- year=${YEAR} smooth=${SMOOTH} hour_idx=${HOUR_IDX}/${FIT_HOURS} first-10-days $(date) ----"
     srun python "${SCRIPT}" \
       --mode fit \
       --input "${DATA_PATH}" \
@@ -179,11 +180,14 @@ for SMOOTH in "${SMOOTHS[@]}"; do
       --cluster-neighbor-blocks 2 \
       --target-chunk-size 96 \
       --min-target-points 1 \
+      --qc-whitened-threshold "${QC_WHITENED_THRESHOLD}" \
       --min-tile-points 80 \
       --tile-full-max-points "${TILE_FULL_MAX_POINTS}" \
       --mean-design lat \
       --sigmasq-init 10 \
       --range-init 0.2 \
+      --range-lat-init 0.2 \
+      --range-lon-init 0.2 \
       --nugget-init 1.0 \
       --device cuda
   done
@@ -213,12 +217,13 @@ for SMOOTH in "${SMOOTHS[@]}"; do
     --min-target-points 1 \
     --min-tile-points 80 \
     --tile-full-max-points "${TILE_FULL_MAX_POINTS}" \
+    --qc-whitened-threshold "${QC_WHITENED_THRESHOLD}" \
     --mean-design lat
 
   echo "Completed year=${YEAR}, smooth=${SMOOTH}: $(date)"
 done
 
-echo "Finished full-likelihood tile run: $(date)"
+echo "Finished tile Vecchia run: $(date)"
 ```
 
 Submit:
@@ -233,13 +238,13 @@ sbatch fit_sim_july_group_vecchia_global_full_lik_tile_111131_2024_seq_052626.sh
 squeue -u jl2815
 tail -f /home/jl2815/tco/exercise_output/logs/real_gv_fulltile24_<JOBID>.out
 
-ls -R /home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_global_full_lik_tile_111131_first7days_052626
+ls -R /home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_global_tile_vecchia_111131_first10days_060526
 ```
 
 Expected output folders:
 
 ```text
-july_expanded_bounds_group_vecchia_global_full_lik_tile_111131_first7days_052626/
+july_expanded_bounds_group_vecchia_global_tile_vecchia_111131_first10days_060526/
   2024_july_expanded_bounds/
     manifest_hours.csv
     nu0p2/
@@ -255,6 +260,6 @@ july_expanded_bounds_group_vecchia_global_full_lik_tile_111131_first7days_052626
 ```bash
 mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/real_data"
 
-scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_global_full_lik_tile_111131_first7days_052626 \
+scp -r jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/eda/real_data/july_expanded_bounds_group_vecchia_global_tile_vecchia_111131_first10days_060526 \
   "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/eda/real_data/"
 ```

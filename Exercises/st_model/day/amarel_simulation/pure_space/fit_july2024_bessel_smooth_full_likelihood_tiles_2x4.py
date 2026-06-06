@@ -2,7 +2,7 @@
 """July 2024 tile-wise anisotropic Matern fits with exact full likelihood.
 
 This entrypoint fits the first 240 observed July 2024 hours.  Each hour is
-split into a 2x4 lat/lon tile grid, and each tile is fitted independently with
+split into a configurable lat/lon tile grid, and each tile is fitted independently with
 an anisotropic pure-space Matern covariance:
 
     sigmasq, range_lat, range_lon, smooth, nugget
@@ -14,6 +14,8 @@ Matern formula from GEMS_TCO.matern_bessel_anisotropic.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import math
 import os
@@ -31,9 +33,11 @@ try:
     from GEMS_TCO.matern_bessel_anisotropic import (
         covariance_from_deltas,
         fit_full_matern,
+        fit_vecchia_matern_from_batches,
         make_mean_design,
         natural_from_raw,
         pairwise_deltas,
+        vecchia_batches_to_numpy,
     )
 except ImportError:
     _candidates = [
@@ -47,10 +51,24 @@ except ImportError:
     from GEMS_TCO.matern_bessel_anisotropic import (
         covariance_from_deltas,
         fit_full_matern,
+        fit_vecchia_matern_from_batches,
         make_mean_design,
         natural_from_raw,
         pairwise_deltas,
+        vecchia_batches_to_numpy,
     )
+
+try:
+    import torch
+    from GEMS_TCO.kernels_space_iso_cluster_052426 import ClusterSpaceIsoTrendVecchiaFit
+
+    VECCHIA_QC_AVAILABLE = True
+    VECCHIA_QC_IMPORT_ERROR = ""
+except Exception as exc:
+    torch = None
+    ClusterSpaceIsoTrendVecchiaFit = None
+    VECCHIA_QC_AVAILABLE = False
+    VECCHIA_QC_IMPORT_ERROR = repr(exc)
 
 
 METHOD = "full_likelihood"
@@ -63,13 +81,20 @@ def parse_float_pair(text: str) -> list[float]:
     return [min(vals), max(vals)]
 
 
+def parse_block_shape(text: str) -> tuple[int, int]:
+    vals = [int(x.strip()) for x in str(text).lower().replace("x", ",").split(",") if x.strip()]
+    if len(vals) != 2 or vals[0] <= 0 or vals[1] <= 0:
+        raise argparse.ArgumentTypeError("block shape must look like 4x4")
+    return vals[0], vals[1]
+
+
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="July 2024 2x4 tile Bessel-smooth full likelihood fits.")
+    p = argparse.ArgumentParser(description="July 2024 tile-wise Bessel-smooth full likelihood fits.")
     p.add_argument("--mode", choices=["manifest", "fit", "summarize", "all"], required=True)
     p.add_argument("--input", default=os.environ.get("DATA_PATH"))
     p.add_argument("--output-dir", default=os.environ.get(
         "OUTDIR",
-        "/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/full_likelihood_2x4",
+        "/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/full_likelihood_4x4",
     ))
     p.add_argument("--monthly-output-dir", default=os.environ.get("MONTHLY_OUTDIR", ""))
     p.add_argument("--manifest", default=None)
@@ -87,12 +112,29 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--coords", choices=["raw", "lonlat"], default=os.environ.get("COORDS", "raw"))
     p.add_argument("--lat-range", type=parse_float_pair, default=parse_float_pair(os.environ.get("LAT_RANGE", "-3,2")))
     p.add_argument("--lon-range", type=parse_float_pair, default=parse_float_pair(os.environ.get("LON_RANGE", "121,131")))
-    p.add_argument("--tile-y", type=int, default=int(os.environ.get("TILE_Y", "2")))
+    p.add_argument("--tile-y", type=int, default=int(os.environ.get("TILE_Y", "4")))
     p.add_argument("--tile-x", type=int, default=int(os.environ.get("TILE_X", "4")))
     p.add_argument("--min-tile-points", type=int, default=int(os.environ.get("MIN_TILE_POINTS", "200")))
     p.add_argument("--tile-max-points", type=int, default=int(os.environ.get("TILE_MAX_POINTS", "0")))
     p.add_argument("--tile-workers", type=int, default=int(os.environ.get("TILE_WORKERS", "1")))
     p.add_argument("--sample-seed", type=int, default=int(os.environ.get("SAMPLE_SEED", "202407")))
+
+    p.add_argument("--cluster-block-shape", type=parse_block_shape, default=parse_block_shape(os.environ.get("CLUSTER_BLOCK_SHAPE", "4x4")),
+                   help="Vecchia-only first-stage QC cluster target block shape.")
+    p.add_argument("--cluster-neighbor-blocks", type=int, default=int(os.environ.get("CLUSTER_NEIGHBOR_BLOCKS", "2")),
+                   help="Vecchia-only first-stage QC previous cluster blocks used for conditioning.")
+    p.add_argument("--target-chunk-size", type=int, default=int(os.environ.get("TARGET_CHUNK_SIZE", "128")),
+                   help="Vecchia-only first-stage QC target chunk size.")
+    p.add_argument("--min-target-points", type=int, default=int(os.environ.get("MIN_TARGET_POINTS", "1")),
+                   help="Vecchia-only first-stage QC minimum target points.")
+    p.add_argument("--qc-tile-y", type=int, default=int(os.environ.get("QC_TILE_Y", "0")),
+                   help="If >0 with --qc-tile-x, compute first-stage Vecchia QC on this y tile grid before final full likelihood.")
+    p.add_argument("--qc-tile-x", type=int, default=int(os.environ.get("QC_TILE_X", "0")),
+                   help="If >0 with --qc-tile-y, compute first-stage Vecchia QC on this x tile grid before final full likelihood.")
+    p.add_argument("--qc-tile-max-points", type=int, default=int(os.environ.get("QC_TILE_MAX_POINTS", "0")),
+                   help="Optional deterministic thinning limit for each first-stage Vecchia QC tile; 0 keeps all QC-tile points.")
+    p.add_argument("--qc-tile-workers", type=int, default=int(os.environ.get("QC_TILE_WORKERS", "0")),
+                   help="Workers for first-stage Vecchia QC tiles; 0 reuses --tile-workers.")
 
     p.add_argument("--nugget-mode", choices=["free", "fixed0"], default=os.environ.get("NUGGET_MODE", "free"))
     p.add_argument("--mean-design", choices=["constant", "lat", "latlon"], default=os.environ.get("MEAN_DESIGN", "lat"))
@@ -401,6 +443,246 @@ def _fit_has_usable_qc_params(fit: dict) -> bool:
     return raw_arr.size > 0 and bool(np.all(np.isfinite(raw_arr))) and bool(np.isfinite(loss))
 
 
+def _build_vecchia_qc_tile_model(y: np.ndarray, coords: np.ndarray, task: dict):
+    if not VECCHIA_QC_AVAILABLE:
+        raise RuntimeError(f"Vecchia QC unavailable: {VECCHIA_QC_IMPORT_ERROR}")
+    data = np.zeros((len(y), 4), dtype=np.float64)
+    data[:, 0] = coords[:, 0]
+    data[:, 1] = coords[:, 1]
+    data[:, 2] = y
+    tensor = torch.from_numpy(data).to(dtype=torch.float64)
+    model = ClusterSpaceIsoTrendVecchiaFit(
+        smooth=0.5,
+        input_map={"t0": tensor},
+        grid_coords=np.asarray(coords, dtype=np.float64),
+        block_shape=tuple(task["cluster_block_shape"]),
+        n_neighbor_blocks=int(task["cluster_neighbor_blocks"]),
+        target_chunk_size=int(task["target_chunk_size"]),
+        min_target_points=int(task["min_target_points"]),
+        mean_design=str(task["mean_design"]),
+    )
+    with contextlib.redirect_stdout(io.StringIO()):
+        model.precompute_conditioning_sets()
+    return model, vecchia_batches_to_numpy(model)
+
+
+def _fit_vecchia_qc_tile_once(y: np.ndarray, coords: np.ndarray, task: dict):
+    model, batches = _build_vecchia_qc_tile_model(y, coords, task)
+    fit = fit_vecchia_matern_from_batches(
+        batches=batches,
+        n_features=int(model.n_features),
+        y_var=max(float(np.nanvar(y, ddof=1)), 1e-8),
+        nugget_mode=str(task["nugget_mode"]),
+        fixed_nugget=0.0,
+        smooth_bounds=tuple(task["smooth_bounds"]),
+        range_bounds=tuple(task["range_bounds"]),
+        range_lat_init=float(task["range_lat_init"]),
+        range_lon_init=float(task["range_lon_init"]),
+        smooth_init=float(task["smooth_init"]),
+        nugget_init=task["nugget_init"],
+        jitter=float(task["jitter"]),
+        n_restarts=int(task["n_restarts"]),
+        maxiter=int(task["maxiter"]),
+        maxfun=int(task["maxfun"]),
+        maxls=int(task["maxls"]),
+        maxcor=int(task["maxcor"]),
+        method=str(task["optimizer_method"]),
+    )
+    return fit, model, batches
+
+
+def vecchia_qc_whitened_residuals_by_obs(
+    model,
+    batches: list[dict],
+    fit: dict,
+    task: dict,
+    n_obs: int,
+) -> np.ndarray:
+    """Map first-stage Vecchia target whitened residuals back to tile rows."""
+    raw = fit.get("raw_params")
+    if raw is None:
+        raise ValueError("Vecchia QC fit record has no raw_params")
+    params = natural_from_raw(raw, str(task["nugget_mode"]), 0.0, tuple(task["smooth_bounds"]))
+    n_features = int(model.n_features)
+    xt_sinv_x = np.zeros((n_features, n_features), dtype=np.float64)
+    xt_sinv_y = np.zeros((n_features, 1), dtype=np.float64)
+
+    for batch in batches:
+        coords_all = batch["coords"]
+        X_all = batch["X"]
+        y_all = batch["y"]
+        d_lat_all = batch.get("d_lat")
+        d_lon_all = batch.get("d_lon")
+        m = int(batch["max_cond_points"])
+        t = int(batch["target_size"])
+        target = slice(m, m + t)
+        for i in range(coords_all.shape[0]):
+            K = covariance_from_deltas(d_lat_all[i], d_lon_all[i], params, jitter=float(task["jitter"]))
+            c, lower = cho_factor(K, lower=True, check_finite=False)
+            z_X = solve_triangular(c, X_all[i], lower=lower, check_finite=False)
+            z_y = solve_triangular(c, y_all[i], lower=lower, check_finite=False)
+            u_X = z_X[target, :]
+            u_y = z_y[target, :]
+            xt_sinv_x += u_X.T @ u_X
+            xt_sinv_y += u_X.T @ u_y
+
+    beta = np.linalg.solve(xt_sinv_x + np.eye(n_features) * 1e-8, xt_sinv_y)
+    out = np.full(int(n_obs), np.nan, dtype=np.float64)
+    cluster_batches = getattr(model, "_cluster_batches", [])
+    for batch_np, batch_obj in zip(batches, cluster_batches):
+        coords_all = batch_np["coords"]
+        X_all = batch_np["X"]
+        y_all = batch_np["y"]
+        d_lat_all = batch_np.get("d_lat")
+        d_lon_all = batch_np.get("d_lon")
+        rows_all = batch_obj.rows.detach().cpu().numpy()
+        m = int(batch_np["max_cond_points"])
+        t = int(batch_np["target_size"])
+        target = slice(m, m + t)
+        for i in range(coords_all.shape[0]):
+            K = covariance_from_deltas(d_lat_all[i], d_lon_all[i], params, jitter=float(task["jitter"]))
+            c, lower = cho_factor(K, lower=True, check_finite=False)
+            z_X = solve_triangular(c, X_all[i], lower=lower, check_finite=False)
+            z_y = solve_triangular(c, y_all[i], lower=lower, check_finite=False)
+            resid = (z_y[target, :] - z_X[target, :] @ beta).reshape(-1)
+            obs_idx = rows_all[i, target].reshape(-1)
+            real = obs_idx < int(n_obs)
+            out[obs_idx[real].astype(int)] = resid[real]
+    return out
+
+
+def _qc_tile_worker(task: dict) -> dict:
+    obs_idx = np.asarray(task["obs_idx"], dtype=int)
+    tile_id = int(task.get("tile_id", -1))
+    try:
+        initial_fit, initial_model, initial_batches = _fit_vecchia_qc_tile_once(
+            np.asarray(task["y"], dtype=np.float64),
+            np.asarray(task["coords"], dtype=np.float64),
+            task,
+        )
+        if not _fit_has_usable_qc_params(initial_fit):
+            return {"tile_id": tile_id, "obs_idx": obs_idx, "success": False, "message": "unusable"}
+        w_local = vecchia_qc_whitened_residuals_by_obs(
+            initial_model,
+            initial_batches,
+            initial_fit,
+            task,
+            n_obs=len(obs_idx),
+        )
+        return {
+            "tile_id": tile_id,
+            "obs_idx": obs_idx,
+            "w": w_local,
+            "success": True,
+            "loss": initial_fit.get("loss", np.nan),
+            "nll": initial_fit.get("nll", np.nan),
+            "message": "",
+        }
+    except Exception as exc:
+        return {"tile_id": tile_id, "obs_idx": obs_idx, "success": False, "message": f"error {exc}"}
+
+
+def precompute_vecchia_qc_mask(
+    coords: np.ndarray,
+    values: np.ndarray,
+    args: argparse.Namespace,
+) -> tuple[np.ndarray, np.ndarray, dict] | None:
+    """Compute a reusable hour-level outlier mask from Vecchia QC tiles."""
+    threshold = float(args.outlier_whitened_threshold)
+    qc_tile_y = int(args.qc_tile_y)
+    qc_tile_x = int(args.qc_tile_x)
+    if threshold <= 0.0 or qc_tile_y <= 0 or qc_tile_x <= 0:
+        return None
+
+    qid, _ = assign_tiles(coords, qc_tile_y, qc_tile_x)
+    keep_global = np.ones(len(values), dtype=bool)
+    w_global = np.full(len(values), np.nan, dtype=np.float64)
+    n_fit_tiles = 0
+    n_failed_tiles = 0
+    n_too_small_tiles = 0
+    messages: list[str] = []
+    task = {
+        "cluster_block_shape": tuple(args.cluster_block_shape),
+        "cluster_neighbor_blocks": int(args.cluster_neighbor_blocks),
+        "target_chunk_size": int(args.target_chunk_size),
+        "min_target_points": int(args.min_target_points),
+        "nugget_mode": str(args.nugget_mode),
+        "mean_design": str(args.mean_design),
+        "smooth_bounds": (float(args.smooth_min), float(args.smooth_max)),
+        "range_bounds": (float(args.range_min), float(args.range_max)),
+        "range_lat_init": float(args.range_lat_init),
+        "range_lon_init": float(args.range_lon_init),
+        "smooth_init": float(args.smooth_init),
+        "nugget_init": args.nugget_init,
+        "jitter": float(args.jitter),
+        "n_restarts": int(args.n_restarts),
+        "maxiter": int(args.maxiter),
+        "maxfun": int(args.maxfun),
+        "maxls": int(args.maxls),
+        "maxcor": int(args.maxcor),
+        "optimizer_method": str(args.optimizer_method),
+    }
+
+    qc_tasks = []
+    for tid in range(qc_tile_y * qc_tile_x):
+        idx = np.flatnonzero(qid == tid)
+        if idx.size < int(args.min_tile_points):
+            n_too_small_tiles += 1
+            continue
+        local_keep = deterministic_subset(int(idx.size), int(args.qc_tile_max_points))
+        fit_idx = idx[local_keep]
+        qc_task = dict(task)
+        qc_task.update({
+            "tile_id": int(tid),
+            "obs_idx": fit_idx,
+            "y": values[fit_idx],
+            "coords": coords[fit_idx],
+        })
+        qc_tasks.append(qc_task)
+
+    workers = int(args.qc_tile_workers) if int(args.qc_tile_workers) > 0 else int(args.tile_workers)
+    workers = max(1, workers)
+    if workers == 1:
+        qc_results = [_qc_tile_worker(t) for t in qc_tasks]
+    else:
+        qc_results = []
+        with ProcessPoolExecutor(max_workers=workers) as ex:
+            futures = [ex.submit(_qc_tile_worker, t) for t in qc_tasks]
+            for fut in as_completed(futures):
+                qc_results.append(fut.result())
+
+    for result in qc_results:
+        fit_idx = np.asarray(result.get("obs_idx", []), dtype=int)
+        tid = int(result.get("tile_id", -1)) if "tile_id" in result else -1
+        if bool(result.get("success", False)):
+            w_local = np.asarray(result["w"], dtype=np.float64)
+            w_global[fit_idx] = w_local
+            bad_local = np.isfinite(np.abs(w_local)) & (np.abs(w_local) > threshold)
+            keep_global[fit_idx[bad_local]] = False
+            n_fit_tiles += 1
+        else:
+            n_failed_tiles += 1
+            messages.append(f"qc_tile_{tid}_{result.get('message', 'failed')}")
+
+    meta = {
+        "qc_precomputed": True,
+        "qc_initial_method": f"vecchia_qc_tiles_{qc_tile_y}x{qc_tile_x}_cluster_{args.cluster_block_shape[0]}x{args.cluster_block_shape[1]}_cond{int(args.cluster_neighbor_blocks)}",
+        "qc_tile_y": qc_tile_y,
+        "qc_tile_x": qc_tile_x,
+        "qc_tile_max_points": int(args.qc_tile_max_points),
+        "qc_tile_workers": workers,
+        "qc_tiles_fit": int(n_fit_tiles),
+        "qc_tiles_failed": int(n_failed_tiles),
+        "qc_tiles_too_small": int(n_too_small_tiles),
+        "qc_global_removed": int((~keep_global).sum()),
+        "qc_global_max_abs_whitened": float(np.nanmax(np.abs(w_global))) if np.isfinite(w_global).any() else np.nan,
+        "qc_global_message": "; ".join(messages[:8]),
+    }
+    if n_fit_tiles == 0:
+        return None
+    return keep_global, w_global, meta
+
+
 def full_whitened_residuals(
     y: np.ndarray,
     coords: np.ndarray,
@@ -456,9 +738,8 @@ def fit_full_tile_with_outlier_qc(
     coords: np.ndarray,
     task: dict,
 ) -> tuple[dict, np.ndarray, dict]:
-    """Fit a tile, optionally mask extreme fitted whitened residuals, and refit."""
+    """Use first-stage Vecchia whitening for QC, then fit the final full GP."""
     threshold = float(task.get("outlier_whitened_threshold", 0.0))
-    initial_fit = _fit_full_tile_once(y, coords, task)
     qc = {
         "outlier_whitened_threshold": threshold,
         "n_qc_initial_fit": int(len(y)),
@@ -466,27 +747,44 @@ def fit_full_tile_with_outlier_qc(
         "n_qc_fit": int(len(y)),
         "qc_max_abs_whitened": np.nan,
         "qc_refit": False,
-        "qc_initial_success": bool(initial_fit.get("success", False)),
+        "qc_initial_success": False,
+        "qc_initial_method": "vecchia_cluster_4x4_cond2",
     }
-    if threshold <= 0.0 or not _fit_has_usable_qc_params(initial_fit):
-        return initial_fit, np.ones(len(y), dtype=bool), qc
+    if threshold <= 0.0:
+        final_fit = _fit_full_tile_once(y, coords, task)
+        return final_fit, np.ones(len(y), dtype=bool), qc
 
     try:
-        w = full_whitened_residuals(
-            y=y,
-            coords=coords,
-            fit=initial_fit,
-            nugget_mode=str(task["nugget_mode"]),
-            mean_design=str(task["mean_design"]),
-            smooth_bounds=tuple(task["smooth_bounds"]),
-            jitter=float(task["jitter"]),
-        )
+        initial_fit, initial_model, initial_batches = _fit_vecchia_qc_tile_once(y, coords, task)
     except Exception as exc:
-        initial_fit["message"] = _append_message(
-            initial_fit.get("message", ""),
-            f"outlier_qc_skipped_whitening_error {exc}",
+        final_fit = _fit_full_tile_once(y, coords, task)
+        final_fit["message"] = _append_message(
+            final_fit.get("message", ""),
+            f"outlier_qc_skipped_vecchia_fit_error {exc}",
         )
-        return initial_fit, np.ones(len(y), dtype=bool), qc
+        return final_fit, np.ones(len(y), dtype=bool), qc
+
+    qc["qc_initial_success"] = bool(initial_fit.get("success", False))
+    qc["pre_qc_vecchia_loss"] = initial_fit.get("loss", np.nan)
+    qc["pre_qc_vecchia_nll"] = initial_fit.get("nll", np.nan)
+    if not _fit_has_usable_qc_params(initial_fit):
+        final_fit = _fit_full_tile_once(y, coords, task)
+        final_fit["message"] = _append_message(
+            final_fit.get("message", ""),
+            "outlier_qc_skipped_vecchia_unusable",
+        )
+        return final_fit, np.ones(len(y), dtype=bool), qc
+
+    try:
+        w = vecchia_qc_whitened_residuals_by_obs(initial_model, initial_batches, initial_fit, task, n_obs=len(y))
+    except Exception as exc:
+        final_fit = _fit_full_tile_once(y, coords, task)
+        final_fit["message"] = _append_message(
+            final_fit.get("message", ""),
+            f"outlier_qc_skipped_vecchia_whitening_error {exc}",
+        )
+        return final_fit, np.ones(len(y), dtype=bool), qc
+
     abs_w = np.abs(w)
     bad = np.isfinite(abs_w) & (abs_w > threshold)
     keep = ~bad
@@ -494,23 +792,24 @@ def fit_full_tile_with_outlier_qc(
     qc["n_qc_removed"] = int(bad.sum())
     qc["n_qc_fit"] = int(keep.sum())
     if int(bad.sum()) == 0:
-        return initial_fit, keep, qc
+        final_fit = _fit_full_tile_once(y, coords, task)
+        return final_fit, keep, qc
+
     min_refit_points = max(10, int(make_mean_design(coords, str(task["mean_design"])).shape[1]) + 2)
     if int(keep.sum()) < min_refit_points:
-        initial_fit["message"] = _append_message(
-            initial_fit.get("message", ""),
+        final_fit = _fit_full_tile_once(y, coords, task)
+        final_fit["message"] = _append_message(
+            final_fit.get("message", ""),
             f"outlier_qc_skipped_too_few_after_removal {len(y)}->{int(keep.sum())}",
         )
         qc["n_qc_fit"] = int(len(y))
-        return initial_fit, np.ones(len(y), dtype=bool), qc
+        return final_fit, np.ones(len(y), dtype=bool), qc
 
     refit = _fit_full_tile_once(y[keep], coords[keep], task)
     refit["message"] = _append_message(
         refit.get("message", ""),
-        f"whitened_outlier_qc |r|>{threshold:g} removed {int(bad.sum())}/{len(y)}",
+        f"vecchia_whitened_outlier_qc |w|>{threshold:g} removed {int(bad.sum())}/{len(y)}",
     )
-    refit["pre_qc_loss"] = initial_fit.get("loss", np.nan)
-    refit["pre_qc_nll"] = initial_fit.get("nll", np.nan)
     qc["qc_refit"] = True
     return refit, keep, qc
 
@@ -534,7 +833,37 @@ def _fit_tile_worker(task: dict) -> dict:
     y = y_all[keep]
     coords = coords_all[keep]
     try:
-        fit, _qc_keep, qc = fit_full_tile_with_outlier_qc(y, coords, task)
+        if "precomputed_qc_keep" in task and task["precomputed_qc_keep"] is not None:
+            pre_keep_all = np.asarray(task["precomputed_qc_keep"], dtype=bool)
+            pre_w_all = np.asarray(task.get("precomputed_qc_w", np.full(n_tile, np.nan)), dtype=np.float64)
+            qc_keep = pre_keep_all[keep]
+            min_refit_points = max(10, int(make_mean_design(coords, str(task["mean_design"])).shape[1]) + 2)
+            qc = {
+                "outlier_whitened_threshold": float(task.get("outlier_whitened_threshold", 0.0)),
+                "n_qc_initial_fit": int(len(y)),
+                "n_qc_removed": int((~qc_keep).sum()),
+                "n_qc_fit": int(qc_keep.sum()),
+                "qc_max_abs_whitened": float(np.nanmax(np.abs(pre_w_all[keep]))) if np.isfinite(pre_w_all[keep]).any() else np.nan,
+                "qc_refit": bool((~qc_keep).sum() > 0 and int(qc_keep.sum()) >= min_refit_points),
+                "qc_initial_success": True,
+                **dict(task.get("precomputed_qc_meta", {})),
+            }
+            if int((~qc_keep).sum()) > 0 and int(qc_keep.sum()) >= min_refit_points:
+                fit = _fit_full_tile_once(y[qc_keep], coords[qc_keep], task)
+                fit["message"] = _append_message(
+                    fit.get("message", ""),
+                    f"precomputed_vecchia_whitened_outlier_qc |w|>{float(task.get('outlier_whitened_threshold', 0.0)):g} removed {int((~qc_keep).sum())}/{len(y)}",
+                )
+            else:
+                fit = _fit_full_tile_once(y, coords, task)
+                if int((~qc_keep).sum()) > 0:
+                    fit["message"] = _append_message(
+                        fit.get("message", ""),
+                        f"precomputed_qc_skipped_too_few_after_removal {len(y)}->{int(qc_keep.sum())}",
+                    )
+                    qc["n_qc_fit"] = int(len(y))
+        else:
+            fit, _qc_keep, qc = fit_full_tile_with_outlier_qc(y, coords, task)
         base.update(fit)
         base.update({
             "n": n_tile,
@@ -562,6 +891,7 @@ def _fit_tile_worker(task: dict) -> dict:
 def fit_tiles_for_hour(coords: np.ndarray, values: np.ndarray, tile_id: np.ndarray, tile_meta: dict, args: argparse.Namespace) -> pd.DataFrame:
     tasks = []
     tile_count = int(args.tile_y) * int(args.tile_x)
+    precomputed_qc = precompute_vecchia_qc_mask(coords, values, args)
     for tid in range(tile_count):
         mask = tile_id == tid
         base = tile_geometry(tid, tile_meta, int(args.tile_x))
@@ -571,6 +901,10 @@ def fit_tiles_for_hour(coords: np.ndarray, values: np.ndarray, tile_id: np.ndarr
             "coords": coords[mask],
             "min_tile_points": int(args.min_tile_points),
             "tile_max_points": int(args.tile_max_points),
+            "cluster_block_shape": tuple(args.cluster_block_shape),
+            "cluster_neighbor_blocks": int(args.cluster_neighbor_blocks),
+            "target_chunk_size": int(args.target_chunk_size),
+            "min_target_points": int(args.min_target_points),
             "nugget_mode": str(args.nugget_mode),
             "mean_design": str(args.mean_design),
             "smooth_bounds": (float(args.smooth_min), float(args.smooth_max)),
@@ -588,6 +922,12 @@ def fit_tiles_for_hour(coords: np.ndarray, values: np.ndarray, tile_id: np.ndarr
             "optimizer_method": str(args.optimizer_method),
             "outlier_whitened_threshold": float(args.outlier_whitened_threshold),
         })
+        if precomputed_qc is not None:
+            keep_global, w_global, qc_meta = precomputed_qc
+            tile_obs = np.flatnonzero(mask)
+            tasks[-1]["precomputed_qc_keep"] = keep_global[tile_obs]
+            tasks[-1]["precomputed_qc_w"] = w_global[tile_obs]
+            tasks[-1]["precomputed_qc_meta"] = qc_meta
     workers = max(1, int(args.tile_workers))
     if workers == 1:
         rows = [_fit_tile_worker(t) for t in tasks]
@@ -787,6 +1127,10 @@ def summarize(args: argparse.Namespace) -> None:
         "sigmasq", "sigma", "range_lat", "range_lon", "smooth", "nugget",
         "phi1", "phi2", "phi3", "loss", "nll", "n", "n_fit",
         "n_initial_fit", "n_qc_removed", "qc_max_abs_whitened",
+        "pre_qc_vecchia_loss", "pre_qc_vecchia_nll",
+        "qc_tile_y", "qc_tile_x", "qc_tile_max_points", "qc_tile_workers",
+        "qc_tiles_fit", "qc_tiles_failed", "qc_tiles_too_small",
+        "qc_global_removed", "qc_global_max_abs_whitened",
     ]
     agg = {f"{c}_mean": (c, "mean") for c in value_cols if c in d.columns}
     agg.update({f"{c}_median": (c, "median") for c in ["sigmasq", "range_lat", "range_lon", "smooth", "nugget"] if c in d.columns})
@@ -824,8 +1168,6 @@ def run_all(args: argparse.Namespace) -> None:
 
 def main() -> None:
     args = parse_args()
-    if int(args.tile_y) != 2 or int(args.tile_x) != 4:
-        print(f"WARNING: expected 2x4 tiles, got {args.tile_y}x{args.tile_x}")
     if args.mode == "manifest":
         make_manifest(args)
     elif args.mode == "fit":

@@ -7,6 +7,9 @@ into `2x4` tiles.  Inside each tile, the Vecchia likelihood uses:
 - conditioning: two previous max-min cluster blocks
 - covariance: direct-Bessel anisotropic Matern
 - estimated parameters: `sigmasq, range_lat, range_lon, smooth, nugget`
+- optimizer scale: `phi1, phi2, phi3`, bounded smooth-logit, and nugget, with
+  `phi2 = 1/range_lon`, `phi3 = (range_lon/range_lat)^2`, and
+  `sigmasq = phi1/phi2`
 
 Both nugget settings are run in the same Slurm job:
 

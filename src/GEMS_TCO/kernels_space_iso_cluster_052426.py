@@ -273,16 +273,19 @@ class ClusterSpaceVecchiaFit(_PureSpaceVecchiaBase):
             end=" ",
         )
         t0 = time.time()
-        max_cond_points = int(self.n_neighbor_blocks * max(1, self.block_shape[0] * self.block_shape[1]))
+        first_data = next(iter(self.input_map.values()))
+        n_grid_for_clusters = int(first_data.shape[0])
+        self._build_clusters(n_grid_for_clusters)
+        max_cond_points = int(self.n_neighbor_blocks * self.max_points_per_cluster)
         all_data_list, full_data, n_real, num_cols, day_lengths, cumulative_len, valid_obs_np = self._make_full_data(
             max_cond_points
         )
         del all_data_list
 
         n_grid = day_lengths[0]
-        self._build_clusters(n_grid)
+        if n_grid != n_grid_for_clusters:
+            raise ValueError(f"Cluster grid length {n_grid_for_clusters} != data grid length {n_grid}")
         dummy_start = n_real
-        max_cond_points = int(self.n_neighbor_blocks * self.max_points_per_cluster)
 
         batch_rows: dict[tuple[int, int], list[list[int]]] = {}
         m_sizes: list[int] = []

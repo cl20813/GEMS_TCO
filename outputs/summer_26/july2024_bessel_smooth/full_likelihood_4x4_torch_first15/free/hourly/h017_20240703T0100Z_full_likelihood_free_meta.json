@@ -1,0 +1,100 @@
+{
+  "hour_index": 17,
+  "hour": "2024-07-03T01:00:00Z",
+  "method": "full_likelihood",
+  "nugget_mode": "free",
+  "tile_shape": [
+    4,
+    4
+  ],
+  "tile_meta": {
+    "y_edges": [
+      -2.9879999999999076,
+      -1.744999999998676,
+      -0.5019999999974445,
+      0.7410000000037873,
+      1.9840000000050186
+    ],
+    "x_edges": [
+      121.04600000000188,
+      123.5345000000039,
+      126.02300000000591,
+      128.51150000000794,
+      131.00000000000995
+    ]
+  },
+  "data_meta": {
+    "lat_min": -2.9879999999999076,
+    "lat_max": 1.9840000000000466,
+    "lon_min": 121.04600000000188,
+    "lon_max": 131.0,
+    "n_after_region_filter": 18126,
+    "n_used": 16652,
+    "value_mean": 257.7208188121547,
+    "value_sd": 4.2857899590027255
+  },
+  "args": {
+    "mode": "fit",
+    "input": "/home/jl2815/tco/data/pickle_2024/tco_grid_lat-3to7_lon111to131_24_07.pkl",
+    "output_dir": "/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/full_likelihood_4x4_torch_first15",
+    "monthly_output_dir": "/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/monthly_output_4x4_torch_first15",
+    "manifest": "/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/full_likelihood_4x4_torch_first15/manifest_hours.csv",
+    "month": "2024-07",
+    "max_hours": 120,
+    "expected_hours": 120,
+    "time_col": "hour",
+    "x_col": "Longitude",
+    "y_col": "Latitude",
+    "value_col": "ColumnAmountO3",
+    "qa_col": "",
+    "qa_min": null,
+    "coords": "raw",
+    "lat_range": [
+      -3.0,
+      2.0
+    ],
+    "lon_range": [
+      121.0,
+      131.0
+    ],
+    "tile_y": 4,
+    "tile_x": 4,
+    "min_tile_points": 200,
+    "tile_max_points": 2400,
+    "tile_workers": 4,
+    "sample_seed": 202407,
+    "cluster_block_shape": [
+      4,
+      4
+    ],
+    "cluster_neighbor_blocks": 2,
+    "target_chunk_size": 128,
+    "min_target_points": 1,
+    "qc_tile_y": 4,
+    "qc_tile_x": 4,
+    "qc_tile_max_points": 0,
+    "qc_tile_workers": 4,
+    "nugget_mode": "free",
+    "mean_design": "lat",
+    "range_lat_init": 0.35,
+    "range_lon_init": 0.35,
+    "smooth_init": 0.5,
+    "nugget_init": null,
+    "smooth_min": 0.05,
+    "smooth_max": 2.5,
+    "range_min": 0.03,
+    "range_max": 5.0,
+    "jitter": 1e-06,
+    "n_restarts": 1,
+    "maxiter": 80,
+    "maxfun": 0,
+    "maxls": 20,
+    "maxcor": 20,
+    "optimizer_method": "L-BFGS-B",
+    "full_fit_engine": "torch",
+    "outlier_whitened_threshold": 10.0,
+    "array_index": 17,
+    "hour": null,
+    "overwrite": false
+  }
+}

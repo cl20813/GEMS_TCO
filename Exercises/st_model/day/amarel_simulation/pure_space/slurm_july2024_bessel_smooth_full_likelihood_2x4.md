@@ -1,7 +1,7 @@
-# July 2024 Bessel Smooth Full Likelihood 2x4 Tiles
+# July 2024 Bessel Smooth Full Likelihood 4x4 Tiles
 
 This run fits the first 240 observed hours of July 2024.  Each hour is split
-into `2x4` tiles and each tile is fitted independently with a direct-Bessel
+into `4x4` tiles and each tile is fitted independently with a direct-Bessel
 anisotropic Matern model:
 
 `sigmasq, range_lat, range_lon, smooth, nugget`
@@ -11,10 +11,16 @@ Both nugget settings are run in the same Slurm job:
 - `free`: nugget estimated
 - `fixed0`: nugget fixed at zero, with numerical jitter still added
 
+When `--outlier-whitened-threshold` is positive, outlier screening is two-stage:
+the first fit is a 4x4-cond2 cluster Vecchia fit using the same anisotropic
+`phi1, phi2, phi3` reparameterization.  The QC whitening mask is computed once
+per hour on the same `4x4` tile grid, then reused by the final `4x4` dense
+full-likelihood tile fits.
+
 Monthly summaries are written to:
 
 ```text
-/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/monthly_output
+/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/monthly_output_4x4
 ```
 
 ## Transfer
@@ -39,8 +45,8 @@ On Amarel:
 
 ```bash
 cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space
-nano run_july2024_bessel_full_likelihood_2x4.sh
-sbatch run_july2024_bessel_full_likelihood_2x4.sh
+nano run_july2024_bessel_full_likelihood_4x4.sh
+sbatch run_july2024_bessel_full_likelihood_4x4.sh
 ```
 
 The current RedHat high-memory partitions can be checked with:
@@ -68,9 +74,9 @@ Paste:
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name=bess_full2x4
-#SBATCH --output=/home/jl2815/tco/exercise_output/logs/bess_full2x4_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/logs/bess_full2x4_%j.err
+#SBATCH --job-name=bess_full4x4
+#SBATCH --output=/home/jl2815/tco/exercise_output/logs/bess_full4x4_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/logs/bess_full4x4_%j.err
 #SBATCH --time=72:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -95,8 +101,8 @@ export NUMEXPR_NUM_THREADS=2
 
 SCRIPT=/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/fit_july2024_bessel_smooth_full_likelihood_tiles_2x4.py
 DATA_PATH=/home/jl2815/tco/data/pickle_2024/tco_grid_lat-3to7_lon111to131_24_07.pkl
-OUTDIR=/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/full_likelihood_2x4
-MONTHLY_OUTDIR=/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/monthly_output
+OUTDIR=/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/full_likelihood_4x4
+MONTHLY_OUTDIR=/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/monthly_output_4x4
 MANIFEST=${OUTDIR}/manifest_hours.csv
 
 mkdir -p /home/jl2815/tco/exercise_output/logs "${OUTDIR}" "${MONTHLY_OUTDIR}"
@@ -127,7 +133,7 @@ python "${SCRIPT}" \
   --coords raw \
   --lat-range=-3,2 \
   --lon-range=121,131 \
-  --tile-y 2 \
+  --tile-y 4 \
   --tile-x 4
 
 for NUGGET_MODE in free fixed0; do
@@ -155,11 +161,19 @@ for NUGGET_MODE in free fixed0; do
       --coords raw \
       --lat-range=-3,2 \
       --lon-range=121,131 \
-      --tile-y 2 \
+      --tile-y 4 \
       --tile-x 4 \
       --min-tile-points 200 \
       --tile-max-points 2400 \
       --tile-workers 4 \
+      --qc-tile-y 4 \
+      --qc-tile-x 4 \
+      --qc-tile-max-points 0 \
+      --qc-tile-workers 4 \
+      --cluster-block-shape 4x4 \
+      --cluster-neighbor-blocks 2 \
+      --target-chunk-size 128 \
+      --min-target-points 1 \
       --nugget-mode "${NUGGET_MODE}" \
       --mean-design lat \
       --range-lat-init 0.35 \
@@ -199,7 +213,7 @@ echo "Finished full likelihood run: $(date)"
 Expected monthly output files:
 
 ```text
-/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/monthly_output/
+/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/monthly_output_4x4/
   202407_full_likelihood_free_tile_monthly_summary.csv
   202407_full_likelihood_fixed0_tile_monthly_summary.csv
   202407_full_likelihood_free_tile_monthly_parameter_maps.png
@@ -209,3 +223,47 @@ Expected monthly output files:
   202407_full_likelihood_free_tile_monthly_{sigmasq,sigma,range_lat,range_lon,nu,nugget,phi1,phi2,phi3}_map.png
   202407_full_likelihood_fixed0_tile_monthly_{sigmasq,sigma,range_lat,range_lon,nu,nugget,phi1,phi2,phi3}_map.png
 ```
+
+## Recover Partial Hourly Outputs
+
+If the Slurm job stops before the summarize step, copy the already-written
+hourly tile CSVs from Amarel to the local machine:
+
+```bash
+LOCAL_ROOT="/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/july2024_bessel_smooth/full_likelihood_2x4"
+
+
+REMOTE_ROOT="/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/full_likelihood_2x4"
+
+
+
+
+mkdir -p "${LOCAL_ROOT}/free" "${LOCAL_ROOT}/fixed0"
+
+scp -r "jl2815@amarel.rutgers.edu:${REMOTE_ROOT}/manifest_hours.csv" \
+  "${LOCAL_ROOT}/"
+
+mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/july2024_bessel_smooth/full_likelihood_2x4/free"
+
+scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/full_likelihood_2x4/free/hourly" \
+  "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/july2024_bessel_smooth/full_likelihood_2x4/free/"
+
+  
+scp -r "jl2815@amarel.rutgers.edu:${REMOTE_ROOT}/fixed0/hourly" \
+  "${LOCAL_ROOT}/fixed0/"
+```
+
+Optional monthly output recovery, if the summarize step finished:
+
+```bash
+LOCAL_MONTHLY="/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/july2024_bessel_smooth/monthly_output"
+REMOTE_MONTHLY="/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/monthly_output"
+
+mkdir -p "${LOCAL_MONTHLY}"
+
+scp -r "jl2815@amarel.rutgers.edu:${REMOTE_MONTHLY}/"* \
+  "${LOCAL_MONTHLY}/"
+```
+
+If only one nugget mode had started, run only the corresponding `scp -r`
+command for `free/hourly` or `fixed0/hourly`.

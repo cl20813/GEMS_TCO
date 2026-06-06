@@ -6,12 +6,20 @@ Workflow:
   2. fit:      fit one hourly global spatial model and tile nuggets.
   3. summarize: aggregate hourly outputs and write diagnostic plots.
 
-The global model estimates sigmasq, range (isotropic), and a global nugget
+The global model estimates sigmasq, range_lat, range_lon, and a global nugget
 for a fixed Matern smoothness using GPU-batched cluster/group Vecchia.  The
-global spatial scale is fitted with the phi1/phi2 reparameterization used by
-the hybrid kernels: sigmasq = phi1 / phi2 and range = 1 / phi2.  Tile nuggets
-are then profiled with global sigmasq and range held fixed, using an exact
-Gaussian full likelihood inside each tile.
+global spatial scale is fitted with the anisotropic microergodic-style
+reparameterization used by the hybrid kernels:
+phi2 = 1 / range_lon, phi3 = (range_lon / range_lat)^2, and
+sigmasq = phi1 / phi2.  Tile parameters are fitted tile-by-tile with the same
+torch/autograd group Vecchia likelihood rather than a dense full-likelihood
+profile.
+
+By default this entrypoint runs a two-stage robustification pass: first fit the
+hour with group Vecchia, compute Vecchia whitened residuals, remove observations
+with |w| > 10, and then refit/profile on the cleaned observations.  The all-mode
+default is restricted to the first 10 days and first 8 observed hour slots per
+day for the short diagnostic run.
 
 This updated simulation entrypoint is intentionally not pointwise Vecchia.  It
 uses 4x4 grid-cell cluster targets with previous max-min cluster blocks as
@@ -37,9 +45,6 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 import torch
-from scipy.linalg import LinAlgError, cho_factor, cho_solve
-from scipy.optimize import minimize_scalar
-from scipy.special import gamma, kv
 
 # Locate GEMS_TCO package (local dev tree or Amarel via PYTHONPATH)
 try:
@@ -56,20 +61,18 @@ except ImportError:
     from GEMS_TCO.kernels_space_iso_cluster_052426 import ClusterSpaceIsoTrendVecchiaFit as _ClusterBase
 
 
-TWO_PI_LOG = float(np.log(2.0 * np.pi))
-
-
 # ---------------------------------------------------------------------------
 # GPU-batched cluster/group spatial Vecchia
 # ---------------------------------------------------------------------------
 
 class EDAClusterSpaceVecchiaFit(_ClusterBase):
-    """Cluster-target isotropic spatial Vecchia with phi1/phi2 parameterization.
+    """Cluster-target anisotropic spatial Vecchia with phi1/phi2/phi3 parameterization.
 
-    Parameters are optimized as log(phi1), log(phi2), log(nugget), with
-    sigmasq = phi1 / phi2 and range = 1 / phi2.  This keeps the pure-space
-    isotropic fit on the same microergodic-style scale as the earlier hybrid
-    kernels, while using group/cluster targets instead of pointwise targets.
+    Parameters are optimized as log(phi1), log(phi2), log(phi3), log(nugget),
+    with sigmasq = phi1 / phi2, range_lon = 1 / phi2, and
+    range_lat = 1 / (phi2 * sqrt(phi3)).  This keeps the pure-space fit on the
+    same microergodic-style scale as the earlier hybrid kernels, while using
+    group/cluster targets instead of pointwise targets.
 
     For this hourly pure-space diagnostic the default mean is beta0 + latitude.
     The older space-time fits used time dummies and latitude terms, but here
@@ -92,22 +95,38 @@ class EDAClusterSpaceVecchiaFit(_ClusterBase):
     def _raw_params(self, params: torch.Tensor):
         phi1 = torch.exp(params[0])
         phi2 = torch.exp(params[1])
+        phi3 = torch.exp(params[2])
         sigmasq = phi1 / phi2
-        range_space = 1.0 / phi2
-        nugget = torch.exp(params[2])
-        return sigmasq, range_space, range_space, nugget
+        range_lon = 1.0 / phi2
+        range_lat = 1.0 / (phi2 * torch.sqrt(phi3).clamp_min(1e-12))
+        nugget = torch.exp(params[3])
+        return sigmasq, range_lat, range_lon, nugget
+
+    def _cov_from_deltas(self, d_lat, d_lon, params: torch.Tensor):
+        sigmasq, range_lat, range_lon, _ = self._raw_params(params)
+        dist = torch.sqrt(
+            d_lat.new_tensor(1e-8)
+            + (d_lat / range_lat.clamp_min(1e-12)).pow(2)
+            + (d_lon / range_lon.clamp_min(1e-12)).pow(2)
+        )
+        return sigmasq * self._matern_corr(dist)
 
     def _convert_params(self, raw):
         phi1 = float(np.exp(raw[0]))
         phi2 = float(np.exp(raw[1]))
+        phi3 = float(np.exp(raw[2]))
         sigmasq = phi1 / phi2
-        range_space = 1.0 / phi2
+        range_lon = 1.0 / phi2
+        range_lat = 1.0 / (phi2 * np.sqrt(phi3))
         return {
             "sigmasq": sigmasq,
-            "range": range_space,
-            "nugget": float(np.exp(raw[2])),
+            "range": float(np.sqrt(range_lat * range_lon)),
+            "range_lat": range_lat,
+            "range_lon": range_lon,
+            "nugget": float(np.exp(raw[3])),
             "phi1": phi1,
             "phi2": phi2,
+            "phi3": phi3,
         }
 
     def _design_from_rows(self, rows: torch.Tensor) -> torch.Tensor:
@@ -152,8 +171,13 @@ class FitResult:
     nll: float
     sigmasq: float
     sigma: float
-    range: float      # isotropic range (degree units when --coords raw)
+    range: float      # geometric mean range, retained for backward-compatible summaries
+    range_lat: float
+    range_lon: float
     nugget: float
+    phi1: float
+    phi2: float
+    phi3: float
     message: str
     n_eval: int
 
@@ -173,6 +197,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--manifest", default=None)
     parser.add_argument("--month", default=os.environ.get("MONTH", "2024-07"))
     parser.add_argument("--expected-hours", type=int, default=int(os.environ.get("EXPECTED_HOURS", "248")))
+    parser.add_argument("--max-days", type=int, default=int(os.environ.get("MAX_DAYS", "10")),
+                        help="For --mode all, fit at most this many distinct days. 0 means all days.")
+    parser.add_argument("--max-hour-slots-per-day", type=int, default=int(os.environ.get("MAX_HOUR_SLOTS_PER_DAY", "8")),
+                        help="For --mode all, fit at most this many observed hour slots per day. 0 means all slots.")
 
     parser.add_argument("--time-col", default=os.environ.get("TIME_COL", "auto"))
     parser.add_argument("--x-col", default=os.environ.get("X_COL", "auto"))
@@ -193,11 +221,17 @@ def parse_args() -> argparse.Namespace:
                         help="Number of cluster conditionals per GPU batch.")
     parser.add_argument("--min-target-points", type=int, default=int(os.environ.get("MIN_TARGET_POINTS", "1")),
                         help="Minimum observed points required for a target cluster to enter the likelihood.")
+    parser.add_argument("--qc-whitened-threshold", type=float, default=float(os.environ.get("QC_WHITENED_THRESHOLD", "10.0")),
+                        help="Two-stage QC threshold. Remove observations with |Vecchia whitened residual| above this value before the final fit. <=0 disables QC.")
+    parser.add_argument("--qc-min-fit-points", type=int, default=int(os.environ.get("QC_MIN_FIT_POINTS", "80")),
+                        help="Skip QC removal if fewer than this many observations would remain.")
     parser.add_argument("--mean-design", default=os.environ.get("MEAN_DESIGN", "lat"),
                         choices=["constant", "lat", "latlon", "base", "hour_spatial"],
                         help="GLS trend design. Default is beta0 + centered latitude for separate hourly pure-space fits.")
     parser.add_argument("--sigmasq-init", type=float, default=float(os.environ.get("SIGMASQ_INIT", "10.0")))
     parser.add_argument("--range-init", type=float, default=float(os.environ.get("RANGE_INIT", "0.2")))
+    parser.add_argument("--range-lat-init", type=float, default=float(os.environ.get("RANGE_LAT_INIT", os.environ.get("RANGE_INIT", "0.2"))))
+    parser.add_argument("--range-lon-init", type=float, default=float(os.environ.get("RANGE_LON_INIT", os.environ.get("RANGE_INIT", "0.2"))))
     parser.add_argument("--nugget-init", type=float, default=float(os.environ.get("NUGGET_INIT", "1.0")))
     parser.add_argument("--lat-range", type=parse_float_pair, default=parse_float_pair(os.environ.get("LAT_RANGE", "-3,7")),
                         help="Required fitted latitude range; default is the expanded domain -3,7.")
@@ -210,9 +244,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-points", type=int, default=int(os.environ.get("MAX_POINTS", "0")))
     parser.add_argument("--min-tile-points", type=int, default=int(os.environ.get("MIN_TILE_POINTS", "80")))
     parser.add_argument("--tile-full-max-points", type=int, default=int(os.environ.get("TILE_FULL_MAX_POINTS", "0")),
-                        help="Maximum points per tile for exact full-likelihood nugget profiling. 0 means use all tile points.")
+                        help="Legacy name retained for Slurm compatibility; now controls deterministic thinning before tile Vecchia. 0 means use all tile points.")
     parser.add_argument("--tile-full-jitter", type=float, default=float(os.environ.get("TILE_FULL_JITTER", "1e-6")),
-                        help="Diagonal jitter added during exact tile Cholesky factorization.")
+                        help="Legacy full-likelihood option retained for CLI compatibility; tile Vecchia uses the model's internal jitter.")
     parser.add_argument("--tiles", type=int, default=int(os.environ["TILES"]) if os.environ.get("TILES") else None,
                         help="Legacy square tile count. Use --tile-y/--tile-x for rectangular grids.")
     parser.add_argument("--tile-y", type=int, default=int(os.environ["TILE_Y"]) if os.environ.get("TILE_Y") else None,
@@ -675,12 +709,24 @@ def _build_gpu_model(
     return model
 
 
-def fit_global(
+def raw_to_float_list(raw) -> list[float]:
+    if isinstance(raw, torch.Tensor):
+        return [float(x) for x in raw.detach().cpu().reshape(-1).tolist()]
+    out = []
+    for x in raw:
+        if isinstance(x, torch.Tensor):
+            out.append(float(x.detach().cpu().item()))
+        else:
+            out.append(float(x))
+    return out
+
+
+def fit_global_with_model(
     y: np.ndarray,
     coords: np.ndarray,
     args: argparse.Namespace,
     device: torch.device,
-) -> FitResult:
+) -> tuple[FitResult, EDAClusterSpaceVecchiaFit, list[float]]:
     if len(y) < 5:
         raise ValueError("Need at least 5 observations for global fit.")
     smooth = float(args.smooth)
@@ -695,35 +741,162 @@ def fit_global(
     model = _build_gpu_model(y, coords, smooth, args, device)
 
     # Fixed init informed by pure-space EDA. The optimizer sees
-    # log(phi1), log(phi2), log(nugget), with sigmasq=phi1/phi2 and range=1/phi2.
+    # log(phi1), log(phi2), log(phi3), log(nugget), with
+    # phi2=1/range_lon, phi3=(range_lon/range_lat)^2, sigmasq=phi1/phi2.
     init_sigmasq = float(args.sigmasq_init)
-    init_range = float(args.range_init)
+    init_range_lat = float(getattr(args, "range_lat_init", args.range_init))
+    init_range_lon = float(getattr(args, "range_lon_init", args.range_init))
     init_nugget = float(args.nugget_init)
-    init_phi2 = 1.0 / init_range
+    init_phi2 = 1.0 / init_range_lon
+    init_phi3 = (init_range_lon / init_range_lat) ** 2
     init_phi1 = init_sigmasq * init_phi2
     params_list = [
         torch.tensor(math.log(init_phi1), requires_grad=True, dtype=torch.float64, device=device),
         torch.tensor(math.log(init_phi2), requires_grad=True, dtype=torch.float64, device=device),
+        torch.tensor(math.log(init_phi3), requires_grad=True, dtype=torch.float64, device=device),
         torch.tensor(math.log(init_nugget), requires_grad=True, dtype=torch.float64, device=device),
     ]
     opt = model.set_optimizer(params_list, lr=1.0, max_iter=150, tolerance_grad=1e-5)
     raw, iters = model.fit_vecc_lbfgs(params_list, opt, max_steps=60, grad_tol=1e-5)
+    raw_vals = raw_to_float_list(raw)
+    raw_params = raw_vals[:4]
 
-    phi1 = math.exp(raw[0])
-    phi2 = math.exp(raw[1])
+    phi1 = math.exp(raw_params[0])
+    phi2 = math.exp(raw_params[1])
+    phi3 = math.exp(raw_params[2])
     sigmasq = phi1 / phi2
-    range_  = 1.0 / phi2
-    nugget  = math.exp(raw[2])
-    return FitResult(
+    range_lon = 1.0 / phi2
+    range_lat = 1.0 / (phi2 * math.sqrt(phi3))
+    range_ = math.sqrt(range_lat * range_lon)
+    nugget  = math.exp(raw_params[3])
+    fit = FitResult(
         success=True,
-        nll=raw[-1],
+        nll=float(raw_vals[-1]),
         sigmasq=sigmasq,
         sigma=math.sqrt(sigmasq),
         range=range_,
+        range_lat=range_lat,
+        range_lon=range_lon,
         nugget=nugget,
-        message="lbfgs_gpu_phi1_phi2",
+        phi1=phi1,
+        phi2=phi2,
+        phi3=phi3,
+        message="lbfgs_gpu_phi1_phi2_phi3",
         n_eval=iters,
     )
+    return fit, model, raw_params
+
+
+def fit_global(
+    y: np.ndarray,
+    coords: np.ndarray,
+    args: argparse.Namespace,
+    device: torch.device,
+) -> FitResult:
+    fit, model, _ = fit_global_with_model(y, coords, args, device)
+    del model
+    return fit
+
+
+def vecchia_whitened_residuals_by_obs(
+    model: EDAClusterSpaceVecchiaFit,
+    raw_params: list[float],
+    n_obs: int,
+) -> np.ndarray:
+    """Return target-row Vecchia whitened residuals mapped to input rows."""
+    device = getattr(model, "device", None)
+    if device is None:
+        device = next(iter(model.input_map.values())).device
+    params = torch.as_tensor(raw_params, device=device, dtype=torch.float64)
+    n_features = int(model.n_features)
+    xt_sinv_x = torch.zeros((n_features, n_features), device=device, dtype=torch.float64)
+    xt_sinv_y = torch.zeros((n_features, 1), device=device, dtype=torch.float64)
+    chunk_size = max(1, int(model.target_chunk_size))
+
+    with torch.no_grad():
+        for batch in getattr(model, "_cluster_batches", []):
+            if batch.coords.shape[0] == 0:
+                continue
+            target_slice = slice(batch.max_cond_points, batch.max_cond_points + batch.target_size)
+            for start in range(0, batch.coords.shape[0], chunk_size):
+                end = min(start + chunk_size, batch.coords.shape[0])
+                k_mat = model._cov_full(batch.coords[start:end], params)
+                chol = torch.linalg.cholesky(k_mat)
+                z_x = torch.linalg.solve_triangular(chol, batch.X[start:end], upper=False)
+                z_y = torch.linalg.solve_triangular(chol, batch.y[start:end], upper=False)
+                u_x = z_x[:, target_slice, :].reshape(-1, n_features)
+                u_y = z_y[:, target_slice, :].reshape(-1, 1)
+                xt_sinv_x += u_x.T @ u_x
+                xt_sinv_y += u_x.T @ u_y
+
+        beta = torch.linalg.solve(
+            xt_sinv_x + torch.eye(n_features, device=device, dtype=torch.float64) * 1e-8,
+            xt_sinv_y,
+        )
+        out = torch.full((int(n_obs),), float("nan"), device=device, dtype=torch.float64)
+        for batch in getattr(model, "_cluster_batches", []):
+            if batch.coords.shape[0] == 0:
+                continue
+            target_slice = slice(batch.max_cond_points, batch.max_cond_points + batch.target_size)
+            for start in range(0, batch.coords.shape[0], chunk_size):
+                end = min(start + chunk_size, batch.coords.shape[0])
+                k_mat = model._cov_full(batch.coords[start:end], params)
+                chol = torch.linalg.cholesky(k_mat)
+                z_x = torch.linalg.solve_triangular(chol, batch.X[start:end], upper=False)
+                z_y = torch.linalg.solve_triangular(chol, batch.y[start:end], upper=False)
+                resid = (z_y[:, target_slice, :] - z_x[:, target_slice, :] @ beta).reshape(-1)
+                rows = batch.rows[start:end, target_slice].reshape(-1)
+                real = rows < int(n_obs)
+                out[rows[real].long()] = resid[real]
+    return out.detach().cpu().numpy()
+
+
+def apply_vecchia_whitened_qc(
+    values: np.ndarray,
+    coords: np.ndarray,
+    args: argparse.Namespace,
+    device: torch.device,
+) -> tuple[np.ndarray, np.ndarray, dict]:
+    threshold = float(getattr(args, "qc_whitened_threshold", 0.0))
+    qc = {
+        "qc_whitened_threshold": threshold,
+        "qc_max_abs_whitened": np.nan,
+        "n_qc_initial_fit": int(len(values)),
+        "n_qc_removed": 0,
+        "n_qc_fit": int(len(values)),
+        "qc_refit": False,
+        "qc_message": "disabled" if threshold <= 0.0 else "no_outliers",
+    }
+    if threshold <= 0.0:
+        return values, coords, qc
+
+    try:
+        initial_fit, initial_model, raw_params = fit_global_with_model(values, coords, args, device)
+        w = vecchia_whitened_residuals_by_obs(initial_model, raw_params, n_obs=int(len(values)))
+        del initial_model
+        abs_w = np.abs(np.asarray(w, dtype=float))
+        finite = np.isfinite(abs_w)
+        bad = finite & (abs_w > threshold)
+        qc["qc_max_abs_whitened"] = float(np.nanmax(abs_w)) if np.any(finite) else np.nan
+        qc["pre_qc_loss"] = float(initial_fit.nll)
+        qc["pre_qc_sigmasq"] = float(initial_fit.sigmasq)
+        qc["pre_qc_range_lat"] = float(initial_fit.range_lat)
+        qc["pre_qc_range_lon"] = float(initial_fit.range_lon)
+        qc["pre_qc_nugget"] = float(initial_fit.nugget)
+        n_keep = int(len(values) - np.sum(bad))
+        if np.any(bad) and n_keep >= int(getattr(args, "qc_min_fit_points", 80)):
+            keep = ~bad
+            qc["n_qc_removed"] = int(np.sum(bad))
+            qc["n_qc_fit"] = n_keep
+            qc["qc_refit"] = True
+            qc["qc_message"] = "removed_whitened_outliers"
+            return values[keep], coords[keep], qc
+        if np.any(bad):
+            qc["qc_message"] = f"skipped_too_few_after_qc:{n_keep}"
+        return values, coords, qc
+    except Exception as exc:
+        qc["qc_message"] = f"whitened_qc_skipped_error:{exc}"
+        return values, coords, qc
 
 
 def assign_tiles(coords: np.ndarray, tile_y_count: int, tile_x_count: int) -> tuple[np.ndarray, dict]:
@@ -784,117 +957,25 @@ def add_tile_geometry(tile_df: pd.DataFrame, tile_meta: dict, args: argparse.Nam
     return out
 
 
-def _matern_corr_numpy(distance_over_range: np.ndarray, smooth: float) -> np.ndarray:
-    """Unit-variance isotropic Matern correlation.
-
-    The Vecchia global fit uses the same Matern family.  For smoothness values
-    other than 0.5 and 1.5 we evaluate the closed-form Bessel expression here;
-    this is exact enough for the tile full likelihood and avoids relying on GPU
-    spline internals.
-    """
-    r = np.asarray(distance_over_range, dtype=np.float64)
-    out = np.empty_like(r)
-    zero = r <= 0.0
-    out[zero] = 1.0
-    z = r[~zero]
-    if z.size:
-        if abs(float(smooth) - 0.5) < 1e-12:
-            out[~zero] = np.exp(-z)
-        elif abs(float(smooth) - 1.5) < 1e-12:
-            out[~zero] = (1.0 + z) * np.exp(-z)
-        else:
-            nu = float(smooth)
-            arg = np.sqrt(2.0 * nu) * z
-            vals = (2.0 ** (1.0 - nu) / gamma(nu)) * (arg ** nu) * kv(nu, arg)
-            out[~zero] = np.nan_to_num(vals, nan=0.0, posinf=1.0, neginf=0.0)
-    return np.clip(out, 0.0, 1.0)
-
-
-def _full_likelihood_design(coords: np.ndarray, mean_design: str) -> np.ndarray:
-    """Build the hourly pure-space GLS design used in the tile full likelihood."""
-    y_coord = coords[:, 0:1]
-    x_coord = coords[:, 1:2]
-    ones = np.ones((coords.shape[0], 1), dtype=np.float64)
-    lat = y_coord - float(np.mean(y_coord))
-    lon = x_coord - float(np.mean(x_coord))
-    design = str(mean_design)
-    if design == "constant":
-        return ones
-    if design in {"lat", "base", "hour_spatial"}:
-        return np.hstack([ones, lat])
-    if design == "latlon":
-        return np.hstack([ones, lat, lon])
-    raise ValueError(f"Unsupported mean design for full likelihood tile fit: {mean_design}")
-
-
 def _deterministic_tile_subset(n: int, max_points: int) -> np.ndarray:
     if max_points <= 0 or n <= max_points:
         return np.arange(n, dtype=int)
     # Evenly spaced deterministic thinning keeps results reproducible and avoids
-    # tile-to-tile random seed artifacts when full Cholesky is too expensive.
+    # tile-to-tile random seed artifacts when a tile is too large.
     return np.unique(np.linspace(0, n - 1, int(max_points)).round().astype(int))
 
 
-def _full_tile_nll_for_nugget(
-    y: np.ndarray,
-    coords: np.ndarray,
-    sigmasq: float,
-    range_space: float,
-    nugget: float,
-    smooth: float,
-    mean_design: str,
-    jitter: float,
-) -> float:
-    n = int(y.shape[0])
-    if n <= 0:
-        return np.inf
-    diff = coords[:, None, :] - coords[None, :, :]
-    dist = np.sqrt(np.sum(diff * diff, axis=2))
-    corr = _matern_corr_numpy(dist / float(range_space), smooth)
-    cov = float(sigmasq) * corr
-    diag = np.diag_indices_from(cov)
-    cov[diag] += float(nugget) + float(jitter)
-
-    X = _full_likelihood_design(coords, mean_design)
-    try:
-        c, lower = cho_factor(cov, lower=True, check_finite=False)
-        kinv_y = cho_solve((c, lower), y, check_finite=False)
-        kinv_X = cho_solve((c, lower), X, check_finite=False)
-        xt_k_x = X.T @ kinv_X
-        xt_k_y = X.T @ kinv_y
-        beta = np.linalg.solve(xt_k_x, xt_k_y)
-        resid = y - X @ beta
-        kinv_resid = cho_solve((c, lower), resid, check_finite=False)
-        quad = float(resid.T @ kinv_resid)
-        logdet = 2.0 * float(np.sum(np.log(np.diag(c))))
-        return 0.5 * (n * TWO_PI_LOG + logdet + quad)
-    except (LinAlgError, np.linalg.LinAlgError, ValueError, FloatingPointError):
-        return np.inf
-
-
-def profile_tile_nuggets(
+def fit_tile_vecchia_parameters(
     y: np.ndarray,
     coords: np.ndarray,
     tile_id: np.ndarray,
-    global_fit: FitResult,
     args: argparse.Namespace,
     device: torch.device,
 ) -> pd.DataFrame:
-    """Profile tile nugget with exact Gaussian full likelihood.
-
-    The global sigmasq and range come from the GPU cluster Vecchia fit.  Inside
-    each tile we hold them fixed and optimize only the diagonal nugget using a
-    dense Cholesky likelihood with GLS-profiled mean.
-    """
-    del device  # tile fitting is dense CPU linear algebra by design.
+    """Fit each tile with the same torch/autograd group Vecchia model."""
     rows = []
-    var_y = max(float(np.nanvar(y, ddof=1)), 1e-8)
-    low = math.log(max(var_y * 1e-8, 1e-10))
-    high = math.log(max(var_y * 1e3, 1e-8))
-    smooth = float(args.smooth)
     tile_y_count, tile_x_count = tile_shape(args)
     max_points = int(getattr(args, "tile_full_max_points", 0) or 0)
-    jitter = float(getattr(args, "tile_full_jitter", 1e-6))
 
     for tid in range(tile_y_count * tile_x_count):
         mask = tile_id == tid
@@ -904,9 +985,9 @@ def profile_tile_nuggets(
         if n_tile < args.min_tile_points:
             rows.append({
                 "tile_id": tid, "tile_x": x_idx, "tile_y": y_idx, "n": n_tile,
-                "n_full_lik": 0, "tile_nugget": np.nan, "tile_nugget_se": np.nan,
-                "tile_nll": np.nan, "success": False, "message": "too_few_points",
-                "tile_fit_method": "full_likelihood",
+                "n_vecchia": 0, "tile_nugget": np.nan, "tile_loss": np.nan,
+                "success": False, "message": "too_few_points",
+                "tile_fit_method": "torch_vecchia_autograd",
             })
             continue
 
@@ -916,33 +997,38 @@ def profile_tile_nuggets(
         yy = yy_all[keep]
         cc = cc_all[keep]
         n_used = int(len(yy))
-
-        def objective(log_nugget: float) -> float:
-            return _full_tile_nll_for_nugget(
-                yy,
-                cc,
-                sigmasq=float(global_fit.sigmasq),
-                range_space=float(global_fit.range),
-                nugget=float(math.exp(log_nugget)),
-                smooth=smooth,
-                mean_design=str(args.mean_design),
-                jitter=jitter,
-            )
-
-        res = minimize_scalar(objective, bounds=(low, high), method="bounded", options={"xatol": 1e-4})
-        msg = str(res.message)
-        if max_points > 0 and n_tile > max_points:
-            msg = f"{msg}; deterministic_thin {n_tile}->{n_used}"
-        rows.append({
-            "tile_id": tid, "tile_x": x_idx, "tile_y": y_idx, "n": n_tile,
-            "n_full_lik": n_used,
-            "tile_nugget": float(math.exp(res.x)) if np.isfinite(res.fun) else np.nan,
-            "tile_nugget_se": np.nan,
-            "tile_nll": float(res.fun),
-            "success": bool(res.success and np.isfinite(res.fun)),
-            "message": msg,
-            "tile_fit_method": "full_likelihood",
-        })
+        try:
+            fit = fit_global(yy, cc, args, device)
+            msg = str(fit.message)
+            if max_points > 0 and n_tile > max_points:
+                msg = f"{msg}; deterministic_thin {n_tile}->{n_used}"
+            rows.append({
+                "tile_id": tid, "tile_x": x_idx, "tile_y": y_idx, "n": n_tile,
+                "n_vecchia": n_used,
+                "tile_sigmasq": fit.sigmasq,
+                "tile_sigma": fit.sigma,
+                "tile_range": fit.range,
+                "tile_range_lat": fit.range_lat,
+                "tile_range_lon": fit.range_lon,
+                "tile_nugget": fit.nugget,
+                "tile_phi1": fit.phi1,
+                "tile_phi2": fit.phi2,
+                "tile_phi3": fit.phi3,
+                "tile_loss": fit.nll,
+                "success": bool(fit.success),
+                "message": msg,
+                "tile_fit_method": "torch_vecchia_autograd",
+            })
+        except Exception as exc:
+            rows.append({
+                "tile_id": tid, "tile_x": x_idx, "tile_y": y_idx, "n": n_tile,
+                "n_vecchia": n_used,
+                "tile_nugget": np.nan,
+                "tile_loss": np.nan,
+                "success": False,
+                "message": f"ERROR: {exc}",
+                "tile_fit_method": "torch_vecchia_autograd",
+            })
     return pd.DataFrame(rows)
 
 
@@ -1046,9 +1132,10 @@ def fit_hour_record(
         raise SystemExit(f"No rows found for hour {hour}.")
 
     coords, values, _, coord_meta = prepare_hour_data(df_hour, args)
-    global_fit = fit_global(values, coords, args, device)
-    tile_id, tile_meta = assign_tiles(coords, *tile_shape(args))
-    tile_df = profile_tile_nuggets(values, coords, tile_id, global_fit, args, device)
+    values_fit, coords_fit, qc_meta = apply_vecchia_whitened_qc(values, coords, args, device)
+    global_fit = fit_global(values_fit, coords_fit, args, device)
+    tile_id, tile_meta = assign_tiles(coords_fit, *tile_shape(args))
+    tile_df = fit_tile_vecchia_parameters(values_fit, coords_fit, tile_id, args, device)
     tile_df = add_tile_geometry(tile_df, tile_meta, args)
 
     global_row = {
@@ -1060,6 +1147,7 @@ def fit_hour_record(
         "hour": hour.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "n_raw": int(len(df_hour)),
         "n_used": int(len(values)),
+        "n_fit": int(len(values_fit)),
         "lat_min": coord_meta.get("fit_lat_min", np.nan),
         "lat_max": coord_meta.get("fit_lat_max", np.nan),
         "lon_min": coord_meta.get("fit_lon_min", np.nan),
@@ -1068,9 +1156,15 @@ def fit_hour_record(
         "sigmasq": global_fit.sigmasq,
         "sigma": global_fit.sigma,
         "range": global_fit.range,
+        "range_lat": global_fit.range_lat,
+        "range_lon": global_fit.range_lon,
         "nugget": global_fit.nugget,
+        "phi1": global_fit.phi1,
+        "phi2": global_fit.phi2,
+        "phi3": global_fit.phi3,
         "loss": global_fit.nll,
         "success": bool(global_fit.success),
+        **qc_meta,
     }
     tile_df.insert(0, "day", hour.strftime("%Y-%m-%d"))
     tile_df.insert(1, "day_index", day_index)
@@ -1079,6 +1173,12 @@ def fit_hour_record(
     tile_df.insert(4, "hour_key", hour_key)
     tile_df.insert(5, "hour", hour.strftime("%Y-%m-%dT%H:%M:%SZ"))
     tile_df["global_nugget"] = global_fit.nugget
+    tile_df["global_sigmasq"] = global_fit.sigmasq
+    tile_df["global_range"] = global_fit.range
+    tile_df["global_range_lat"] = global_fit.range_lat
+    tile_df["global_range_lon"] = global_fit.range_lon
+    for key, value in qc_meta.items():
+        tile_df[key] = value
     return global_row, tile_df
 
 
@@ -1136,40 +1236,58 @@ def merge_tile_geometry_summary(summary: pd.DataFrame, tile_df: pd.DataFrame, ke
 def tile_mean_summary(tile_df: pd.DataFrame, tile_y_count: int, tile_x_count: int) -> tuple[pd.DataFrame, np.ndarray]:
     keys = ["tile_y", "tile_x", "tile_id"]
     d = tile_df.dropna(subset=["tile_nugget"]).copy()
+    optional_mean_cols = [
+        c for c in [
+            "tile_sigmasq", "tile_sigma", "tile_range", "tile_range_lat", "tile_range_lon",
+            "tile_phi1", "tile_phi2", "tile_phi3", "tile_loss", "n_vecchia",
+            "global_sigmasq", "global_range", "global_range_lat", "global_range_lon",
+            "global_nugget", "n_qc_removed", "n_qc_fit", "qc_max_abs_whitened",
+        ]
+        if c in d.columns
+    ]
     if d.empty:
         summary = pd.DataFrame(columns=keys + [
             "n_days", "n_hours", "tile_nugget_mean", "tile_nugget_sd", "tile_nugget_median",
         ])
     elif "day_index" in d.columns:
+        daily_aggs = {
+            "daily_tile_nugget": ("tile_nugget", "mean"),
+            "daily_n_hours": ("tile_nugget", "count"),
+        }
+        for col in optional_mean_cols:
+            daily_aggs[f"daily_{col}"] = (col, "mean")
         day_key = "day_index"
         daily = (
             d.groupby(keys + [day_key], as_index=False)
-            .agg(
-                daily_tile_nugget=("tile_nugget", "mean"),
-                daily_n_hours=("tile_nugget", "count"),
-            )
+            .agg(**daily_aggs)
         )
+        summary_aggs = {
+            "n_days": ("daily_tile_nugget", "count"),
+            "n_hours": ("daily_n_hours", "sum"),
+            "tile_nugget_mean": ("daily_tile_nugget", "mean"),
+            "tile_nugget_sd": ("daily_tile_nugget", "std"),
+            "tile_nugget_median": ("daily_tile_nugget", "median"),
+        }
+        for col in optional_mean_cols:
+            summary_aggs[f"{col}_mean"] = (f"daily_{col}", "mean")
         summary = (
             daily.groupby(keys, as_index=False)
-            .agg(
-                n_days=("daily_tile_nugget", "count"),
-                n_hours=("daily_n_hours", "sum"),
-                tile_nugget_mean=("daily_tile_nugget", "mean"),
-                tile_nugget_sd=("daily_tile_nugget", "std"),
-                tile_nugget_median=("daily_tile_nugget", "median"),
-            )
+            .agg(**summary_aggs)
             .sort_values(["tile_y", "tile_x"])
         )
     else:
+        aggs = {
+            "n_days": ("tile_nugget", "count"),
+            "n_hours": ("tile_nugget", "count"),
+            "tile_nugget_mean": ("tile_nugget", "mean"),
+            "tile_nugget_sd": ("tile_nugget", "std"),
+            "tile_nugget_median": ("tile_nugget", "median"),
+        }
+        for col in optional_mean_cols:
+            aggs[f"{col}_mean"] = (col, "mean")
         summary = (
             d.groupby(keys, as_index=False)
-            .agg(
-                n_days=("tile_nugget", "count"),
-                n_hours=("tile_nugget", "count"),
-                tile_nugget_mean=("tile_nugget", "mean"),
-                tile_nugget_sd=("tile_nugget", "std"),
-                tile_nugget_median=("tile_nugget", "median"),
-            )
+            .agg(**aggs)
             .sort_values(["tile_y", "tile_x"])
         )
 
@@ -1205,12 +1323,10 @@ def global_params_by_hour_slot(global_df: pd.DataFrame) -> pd.DataFrame:
     agg = {
         "n_days": ("day", "nunique"),
         "n_hours": ("day", "count"),
-        "sigmasq_mean": ("sigmasq", "mean"),
-        "sigma_mean": ("sigma", "mean"),
-        "range_mean": ("range", "mean"),
-        "nugget_mean": ("nugget", "mean"),
-        "loss_mean": ("loss", "mean"),
     }
+    for col in ["sigmasq", "sigma", "range", "range_lat", "range_lon", "nugget", "phi1", "phi2", "phi3", "loss"]:
+        if col in global_df.columns:
+            agg[f"{col}_mean"] = (col, "mean")
     return (
         global_df.groupby(["hour_slot", "hour_utc"], as_index=False)
         .agg(**agg)
@@ -1279,8 +1395,12 @@ def write_compact_outputs(global_df: pd.DataFrame, tile_df: pd.DataFrame, args: 
     global_df = ensure_sigma_column(global_df)
 
     global_cols = ["day", "hour_slot", "hour_utc", "hour_key", "n_raw", "n_used",
+                   "n_fit", "n_qc_removed", "qc_max_abs_whitened",
                    "lat_min", "lat_max", "lon_min", "lon_max", "region_cover_ok",
-                   "sigmasq", "sigma", "range", "nugget", "loss"]
+                   "sigmasq", "sigma", "range", "range_lat", "range_lon",
+                   "nugget", "phi1", "phi2", "phi3", "loss", "pre_qc_loss",
+                   "pre_qc_sigmasq", "pre_qc_range_lat", "pre_qc_range_lon",
+                   "pre_qc_nugget", "qc_message"]
     global_cols_avail = [c for c in global_cols if c in global_df.columns]
     global_out = round_numeric(global_df[global_cols_avail], 4)
     global_path = output_dir / f"{month_label}_spatial_fit_{len(global_out)}.csv"
@@ -1330,6 +1450,26 @@ def write_compact_outputs(global_df: pd.DataFrame, tile_df: pd.DataFrame, args: 
         output_dir / f"tile_nugget_median_heatmap_{tag}.png",
         args,
     )
+    for col, label in [
+        ("tile_sigmasq_mean", "mean tile sigmasq"),
+        ("tile_range_lat_mean", "mean tile range lat"),
+        ("tile_range_lon_mean", "mean tile range lon"),
+        ("tile_phi1_mean", "mean tile phi1"),
+        ("tile_phi2_mean", "mean tile phi2"),
+        ("tile_phi3_mean", "mean tile phi3"),
+        ("global_sigmasq_mean", "mean global sigmasq"),
+        ("global_range_lat_mean", "mean global range lat"),
+        ("global_range_lon_mean", "mean global range lon"),
+        ("global_nugget_mean", "mean global nugget"),
+        ("n_qc_removed_mean", "mean QC removed count"),
+    ]:
+        if col in tile_summary.columns:
+            save_tile_geographic_heatmap(
+                tile_summary, col, tile_y_count, tile_x_count,
+                f"{args.month} {label}, {tag}", label,
+                output_dir / f"{col}_heatmap_{tag}.png",
+                args,
+            )
     save_tile_nugget_vs_nadir_plot(
         tile_summary,
         output_dir / f"tile_nugget_vs_nadir_distance_{tag}.png",
@@ -1379,9 +1519,10 @@ def fit_one_hour(args: argparse.Namespace) -> None:
         raise SystemExit(f"No rows found for hour {hour}.")
 
     coords, values, _, coord_meta = prepare_hour_data(df_hour, args)
-    global_fit = fit_global(values, coords, args, device)
-    tile_id, tile_meta = assign_tiles(coords, *tile_shape(args))
-    tile_df = profile_tile_nuggets(values, coords, tile_id, global_fit, args, device)
+    values_fit, coords_fit, qc_meta = apply_vecchia_whitened_qc(values, coords, args, device)
+    global_fit = fit_global(values_fit, coords_fit, args, device)
+    tile_id, tile_meta = assign_tiles(coords_fit, *tile_shape(args))
+    tile_df = fit_tile_vecchia_parameters(values_fit, coords_fit, tile_id, args, device)
     tile_df = add_tile_geometry(tile_df, tile_meta, args)
 
     global_row = {
@@ -1391,19 +1532,21 @@ def fit_one_hour(args: argparse.Namespace) -> None:
         "hour_utc": hour_utc,
         "hour": hour.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "n_raw": int(len(df_hour)),
-        "n_fit": int(len(values)),
+        "n_used": int(len(values)),
+        "n_fit": int(len(values_fit)),
         "lat_min": coord_meta.get("fit_lat_min", np.nan),
         "lat_max": coord_meta.get("fit_lat_max", np.nan),
         "lon_min": coord_meta.get("fit_lon_min", np.nan),
         "lon_max": coord_meta.get("fit_lon_max", np.nan),
         "region_cover_ok": bool(coord_meta.get("region_cover_ok", False)),
         "smooth": float(args.smooth),
-        "method": "gpu_cluster_group_vecchia_phi1_phi2",
+        "method": "gpu_cluster_group_vecchia_phi1_phi2_phi3",
         "cluster_block_shape": f"{args.cluster_block_shape[0]}x{args.cluster_block_shape[1]}",
         "cluster_neighbor_blocks": int(args.cluster_neighbor_blocks),
         "mean_design": str(args.mean_design),
         **asdict(global_fit),
-        "resid_var": float(np.nanvar(values, ddof=1)),
+        "resid_var": float(np.nanvar(values_fit, ddof=1)),
+        **qc_meta,
     }
     global_df = pd.DataFrame([global_row])
     tile_df.insert(0, "hour_index", hour_index)
@@ -1414,14 +1557,19 @@ def fit_one_hour(args: argparse.Namespace) -> None:
     tile_df.insert(5, "smooth", float(args.smooth))
     tile_df["global_sigmasq"] = global_fit.sigmasq
     tile_df["global_range"]   = global_fit.range
+    tile_df["global_range_lat"] = global_fit.range_lat
+    tile_df["global_range_lon"] = global_fit.range_lon
     tile_df["global_nugget"]  = global_fit.nugget
     tile_df["tile_to_global_nugget"] = tile_df["tile_nugget"] / global_fit.nugget
+    for key, value in qc_meta.items():
+        tile_df[key] = value
 
     round_numeric(global_df, 4).to_csv(global_path, index=False, float_format="%.4f")
     round_numeric(tile_df, 4).to_csv(tile_path, index=False, float_format="%.4f")
     meta = {
         "args": vars(args),
         "coord_meta": coord_meta,
+        "qc_meta": qc_meta,
         "tile_meta": tile_meta,
         "hour": hour.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "device": str(device),
@@ -1585,7 +1733,9 @@ def save_global_timeseries(global_df: pd.DataFrame, path: Path) -> None:
     d = d.sort_values("hour_dt")
     panels = [
         ("sigma",  "global sigma"),
-        ("range",  "global range (deg)"),
+        ("range",  "global range geom mean"),
+        ("range_lat",  "global range lat"),
+        ("range_lon",  "global range lon"),
         ("nugget", "global nugget"),
     ]
     panels = [(col, lbl) for col, lbl in panels if col in d.columns]
@@ -1616,7 +1766,10 @@ def add_global_time_features(global_df: pd.DataFrame) -> pd.DataFrame:
 
 def summarize_global_by_time(global_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     d = add_global_time_features(global_df)
-    param_cols = ["sigmasq", "sigma", "range", "nugget", "loss", "nll", "resid_var"]
+    param_cols = [
+        "sigmasq", "sigma", "range", "range_lat", "range_lon",
+        "nugget", "phi1", "phi2", "phi3", "loss", "nll", "resid_var",
+    ]
     param_cols = [c for c in param_cols if c in d.columns]
     agg_map = {col: ["mean", "median", "std", "min", "max"] for col in param_cols}
 
@@ -1637,6 +1790,8 @@ def summarize_global_by_time(global_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.
 PLOT_PARAM_CAPS = {
     "sigma": 50.0,
     "range": 10.0,
+    "range_lat": 10.0,
+    "range_lon": 10.0,
     "nugget": 5.0,
 }
 
@@ -1699,7 +1854,9 @@ def save_daily_param_plot(by_day: pd.DataFrame, path: Path) -> None:
 
     plot_specs = [
         ("sigma", "global sigma"),
-        ("range", "global range"),
+        ("range", "global range geom mean"),
+        ("range_lat", "global range lat"),
+        ("range_lon", "global range lon"),
         ("nugget", "global nugget"),
     ]
     plot_specs = [(c, l) for c, l in plot_specs if f"{c}_mean" in by_day.columns]
@@ -1726,7 +1883,9 @@ def save_hour_slot_param_plot(by_hour_slot: pd.DataFrame, path: Path) -> None:
 
     plot_specs = [
         ("sigma", "global sigma"),
-        ("range", "global range"),
+        ("range", "global range geom mean"),
+        ("range_lat", "global range lat"),
+        ("range_lon", "global range lon"),
         ("nugget", "global nugget"),
     ]
     plot_specs = [(c, l) for c, l in plot_specs if f"{c}_mean" in by_hour_slot.columns]
@@ -1759,7 +1918,9 @@ def save_day_hour_heatmaps(global_with_time: pd.DataFrame, summary_dir: Path) ->
 
     panels = [
         ("sigma", "global sigma"),
-        ("range", "global range"),
+        ("range", "global range geom mean"),
+        ("range_lat", "global range lat"),
+        ("range_lon", "global range lon"),
         ("nugget", "global nugget"),
     ]
     for col, label in panels:
@@ -1876,6 +2037,15 @@ def save_tile_nugget_vs_nadir_plot(
 def make_summary_tile_table(tile_df: pd.DataFrame) -> pd.DataFrame:
     keys = ["tile_y", "tile_x", "tile_id"]
     d = tile_df.dropna(subset=["tile_nugget"]).copy()
+    optional_mean_cols = [
+        c for c in [
+            "tile_sigmasq", "tile_sigma", "tile_range", "tile_range_lat", "tile_range_lon",
+            "tile_phi1", "tile_phi2", "tile_phi3", "tile_loss", "n_vecchia",
+            "global_sigmasq", "global_range", "global_range_lat", "global_range_lon",
+            "global_nugget", "n_qc_removed", "n_qc_fit", "qc_max_abs_whitened",
+        ]
+        if c in d.columns
+    ]
     if d.empty:
         return pd.DataFrame(columns=keys + [
             "n_days", "n_hours", "mean_tile_nugget", "median_tile_nugget",
@@ -1889,43 +2059,52 @@ def make_summary_tile_table(tile_df: pd.DataFrame) -> pd.DataFrame:
         d["tile_to_global_nugget"] = np.nan
 
     if "day_index" in d.columns:
+        daily_aggs = {
+            "daily_tile_nugget": ("tile_nugget", "mean"),
+            "daily_ratio_to_global": ("tile_to_global_nugget", "mean"),
+            "daily_tile_n": ("n", "mean"),
+            "daily_n_hours": ("tile_nugget", "count"),
+        }
+        for col in optional_mean_cols:
+            daily_aggs[f"daily_{col}"] = (col, "mean")
         daily = (
             d.groupby(keys + ["day_index"], as_index=False)
-            .agg(
-                daily_tile_nugget=("tile_nugget", "mean"),
-                daily_ratio_to_global=("tile_to_global_nugget", "mean"),
-                daily_tile_n=("n", "mean"),
-                daily_n_hours=("tile_nugget", "count"),
-            )
+            .agg(**daily_aggs)
         )
+        summary_aggs = {
+            "n_days": ("daily_tile_nugget", "count"),
+            "n_hours": ("daily_n_hours", "sum"),
+            "mean_tile_nugget": ("daily_tile_nugget", "mean"),
+            "median_tile_nugget": ("daily_tile_nugget", "median"),
+            "sd_tile_nugget": ("daily_tile_nugget", "std"),
+            "mean_ratio_to_global": ("daily_ratio_to_global", "mean"),
+            "median_ratio_to_global": ("daily_ratio_to_global", "median"),
+            "mean_tile_n": ("daily_tile_n", "mean"),
+        }
+        for col in optional_mean_cols:
+            summary_aggs[f"mean_{col}"] = (f"daily_{col}", "mean")
         summary = (
             daily.groupby(keys, as_index=False)
-            .agg(
-                n_days=("daily_tile_nugget", "count"),
-                n_hours=("daily_n_hours", "sum"),
-                mean_tile_nugget=("daily_tile_nugget", "mean"),
-                median_tile_nugget=("daily_tile_nugget", "median"),
-                sd_tile_nugget=("daily_tile_nugget", "std"),
-                mean_ratio_to_global=("daily_ratio_to_global", "mean"),
-                median_ratio_to_global=("daily_ratio_to_global", "median"),
-                mean_tile_n=("daily_tile_n", "mean"),
-            )
+            .agg(**summary_aggs)
             .sort_values(["tile_y", "tile_x"])
         )
         return merge_tile_geometry_summary(summary, d, keys)
 
+    aggs = {
+        "n_days": ("tile_nugget", "count"),
+        "n_hours": ("tile_nugget", "count"),
+        "mean_tile_nugget": ("tile_nugget", "mean"),
+        "median_tile_nugget": ("tile_nugget", "median"),
+        "sd_tile_nugget": ("tile_nugget", "std"),
+        "mean_ratio_to_global": ("tile_to_global_nugget", "mean"),
+        "median_ratio_to_global": ("tile_to_global_nugget", "median"),
+        "mean_tile_n": ("n", "mean"),
+    }
+    for col in optional_mean_cols:
+        aggs[f"mean_{col}"] = (col, "mean")
     summary = (
         d.groupby(keys, as_index=False)
-        .agg(
-            n_days=("tile_nugget", "count"),
-            n_hours=("tile_nugget", "count"),
-            mean_tile_nugget=("tile_nugget", "mean"),
-            median_tile_nugget=("tile_nugget", "median"),
-            sd_tile_nugget=("tile_nugget", "std"),
-            mean_ratio_to_global=("tile_to_global_nugget", "mean"),
-            median_ratio_to_global=("tile_to_global_nugget", "median"),
-            mean_tile_n=("n", "mean"),
-        )
+        .agg(**aggs)
         .sort_values(["tile_y", "tile_x"])
     )
     return merge_tile_geometry_summary(summary, d, keys)
@@ -1991,6 +2170,26 @@ def summarize(args: argparse.Namespace) -> None:
         summary_dir / f"tile_to_global_nugget_ratio_mean_heatmap_{tag}.png",
         args,
     )
+    for col, label in [
+        ("mean_tile_sigmasq", "mean tile sigmasq"),
+        ("mean_tile_range_lat", "mean tile range lat"),
+        ("mean_tile_range_lon", "mean tile range lon"),
+        ("mean_tile_phi1", "mean tile phi1"),
+        ("mean_tile_phi2", "mean tile phi2"),
+        ("mean_tile_phi3", "mean tile phi3"),
+        ("mean_global_sigmasq", "mean global sigmasq"),
+        ("mean_global_range_lat", "mean global range lat"),
+        ("mean_global_range_lon", "mean global range lon"),
+        ("mean_global_nugget", "mean global nugget"),
+        ("mean_n_qc_removed", "mean QC removed count"),
+    ]:
+        if col in tile_summary.columns:
+            save_tile_geographic_heatmap(
+                tile_summary, col, tile_y_count, tile_x_count,
+                f"{label}, {tag}", label,
+                summary_dir / f"{col}_heatmap_{tag}.png",
+                args,
+            )
     save_tile_nugget_vs_nadir_plot(
         tile_summary,
         summary_dir / f"tile_nugget_vs_nadir_distance_{tag}.png",
@@ -2013,28 +2212,60 @@ def summarize(args: argparse.Namespace) -> None:
     print(f"Wrote plots under {summary_dir}")
 
 
+def limited_manifest_indices(manifest: pd.DataFrame, args: argparse.Namespace) -> list[int]:
+    max_days = int(getattr(args, "max_days", 0) or 0)
+    max_slots = int(getattr(args, "max_hour_slots_per_day", 0) or 0)
+    if max_days <= 0 and max_slots <= 0:
+        return list(range(len(manifest)))
+
+    seen_days: list[int] = []
+    per_day_counts: dict[int, int] = {}
+    selected: list[int] = []
+    for idx, row in manifest.iterrows():
+        hour = pd.to_datetime(row["hour"], utc=True)
+        day = int(row["day_index"]) if "day_index" in manifest.columns else int(hour.day)
+        if day not in seen_days:
+            if max_days > 0 and len(seen_days) >= max_days:
+                continue
+            seen_days.append(day)
+            per_day_counts[day] = 0
+        if max_slots > 0 and per_day_counts.get(day, 0) >= max_slots:
+            continue
+        selected.append(int(idx))
+        per_day_counts[day] = per_day_counts.get(day, 0) + 1
+    return selected
+
+
 def run_all(args: argparse.Namespace) -> None:
     device = get_device(args)
     make_manifest(args)
     manifest = read_manifest(args)
+    run_indices = limited_manifest_indices(manifest, args)
+    if len(run_indices) != len(manifest):
+        print(
+            f"Restricted --mode all to {len(run_indices)}/{len(manifest)} hours "
+            f"(max_days={args.max_days}, max_hour_slots_per_day={args.max_hour_slots_per_day}).",
+            flush=True,
+        )
     pickle_obj = load_single_pickle_dict(args)
     global_rows: list[dict] = []
     tile_frames: list[pd.DataFrame] = []
     running_cols = [
         "day", "hour_slot", "hour_utc", "hour_key",
-        "n_raw", "n_used", "lat_min", "lat_max", "lon_min", "lon_max",
-        "sigmasq", "sigma", "range", "nugget", "loss",
+        "n_raw", "n_used", "n_fit", "n_qc_removed",
+        "lat_min", "lat_max", "lon_min", "lon_max",
+        "sigmasq", "sigma", "range", "range_lat", "range_lon", "nugget", "loss",
     ]
     print("\nFITTED PARAMETERS EACH HOUR", flush=True)
     print(",".join(running_cols), flush=True)
-    for idx in range(len(manifest)):
+    total = len(run_indices)
+    for n_done, idx in enumerate(run_indices, start=1):
         global_row, tile_df = fit_hour_record(args, manifest, idx, device, pickle_obj=pickle_obj)
         global_rows.append(global_row)
         tile_frames.append(tile_df)
         print(csv_line_from_row(global_row, running_cols), flush=True)
 
-        n_done = idx + 1
-        is_last = n_done == len(manifest)
+        is_last = n_done == total
         if args.summary_every > 0 and (n_done % args.summary_every == 0 or is_last):
             global_running = pd.DataFrame(global_rows)
             tile_running   = pd.concat(tile_frames, ignore_index=True)
@@ -2042,7 +2273,7 @@ def run_all(args: argparse.Namespace) -> None:
                 "\n"
                 + running_summary_text(
                     global_running, tile_running, args,
-                    f"RUNNING SUMMARY after {n_done}/{len(manifest)} fitted hours",
+                    f"RUNNING SUMMARY after {n_done}/{total} fitted hours",
                 )
                 + "\n",
                 flush=True,

@@ -64,6 +64,7 @@ from GEMS_TCO.vecchia_realdata_corridor_width_4x4_lag643 import (
     build_model as build_corridor_width_643_model,
     model_spec as corridor_width_643_spec,
 )
+from GEMS_TCO.vecchia_st_spline import RealDataCorridorWidth4x4Lag643SplineFit
 
 
 DTYPE = torch.float64
@@ -932,7 +933,31 @@ def write_running_summary(path: Path, df: pd.DataFrame, param_summary: pd.DataFr
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def refresh_outputs(out_dir: Path, rows: list[dict[str, Any]]) -> None:
+def write_external_monthly_outputs(monthly_out_dir: Path | None, out_dir: Path) -> None:
+    if monthly_out_dir is None:
+        return
+    monthly_out_dir.mkdir(parents=True, exist_ok=True)
+    for name in [
+        "st_corridor_density_sweep_all_fits.csv",
+        "parameter_by_nfirst_summary.csv",
+        "parameter_shift_vs_densest_summary.csv",
+        "parameter_by_nfirst.png",
+        "parameter_shift_vs_densest.png",
+        "running_summary.txt",
+        "run_config.json",
+        "simulation_truth.json",
+    ]:
+        src = out_dir / name
+        if not src.exists():
+            continue
+        dst = monthly_out_dir / name
+        if src.suffix.lower() == ".png":
+            dst.write_bytes(src.read_bytes())
+        else:
+            dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+
+
+def refresh_outputs(out_dir: Path, rows: list[dict[str, Any]], monthly_out_dir: Path | None = None) -> None:
     raw_csv = out_dir / "st_corridor_density_sweep_all_fits.csv"
     df = save_rows(raw_csv, rows)
     if df.empty:
@@ -955,6 +980,7 @@ def refresh_outputs(out_dir: Path, rows: list[dict[str, Any]]) -> None:
     plot_parameter_summary(param_summary, out_dir / "parameter_by_nfirst.png")
     plot_shift_summary(shift_summary, out_dir / "parameter_shift_vs_densest.png")
     write_running_summary(out_dir / "running_summary.txt", df, param_summary, shift_summary)
+    write_external_monthly_outputs(monthly_out_dir, out_dir)
 
 
 def fit_one(
@@ -977,16 +1003,30 @@ def fit_one(
 
     params_list = make_params_list(init_physical, dtype=DTYPE, device=device)
     model_spec = corridor_width_643_spec(reference_advec_lon_abs)
-    model = build_corridor_width_643_model(
-        smooth=smooth,
-        input_map=source_map,
-        grid_coords=grid_coords_np,
-        device=None,
-        reference_advec_lon_abs=reference_advec_lon_abs,
-        daily_stride=args.daily_stride,
-        target_chunk_size=args.target_chunk_size,
-        min_target_points=args.min_target_points,
-    )
+    model_spec["smooth_kernel"] = str(args.smooth_kernel)
+    if str(args.smooth_kernel) == "spline":
+        model = RealDataCorridorWidth4x4Lag643SplineFit(
+            smooth=smooth,
+            input_map=source_map,
+            grid_coords=grid_coords_np,
+            lag1_lon_offset=reference_advec_lon_abs,
+            daily_stride=args.daily_stride,
+            target_chunk_size=args.target_chunk_size,
+            min_target_points=args.min_target_points,
+            spline_n_points=args.spline_n_points,
+            spline_r_max=args.spline_r_max,
+        )
+    else:
+        model = build_corridor_width_643_model(
+            smooth=smooth,
+            input_map=source_map,
+            grid_coords=grid_coords_np,
+            device=None,
+            reference_advec_lon_abs=reference_advec_lon_abs,
+            daily_stride=args.daily_stride,
+            target_chunk_size=args.target_chunk_size,
+            min_target_points=args.min_target_points,
+        )
 
     t0 = time.time()
     model.precompute_conditioning_sets()
@@ -1034,6 +1074,9 @@ def fit_one(
         "first_slot": subset["day_keys"][0] if subset.get("day_keys") else "",
         "last_slot": subset["day_keys"][-1] if subset.get("day_keys") else "",
         "spec_name": VECCHIA_SPEC_NAME,
+        "smooth_kernel": str(args.smooth_kernel),
+        "spline_n_points": int(args.spline_n_points) if str(args.smooth_kernel) == "spline" else 0,
+        "spline_r_max": float(args.spline_r_max) if str(args.smooth_kernel) == "spline" else np.nan,
         "block_shape": f"{BLOCK_SHAPE[0]}x{BLOCK_SHAPE[1]}",
         "lag_pattern": f"{LAG_COUNTS[0]}/{LAG_COUNTS[1]}/{LAG_COUNTS[2]}",
         "reference_advec_lon_abs": float(reference_advec_lon_abs),
@@ -1070,6 +1113,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--data-root", type=Path, default=None)
     parser.add_argument("--sim-data-root", type=Path, default=Path("/home/jl2815/tco/exercise_output/sim_data/july_st_circulant_realpattern"))
     parser.add_argument("--sim-pickle-kind", default="real_locations", choices=["real_locations", "gridded"])
+    parser.add_argument("--smooth-kernel", choices=["spline", "closed"], default="spline",
+                        help="Use spline ST Matern for arbitrary smooth values such as 0.3.")
+    parser.add_argument("--spline-n-points", type=int, default=4000)
+    parser.add_argument("--spline-r-max", type=float, default=30.0)
     parser.add_argument("--real-reference-advec-lon-abs", type=float, default=REFERENCE_ADVEC_LON_ABS)
     parser.add_argument("--sim-reference-advec-lon-abs", type=float, default=0.2)
     parser.add_argument("--daily-stride", type=int, default=2)
@@ -1093,6 +1140,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--round-decimals", type=int, default=ROUND_DECIMALS)
     parser.add_argument("--suppress-fit-prints", action="store_true")
     parser.add_argument("--out-dir", type=Path, default=None)
+    parser.add_argument("--monthly-out-dir", type=Path, default=None)
     return parser
 
 
@@ -1103,6 +1151,9 @@ def main() -> None:
     n_first_values = parse_int_tokens(args.n_first_values)
     out_dir = args.out_dir or default_output_root()
     out_dir.mkdir(parents=True, exist_ok=True)
+    monthly_out_dir = args.monthly_out_dir
+    if monthly_out_dir is not None:
+        monthly_out_dir.mkdir(parents=True, exist_ok=True)
 
     config_path = out_dir / "run_config.json"
     jsonl_path = out_dir / "st_corridor_density_sweep_all_fits.jsonl"
@@ -1126,6 +1177,7 @@ def main() -> None:
         "args": clean_json_value(vars(args)),
         "smooths": smooths,
         "n_first_values": n_first_values,
+        "monthly_out_dir": str(monthly_out_dir) if monthly_out_dir is not None else "",
         "model_spec_real": corridor_width_643_spec(args.real_reference_advec_lon_abs),
         "model_spec_sim": corridor_width_643_spec(args.sim_reference_advec_lon_abs),
         "default_real_init_physical": DEFAULT_REAL_INIT_PHYSICAL,
@@ -1253,12 +1305,12 @@ def main() -> None:
                     rows.append(clean_json_value(row))
                     append_jsonl(jsonl_path, row)
                     if int(args.summary_every) > 0 and fit_id % int(args.summary_every) == 0:
-                        refresh_outputs(out_dir, rows)
+                        refresh_outputs(out_dir, rows, monthly_out_dir)
                     gc.collect()
                     if device.type == "cuda":
                         torch.cuda.empty_cache()
 
-    refresh_outputs(out_dir, rows)
+    refresh_outputs(out_dir, rows, monthly_out_dir)
     print("\nDone.", flush=True)
     print("csv:", raw_csv, flush=True)
     print("summary:", out_dir / "running_summary.txt", flush=True)
