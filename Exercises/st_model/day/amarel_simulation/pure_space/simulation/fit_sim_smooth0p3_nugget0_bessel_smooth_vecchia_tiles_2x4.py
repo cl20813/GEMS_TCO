@@ -21,7 +21,7 @@ HERE = Path(__file__).resolve().parent
 PURE_SPACE_DIR = HERE.parent
 
 DEFAULT_SIM_ROOT = Path("/home/jl2815/tco/exercise_output/sim_data/july_st_circulant_realpattern_smooth0p3_nugget0")
-DEFAULT_OUT_ROOT = Path("/home/jl2815/tco/exercise_output/summer/sim_smooth0p3_nugget0_purespace_bessel_vecchia_2x4_060726")
+DEFAULT_OUT_ROOT = Path("/home/jl2815/tco/exercise_output/summer/sim_smooth0p3_nugget0_purespace_bessel_vecchia_2x4_fixed0_060726")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -39,7 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--hour-start", type=int, default=0)
     p.add_argument("--hour-end", type=int, default=None)
     p.add_argument("--array-index", type=int, default=None)
-    p.add_argument("--nugget-mode", choices=["free", "fixed0"], default="free")
+    p.add_argument("--nugget-mode", choices=["free", "fixed0"], default="fixed0")
     p.add_argument("--lat-range", default="-3,2")
     p.add_argument("--lon-range", default="121,131")
     p.add_argument("--tile-y", type=int, default=2)

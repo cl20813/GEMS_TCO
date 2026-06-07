@@ -37,7 +37,7 @@ The expected periodogram uses only the missing-data mask/window autocorrelation.
 Output is organized by year first, then smooth:
 
 ```text
-/home/jl2815/tco/exercise_output/summer/real_data/spline_smooth_spectral_maxmin_060726/
+/home/jl2815/tco/exercise_output/summer/real_data/spline_smooth_spectral_maxmin_kcut_060726/
   2022_07/
     smooth_0p25/
     smooth_0p3/
@@ -81,8 +81,8 @@ scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simula
 ```bash
 ssh jl2815@amarel.rutgers.edu
 cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space
-nano slurm_real_july_spline_smooth_spectral_maxmin_060726.sh
-sbatch slurm_real_july_spline_smooth_spectral_maxmin_060726.sh
+nano slurm_real_july_spline_smooth_spectral_maxmin_kcut_060726.sh
+sbatch slurm_real_july_spline_smooth_spectral_maxmin_kcut_060726.sh
 ```
 
 Paste this sbatch script:
@@ -92,7 +92,7 @@ Paste this sbatch script:
 #SBATCH --job-name=real_jul_maxmin
 #SBATCH --output=/home/jl2815/tco/exercise_output/logs/real_jul_maxmin_060726_%j.out
 #SBATCH --error=/home/jl2815/tco/exercise_output/logs/real_jul_maxmin_060726_%j.err
-#SBATCH --time=48:00:00
+#SBATCH --time=12:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -129,7 +129,7 @@ YEARS=(2022 2023 2024 2025)
 MONTH=7
 
 SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/real_july_spline_smooth_spectral_maxmin_060726.py"
-OUTROOT="/home/jl2815/tco/exercise_output/summer/real_data/spline_smooth_spectral_maxmin_060726"
+OUTROOT="/home/jl2815/tco/exercise_output/summer/real_data/spline_smooth_spectral_maxmin_kcut_060726"
 TOPPLOTS="${OUTROOT}/monthly_plots_top"
 LOGROOT="/home/jl2815/tco/exercise_output/logs"
 
@@ -198,7 +198,7 @@ echo "All done: $(date)"
 Remote output root:
 
 ```text
-/home/jl2815/tco/exercise_output/summer/real_data/spline_smooth_spectral_maxmin_060726
+/home/jl2815/tco/exercise_output/summer/real_data/spline_smooth_spectral_maxmin_kcut_060726
 ```
 
 Important folders:
@@ -230,10 +230,10 @@ monthly_plots_top/2022_07/
 Only copy the monthly plot summary folder:
 
 ```bash
-mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/spline_smooth_spectral_maxmin_060726"
+mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/spline_smooth_spectral_maxmin_kcut_060726"
 
-scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/real_data/spline_smooth_spectral_maxmin_060726/monthly_plots_top" \
-  "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/spline_smooth_spectral_maxmin_060726/"
+scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/real_data/spline_smooth_spectral_maxmin_kcut_060726/monthly_plots_top" \
+  "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/spline_smooth_spectral_maxmin_kcut_060726/"
 ```
 
 Full output fallback:
@@ -241,6 +241,6 @@ Full output fallback:
 ```bash
 mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26"
 
-scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/real_data/spline_smooth_spectral_maxmin_060726" \
+scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/real_data/spline_smooth_spectral_maxmin_kcut_060726" \
   "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/"
 ```

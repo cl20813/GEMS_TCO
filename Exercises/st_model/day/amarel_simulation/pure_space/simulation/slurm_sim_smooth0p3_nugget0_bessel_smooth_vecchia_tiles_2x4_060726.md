@@ -34,7 +34,7 @@ Simulation data root on Amarel:
 Output root on Amarel:
 
 ```text
-/home/jl2815/tco/exercise_output/summer/sim_smooth0p3_nugget0_purespace_bessel_vecchia_2x4_060726
+/home/jl2815/tco/exercise_output/summer/sim_smooth0p3_nugget0_purespace_bessel_vecchia_2x4_fixed0_060726
 ```
 
 For `year=2024`, the wrapper expects:
@@ -64,9 +64,7 @@ ssh jl2815@amarel.rutgers.edu "mkdir -p ${REMOTE_DIR} ${REMOTE_SIM_DIR} /home/jl
 scp -r "${LOCAL_ROOT}/src/GEMS_TCO" \
   "jl2815@amarel.rutgers.edu:/home/jl2815/tco/"
 
-scp \
-  "${LOCAL_PURE}/fit_july2024_bessel_smooth_full_likelihood_tiles_2x4.py" \
-  "${LOCAL_PURE}/fit_july2024_bessel_smooth_vecchia_cluster_4x4_cond2_tiles_2x4.py" \
+scp "${LOCAL_PURE}/fit_july2024_bessel_smooth_vecchia_cluster_4x4_cond2_tiles_2x4.py" \
   "jl2815@amarel.rutgers.edu:${REMOTE_DIR}/"
 
 scp \
@@ -123,10 +121,10 @@ export NUMEXPR_NUM_THREADS=1
 
 SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/simulation/fit_sim_smooth0p3_nugget0_bessel_smooth_vecchia_tiles_2x4.py"
 SIM_ROOT="/home/jl2815/tco/exercise_output/sim_data/july_st_circulant_realpattern_smooth0p3_nugget0"
-OUTROOT="/home/jl2815/tco/exercise_output/summer/sim_smooth0p3_nugget0_purespace_bessel_vecchia_2x4_060726"
+OUTROOT="/home/jl2815/tco/exercise_output/summer/sim_smooth0p3_nugget0_purespace_bessel_vecchia_2x4_fixed0_060726"
 YEAR="${YEAR:-2024}"
 MAX_HOURS="${MAX_HOURS:-80}"
-NUGGET_MODE="${NUGGET_MODE:-free}"
+NUGGET_MODE="${NUGGET_MODE:-fixed0}"
 
 mkdir -p /home/jl2815/tco/exercise_output/summer/logs "${OUTROOT}"
 
@@ -201,7 +199,7 @@ Run from the local Mac:
 ```bash
 mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26"
 
-scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/sim_smooth0p3_nugget0_purespace_bessel_vecchia_2x4_060726" \
+scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/sim_smooth0p3_nugget0_purespace_bessel_vecchia_2x4_fixed0_060726" \
   "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/"
 ```
 
@@ -209,7 +207,7 @@ Expected summary files:
 
 ```text
 .../monthly_output/vecchia_cluster_4x4_cond2_tiles_2x4/
-  202407_vecc_cluster_4x4_cond2_free_tile_monthly_summary.csv
-  202407_vecc_cluster_4x4_cond2_free_tile_monthly_parameter_maps.png
-  202407_vecc_cluster_4x4_cond2_free_tile_monthly_nugget_nu_maps.png
+  202407_vecc_cluster_4x4_cond2_fixed0_tile_monthly_summary.csv
+  202407_vecc_cluster_4x4_cond2_fixed0_tile_monthly_parameter_maps.png
+  202407_vecc_cluster_4x4_cond2_fixed0_tile_monthly_nugget_nu_maps.png
 ```

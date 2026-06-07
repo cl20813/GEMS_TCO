@@ -135,7 +135,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--cluster-block-shape", default="4x4")
     p.add_argument("--mean-design", default="lat", choices=["lat", "base", "latlon", "hour_spatial"])
     p.add_argument("--data-root", default=getattr(config, "amarel_data_load_path", "/home/jl2815/tco/data/"))
-    p.add_argument("--output-root", default="/home/jl2815/tco/exercise_output/summer/real_data/spline_smooth_spectral_maxmin_060726")
+    p.add_argument("--output-root", default="/home/jl2815/tco/exercise_output/summer/real_data/spline_smooth_spectral_maxmin_kcut_060726")
     p.add_argument("--top-plot-dir", default="", help="Optional top-level folder that receives copies of monthly plot PNGs.")
     p.add_argument("--expanded-bounds", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--lat-range", default="-3,2")
@@ -470,12 +470,16 @@ def maxmin_block_indices(ctx: MonthContext, block_prefix: int, block_shape_text:
     selected_blocks = [block_keys[int(i)] for i in order[:n_use]]
     idx = np.concatenate([np.asarray(by_block[key], dtype=np.int64) for key in selected_blocks])
     idx = np.asarray(sorted(set(int(i) for i in idx)), dtype=np.int64)
+    density_scale = math.sqrt(float(n_use) / float(len(block_keys))) if len(block_keys) else 1.0
+    effective_k_max = float(ctx.k_max_full) if requested <= 0 else float(ctx.k_max_full) * float(density_scale)
     meta = {
         "block_prefix_requested": int(requested),
         "block_prefix_used": int(n_use),
         "block_prefix_label": "all" if requested <= 0 else f"B{int(n_use)}",
         "n_blocks_full": int(len(block_keys)),
         "n_grid_selected": int(idx.size),
+        "prefix_density_scale": float(density_scale),
+        "effective_k_max": float(effective_k_max),
     }
     return idx, meta
 
@@ -568,6 +572,8 @@ def fit_hour_variant(
         "block_prefix_label": str(prefix_meta["block_prefix_label"]),
         "n_blocks_full": int(prefix_meta["n_blocks_full"]),
         "n_grid_selected": int(prefix_meta["n_grid_selected"]),
+        "prefix_density_scale": float(prefix_meta["prefix_density_scale"]),
+        "effective_k_max": float(prefix_meta["effective_k_max"]),
         "variant": variant,
         "mean_design": args.mean_design,
         "neighbors": int(args.cluster_neighbor_blocks),
@@ -1027,6 +1033,8 @@ def compute_spectrum_rows(
         "block_prefix_label",
         "n_blocks_full",
         "n_grid_selected",
+        "prefix_density_scale",
+        "effective_k_max",
         "variant",
         "mean_design",
         "neighbors",
@@ -1088,7 +1096,9 @@ def compute_spectrum_rows(
             fallback = 0.5 * (ctx.radial_bins[:-1] + ctx.radial_bins[1:])
             missing = merged["k_mid"].isna() & merged["k_bin"].notna()
             merged.loc[missing, "k_mid"] = [float(fallback[int(b)]) for b in merged.loc[missing, "k_bin"]]
-        data_k_max = float(data_prof["k_mid"].max()) if not data_prof.empty else np.nan
+        raw_data_k_max = float(data_prof["k_mid"].max()) if not data_prof.empty else np.nan
+        effective_k_max = float(fit_row.get("effective_k_max", raw_data_k_max))
+        data_k_max = min(raw_data_k_max, effective_k_max) if np.isfinite(raw_data_k_max) else effective_k_max
         for m in merged.sort_values("k_bin").itertuples(index=False):
             rows.append(
                 {
@@ -1128,12 +1138,14 @@ def positive_ylim(*series_list, fallback=(1e0, 1e4)):
     return 10 ** np.floor(np.log10(float(x.min()))), 10 ** np.ceil(np.log10(float(x.max())))
 
 
-def ratio_frame(numerator_df, denominator_df, numerator_col, denominator_col, normalize_mean=False, sigma_sq=None):
+def ratio_frame(numerator_df, denominator_df, numerator_col, denominator_col, normalize_mean=False, sigma_sq=None, k_max=None):
     if numerator_df.empty or denominator_df.empty:
         return pd.DataFrame(columns=["k_bin", "k_mid", "ratio"])
     left = numerator_df[["k_bin", "k_mid", numerator_col]].copy()
     right = denominator_df[["k_bin", denominator_col]].copy()
     merged = left.merge(right, on="k_bin", how="inner").replace([np.inf, -np.inf], np.nan)
+    if k_max is not None and np.isfinite(float(k_max)) and float(k_max) > 0:
+        merged = merged[pd.to_numeric(merged["k_mid"], errors="coerce") <= float(k_max)].copy()
     good = merged[numerator_col].notna() & merged[denominator_col].notna() & (merged[numerator_col] > 0) & (merged[denominator_col] > 0)
     out = merged.loc[good, ["k_bin", "k_mid"]].copy()
     raw_ratio = merged.loc[good, numerator_col].to_numpy(dtype=float) / merged.loc[good, denominator_col].to_numpy(dtype=float)
@@ -1177,6 +1189,22 @@ def profile_ratio_label(ratio_df):
     if np.isfinite(sigma_profile):
         label += f"\nprofile sigma^2={sigma_profile:.3g}"
     return label
+
+
+def cutoff_from_frame(df: pd.DataFrame, fallback: float) -> float:
+    if df is not None and not df.empty and "data_k_max" in df.columns and df["data_k_max"].notna().any():
+        val = float(pd.to_numeric(df["data_k_max"], errors="coerce").dropna().iloc[0])
+        if np.isfinite(val) and val > 0:
+            return val
+    return float(fallback)
+
+
+def keep_to_cutoff(df: pd.DataFrame, k_cut: float) -> pd.DataFrame:
+    if df is None or df.empty or "k_mid" not in df.columns:
+        return df
+    if not np.isfinite(float(k_cut)) or float(k_cut) <= 0:
+        return df
+    return df[pd.to_numeric(df["k_mid"], errors="coerce") <= float(k_cut)].copy()
 
 
 def add_ratio_axis(ax, ratio_df, ylabel=None, color="tab:blue"):
@@ -1319,7 +1347,13 @@ def plot_daily(args, ctx: MonthContext, smooth: float, day: int, spectral_df: pd
             if sub_data.empty or sub_theory.empty:
                 ax.set_visible(False)
                 continue
-            k_cut = float(sub_data["data_k_max"].dropna().iloc[0]) if sub_data["data_k_max"].notna().any() else float(sub_data["k_mid"].max())
+            k_cut = cutoff_from_frame(sub_data, sub_data["k_mid"].max())
+            sub_data = keep_to_cutoff(sub_data, k_cut)
+            sub_theory = keep_to_cutoff(sub_theory, k_cut)
+            hour_sub = keep_to_cutoff(hour_sub, k_cut)
+            if sub_data.empty or sub_theory.empty:
+                ax.set_visible(False)
+                continue
             param_label = format_fit_label(spectral_df, variant, label)
             if param_label:
                 ax.plot([], [], color="none", label=param_label)
@@ -1336,14 +1370,14 @@ def plot_daily(args, ctx: MonthContext, smooth: float, day: int, spectral_df: pd
                 "theory_spectrum_expected",
                 normalize_mean=True,
                 sigma_sq=sigma_sq,
+                k_max=k_cut,
             )
             ratio_label = profile_ratio_label(ratio_df)
             if ratio_label:
                 ax.plot([], [], color="none", label=ratio_label)
             add_ratio_axis(ax, ratio_df, ylabel="I / E[I]" if j == len(labels_order) - 1 else None)
             ax.plot([], [], color="tab:blue", linewidth=1.35, linestyle=":", label="profiled I / E[I] (mean=1)")
-            ax.axvline(k_cut, color="0.45", linewidth=1.0, linestyle=":", alpha=0.95, zorder=2)
-            ax.set_xlim(0, ctx.k_max_full)
+            ax.set_xlim(0, k_cut)
             ax.set_ylim(*ylim)
             ax.set_title(f"{row_title}, {label}  (data k <= {k_cut:.1f})")
             ax.set_xlabel("radial frequency on full-grid scale")
@@ -1512,7 +1546,12 @@ def plot_monthly_directional_data_expected(
             if sub_data.empty:
                 ax.set_visible(False)
                 continue
-            k_cut = float(sub_data["data_k_max"].dropna().iloc[0]) if sub_data["data_k_max"].notna().any() else float(sub_data["k_mid"].max())
+            k_cut = cutoff_from_frame(sub_data, sub_data["k_mid"].max())
+            sub_data = keep_to_cutoff(sub_data, k_cut)
+            daily_sub = keep_to_cutoff(daily_sub, k_cut)
+            if sub_data.empty:
+                ax.set_visible(False)
+                continue
             param_label = format_fit_label(fit_df, variant, label)
             if param_label:
                 ax.plot([], [], color="none", label=param_label)
@@ -1529,14 +1568,14 @@ def plot_monthly_directional_data_expected(
                 "theory_spectrum_expected",
                 normalize_mean=True,
                 sigma_sq=sigma_sq,
+                k_max=k_cut,
             )
             ratio_label = profile_ratio_label(ratio_df)
             if ratio_label:
                 ax.plot([], [], color="none", label=ratio_label)
             add_ratio_axis(ax, ratio_df, ylabel="I / E[I]" if j == len(labels_order) - 1 else None)
             ax.plot([], [], color="tab:blue", linewidth=1.35, linestyle=":", label="profiled I / E[I] (mean=1)")
-            ax.axvline(k_cut, color="0.45", linewidth=1.0, linestyle=":", alpha=0.95, zorder=2)
-            ax.set_xlim(0, ctx.k_max_full)
+            ax.set_xlim(0, k_cut)
             ax.set_ylim(*ylim)
             direction_label = DIRECTION_SPECS[direction]["label"]
             freq_label = DIRECTION_SPECS[direction]["frequency_label"]
@@ -1597,6 +1636,8 @@ def plot_monthly_expected_vs_continuous(
             ].copy()
             sub = sub.dropna(subset=["theory_spectrum_expected"])
             sub = sub[sub["theory_spectrum_expected"] > 0]
+            k_cut = cutoff_from_frame(sub, sub["k_mid"].max())
+            sub = keep_to_cutoff(sub, k_cut)
             has_latent = sub["theory_spectrum_continuous_scaled"].notna().any()
             has_observed = sub["theory_spectrum_continuous_observed_scaled"].notna().any()
             if has_latent:
@@ -1637,7 +1678,13 @@ def plot_monthly_expected_vs_continuous(
                     label="latent continuous S (no nugget, profiled)",
                     zorder=4,
                 )
-                ratio_df = ratio_frame(latent, latent, "theory_spectrum_expected_latent", "theory_spectrum_continuous_scaled")
+                ratio_df = ratio_frame(
+                    latent,
+                    latent,
+                    "theory_spectrum_expected_latent",
+                    "theory_spectrum_continuous_scaled",
+                    k_max=k_cut,
+                )
                 add_ratio_axis(ax, ratio_df, ylabel="E[I] / scaled S" if j == len(labels_order) - 1 else None, color="tab:blue")
                 ax.plot([], [], color="tab:blue", linewidth=1.35, linestyle=":", label="E[I] / scaled latent S")
             if has_observed:
@@ -1662,7 +1709,7 @@ def plot_monthly_expected_vs_continuous(
                 )
             profile_label = DIRECTION_SPECS.get(profile, DIRECTION_SPECS["radial"])["label"]
             freq_label = DIRECTION_SPECS.get(profile, DIRECTION_SPECS["radial"])["frequency_label"]
-            ax.set_xlim(0, ctx.k_max_full)
+            ax.set_xlim(0, k_cut)
             ax.set_ylim(*ylim)
             ax.set_title(f"{VARIANTS[variant]['row_title']}: {profile_label}, {label}")
             ax.set_xlabel(freq_label)
@@ -1793,7 +1840,12 @@ def make_monthly_average(args: argparse.Namespace, ctx: MonthContext, smooth: fl
                 if sub_data.empty:
                     ax.set_visible(False)
                     continue
-                k_cut = float(sub_data["data_k_max"].dropna().iloc[0]) if sub_data["data_k_max"].notna().any() else float(sub_data["k_mid"].max())
+                k_cut = cutoff_from_frame(sub_data, sub_data["k_mid"].max())
+                sub_data = keep_to_cutoff(sub_data, k_cut)
+                daily_sub = keep_to_cutoff(daily_sub, k_cut)
+                if sub_data.empty:
+                    ax.set_visible(False)
+                    continue
                 param_label = format_fit_label(fit_df, variant, label)
                 if param_label:
                     ax.plot([], [], color="none", label=param_label)
@@ -1810,14 +1862,14 @@ def make_monthly_average(args: argparse.Namespace, ctx: MonthContext, smooth: fl
                     "theory_spectrum_expected",
                     normalize_mean=True,
                     sigma_sq=sigma_sq,
+                    k_max=k_cut,
                 )
                 ratio_label = profile_ratio_label(ratio_df)
                 if ratio_label:
                     ax.plot([], [], color="none", label=ratio_label)
                 add_ratio_axis(ax, ratio_df, ylabel="I / E[I]" if j == len(labels_order) - 1 else None)
                 ax.plot([], [], color="tab:blue", linewidth=1.35, linestyle=":", label="profiled I / E[I] (mean=1)")
-                ax.axvline(k_cut, color="0.45", linewidth=1.0, linestyle=":", alpha=0.95, zorder=2)
-                ax.set_xlim(0, ctx.k_max_full)
+                ax.set_xlim(0, k_cut)
                 ax.set_ylim(*ylim)
                 ax.set_title(f"{row_title}, {label}  (data k <= {k_cut:.1f})")
                 ax.set_xlabel("radial frequency on full-grid scale")
