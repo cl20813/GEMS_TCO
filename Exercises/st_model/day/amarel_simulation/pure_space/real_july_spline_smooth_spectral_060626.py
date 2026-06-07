@@ -121,7 +121,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--years", default="2022,2023,2024,2025")
     p.add_argument("--month", type=int, default=7)
     p.add_argument("--days", default="1,30", help="Inclusive day range or comma list. Default uses July days 1..30.")
-    p.add_argument("--smooths", default="0.35,0.4,0.5")
+    p.add_argument("--smooths", default="0.25,0.3")
     p.add_argument("--resolutions", default="8,4,2,1")
     p.add_argument("--variants", default="nugget0,nugget_free")
     p.add_argument("--neighbors", type=int, default=2, help="Deprecated alias; cluster B2 uses --cluster-neighbor-blocks.")

@@ -8,7 +8,7 @@ Settings:
 
 ```text
 years: 2022, 2023, 2024, 2025
-smooth values: 0.2, 0.3, 0.4, 0.5
+additional smooth values for this run: 0.25, 0.35
 domain: lat -3..7, lon 111..131 input files
 diagnostic regions: 2x4 tiles + whole-domain sparse x4 stride
 Vecchia: 4x4 target blocks, condition on 2 previous max-min cluster blocks
@@ -68,13 +68,13 @@ Paste:
 #SBATCH --job-name=eig_gv_qc_july
 #SBATCH --output=/home/jl2815/tco/exercise_output/logs/eig_gv_qc_july_%j.out
 #SBATCH --error=/home/jl2815/tco/exercise_output/logs/eig_gv_qc_july_%j.err
-#SBATCH --time=48:00:00
+#SBATCH --time=24:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 #SBATCH --mem=64G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu024
+#SBATCH --nodelist=gpu020
 
 set -euo pipefail
 
@@ -97,7 +97,7 @@ DATA_ROOT=/home/jl2815/tco/data
 BASE_ROOT=/home/jl2815/tco/exercise_output/summer/eigen_analysis/group_vecchia_aniso_nuggetfree_2stage_qc_w10_111131
 
 YEARS=(2022 2023 2024 2025)
-SMOOTHS=(0.2 0.3 0.4 0.5)
+SMOOTHS=(0.25 0.35)
 MONTH=7
 DAY_RANGE="1,31"
 HOURS="all"
@@ -189,10 +189,8 @@ tail -f /home/jl2815/tco/exercise_output/logs/eig_gv_qc_july_<JOBID>.out
 The run writes into:
 
 ```text
-/home/jl2815/tco/exercise_output/summer/eigen_analysis/group_vecchia_aniso_nuggetfree_2stage_qc_w10_111131/{YEAR}/nu0p2
-/home/jl2815/tco/exercise_output/summer/eigen_analysis/group_vecchia_aniso_nuggetfree_2stage_qc_w10_111131/{YEAR}/nu0p3
-/home/jl2815/tco/exercise_output/summer/eigen_analysis/group_vecchia_aniso_nuggetfree_2stage_qc_w10_111131/{YEAR}/nu0p4
-/home/jl2815/tco/exercise_output/summer/eigen_analysis/group_vecchia_aniso_nuggetfree_2stage_qc_w10_111131/{YEAR}/nu0p5
+/home/jl2815/tco/exercise_output/summer/eigen_analysis/group_vecchia_aniso_nuggetfree_2stage_qc_w10_111131/{YEAR}/nu0p25
+/home/jl2815/tco/exercise_output/summer/eigen_analysis/group_vecchia_aniso_nuggetfree_2stage_qc_w10_111131/{YEAR}/nu0p35
 ```
 
 Expected files in each `nu...` folder:

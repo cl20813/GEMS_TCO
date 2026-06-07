@@ -8,7 +8,7 @@ periodograms.
 years   = 2022, 2023, 2024, 2025
 month   = July
 days    = July 1..30
-smooth  = 0.35, 0.4, 0.5
+smooth  = 0.25, 0.3
 region  = lat -3..2, lon 121..131
 Vecchia = 4x4 target blocks, condition on 2 previous max-min cluster blocks
 ```
@@ -107,7 +107,7 @@ Paste this sbatch script:
 #SBATCH --mem=64G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
-#SBATCH --nodelist=gpu038
+#SBATCH --nodelist=gpu042
 
 set -euo pipefail
 
@@ -125,7 +125,7 @@ export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
-SMOOTHS=(0.35 0.4 0.5)
+SMOOTHS=(0.25 0.3)
 YEARS=(2022 2023 2024 2025)
 MONTH=7
 
@@ -196,7 +196,7 @@ echo "All done: $(date)"
 The sbatch file launches one Slurm job:
 
 ```text
-3 smooth values x 4 years = 12 smooth/year runs
+2 smooth values x 4 years = 8 smooth/year runs
 ```
 
 ## Output

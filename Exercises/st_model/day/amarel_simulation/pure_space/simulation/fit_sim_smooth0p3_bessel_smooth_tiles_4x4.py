@@ -44,6 +44,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tile-x", type=int, default=4)
     p.add_argument("--min-tile-points", type=int, default=200)
     p.add_argument("--tile-workers", type=int, default=4)
+    p.add_argument("--full-tile-workers", type=int, default=1)
+    p.add_argument("--vecchia-tile-workers", type=int, default=4)
     p.add_argument("--full-tile-max-points", type=int, default=2400)
     p.add_argument("--vecchia-tile-max-points", type=int, default=0)
     p.add_argument("--cluster-block-shape", default="4x4")
@@ -127,8 +129,8 @@ def common_args(args: argparse.Namespace, data_path: Path, paths: dict[str, Path
         "--y-col", y_col,
         "--value-col", "ColumnAmountO3",
         "--coords", "raw",
-        "--lat-range", str(args.lat_range),
-        "--lon-range", str(args.lon_range),
+        f"--lat-range={args.lat_range}",
+        f"--lon-range={args.lon_range}",
         "--tile-y", str(int(args.tile_y)),
         "--tile-x", str(int(args.tile_x)),
     ]
@@ -136,11 +138,12 @@ def common_args(args: argparse.Namespace, data_path: Path, paths: dict[str, Path
 
 def fit_args(method: str, args: argparse.Namespace, hour_idx: int) -> list[str]:
     tile_max = args.full_tile_max_points if method == "full" else args.vecchia_tile_max_points
+    tile_workers = args.full_tile_workers if method == "full" else args.vecchia_tile_workers
     out = [
         "--array-index", str(int(hour_idx)),
         "--min-tile-points", str(int(args.min_tile_points)),
         "--tile-max-points", str(int(tile_max)),
-        "--tile-workers", str(int(args.tile_workers)),
+        "--tile-workers", str(int(tile_workers)),
         "--nugget-mode", str(args.nugget_mode),
         "--mean-design", str(args.mean_design),
         "--range-lat-init", str(float(args.range_lat_init)),
@@ -164,7 +167,7 @@ def fit_args(method: str, args: argparse.Namespace, hour_idx: int) -> list[str]:
             "--full-fit-engine", "torch",
             "--qc-tile-y", str(int(args.tile_y)),
             "--qc-tile-x", str(int(args.tile_x)),
-            "--qc-tile-workers", str(int(args.tile_workers)),
+            "--qc-tile-workers", str(int(tile_workers)),
             "--qc-tile-max-points", "0",
         ])
     out.extend([

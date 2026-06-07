@@ -1,4 +1,4 @@
-# Smooth 0.3 Simulation, Pure-Space Bessel Smooth Estimation, 4x4 Tiles
+# Smooth 0.3 Simulation, Pure-Space Bessel Smooth Estimation, 4x4 Tiles, Nugget Fixed 0
 
 This test uses the reusable Amarel simulation data generated with true Matérn
 smoothness `nu=0.3` and fits pure-space models for the first 10 days:
@@ -10,8 +10,11 @@ smoothness `nu=0.3` and fits pure-space models for the first 10 days:
 Each hour is split into `4x4` spatial tiles.  Within each tile we estimate:
 
 ```text
-sigmasq, range_lat, range_lon, smooth, nugget
+sigmasq, range_lat, range_lon, smooth
 ```
+
+Here `nugget` is fixed to zero.  This is a diagnostic run for the
+smooth-range-nugget confounding seen in the free-nugget version.
 
 Two estimators are run into separate folders:
 
@@ -26,7 +29,7 @@ GPU, while Vecchia keeps four tile workers.
 Simulation output root on Amarel:
 
 ```text
-/home/jl2815/tco/exercise_output/summer/sim_smooth0p3_purespace_bessel_4x4_060626
+/home/jl2815/tco/exercise_output/summer/sim_smooth0p3_purespace_bessel_4x4_fixed0_060626
 ```
 
 The assumed simulation root is:
@@ -73,7 +76,7 @@ scp \
 
 scp \
   "${LOCAL_SIM}/fit_sim_smooth0p3_bessel_smooth_tiles_4x4.py" \
-  "${LOCAL_SIM}/slurm_sim_smooth0p3_bessel_smooth_tiles_4x4_060626.md" \
+  "${LOCAL_SIM}/slurm_sim_smooth0p3_bessel_smooth_tiles_4x4_fixed0_060626.md" \
   "jl2815@amarel.rutgers.edu:${REMOTE_SIM_DIR}/"
 ```
 
@@ -83,16 +86,16 @@ On Amarel:
 
 ```bash
 cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/simulation
-nano run_sim_smooth0p3_bessel_smooth_tiles_4x4_060626.sh
+nano run_sim_smooth0p3_bessel_smooth_tiles_4x4_fixed0_060626.sh
 ```
 
 Paste:
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name=sim03_pure_bess
-#SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/sim03_pure_bess_%A_%a.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/summer/logs/sim03_pure_bess_%A_%a.err
+#SBATCH --job-name=sim03_bess_fix0
+#SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/sim03_bess_fix0_%A_%a.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/summer/logs/sim03_bess_fix0_%A_%a.err
 #SBATCH --time=48:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -130,10 +133,10 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/simulation/fit_sim_smooth0p3_bessel_smooth_tiles_4x4.py"
 SIM_ROOT="/home/jl2815/tco/exercise_output/sim_data/july_st_circulant_realpattern_smooth0p3"
-OUTROOT="/home/jl2815/tco/exercise_output/summer/sim_smooth0p3_purespace_bessel_4x4_060626"
+OUTROOT="/home/jl2815/tco/exercise_output/summer/sim_smooth0p3_purespace_bessel_4x4_fixed0_060626"
 YEAR="${YEAR:-2024}"
 MAX_HOURS="${MAX_HOURS:-80}"
-NUGGET_MODE="${NUGGET_MODE:-free}"
+NUGGET_MODE="${NUGGET_MODE:-fixed0}"
 
 METHODS=(vecchia full)
 METHOD="${METHODS[$SLURM_ARRAY_TASK_ID]}"
@@ -207,7 +210,7 @@ echo "Finished METHOD=${METHOD}: $(date)"
 Submit:
 
 ```bash
-sbatch run_sim_smooth0p3_bessel_smooth_tiles_4x4_060626.sh
+sbatch run_sim_smooth0p3_bessel_smooth_tiles_4x4_fixed0_060626.sh
 ```
 
 This creates two array tasks:
@@ -224,7 +227,7 @@ Run from the local Mac:
 ```bash
 mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26"
 
-scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/sim_smooth0p3_purespace_bessel_4x4_060626" \
+scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/sim_smooth0p3_purespace_bessel_4x4_fixed0_060626" \
   "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/"
 ```
 
@@ -232,12 +235,12 @@ Expected summary files:
 
 ```text
 .../monthly_output/vecchia_cluster_4x4_cond2_tiles_4x4/
-  202407_vecc_cluster_4x4_cond2_free_tile_monthly_summary.csv
-  202407_vecc_cluster_4x4_cond2_free_tile_monthly_parameter_maps.png
-  202407_vecc_cluster_4x4_cond2_free_tile_monthly_nugget_nu_maps.png
+  202407_vecc_cluster_4x4_cond2_fixed0_tile_monthly_summary.csv
+  202407_vecc_cluster_4x4_cond2_fixed0_tile_monthly_parameter_maps.png
+  202407_vecc_cluster_4x4_cond2_fixed0_tile_monthly_nugget_nu_maps.png
 
 .../monthly_output/full_likelihood_4x4/
-  202407_full_likelihood_free_tile_monthly_summary.csv
-  202407_full_likelihood_free_tile_monthly_parameter_maps.png
-  202407_full_likelihood_free_tile_monthly_nugget_nu_maps.png
+  202407_full_likelihood_fixed0_tile_monthly_summary.csv
+  202407_full_likelihood_fixed0_tile_monthly_parameter_maps.png
+  202407_full_likelihood_fixed0_tile_monthly_nugget_nu_maps.png
 ```

@@ -13,6 +13,7 @@ GPU Vecchia fitting.
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import asdict, dataclass
 from typing import Sequence
 
@@ -303,6 +304,7 @@ def fit_full_matern_torch(
     tolerance_grad: float = 1e-7,
     tolerance_change: float = 1e-9,
     bounds: dict[str, tuple[float, float]] | None = None,
+    device: str | torch.device | None = None,
 ) -> dict:
     """Optimize the smooth-free full likelihood with torch LBFGS.
 
@@ -310,9 +312,18 @@ def fit_full_matern_torch(
     evaluation.  This keeps the diagnostic comparable to SciPy L-BFGS-B without
     introducing another transform layer.
     """
-    y = torch.tensor(np.asarray(y_np, dtype=np.float64), dtype=torch.float64)
-    coords = torch.tensor(np.asarray(coords_np, dtype=np.float64), dtype=torch.float64)
-    raw = torch.tensor(np.asarray(start_raw, dtype=np.float64), dtype=torch.float64, requires_grad=True)
+    if device is None:
+        requested = os.environ.get("TORCH_FULL_DEVICE", "cpu").strip().lower()
+        if requested == "auto":
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            device = torch.device(requested or "cpu")
+    else:
+        device = torch.device(device)
+
+    y = torch.tensor(np.asarray(y_np, dtype=np.float64), dtype=torch.float64, device=device)
+    coords = torch.tensor(np.asarray(coords_np, dtype=np.float64), dtype=torch.float64, device=device)
+    raw = torch.tensor(np.asarray(start_raw, dtype=np.float64), dtype=torch.float64, device=device, requires_grad=True)
 
     if bounds is None:
         bounds = {}
@@ -328,8 +339,8 @@ def fit_full_matern_torch(
         raw_los[3], raw_his[3] = bounds["smooth_raw"]
     if len(start_raw) > 4 and "log_nugget" in bounds:
         raw_los[4], raw_his[4] = bounds["log_nugget"]
-    lo_t = torch.tensor(raw_los, dtype=torch.float64)
-    hi_t = torch.tensor(raw_his, dtype=torch.float64)
+    lo_t = torch.tensor(raw_los, dtype=torch.float64, device=device)
+    hi_t = torch.tensor(raw_his, dtype=torch.float64, device=device)
 
     def clamp_raw_() -> None:
         with torch.no_grad():
@@ -403,5 +414,6 @@ def fit_full_matern_torch(
         "message": message,
         "n_eval": int(calls),
         "raw_params": raw_np.tolist(),
+        "torch_device": str(device),
     })
     return params
