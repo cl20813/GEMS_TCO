@@ -1377,7 +1377,7 @@ def plot_daily(args, ctx: MonthContext, smooth: float, day: int, spectral_df: pd
                 ax.plot([], [], color="none", label=ratio_label)
             add_ratio_axis(ax, ratio_df, ylabel="I / E[I]" if j == len(labels_order) - 1 else None)
             ax.plot([], [], color="tab:blue", linewidth=1.35, linestyle=":", label="profiled I / E[I] (mean=1)")
-            ax.set_xlim(0, k_cut)
+            ax.set_xlim(0, ctx.k_max_full)
             ax.set_ylim(*ylim)
             ax.set_title(f"{row_title}, {label}  (data k <= {k_cut:.1f})")
             ax.set_xlabel("radial frequency on full-grid scale")
@@ -1575,7 +1575,7 @@ def plot_monthly_directional_data_expected(
                 ax.plot([], [], color="none", label=ratio_label)
             add_ratio_axis(ax, ratio_df, ylabel="I / E[I]" if j == len(labels_order) - 1 else None)
             ax.plot([], [], color="tab:blue", linewidth=1.35, linestyle=":", label="profiled I / E[I] (mean=1)")
-            ax.set_xlim(0, k_cut)
+            ax.set_xlim(0, ctx.k_max_full)
             ax.set_ylim(*ylim)
             direction_label = DIRECTION_SPECS[direction]["label"]
             freq_label = DIRECTION_SPECS[direction]["frequency_label"]
@@ -1709,7 +1709,7 @@ def plot_monthly_expected_vs_continuous(
                 )
             profile_label = DIRECTION_SPECS.get(profile, DIRECTION_SPECS["radial"])["label"]
             freq_label = DIRECTION_SPECS.get(profile, DIRECTION_SPECS["radial"])["frequency_label"]
-            ax.set_xlim(0, k_cut)
+            ax.set_xlim(0, ctx.k_max_full)
             ax.set_ylim(*ylim)
             ax.set_title(f"{VARIANTS[variant]['row_title']}: {profile_label}, {label}")
             ax.set_xlabel(freq_label)
@@ -1869,7 +1869,7 @@ def make_monthly_average(args: argparse.Namespace, ctx: MonthContext, smooth: fl
                     ax.plot([], [], color="none", label=ratio_label)
                 add_ratio_axis(ax, ratio_df, ylabel="I / E[I]" if j == len(labels_order) - 1 else None)
                 ax.plot([], [], color="tab:blue", linewidth=1.35, linestyle=":", label="profiled I / E[I] (mean=1)")
-                ax.set_xlim(0, k_cut)
+                ax.set_xlim(0, ctx.k_max_full)
                 ax.set_ylim(*ylim)
                 ax.set_title(f"{row_title}, {label}  (data k <= {k_cut:.1f})")
                 ax.set_xlabel("radial frequency on full-grid scale")
