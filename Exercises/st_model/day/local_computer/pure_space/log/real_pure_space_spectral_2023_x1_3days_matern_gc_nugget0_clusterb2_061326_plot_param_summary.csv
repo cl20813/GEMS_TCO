@@ -1,0 +1,6 @@
+variant,model_label,n_slices,sigmasq_median,range_lat_median,range_lon_median,loss_median,loss_mean
+gc_a06_b35,GC a=0.6 b=3.5,24,12.5630,5.1351,5.1112,1.4989,1.4734
+gc_a07_b35,GC a=0.7 b=3.5,24,11.5011,1.7278,1.9136,1.4463,1.4425
+gc_a07_b4,GC a=0.7 b=4,24,11.4749,2.1056,2.3336,1.4682,1.4471
+gc_a08_b4,GC a=0.8 b=4,24,10.6044,1.0233,1.1243,1.4183,1.4268
+matern_s03,Matern s=0.3,24,11.8748,0.2284,0.2534,1.2458,1.2749
