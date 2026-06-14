@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Real July implied-spatial spectral diagnostics from daily ST Vecchia fits.
+"""Real July 2022-2025 implied-spatial ratio diagnostics from daily ST Vecchia fits.
 
 What this script does
 ---------------------
@@ -14,7 +14,7 @@ The main loop is intentionally:
       for year
         for day in July 1..30
           for resolution x8, x4, x2, x1
-            1. full grid에서 fixed thinned grid order 생성
+            1. full grid에서 4x4 block-center max-min prefix 생성
             2. 8 hourly fields를 그 fixed order에 reindex
             3. 하루 8시간을 함께 넣어서 ST Vecchia model 하나 fit
             4. fitted ST model에서 temporal lag=0 slice를 뽑아 implied spatial model 구성
@@ -22,17 +22,18 @@ The main loop is intentionally:
             6. plot: gray hourly I, black mean I, red mean E[I], blue ratio
         monthly average plot
 
-Fixed thinned grid order
-------------------------
-For x8/x4/x2/x1 we first define a fixed downsampled spatial grid from the full
-regular grid:
+Resolution expansion
+--------------------
+For x8/x4/x2/x1, the default is a 4x4 block-center max-min expansion.  We first
+partition the full regular grid into 4x4 spatial blocks, order the block centers
+by max-min distance, and keep the first ceil(n_blocks / stride^2) blocks:
 
-    x8: keep row % 8 == 0 and col % 8 == 0
-    x4: keep row % 4 == 0 and col % 4 == 0
-    x2: keep row % 2 == 0 and col % 2 == 0
-    x1: keep every grid cell
+    x8: first ceil(n_blocks / 64) max-min center blocks
+    x4: first ceil(n_blocks / 16) max-min center blocks
+    x2: first ceil(n_blocks / 4) max-min center blocks
+    x1: all blocks
 
-Every hourly tensor is then reindexed to that same fixed thinned grid order.
+Every hourly tensor is then reindexed to that same selected regular-grid order.
 If an hourly observation is missing at a retained grid cell, we keep the row and
 put y=NaN instead of dropping the row.  This matters because the ST cluster
 Vecchia code assumes that input_map["hour1"][i], input_map["hour2"][i], and
@@ -40,11 +41,11 @@ grid_coords[i] all mean the same spatial location.
 
 Plot layout
 -----------
-The plot keeps the earlier format:
+The plot keeps the earlier format for each norm/lat/lon/diagonal profile:
 
     columns: x8, x4, x2, x1
     row 1:  nugget fixed 0 ST model
-    row 2:  nugget free ST model
+    row 2:  optional nugget free ST model
 
 Within each panel:
 
@@ -89,6 +90,7 @@ for candidate in (AMAREL_SRC, LOCAL_SRC):
         break
 
 from GEMS_TCO import configuration as config
+from GEMS_TCO import orderings
 from GEMS_TCO.vecchia_st_spline import (
     RealDataCorridorWidth4x4Lag643NoNuggetSplineFit,
     RealDataCorridorWidth4x4Lag643SplineFit,
@@ -150,17 +152,19 @@ class MonthContext:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Daily ST implied-spatial spectral diagnostics.")
+    p = argparse.ArgumentParser(description="Real July 2022-2025 implied-spatial ratio diagnostics.")
     p.add_argument("--years", default="2022,2023,2024,2025")
     p.add_argument("--month", type=int, default=7)
     p.add_argument("--days", default="1,30")
     p.add_argument("--smooths", default="0.2,0.25,0.3,0.35,0.4,0.45")
     p.add_argument("--resolutions", default="8,4,2,1")
-    p.add_argument("--variants", default="nugget0,nugget_free")
+    p.add_argument("--resolution-order", choices=["maxmin", "stride"], default="maxmin",
+                   help="maxmin keeps expanding prefixes of 4x4 block centers; stride is the old row/column thinning.")
+    p.add_argument("--variants", default="nugget0")
     p.add_argument("--data-root", default=getattr(config, "amarel_data_load_path", "/home/jl2815/tco/data/"))
-    p.add_argument("--output-root", default="/home/jl2815/tco/exercise_output/real_data/implied_spatial_spectral_corridor_4x4_lag643_lat-3to7_lon121to131_052126")
+    p.add_argument("--output-root", default="/home/jl2815/tco/exercise_output/real_data/real_july2022_2025_implied_spatial_ratio_plot")
     p.add_argument("--expanded-bounds", action=argparse.BooleanOptionalAction, default=True)
-    p.add_argument("--lat-range", default="-3,7")
+    p.add_argument("--lat-range", default="-3,2")
     p.add_argument("--lon-range", default="121,131")
     p.add_argument("--x-col", default="Longitude")
     p.add_argument("--y-col", default="Latitude")
@@ -195,6 +199,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--nugget-init", type=float, default=2.5)
     p.add_argument("--radial-bins", type=int, default=70)
     p.add_argument("--radial-qmax", type=float, default=0.985)
+    p.add_argument("--profiles", default="radial,lat,lon,diag", help="Comma list from radial,lat,lon,diag. Radial is labeled as norm frequency.")
     p.add_argument("--hann", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--skip-existing", action="store_true")
     p.add_argument("--make-monthly-only", action="store_true")
@@ -468,8 +473,66 @@ def thin_indices(ctx: MonthContext, stride: int) -> np.ndarray:
     return np.flatnonzero(keep).astype(np.int64)
 
 
+def maxmin_resolution_indices(ctx: MonthContext, stride: int, block_shape_text: str) -> tuple[np.ndarray, dict]:
+    block_y, block_x = parse_shape_pair(block_shape_text)
+    by_block: dict[tuple[int, int], list[int]] = {}
+    for idx, (row, col) in enumerate(zip(ctx.local_to_row, ctx.local_to_col)):
+        key = (int(row) // block_y, int(col) // block_x)
+        by_block.setdefault(key, []).append(int(idx))
+    block_keys = sorted(by_block)
+    if not block_keys:
+        raise ValueError("No grid blocks were built for max-min resolution selection.")
+    centers = []
+    for key in block_keys:
+        idxs = np.asarray(by_block[key], dtype=np.int64)
+        centers.append(ctx.grid_coords_full[idxs].mean(axis=0))
+    centers_np = np.asarray(centers, dtype=np.float64)
+    # maxmin_cpp expects lon/lat order, while grid_coords_full is lat/lon.
+    lon_lat = np.column_stack([centers_np[:, 1], centers_np[:, 0]])
+    order = np.asarray(orderings.maxmin_cpp(lon_lat), dtype=np.int64)
+    if order.size and order.min() == 1 and order.max() == len(block_keys):
+        order = order - 1
+    if order.size != len(block_keys):
+        raise RuntimeError(f"max-min order length {order.size} != number of blocks {len(block_keys)}")
+    stride = int(stride)
+    n_use = len(block_keys) if stride <= 1 else int(math.ceil(len(block_keys) / float(stride * stride)))
+    n_use = max(1, min(n_use, len(block_keys)))
+    selected_blocks = [block_keys[int(i)] for i in order[:n_use]]
+    idx = np.concatenate([np.asarray(by_block[key], dtype=np.int64) for key in selected_blocks])
+    idx = np.asarray(sorted(set(int(i) for i in idx)), dtype=np.int64)
+    return idx, {
+        "resolution_order": "maxmin",
+        "resolution_stride": int(stride),
+        "resolution_label": f"x{int(stride)}",
+        "resolution_blocks_used": int(n_use),
+        "resolution_blocks_full": int(len(block_keys)),
+        "resolution_grid_selected": int(idx.size),
+        "resolution_density": float(n_use / len(block_keys)),
+        "resolution_definition": (
+            "first ceil(n_blocks / stride^2) max-min ordered 4x4 regular-grid "
+            "target blocks; all cells inside selected blocks are kept"
+        ),
+    }
+
+
+def resolution_indices(args: argparse.Namespace, ctx: MonthContext, stride: int) -> tuple[np.ndarray, dict]:
+    if str(args.resolution_order) == "stride":
+        idx = thin_indices(ctx, stride)
+        return idx, {
+            "resolution_order": "stride",
+            "resolution_stride": int(stride),
+            "resolution_label": f"x{int(stride)}",
+            "resolution_blocks_used": np.nan,
+            "resolution_blocks_full": np.nan,
+            "resolution_grid_selected": int(idx.size),
+            "resolution_density": float(idx.size / max(len(ctx.grid_coords_full), 1)),
+            "resolution_definition": "legacy row/column stride thinning",
+        }
+    return maxmin_resolution_indices(ctx, stride, str(args.block_shape))
+
+
 def build_day_input_map(args, ctx: MonthContext, entries, stride: int, device: torch.device):
-    thin_idx = thin_indices(ctx, stride)
+    thin_idx, resolution_meta = resolution_indices(args, ctx, stride)
     input_map = {}
     full_tensors = []
     for hour_idx, (ts, key, df) in enumerate(entries[:8]):
@@ -478,7 +541,7 @@ def build_day_input_map(args, ctx: MonthContext, entries, stride: int, device: t
         input_map[str(key)] = thin_t
         full_tensors.append(full_t)
     grid_coords = ctx.grid_coords_full[thin_idx].astype(np.float64)
-    return input_map, full_tensors, thin_idx, grid_coords
+    return input_map, full_tensors, thin_idx, grid_coords, resolution_meta
 
 
 def count_valid_input(input_map: dict[str, torch.Tensor]) -> tuple[int, int]:
@@ -524,7 +587,7 @@ def convert_raw(raw: list[float], variant: str) -> dict:
     return out
 
 
-def fit_st_variant(args, ctx, day, stride, variant, smooth, input_map, grid_coords, device):
+def fit_st_variant(args, ctx, day, stride, variant, smooth, input_map, grid_coords, resolution_meta, device):
     n_grid, n_valid_total = count_valid_input(input_map)
     row = {
         "date_str": f"{ctx.year}{ctx.month:02d}{day:02d}",
@@ -532,8 +595,14 @@ def fit_st_variant(args, ctx, day, stride, variant, smooth, input_map, grid_coor
         "month": int(ctx.month),
         "day": int(day),
         "smooth": float(smooth),
-        "resolution_stride": int(stride),
-        "resolution_label": f"x{int(stride)}",
+        "resolution_stride": int(resolution_meta.get("resolution_stride", stride)),
+        "resolution_label": str(resolution_meta.get("resolution_label", f"x{int(stride)}")),
+        "resolution_order": str(resolution_meta.get("resolution_order", "")),
+        "resolution_blocks_used": resolution_meta.get("resolution_blocks_used", np.nan),
+        "resolution_blocks_full": resolution_meta.get("resolution_blocks_full", np.nan),
+        "resolution_grid_selected": int(resolution_meta.get("resolution_grid_selected", n_grid)),
+        "resolution_density": float(resolution_meta.get("resolution_density", np.nan)),
+        "resolution_definition": str(resolution_meta.get("resolution_definition", "")),
         "variant": variant,
         "n_hours": int(len(input_map)),
         "n_grid": int(n_grid),
@@ -807,37 +876,109 @@ def radial_average(surface, k_radial, radial_bins, k_max):
     return pd.DataFrame(rows)
 
 
+DIRECTION_SPECS = {
+    "radial": {"label": "norm", "frequency_label": "norm frequency"},
+    "lat": {"label": "latitude N-S", "frequency_label": "lat norm frequency"},
+    "lon": {"label": "longitude E-W", "frequency_label": "lon norm frequency"},
+    "diag": {"label": "diagonal NE-SW", "frequency_label": "diagonal norm frequency"},
+}
+
+
+def directional_average(surface, omega_lat, omega_lon, radial_bins, k_max, direction: str):
+    vals = np.asarray(surface, dtype=float).ravel()
+    fy = np.asarray(omega_lat, dtype=float)
+    fx = np.asarray(omega_lon, dtype=float)
+    if fy.shape != fx.shape:
+        raise ValueError("frequency grids must have matching shapes")
+    if direction == "lat":
+        coord = np.abs(fy)
+        other = np.abs(fx)
+    elif direction == "lon":
+        coord = np.abs(fx)
+        other = np.abs(fy)
+    elif direction == "diag":
+        coord = np.abs(fy + fx) / math.sqrt(2.0)
+        other = np.abs(fy - fx) / math.sqrt(2.0)
+    else:
+        raise ValueError(f"unknown direction: {direction}")
+    bin_width = float(radial_bins[1] - radial_bins[0]) if len(radial_bins) > 1 else 0.0
+    line_tol = max(bin_width * 0.5, EPS)
+    coord_flat = coord.ravel()
+    other_flat = other.ravel()
+    good = (
+        np.isfinite(vals)
+        & np.isfinite(coord_flat)
+        & np.isfinite(other_flat)
+        & (coord_flat > 0)
+        & (coord_flat <= k_max)
+        & (other_flat <= line_tol)
+    )
+    if not np.any(good):
+        return pd.DataFrame(columns=["k_bin", "k_mid", "k_mean", "spectrum", "n_freq"])
+    bin_idx = np.digitize(coord_flat[good], radial_bins, right=False) - 1
+    valid_bin = (bin_idx >= 0) & (bin_idx < len(radial_bins) - 1)
+    bin_idx = bin_idx[valid_bin]
+    vg = vals[good][valid_bin]
+    kg = coord_flat[good][valid_bin]
+    rows = []
+    for b in range(len(radial_bins) - 1):
+        m = bin_idx == b
+        if not np.any(m):
+            continue
+        rows.append({"k_bin": int(b), "k_mid": float(0.5 * (radial_bins[b] + radial_bins[b + 1])), "k_mean": float(np.nanmean(kg[m])), "spectrum": float(np.nanmean(vg[m])), "n_freq": int(m.sum())})
+    return pd.DataFrame(rows)
+
+
+def profile_average(surface, k_radial, omega_lat, omega_lon, radial_bins, k_max, profile: str):
+    if profile == "radial":
+        return radial_average(surface, k_radial, radial_bins, k_max)
+    return directional_average(surface, omega_lat, omega_lon, radial_bins, k_max, profile)
+
+
 def compute_spectrum_rows(args, ctx, fit_row, est, full_tensors, thin_idx, stride, smooth, device):
     rows = []
+    profiles = [p for p in parse_names(args.profiles) if p in DIRECTION_SPECS]
     for hour_idx, full_t in enumerate(full_tensors):
         thin_t = full_t[torch.as_tensor(thin_idx, dtype=torch.long, device=device)].contiguous()
         grid, mask, n_valid_spectrum, lat_axis, lon_axis = detrended_residual_grid(ctx, thin_idx, thin_t)
         data_p = masked_periodogram(grid, mask, args.hann)
         expected_p = expected_periodogram_dw_style(args, est, smooth, mask, lat_axis, lon_axis)
-        k_data, _, _ = frequency_grid_for_axes(lat_axis, lon_axis)
-        data_rad = radial_average(data_p, k_data, ctx.radial_bins, ctx.k_max_full).rename(columns={"spectrum": "data_spectrum"})
-        expected_rad = radial_average(expected_p, k_data, ctx.radial_bins, ctx.k_max_full).rename(columns={"spectrum": "theory_spectrum_expected"})
-        merged = expected_rad[["k_bin", "k_mid", "k_mean", "theory_spectrum_expected", "n_freq"]].merge(
-            data_rad[["k_bin", "data_spectrum"]], on="k_bin", how="left"
-        )
-        data_k_max = float(data_rad["k_mid"].max()) if not data_rad.empty else np.nan
-        for m in merged.itertuples(index=False):
-            rows.append({
-                **{k: fit_row[k] for k in [
-                    "date_str", "year", "month", "day", "smooth", "resolution_stride", "resolution_label", "variant",
-                    "est_sigmasq", "est_range_lat", "est_range_lon", "est_range_time", "est_advec_lat", "est_advec_lon", "est_nugget",
-                    "est_phi1", "est_phi2", "est_phi3", "est_phi4",
-                ]},
-                "hour_idx": int(hour_idx),
-                "n_valid_spectrum": int(n_valid_spectrum),
-                "k_bin": int(m.k_bin),
-                "k_mid": float(m.k_mid),
-                "k_mean": float(m.k_mean),
-                "n_freq": int(m.n_freq) if pd.notna(m.n_freq) else 0,
-                "data_k_max": data_k_max,
-                "data_spectrum": float(m.data_spectrum) if pd.notna(m.data_spectrum) else np.nan,
-                "theory_spectrum_expected": float(m.theory_spectrum_expected) if pd.notna(m.theory_spectrum_expected) else np.nan,
-            })
+        k_data, _, omega_lat_data, omega_lon_data = frequency_grid_for_axes(lat_axis, lon_axis)
+        for profile in profiles:
+            spec = DIRECTION_SPECS[profile]
+            data_prof = profile_average(data_p, k_data, omega_lat_data, omega_lon_data, ctx.radial_bins, ctx.k_max_full, profile).rename(columns={"spectrum": "data_spectrum"})
+            expected_prof = profile_average(expected_p, k_data, omega_lat_data, omega_lon_data, ctx.radial_bins, ctx.k_max_full, profile).rename(columns={"spectrum": "theory_spectrum_expected"})
+            merged = expected_prof[["k_bin", "k_mid", "k_mean", "theory_spectrum_expected", "n_freq"]].merge(
+                data_prof[["k_bin", "data_spectrum"]], on="k_bin", how="left"
+            )
+            data_k_max = float(data_prof["k_mid"].max()) if not data_prof.empty else np.nan
+            for m in merged.itertuples(index=False):
+                rows.append({
+                    **{k: fit_row[k] for k in [
+                        "date_str", "year", "month", "day", "smooth", "resolution_stride", "resolution_label", "variant",
+                        "est_sigmasq", "est_range_lat", "est_range_lon", "est_range_time", "est_advec_lat", "est_advec_lon", "est_nugget",
+                        "est_phi1", "est_phi2", "est_phi3", "est_phi4",
+                    ]},
+                    "resolution_order": fit_row.get("resolution_order", ""),
+                    "resolution_blocks_used": fit_row.get("resolution_blocks_used", np.nan),
+                    "resolution_blocks_full": fit_row.get("resolution_blocks_full", np.nan),
+                    "resolution_grid_selected": fit_row.get("resolution_grid_selected", np.nan),
+                    "resolution_density": fit_row.get("resolution_density", np.nan),
+                    "resolution_definition": fit_row.get("resolution_definition", ""),
+                    "profile": profile,
+                    "direction": profile,
+                    "direction_label": spec["label"],
+                    "frequency_label": spec["frequency_label"],
+                    "hour_idx": int(hour_idx),
+                    "n_valid_spectrum": int(n_valid_spectrum),
+                    "k_bin": int(m.k_bin),
+                    "k_mid": float(m.k_mid),
+                    "k_mean": float(m.k_mean),
+                    "n_freq": int(m.n_freq) if pd.notna(m.n_freq) else 0,
+                    "data_k_max": data_k_max,
+                    "data_spectrum": float(m.data_spectrum) if pd.notna(m.data_spectrum) else np.nan,
+                    "theory_spectrum_expected": float(m.theory_spectrum_expected) if pd.notna(m.theory_spectrum_expected) else np.nan,
+                })
     return rows
 
 
@@ -893,7 +1034,13 @@ def add_ratio_axis(ax, ratio_df, ylabel=None):
 def aggregate_daily(spectral_df: pd.DataFrame):
     return (
         spectral_df
-        .groupby(["variant", "resolution_label", "resolution_stride", "k_bin"], observed=True)
+        .groupby([
+            "profile", "direction_label", "frequency_label", "variant",
+            "resolution_label", "resolution_stride", "resolution_order",
+            "resolution_blocks_used", "resolution_blocks_full",
+            "resolution_grid_selected", "resolution_density",
+            "k_bin",
+        ], observed=True)
         .agg(
             k_mid=("k_mid", "mean"),
             data_spectrum=("data_spectrum", "mean"),
@@ -923,14 +1070,23 @@ def format_fit_label(source_df, variant, resolution_label, prefix="ST fit"):
     return label
 
 
-def plot_panel_grid(ctx, args, smooth, title, spectral_df, fit_df, out_path, monthly=False):
+def plot_panel_grid(ctx, args, smooth, title, spectral_df, fit_df, out_path, monthly=False, profile="radial"):
     labels_order = [f"x{s}" for s in parse_int_list_or_range(args.resolutions)]
     row_specs = [(v, VARIANTS[v]["row_title"]) for v in parse_names(args.variants) if v in VARIANTS]
-    plot_df = spectral_df.copy()
+    plot_df = spectral_df[spectral_df["profile"].astype(str) == str(profile)].copy()
+    if plot_df.empty:
+        return
+    profile_spec = DIRECTION_SPECS.get(str(profile), DIRECTION_SPECS["radial"])
     if monthly:
         gray_df = plot_df.copy()
         mean_df = (
-            plot_df.groupby(["variant", "resolution_label", "resolution_stride", "k_bin"], observed=True)
+            plot_df.groupby([
+                "profile", "direction_label", "frequency_label", "variant",
+                "resolution_label", "resolution_stride", "resolution_order",
+                "resolution_blocks_used", "resolution_blocks_full",
+                "resolution_grid_selected", "resolution_density",
+                "k_bin",
+            ], observed=True)
             .agg(k_mid=("k_mid", "mean"), data_spectrum=("data_spectrum", "mean"), theory_spectrum_expected=("theory_spectrum_expected", "mean"), data_k_max=("data_k_max", "mean"))
             .reset_index()
         )
@@ -968,13 +1124,13 @@ def plot_panel_grid(ctx, args, smooth, title, spectral_df, fit_df, out_path, mon
             ax.set_xlim(0, ctx.k_max_full)
             ax.set_ylim(*ylim)
             ax.set_title(f"{row_title}, {label}  (data k <= {k_cut:.1f})")
-            ax.set_xlabel("radial frequency on full-grid scale")
+            ax.set_xlabel(profile_spec["frequency_label"])
             if j == 0:
                 ax.set_ylabel("spectrum")
             ax.set_yscale("log")
             ax.grid(alpha=0.2)
             ax.legend(fontsize=7, handlelength=1.5)
-    fig.suptitle(title)
+    fig.suptitle(f"{title}: {profile_spec['label']}")
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=180, bbox_inches="tight")
@@ -991,9 +1147,9 @@ def process_day(args, ctx: MonthContext, smooth: float, day: int, out_dir: Path,
     daily_dir = out_dir / "daily_csv"
     plot_dir = out_dir / "daily_plots"
     fit_path = daily_dir / f"{date_str}_st_fits.csv"
-    spec_path = daily_dir / f"{date_str}_implied_spatial_radial_spectrum.csv"
-    plot_path = plot_dir / f"{date_str}_implied_spatial_data_vs_expected_periodogram.png"
-    if args.skip_existing and fit_path.exists() and (args.fit_only or (spec_path.exists() and plot_path.exists())):
+    spec_path = daily_dir / f"{date_str}_implied_spatial_spectral_profiles.csv"
+    first_plot_path = plot_dir / f"{date_str}_implied_spatial_data_vs_expected_norm.png"
+    if args.skip_existing and fit_path.exists() and (args.fit_only or (spec_path.exists() and first_plot_path.exists())):
         print(f"Skip existing day {date_str}", flush=True)
         return
     entries = ctx.entries_by_day.get(day, [])
@@ -1005,10 +1161,15 @@ def process_day(args, ctx: MonthContext, smooth: float, day: int, out_dir: Path,
     fit_rows = []
     spectral_rows = []
     for stride in parse_int_list_or_range(args.resolutions):
-        input_map, full_tensors, thin_idx, grid_coords = build_day_input_map(args, ctx, entries, stride, device)
+        input_map, full_tensors, thin_idx, grid_coords, resolution_meta = build_day_input_map(args, ctx, entries, stride, device)
         for variant in [v for v in parse_names(args.variants) if v in VARIANTS]:
-            print(f"\n{date_str} smooth={smooth} {variant} x{stride}: daily ST fit", flush=True)
-            fit_row, est = fit_st_variant(args, ctx, day, stride, variant, smooth, input_map, grid_coords, device)
+            print(
+                f"\n{date_str} smooth={smooth} {variant} x{stride}: daily ST fit "
+                f"({resolution_meta.get('resolution_order')} blocks="
+                f"{resolution_meta.get('resolution_blocks_used')}/{resolution_meta.get('resolution_blocks_full')})",
+                flush=True,
+            )
+            fit_row, est = fit_st_variant(args, ctx, day, stride, variant, smooth, input_map, grid_coords, resolution_meta, device)
             fit_rows.append(fit_row)
             if args.fit_only or est is None:
                 continue
@@ -1026,13 +1187,16 @@ def process_day(args, ctx: MonthContext, smooth: float, day: int, out_dir: Path,
     write_csv(spec_df, spec_path)
     if not spec_df.empty:
         title = f"{ctx.year}-{ctx.month:02d}-{day:02d}, smooth={smooth}: ST implied spatial residual spectrum vs expected periodogram"
-        plot_panel_grid(ctx, args, smooth, title, spec_df, fit_df, plot_path, monthly=False)
-    print(f"Saved day {date_str}: {fit_path}, {spec_path}, {plot_path}", flush=True)
+        for profile in [p for p in parse_names(args.profiles) if p in DIRECTION_SPECS]:
+            profile_name = "norm" if profile == "radial" else profile
+            plot_path = plot_dir / f"{date_str}_implied_spatial_data_vs_expected_{profile_name}.png"
+            plot_panel_grid(ctx, args, smooth, title, spec_df, fit_df, plot_path, monthly=False, profile=profile)
+    print(f"Saved day {date_str}: {fit_path}, {spec_path}", flush=True)
 
 
 def make_monthly_average(args, ctx: MonthContext, smooth: float, out_dir: Path):
     daily_dir = out_dir / "daily_csv"
-    spec_paths = sorted(daily_dir.glob("*_implied_spatial_radial_spectrum.csv"))
+    spec_paths = sorted(daily_dir.glob("*_implied_spatial_spectral_profiles.csv"))
     if not spec_paths:
         print(f"No daily spectra found in {daily_dir}; skipping monthly average.", flush=True)
         return
@@ -1054,7 +1218,13 @@ def make_monthly_average(args, ctx: MonthContext, smooth: float, out_dir: Path):
     fit_df = pd.concat(fit_frames, ignore_index=True) if fit_frames else spectral_df
     daily_means = (
         spectral_df
-        .groupby(["date_str", "variant", "resolution_label", "resolution_stride", "k_bin"], observed=True)
+        .groupby([
+            "date_str", "profile", "direction_label", "frequency_label", "variant",
+            "resolution_label", "resolution_stride", "resolution_order",
+            "resolution_blocks_used", "resolution_blocks_full",
+            "resolution_grid_selected", "resolution_density",
+            "k_bin",
+        ], observed=True)
         .agg(
             k_mid=("k_mid", "mean"),
             data_spectrum=("data_spectrum", "mean"),
@@ -1066,16 +1236,24 @@ def make_monthly_average(args, ctx: MonthContext, smooth: float, out_dir: Path):
     )
     monthly = (
         daily_means
-        .groupby(["variant", "resolution_label", "resolution_stride", "k_bin"], observed=True)
+        .groupby([
+            "profile", "direction_label", "frequency_label", "variant",
+            "resolution_label", "resolution_stride", "resolution_order",
+            "resolution_blocks_used", "resolution_blocks_full",
+            "resolution_grid_selected", "resolution_density",
+            "k_bin",
+        ], observed=True)
         .agg(k_mid=("k_mid", "mean"), data_spectrum=("data_spectrum", "mean"), theory_spectrum_expected=("theory_spectrum_expected", "mean"), data_k_max=("data_k_max", "mean"), n_days=("date_str", "nunique"))
         .reset_index()
     )
     write_csv(daily_means, out_dir / "monthly_average" / f"{ctx.year}{ctx.month:02d}_daily_mean_curves.csv")
     write_csv(monthly, out_dir / "monthly_average" / f"{ctx.year}{ctx.month:02d}_30day_mean_curves.csv")
     title = f"{ctx.year}-{ctx.month:02d}, smooth={smooth}: 30-day mean ST implied spatial spectrum vs expected periodogram"
-    plot_path = out_dir / "monthly_average" / f"{ctx.year}{ctx.month:02d}_30day_mean_implied_spatial_data_vs_expected_periodogram.png"
-    plot_panel_grid(ctx, args, smooth, title, daily_means, fit_df, plot_path, monthly=True)
-    print(f"Saved monthly average plot: {plot_path}", flush=True)
+    for profile in [p for p in parse_names(args.profiles) if p in DIRECTION_SPECS]:
+        profile_name = "norm" if profile == "radial" else profile
+        plot_path = out_dir / "monthly_average" / f"{ctx.year}{ctx.month:02d}_30day_mean_implied_spatial_data_vs_expected_{profile_name}.png"
+        plot_panel_grid(ctx, args, smooth, title, daily_means, fit_df, plot_path, monthly=True, profile=profile)
+        print(f"Saved monthly average plot: {plot_path}", flush=True)
 
 
 def output_dir_for(args: argparse.Namespace, smooth: float, year: int) -> Path:

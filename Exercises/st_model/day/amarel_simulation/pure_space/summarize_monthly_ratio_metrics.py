@@ -175,7 +175,7 @@ def write_ratio_plot(df: pd.DataFrame, out_path: Path, smooths: list[float]) -> 
             if not k_cut.empty:
                 ax.axvline(float(k_cut.iloc[0]), color="0.65", linewidth=0.9, linestyle=":")
             ax.set_title(f"{title}, {label}")
-            ax.set_xlabel("radial frequency on full-grid scale")
+            ax.set_xlabel("norm frequency")
             if j == 0:
                 ax.set_ylabel("log2(I / E[I])")
             ax.grid(alpha=0.2)

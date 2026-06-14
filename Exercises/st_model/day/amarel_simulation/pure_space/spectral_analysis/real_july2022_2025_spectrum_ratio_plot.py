@@ -1,30 +1,28 @@
 #!/usr/bin/env python3
-"""July real-data max-min spline-smooth spectral diagnostic for Amarel.
+"""Real July 2022-2025 pure-space spectrum ratio diagnostics for Amarel.
 
-For each smooth/year/day this script fits eight hourly pure-space slices under
-two variants and four max-min 4x4 block prefixes:
+This is the canonical pure-space spectrum-ratio plot script for real July GEMS
+TCO data over latitude -3..2 and longitude 121..131.
 
-  variants:       nugget0, nugget_free
-  block prefixes: B200, B400, B800, all
+  years:          2022, 2023, 2024, 2025 by default
+  variants:       nugget0 by default
+  block prefix:   all only by default, so every fit is x1/full-resolution
+  domains:        latitude slices, longitude slices, and 2x4 spatial tiles
 
-It then makes the same style of residual-spectrum diagnostic as the reference
-notebook, with no Hann tapering by default. The finite-sample expectation uses
-only the missing-data mask/window autocorrelation, which matches the Vecchia
-fits where tapering is not part of the likelihood.
-
-Unlike the older x8/x4/x2/x1 version, the increasingly dense sequence is made
-by selecting the first max-min ordered 4x4 grid-cell blocks.  The selected cells
-remain on the original grid and unselected cells are treated as missing, so the
-diagnostic avoids regular-thinning aliasing.
+Each domain is modeled independently.  The combined plots then replace the old
+"2 variants x 4 block-prefixes" view with subdomain panels.  Each panel keeps
+the original diagnostic content: gray daily/hourly curves, black mean spectrum,
+red finite-sample E[I], blue I/E[I] ratio, and a companion E[I] vs continuous
+theoretical-spectrum plot.
 
   gray  = hourly data residual spectra
   black = mean data residual spectrum over hours
   red   = mean fitted finite-sample expected periodogram over hours
   blue  = ratio of means, I / E[I]
 
-Daily radial plots are written first. Year-level plots average the daily
-eight-hour means, so each day has equal weight, and include radial, latitude,
-longitude, and NE-SW diagonal profiles.
+Daily norm-frequency plots are written first. Year-level plots average the
+daily eight-hour means, so each day has equal weight, and include norm,
+latitude, longitude, and NE-SW diagonal profiles.
 """
 
 from __future__ import annotations
@@ -48,6 +46,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+from scipy.optimize import minimize
 from scipy.special import gamma, kv
 
 
@@ -61,26 +60,27 @@ for candidate in (AMAREL_SRC, LOCAL_SRC):
 from GEMS_TCO import configuration as config
 from GEMS_TCO import orderings
 from GEMS_TCO.kernels_space_iso_cluster_052426 import (
-    ClusterSpaceIsoNoNuggetTrendVecchiaFit,
     ClusterSpaceIsoTrendVecchiaFit,
+)
+from GEMS_TCO.matern_bessel_anisotropic import (
+    natural_from_raw,
+    profiled_vecchia_cluster_nll,
+    raw_from_natural,
+    smooth_to_raw,
+    vecchia_batches_to_numpy,
 )
 
 
 DTYPE = torch.float64
 EPS = 1e-12
 ROUND_DECIMALS = 6
+MONTH_PICKLE_CACHE: dict[str, dict] = {}
 
 
 VARIANTS = {
     "nugget0": {
-        "class": ClusterSpaceIsoNoNuggetTrendVecchiaFit,
-        "n_params": 2,
-        "row_title": "full: nugget fixed 0",
-    },
-    "nugget_free": {
-        "class": ClusterSpaceIsoTrendVecchiaFit,
         "n_params": 3,
-        "row_title": "full: nugget free",
+        "row_title": "anisotropic: nugget fixed 0",
     },
 }
 
@@ -122,24 +122,52 @@ class MonthContext:
     lon_step: float
 
 
+@dataclass(frozen=True)
+class DomainSpec:
+    group: str
+    label: str
+    title: str
+    lat_range: tuple[float, float]
+    lon_range: tuple[float, float]
+    row: int = 0
+    col: int = 0
+    n_rows: int = 1
+    n_cols: int = 1
+    lat_upper_inclusive: bool = True
+    lon_upper_inclusive: bool = True
+
+
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Max-min spline-smooth July real-data spectral diagnostics.")
+    p = argparse.ArgumentParser(description="Real July 2022-2025 pure-space spectrum ratio diagnostics.")
     p.add_argument("--years", default="2022,2023,2024,2025")
     p.add_argument("--month", type=int, default=7)
     p.add_argument("--days", default="1,30", help="Inclusive day range or comma list. Default uses July days 1..30.")
     p.add_argument("--smooths", default="0.25,0.3,0.35,0.5")
-    p.add_argument("--block-prefixes", default="200,400,800,all")
-    p.add_argument("--variants", default="nugget0,nugget_free")
+    p.add_argument("--block-prefixes", default="all")
+    p.add_argument("--variants", default="nugget0")
     p.add_argument("--neighbors", type=int, default=2, help="Deprecated alias; cluster B2 uses --cluster-neighbor-blocks.")
     p.add_argument("--cluster-neighbor-blocks", type=int, default=2)
     p.add_argument("--cluster-block-shape", default="4x4")
     p.add_argument("--mean-design", default="lat", choices=["lat", "base", "latlon", "hour_spatial"])
     p.add_argument("--data-root", default=getattr(config, "amarel_data_load_path", "/home/jl2815/tco/data/"))
-    p.add_argument("--output-root", default="/home/jl2815/tco/exercise_output/summer/real_data/spline_smooth_spectral_maxmin_kcut_060726")
+    p.add_argument("--output-root", default="/home/jl2815/tco/exercise_output/summer/real_data/real_july2022_2025_spectrum_ratio_plot")
     p.add_argument("--top-plot-dir", default="", help="Optional top-level folder that receives copies of monthly plot PNGs.")
     p.add_argument("--expanded-bounds", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--lat-range", default="-3,2")
     p.add_argument("--lon-range", default="121,131")
+    p.add_argument(
+        "--domain-modes",
+        default="lat_slices,lon_slices,tile_2x4",
+        help="Comma list from full,lat_slices,lon_slices,tile_2x4.",
+    )
+    p.add_argument("--lat-slice-count", type=int, default=5)
+    p.add_argument("--lon-slice-count", type=int, default=5)
+    p.add_argument("--lat-slice-width", type=float, default=0.0, help="0 means split --lat-range evenly.")
+    p.add_argument("--lon-slice-width", type=float, default=0.0, help="0 means split --lon-range evenly.")
+    p.add_argument("--tile-grid", default="2x4")
+    p.add_argument("--combined-profiles", default="radial,lat,lon,diag")
+    p.add_argument("--combined-ratio-normalize", action=argparse.BooleanOptionalAction, default=True)
+    p.add_argument("--skip-combined-plots", action="store_true")
     p.add_argument("--x-col", default="Longitude")
     p.add_argument("--y-col", default="Latitude")
     p.add_argument("--source-x-col", default="Source_Longitude")
@@ -155,6 +183,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--grad-tol", type=float, default=1e-5)
     p.add_argument("--sigmasq-init", type=float, default=13.0)
     p.add_argument("--range-init", type=float, default=0.25)
+    p.add_argument("--range-lat-init", type=float, default=0.35)
+    p.add_argument("--range-lon-init", type=float, default=0.35)
+    p.add_argument("--range-min", type=float, default=0.03)
+    p.add_argument("--range-max", type=float, default=5.0)
     p.add_argument("--nugget-init", type=float, default=2.5)
     p.add_argument("--radial-bins", type=int, default=70)
     p.add_argument("--radial-qmax", type=float, default=0.985)
@@ -191,6 +223,175 @@ def parse_range_pair(text: str) -> tuple[float, float]:
     if len(vals) != 2:
         raise ValueError(f"Expected two comma-separated values, got {text!r}")
     return vals[0], vals[1]
+
+
+def parse_grid_shape(text: str) -> tuple[int, int]:
+    vals = [int(x.strip()) for x in str(text).lower().replace("x", ",").split(",") if x.strip()]
+    if len(vals) != 2:
+        raise ValueError(f"grid shape must look like 2x4, got {text!r}")
+    if vals[0] <= 0 or vals[1] <= 0:
+        raise ValueError(f"grid shape must be positive, got {text!r}")
+    return vals[0], vals[1]
+
+
+def range_arg(bounds: tuple[float, float]) -> str:
+    return f"{bounds[0]:.12g},{bounds[1]:.12g}"
+
+
+def value_tag(value: float) -> str:
+    s = f"{float(value):.6g}"
+    return s.replace("-", "m").replace(".", "p")
+
+
+def interval_label(prefix: str, lo: float, hi: float) -> str:
+    return f"{prefix}_{value_tag(lo)}to{value_tag(hi)}"
+
+
+def interval_title(prefix: str, lo: float, hi: float) -> str:
+    return f"{prefix} {lo:g} to {hi:g}"
+
+
+def evenly_spaced_intervals(
+    bounds: tuple[float, float],
+    count: int,
+    width: float = 0.0,
+) -> list[tuple[float, float]]:
+    if int(count) <= 0:
+        return []
+    lo, hi = float(bounds[0]), float(bounds[1])
+    if hi <= lo:
+        raise ValueError(f"Range upper bound must exceed lower bound, got {bounds}")
+    step = float(width) if float(width) > 0 else (hi - lo) / int(count)
+    intervals = []
+    for i in range(int(count)):
+        a = lo + i * step
+        b = min(a + step, hi)
+        if b > a + EPS:
+            intervals.append((float(a), float(b)))
+    return intervals
+
+
+def build_domain_specs(args: argparse.Namespace) -> list[DomainSpec]:
+    lat_range = parse_range_pair(args.lat_range)
+    lon_range = parse_range_pair(args.lon_range)
+    modes = parse_names(args.domain_modes)
+    specs: list[DomainSpec] = []
+
+    if "full" in modes:
+        specs.append(
+            DomainSpec(
+                group="full",
+                label="full",
+                title=f"full lat {lat_range[0]:g} to {lat_range[1]:g}, lon {lon_range[0]:g} to {lon_range[1]:g}",
+                lat_range=lat_range,
+                lon_range=lon_range,
+            )
+        )
+
+    if "lat_slices" in modes:
+        intervals = evenly_spaced_intervals(lat_range, int(args.lat_slice_count), float(args.lat_slice_width))
+        for i, bounds in enumerate(intervals):
+            specs.append(
+                DomainSpec(
+                    group="lat_slices",
+                    label=interval_label("lat", bounds[0], bounds[1]),
+                    title=interval_title("lat", bounds[0], bounds[1]),
+                    lat_range=bounds,
+                    lon_range=lon_range,
+                    row=0,
+                    col=i,
+                    n_rows=1,
+                    n_cols=len(intervals),
+                    lat_upper_inclusive=(i == len(intervals) - 1),
+                    lon_upper_inclusive=True,
+                )
+            )
+
+    if "lon_slices" in modes:
+        intervals = evenly_spaced_intervals(lon_range, int(args.lon_slice_count), float(args.lon_slice_width))
+        for i, bounds in enumerate(intervals):
+            specs.append(
+                DomainSpec(
+                    group="lon_slices",
+                    label=interval_label("lon", bounds[0], bounds[1]),
+                    title=interval_title("lon", bounds[0], bounds[1]),
+                    lat_range=lat_range,
+                    lon_range=bounds,
+                    row=0,
+                    col=i,
+                    n_rows=1,
+                    n_cols=len(intervals),
+                    lat_upper_inclusive=True,
+                    lon_upper_inclusive=(i == len(intervals) - 1),
+                )
+            )
+
+    if "tile_2x4" in modes:
+        tile_y, tile_x = parse_grid_shape(args.tile_grid)
+        y_edges = np.linspace(float(lat_range[0]), float(lat_range[1]), tile_y + 1)
+        x_edges = np.linspace(float(lon_range[0]), float(lon_range[1]), tile_x + 1)
+        for iy in range(tile_y):
+            for ix in range(tile_x):
+                lat_bounds = (float(y_edges[iy]), float(y_edges[iy + 1]))
+                lon_bounds = (float(x_edges[ix]), float(x_edges[ix + 1]))
+                label = f"tile_y{iy + 1:02d}_x{ix + 1:02d}"
+                specs.append(
+                    DomainSpec(
+                        group="tile_2x4",
+                        label=label,
+                        title=(
+                            f"tile y{iy + 1}, x{ix + 1}\n"
+                            f"lat {lat_bounds[0]:g} to {lat_bounds[1]:g}, "
+                            f"lon {lon_bounds[0]:g} to {lon_bounds[1]:g}"
+                        ),
+                        lat_range=lat_bounds,
+                        lon_range=lon_bounds,
+                        row=iy,
+                        col=ix,
+                        n_rows=tile_y,
+                        n_cols=tile_x,
+                        lat_upper_inclusive=(iy == tile_y - 1),
+                        lon_upper_inclusive=(ix == tile_x - 1),
+                    )
+                )
+
+    if not specs:
+        raise ValueError(f"No domain specs were built from --domain-modes={args.domain_modes!r}")
+    return specs
+
+
+def domain_args(args: argparse.Namespace, spec: DomainSpec) -> argparse.Namespace:
+    out = argparse.Namespace(**vars(args))
+    out.lat_range = range_arg(spec.lat_range)
+    out.lon_range = range_arg(spec.lon_range)
+    out.domain_group = spec.group
+    out.domain_label = spec.label
+    out.domain_title = spec.title
+    out.domain_row = int(spec.row)
+    out.domain_col = int(spec.col)
+    out.domain_n_rows = int(spec.n_rows)
+    out.domain_n_cols = int(spec.n_cols)
+    out.domain_lat_upper_inclusive = bool(spec.lat_upper_inclusive)
+    out.domain_lon_upper_inclusive = bool(spec.lon_upper_inclusive)
+    return out
+
+
+def current_domain_meta(args: argparse.Namespace) -> dict:
+    return {
+        "domain_group": str(getattr(args, "domain_group", "full")),
+        "domain_label": str(getattr(args, "domain_label", "full")),
+        "domain_title": str(getattr(args, "domain_title", "full")),
+        "domain_row": int(getattr(args, "domain_row", 0)),
+        "domain_col": int(getattr(args, "domain_col", 0)),
+        "domain_n_rows": int(getattr(args, "domain_n_rows", 1)),
+        "domain_n_cols": int(getattr(args, "domain_n_cols", 1)),
+        "domain_lat_min": float(parse_range_pair(getattr(args, "lat_range", "-3,2"))[0]),
+        "domain_lat_max": float(parse_range_pair(getattr(args, "lat_range", "-3,2"))[1]),
+        "domain_lon_min": float(parse_range_pair(getattr(args, "lon_range", "121,131"))[0]),
+        "domain_lon_max": float(parse_range_pair(getattr(args, "lon_range", "121,131"))[1]),
+        "domain_lat_upper_inclusive": bool(getattr(args, "domain_lat_upper_inclusive", True)),
+        "domain_lon_upper_inclusive": bool(getattr(args, "domain_lon_upper_inclusive", True)),
+    }
 
 
 def smooth_tag(smooth: float) -> str:
@@ -282,24 +483,45 @@ def load_month_pickle(args: argparse.Namespace, year: int, lat_range: tuple[floa
     candidates.append(month_dir / default_grid_filename(year, args.month))
     for path in candidates:
         if path.exists():
-            with open(path, "rb") as f:
-                obj = pickle.load(f)
+            cache_key = str(path)
+            if cache_key in MONTH_PICKLE_CACHE:
+                obj = MONTH_PICKLE_CACHE[cache_key]
+                print(f"Loaded {path} from in-process cache", flush=True)
+            else:
+                with open(path, "rb") as f:
+                    obj = pickle.load(f)
+                MONTH_PICKLE_CACHE[cache_key] = obj
+                print(f"Loaded {path}", flush=True)
             if not isinstance(obj, dict):
                 raise TypeError(f"Expected dict pickle at {path}, got {type(obj)}")
-            print(f"Loaded {path}", flush=True)
             return obj, path
     checked = "\n".join(str(p) for p in candidates)
     raise FileNotFoundError(f"Could not find monthly pickle. Checked:\n{checked}")
 
 
-def filter_bounds(df: pd.DataFrame, y_col: str, x_col: str, lat_range: tuple[float, float], lon_range: tuple[float, float]):
+def filter_bounds(
+    df: pd.DataFrame,
+    y_col: str,
+    x_col: str,
+    lat_range: tuple[float, float],
+    lon_range: tuple[float, float],
+    lat_upper_inclusive: bool = True,
+    lon_upper_inclusive: bool = True,
+):
     out = df.copy()
     out[y_col] = pd.to_numeric(out[y_col], errors="coerce")
     out[x_col] = pd.to_numeric(out[x_col], errors="coerce")
-    mask = (
-        out[y_col].between(lat_range[0], lat_range[1], inclusive="both")
-        & out[x_col].between(lon_range[0], lon_range[1], inclusive="both")
-    )
+    lat_mask = out[y_col].ge(lat_range[0])
+    lon_mask = out[x_col].ge(lon_range[0])
+    if lat_upper_inclusive:
+        lat_mask &= out[y_col].le(lat_range[1])
+    else:
+        lat_mask &= out[y_col].lt(lat_range[1])
+    if lon_upper_inclusive:
+        lon_mask &= out[x_col].le(lon_range[1])
+    else:
+        lon_mask &= out[x_col].lt(lon_range[1])
+    mask = lat_mask & lon_mask
     return out.loc[mask].reset_index(drop=True)
 
 
@@ -338,7 +560,15 @@ def build_month_context(args: argparse.Namespace, year: int, days: list[int]) ->
         else:
             sort_key = (fallback_order // 8 + 1, fallback_order % 8, 0, str(key))
             fallback_order += 1
-        f = filter_bounds(df, args.y_col, args.x_col, lat_range, lon_range)
+        f = filter_bounds(
+            df,
+            args.y_col,
+            args.x_col,
+            lat_range,
+            lon_range,
+            lat_upper_inclusive=bool(getattr(args, "domain_lat_upper_inclusive", True)),
+            lon_upper_inclusive=bool(getattr(args, "domain_lon_upper_inclusive", True)),
+        )
         if f.empty:
             continue
         entries.append((sort_key, ts, str(key), f))
@@ -512,27 +742,88 @@ def space_diag(model) -> dict:
     }
 
 
-def make_params(args: argparse.Namespace, variant: str, device: torch.device):
-    vals = [float(args.sigmasq_init), float(args.range_init)]
-    if variant == "nugget_free":
-        vals.append(max(float(args.nugget_init), EPS))
-    return [
-        torch.tensor(math.log(v), dtype=DTYPE, device=device, requires_grad=True)
-        for v in vals
-    ]
+def fit_anisotropic_fixed_smooth_from_batches(
+    args: argparse.Namespace,
+    batches: list[dict],
+    n_features: int,
+    y_var: float,
+    smooth: float,
+) -> dict:
+    smooth_bounds = (max(1e-6, float(smooth) * 0.5), max(float(smooth) * 1.5, float(smooth) + 1e-6))
+    fixed_smooth_raw = smooth_to_raw(float(smooth), smooth_bounds)
+    range_bounds = (float(args.range_min), float(args.range_max))
+    init = raw_from_natural(
+        sigmasq=max(float(args.sigmasq_init), max(float(y_var), 1e-8)),
+        range_lat=float(args.range_lat_init),
+        range_lon=float(args.range_lon_init),
+        smooth=float(smooth),
+        nugget=0.0,
+        nugget_mode="fixed0",
+        smooth_bounds=smooth_bounds,
+    )[:3]
+    starts = [
+        init,
+        raw_from_natural(max(float(y_var), 1e-8), 0.25, 0.50, float(smooth), 0.0, "fixed0", smooth_bounds)[:3],
+        raw_from_natural(max(float(y_var), 1e-8), 0.50, 0.25, float(smooth), 0.0, "fixed0", smooth_bounds)[:3],
+    ][: max(1, int(getattr(args, "n_restarts", 1)))]
 
-
-def convert_raw(raw: list[float], variant: str) -> dict:
-    out = {
-        "sigmasq": float(math.exp(raw[0])),
-        "range": float(math.exp(raw[1])),
-        "nugget": 0.0,
-        "phi1": np.nan,
-        "phi2": np.nan,
+    log_phi2_bounds = (math.log(1.0 / range_bounds[1]), math.log(1.0 / range_bounds[0]))
+    bounds = [(-40.0, 40.0), log_phi2_bounds, (-8.0, 8.0)]
+    param_bounds = {
+        "sigmasq": (1e-12, max(float(y_var) * 1e5, 1e-6)),
+        "range_lat": range_bounds,
+        "range_lon": range_bounds,
+        "smooth": smooth_bounds,
+        "nugget": (0.0, 0.0),
     }
-    if variant == "nugget_free":
-        out["nugget"] = float(math.exp(raw[2]))
-    return out
+
+    def objective(raw3: np.ndarray) -> float:
+        raw4 = np.asarray([raw3[0], raw3[1], raw3[2], fixed_smooth_raw], dtype=np.float64)
+        return profiled_vecchia_cluster_nll(
+            raw4,
+            batches=batches,
+            n_features=int(n_features),
+            nugget_mode="fixed0",
+            fixed_nugget=0.0,
+            smooth_bounds=smooth_bounds,
+            param_bounds=param_bounds,
+            jitter=1e-6,
+        )
+
+    best = None
+    for start in starts:
+        res = minimize(
+            objective,
+            np.asarray(start, dtype=np.float64),
+            method="L-BFGS-B",
+            bounds=bounds,
+            options={
+                "maxiter": int(args.lbfgs_eval),
+                "maxls": 20,
+                "maxcor": int(args.lbfgs_history),
+                "ftol": 1e-7,
+            },
+        )
+        loss = float(res.fun) if np.isfinite(res.fun) else np.inf
+        if best is None or loss < float(best["loss"]):
+            raw4 = np.asarray([res.x[0], res.x[1], res.x[2], fixed_smooth_raw], dtype=np.float64)
+            params = natural_from_raw(raw4, "fixed0", 0.0, smooth_bounds)
+            rec = params.to_record()
+            rec.update(
+                {
+                    "success": bool(np.isfinite(loss)),
+                    "loss": loss,
+                    "nll": loss,
+                    "message": str(res.message),
+                    "n_eval": int(getattr(res, "nfev", 0)),
+                    "raw_params": raw4.tolist(),
+                    "n_restarts": int(len(starts)),
+                }
+            )
+            best = rec
+    if best is None:
+        raise RuntimeError("anisotropic fixed-smooth fit failed before producing a result")
+    return best
 
 
 def fit_hour_variant(
@@ -582,12 +873,14 @@ def fit_hour_variant(
         "n_grid": n_grid,
         "n_valid": n_valid,
         "valid_fraction": float(n_valid / n_grid) if n_grid else np.nan,
+        **current_domain_meta(args),
     }
 
     try:
-        cls = VARIANTS[variant]["class"]
-        model = cls(
-            smooth=float(smooth),
+        if variant != "nugget0":
+            raise ValueError("The anisotropic spectral run currently supports only variant='nugget0'.")
+        model = ClusterSpaceIsoTrendVecchiaFit(
+            smooth=0.5,
             input_map={time_key: selected_t},
             grid_coords=selected_grid,
             block_shape=parse_block_shape(args.cluster_block_shape),
@@ -599,36 +892,53 @@ def fit_hour_variant(
         t_pre = time.time()
         model.precompute_conditioning_sets()
         pre_s = time.time() - t_pre
-        params = make_params(args, variant, device)
-        opt = model.set_optimizer(
-            params,
-            lr=1.0,
-            max_iter=int(args.lbfgs_eval),
-            max_eval=int(args.lbfgs_eval),
-            history_size=int(args.lbfgs_history),
-        )
+        batches = vecchia_batches_to_numpy(model)
+        y_np = selected_t[:, 2].detach().cpu().numpy().astype(np.float64)
+        y_valid = y_np[np.isfinite(y_np)]
+        y_var_raw = float(np.nanvar(y_valid, ddof=1)) if y_valid.size > 1 else 1e-8
+        y_var = y_var_raw if np.isfinite(y_var_raw) and y_var_raw > 0 else 1e-8
         t_fit = time.time()
-        raw_out, fit_iter = model.fit_vecc_lbfgs(params, opt, max_steps=int(args.lbfgs_steps), grad_tol=float(args.grad_tol))
+        fit = fit_anisotropic_fixed_smooth_from_batches(
+            args,
+            batches=batches,
+            n_features=int(model.n_features),
+            y_var=y_var,
+            smooth=float(smooth),
+        )
         fit_s = time.time() - t_fit
-        est = convert_raw(raw_out[: VARIANTS[variant]["n_params"]], variant)
+        est = {
+            "sigmasq": float(fit["sigmasq"]),
+            "range": float(math.sqrt(float(fit["range_lat"]) * float(fit["range_lon"]))),
+            "range_lat": float(fit["range_lat"]),
+            "range_lon": float(fit["range_lon"]),
+            "smooth": float(smooth),
+            "nugget": 0.0,
+            "phi1": float(fit["phi1"]),
+            "phi2": float(fit["phi2"]),
+            "phi3": float(fit["phi3"]),
+        }
         row = {
             **base_row,
-            "status": "ok",
-            "error": "",
-            "loss": float(raw_out[-1]),
-            "fit_iter_raw": int(fit_iter),
-            "fit_steps_reported": int(fit_iter) + 1,
+            "status": "ok" if bool(fit.get("success", True)) else "warn",
+            "error": "" if bool(fit.get("success", True)) else str(fit.get("message", "")),
+            "loss": float(fit["loss"]),
+            "fit_iter_raw": int(fit.get("n_eval", 0)),
+            "fit_steps_reported": int(fit.get("n_eval", 0)),
             "precompute_s": float(pre_s),
             "fit_s": float(fit_s),
             "total_s": float(pre_s + fit_s),
             "est_sigmasq": float(est["sigmasq"]),
             "est_range": float(est["range"]),
+            "est_range_lat": float(est["range_lat"]),
+            "est_range_lon": float(est["range_lon"]),
+            "est_smooth": float(est["smooth"]),
             "est_nugget": float(est["nugget"]),
             "est_phi1": float(est["phi1"]),
             "est_phi2": float(est["phi2"]),
+            "est_phi3": float(est["phi3"]),
             **space_diag(model),
         }
-        del model, params, opt
+        del model, batches
         return row, est
     except Exception as exc:
         row = {
@@ -643,9 +953,13 @@ def fit_hour_variant(
             "total_s": np.nan,
             "est_sigmasq": np.nan,
             "est_range": np.nan,
+            "est_range_lat": np.nan,
+            "est_range_lon": np.nan,
+            "est_smooth": np.nan,
             "est_nugget": np.nan,
             "est_phi1": np.nan,
             "est_phi2": np.nan,
+            "est_phi3": np.nan,
             "n_batches": 0,
             "n_tails": 0,
             "mean_m": np.nan,
@@ -724,10 +1038,10 @@ def masked_periodogram(grid: np.ndarray, mask: np.ndarray, use_hann: bool):
     return np.abs(np.fft.fftshift(np.fft.fft2(zw))) ** 2 / norm
 
 
-def matern_covariance_lag(sigmasq, range_, nugget, smooth, lag_lat, lag_lon):
+def matern_covariance_lag(sigmasq, range_lat, range_lon, nugget, smooth, lag_lat, lag_lon):
     lag_lat = np.asarray(lag_lat, dtype=float)
     lag_lon = np.asarray(lag_lon, dtype=float)
-    r = np.sqrt(lag_lat**2 + lag_lon**2) / max(float(range_), EPS)
+    r = np.sqrt((lag_lat / max(float(range_lat), EPS)) ** 2 + (lag_lon / max(float(range_lon), EPS)) ** 2)
     nu = float(smooth)
     if np.isclose(nu, 0.5):
         corr = np.exp(-r)
@@ -764,11 +1078,11 @@ def autocorr_for_lags(ac, lag1, lag2, n1, n2):
     return out
 
 
-def covariance_lag_kernel(sigmasq, range_, nugget, smooth, n1, n2, dlat, dlon):
+def covariance_lag_kernel(sigmasq, range_lat, range_lon, nugget, smooth, n1, n2, dlat, dlon):
     lag1_vals = np.arange(-(n1 - 1), n1, dtype=int)
     lag2_vals = np.arange(-(n2 - 1), n2, dtype=int)
     lag1, lag2 = np.meshgrid(lag1_vals, lag2_vals, indexing="ij")
-    return matern_covariance_lag(sigmasq, range_, nugget, smooth, lag1 * dlat, lag2 * dlon)
+    return matern_covariance_lag(sigmasq, range_lat, range_lon, nugget, smooth, lag1 * dlat, lag2 * dlon)
 
 
 def fft_convolve_same(values, kernel):
@@ -784,7 +1098,8 @@ def fft_convolve_same(values, kernel):
 def expected_periodogram_dw_style(
     args: argparse.Namespace,
     sigmasq,
-    range_,
+    range_lat,
+    range_lon,
     nugget,
     smooth,
     mask,
@@ -805,7 +1120,7 @@ def expected_periodogram_dw_style(
             ac_lag = autocorr_for_lags(ac, lag1, lag2, n1, n2)
             if not np.any(ac_lag):
                 continue
-            cov_lag = matern_covariance_lag(sigmasq, range_, nugget, smooth, lag1 * dlat, lag2 * dlon)
+            cov_lag = matern_covariance_lag(sigmasq, range_lat, range_lon, nugget, smooth, lag1 * dlat, lag2 * dlon)
             tilde_cov += cov_lag * ac_lag
     expected_no_projection = np.fft.fftshift(np.fft.fft2(tilde_cov).real)
     if not project_mean:
@@ -830,7 +1145,7 @@ def expected_periodogram_dw_style(
     u = x * mask[..., None]
     xtx = np.einsum("ijp,ijq->pq", u, x)
     b = np.linalg.pinv(xtx)
-    kernel = covariance_lag_kernel(sigmasq, range_, nugget, smooth, n1, n2, dlat, dlon)
+    kernel = covariance_lag_kernel(sigmasq, range_lat, range_lon, nugget, smooth, n1, n2, dlat, dlon)
     cu = np.empty_like(u, dtype=float)
     for p_idx in range(u.shape[2]):
         cu[..., p_idx] = fft_convolve_same(u[..., p_idx], kernel)
@@ -849,10 +1164,13 @@ def expected_periodogram_dw_style(
     return np.maximum(expected_projected, EPS)
 
 
-def matern_spectrum_shape(sigmasq, range_, smooth, omega2, nugget=0.0):
+def matern_spectrum_shape(sigmasq, range_lat, range_lon, smooth, omega_lat, omega_lon, nugget=0.0):
     nu = float(smooth)
-    alpha = 2.0 * nu / max(float(range_) ** 2, EPS)
-    matern = float(sigmasq) * (alpha + omega2) ** (-(nu + 1.0))
+    alpha = 2.0 * nu
+    omega_scaled = (np.asarray(omega_lat, dtype=float) * max(float(range_lat), EPS)) ** 2 + (
+        np.asarray(omega_lon, dtype=float) * max(float(range_lon), EPS)
+    ) ** 2
+    matern = float(sigmasq) * max(float(range_lat) * float(range_lon), EPS) * (alpha + omega_scaled) ** (-(nu + 1.0))
     return matern + max(float(nugget), 0.0)
 
 
@@ -886,20 +1204,20 @@ def radial_average(surface, k_radial, radial_bins, k_max):
 
 DIRECTION_SPECS = {
     "radial": {
-        "label": "radial",
-        "frequency_label": "radial frequency",
+        "label": "norm",
+        "frequency_label": "norm frequency",
     },
     "lat": {
         "label": "latitude N-S",
-        "frequency_label": "lat frequency",
+        "frequency_label": "lat norm frequency",
     },
     "lon": {
         "label": "longitude E-W",
-        "frequency_label": "lon frequency",
+        "frequency_label": "lon norm frequency",
     },
     "diag": {
         "label": "diagonal NE-SW",
-        "frequency_label": "diag frequency",
+        "frequency_label": "diagonal norm frequency",
     },
 }
 
@@ -990,7 +1308,8 @@ def compute_spectrum_rows(
     expected_p = expected_periodogram_dw_style(
         args,
         est["sigmasq"],
-        est["range"],
+        est["range_lat"],
+        est["range_lon"],
         est["nugget"],
         smooth,
         mask,
@@ -1000,19 +1319,30 @@ def compute_spectrum_rows(
     expected_latent_p = expected_periodogram_dw_style(
         args,
         est["sigmasq"],
-        est["range"],
+        est["range_lat"],
+        est["range_lon"],
         0.0,
         smooth,
         mask,
         lat_axis,
         lon_axis,
     )
-    shape_latent_p = matern_spectrum_shape(est["sigmasq"], est["range"], smooth, ctx.omega2_full, nugget=0.0)
+    shape_latent_p = matern_spectrum_shape(
+        est["sigmasq"],
+        est["range_lat"],
+        est["range_lon"],
+        smooth,
+        ctx.omega_lat_full,
+        ctx.omega_lon_full,
+        nugget=0.0,
+    )
     shape_observed_p = matern_spectrum_shape(
         est["sigmasq"],
-        est["range"],
+        est["range_lat"],
+        est["range_lon"],
         smooth,
-        ctx.omega2_full,
+        ctx.omega_lat_full,
+        ctx.omega_lon_full,
         nugget=est["nugget"],
     )
 
@@ -1040,9 +1370,24 @@ def compute_spectrum_rows(
         "neighbors",
         "est_sigmasq",
         "est_range",
+        "est_range_lat",
+        "est_range_lon",
+        "est_smooth",
         "est_nugget",
         "est_phi1",
         "est_phi2",
+        "est_phi3",
+        "domain_group",
+        "domain_label",
+        "domain_title",
+        "domain_row",
+        "domain_col",
+        "domain_n_rows",
+        "domain_n_cols",
+        "domain_lat_min",
+        "domain_lat_max",
+        "domain_lon_min",
+        "domain_lon_max",
     ]
     for direction in directions:
         spec = DIRECTION_SPECS[direction]
@@ -1232,7 +1577,7 @@ def add_ratio_axis(ax, ratio_df, ylabel=None, color="tab:blue"):
 
 
 def format_fit_label(source_df, variant, resolution_label):
-    required = {"variant", "resolution_label", "est_sigmasq", "est_range", "est_nugget"}
+    required = {"variant", "resolution_label", "est_sigmasq", "est_range_lat", "est_range_lon", "est_nugget"}
     if source_df is None or source_df.empty or not required.issubset(source_df.columns):
         return None
     df = source_df[
@@ -1245,12 +1590,16 @@ def format_fit_label(source_df, variant, resolution_label):
     if key_cols:
         df = df.drop_duplicates(key_cols)
     sigmasq = float(pd.to_numeric(df["est_sigmasq"], errors="coerce").median())
-    range_ = float(pd.to_numeric(df["est_range"], errors="coerce").median())
+    range_lat = float(pd.to_numeric(df["est_range_lat"], errors="coerce").median())
+    range_lon = float(pd.to_numeric(df["est_range_lon"], errors="coerce").median())
+    phi3 = float(pd.to_numeric(df.get("est_phi3", pd.Series(np.nan, index=df.index)), errors="coerce").median())
     nugget = float(pd.to_numeric(df["est_nugget"], errors="coerce").median())
-    if not np.isfinite(sigmasq) or not np.isfinite(range_):
+    if not np.isfinite(sigmasq) or not np.isfinite(range_lat) or not np.isfinite(range_lon):
         return None
-    label = f"fit median: sigma^2={sigmasq:.3g}\nrange={range_:.3g}"
-    if str(variant) == "nugget_free" or (np.isfinite(nugget) and abs(nugget) > EPS):
+    label = f"fit median: sigma^2={sigmasq:.3g}\nrange_lat={range_lat:.3g}, range_lon={range_lon:.3g}"
+    if np.isfinite(phi3):
+        label += f"\nphi3={phi3:.3g}"
+    if np.isfinite(nugget) and abs(nugget) > EPS:
         label += f"\nnugget={nugget:.3g}"
     return label
 
@@ -1380,13 +1729,13 @@ def plot_daily(args, ctx: MonthContext, smooth: float, day: int, spectral_df: pd
             ax.set_xlim(0, ctx.k_max_full)
             ax.set_ylim(*ylim)
             ax.set_title(f"{row_title}, {label}  (data k <= {k_cut:.1f})")
-            ax.set_xlabel("radial frequency on full-grid scale")
+            ax.set_xlabel("norm frequency")
             if j == 0:
                 ax.set_ylabel("spectrum")
             ax.set_yscale("log")
             ax.grid(alpha=0.2)
             ax.legend(fontsize=7, handlelength=1.5)
-    fig.suptitle(f"{ctx.year}-{ctx.month:02d}-{day:02d}, smooth={smooth}: radial residual spectrum vs fitted expected periodogram")
+    fig.suptitle(f"{ctx.year}-{ctx.month:02d}-{day:02d}, smooth={smooth}: norm-frequency residual spectrum vs fitted expected periodogram")
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=180, bbox_inches="tight")
@@ -1458,7 +1807,8 @@ def publish_monthly_plot(args: argparse.Namespace, ctx: MonthContext, smooth: fl
     top_dir = Path(args.top_plot_dir) if str(args.top_plot_dir).strip() else Path(args.output_root) / "monthly_plots_top"
     year_dir = top_dir / f"{ctx.year}_{ctx.month:02d}"
     year_dir.mkdir(parents=True, exist_ok=True)
-    dest = year_dir / f"smooth_{smooth_tag(smooth)}_{plot_path.name}"
+    domain_prefix = f"{getattr(args, 'domain_group', 'full')}_{getattr(args, 'domain_label', 'full')}"
+    dest = year_dir / f"smooth_{smooth_tag(smooth)}_{domain_prefix}_{plot_path.name}"
     shutil.copy2(plot_path, dest)
     print(f"Copied monthly plot to top folder: {dest}", flush=True)
 
@@ -1806,13 +2156,16 @@ def make_monthly_average(args: argparse.Namespace, ctx: MonthContext, smooth: fl
         )
         .reset_index()
     )
+    for key, value in current_domain_meta(args).items():
+        daily_means[key] = value
+        monthly[key] = value
     write_csv(daily_means, out_dir / "monthly_average" / f"{ctx.year}{ctx.month:02d}_daily_mean_curves.csv")
     write_csv(monthly, out_dir / "monthly_average" / f"{ctx.year}{ctx.month:02d}_30day_mean_curves.csv")
 
     monthly_radial = monthly[monthly["profile"].astype(str) == "radial"].copy()
     daily_radial = daily_means[daily_means["profile"].astype(str) == "radial"].copy()
     if monthly_radial.empty:
-        print("No radial monthly spectra; skipping radial monthly plot.", flush=True)
+        print("No norm-frequency monthly spectra; skipping norm-frequency monthly plot.", flush=True)
     else:
         monthly_for_radial_plot = monthly_radial
         daily_for_radial_plot = daily_radial
@@ -1872,13 +2225,13 @@ def make_monthly_average(args: argparse.Namespace, ctx: MonthContext, smooth: fl
                 ax.set_xlim(0, ctx.k_max_full)
                 ax.set_ylim(*ylim)
                 ax.set_title(f"{row_title}, {label}  (data k <= {k_cut:.1f})")
-                ax.set_xlabel("radial frequency on full-grid scale")
+                ax.set_xlabel("norm frequency")
                 if j == 0:
                     ax.set_ylabel("spectrum")
                 ax.set_yscale("log")
                 ax.grid(alpha=0.2)
                 ax.legend(fontsize=7, handlelength=1.5)
-        fig.suptitle(f"{ctx.year}-{ctx.month:02d}, smooth={smooth}: 30-day mean radial residual spectrum vs fitted expected periodogram")
+        fig.suptitle(f"{ctx.year}-{ctx.month:02d}, smooth={smooth}: 30-day mean norm-frequency residual spectrum vs fitted expected periodogram")
         fig.tight_layout()
         plot_path = out_dir / "monthly_average" / f"{ctx.year}{ctx.month:02d}_30day_mean_data_vs_expected_periodogram.png"
         plot_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1891,8 +2244,421 @@ def make_monthly_average(args: argparse.Namespace, ctx: MonthContext, smooth: fl
     plot_monthly_expected_vs_continuous(args, ctx, smooth, monthly, out_dir)
 
 
+def read_csv_or_empty(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    try:
+        return pd.read_csv(path)
+    except pd.errors.EmptyDataError:
+        return pd.DataFrame()
+
+
+def combined_output_dir(args: argparse.Namespace, smooth: float, year: int) -> Path:
+    return Path(args.output_root) / f"{year}_{args.month:02d}" / f"smooth_{smooth_tag(smooth)}" / "combined_domain_plots"
+
+
+def combined_top_copy(args: argparse.Namespace, year: int, smooth: float, plot_path: Path):
+    top_dir = Path(args.top_plot_dir) if str(args.top_plot_dir).strip() else Path(args.output_root) / "monthly_plots_top"
+    year_dir = top_dir / f"{year}_{args.month:02d}"
+    year_dir.mkdir(parents=True, exist_ok=True)
+    dest = year_dir / f"smooth_{smooth_tag(smooth)}_combined_{plot_path.name}"
+    shutil.copy2(plot_path, dest)
+    print(f"Copied combined plot to top folder: {dest}", flush=True)
+
+
+def ratio_ylim_from_frames(frames: list[pd.DataFrame], fallback=(0.2, 5.0)) -> tuple[float, float]:
+    vals = []
+    for df in frames:
+        if df is None or df.empty or "ratio" not in df.columns:
+            continue
+        arr = pd.to_numeric(df["ratio"], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+        arr = arr[arr > 0]
+        if not arr.empty:
+            vals.append(arr.to_numpy(dtype=float))
+    if not vals:
+        return fallback
+    x = np.concatenate(vals)
+    lo = max(1e-3, min(0.5, float(np.nanpercentile(x, 2)) / 1.25))
+    hi = min(1e3, max(2.0, float(np.nanpercentile(x, 98)) * 1.25))
+    if not np.isfinite(lo) or not np.isfinite(hi) or lo >= hi:
+        return fallback
+    return lo, hi
+
+
+def monthly_curves_for_domain(
+    args: argparse.Namespace,
+    year: int,
+    smooth: float,
+    spec: DomainSpec,
+    profile: str,
+    variant: str,
+) -> dict:
+    out_dir = output_dir_for_domain(args, smooth, year, spec)
+    month_prefix = f"{year}{args.month:02d}"
+    monthly = ensure_profile_columns(read_csv_or_empty(out_dir / "monthly_average" / f"{month_prefix}_30day_mean_curves.csv"))
+    daily_means = ensure_profile_columns(read_csv_or_empty(out_dir / "monthly_average" / f"{month_prefix}_daily_mean_curves.csv"))
+    if monthly is None or monthly.empty:
+        return {"monthly": pd.DataFrame(), "daily": pd.DataFrame(), "ratio": pd.DataFrame(), "scaled": pd.DataFrame()}
+
+    labels_order = [block_prefix_label(s) for s in parse_block_prefixes(args.block_prefixes)]
+    label = labels_order[0] if labels_order else "all"
+    sub = monthly[
+        (monthly["variant"].astype(str) == str(variant))
+        & (monthly["profile"].astype(str) == str(profile))
+        & (monthly["resolution_label"].astype(str) == str(label))
+        & (pd.to_numeric(monthly["k_mid"], errors="coerce") > 0)
+    ].copy()
+    if sub.empty:
+        return {"monthly": pd.DataFrame(), "daily": pd.DataFrame(), "ratio": pd.DataFrame(), "scaled": pd.DataFrame()}
+    k_cut = cutoff_from_frame(sub, sub["k_mid"].max())
+    sub = keep_to_cutoff(sub, k_cut)
+    scaled = keep_to_cutoff(add_continuous_scaled_to_expected(sub), k_cut)
+    monthly_ratio = ratio_frame(
+        sub,
+        sub,
+        "data_spectrum",
+        "theory_spectrum_expected",
+        normalize_mean=bool(args.combined_ratio_normalize),
+        k_max=k_cut,
+    )
+    if not monthly_ratio.empty:
+        for key, value in {
+            "year": year,
+            "month": int(args.month),
+            "smooth": float(smooth),
+            "variant": variant,
+            "profile": profile,
+            "resolution_label": label,
+            "domain_group": spec.group,
+            "domain_label": spec.label,
+            "domain_title": spec.title,
+            "domain_row": spec.row,
+            "domain_col": spec.col,
+            "domain_lat_min": spec.lat_range[0],
+            "domain_lat_max": spec.lat_range[1],
+            "domain_lon_min": spec.lon_range[0],
+            "domain_lon_max": spec.lon_range[1],
+            "domain_lat_upper_inclusive": bool(spec.lat_upper_inclusive),
+            "domain_lon_upper_inclusive": bool(spec.lon_upper_inclusive),
+            "data_k_max": k_cut,
+        }.items():
+            monthly_ratio[key] = value
+
+    daily_sub = pd.DataFrame()
+    daily_ratios = []
+    if daily_means is not None and not daily_means.empty:
+        daily_sub = daily_means[
+            (daily_means["variant"].astype(str) == str(variant))
+            & (daily_means["profile"].astype(str) == str(profile))
+            & (daily_means["resolution_label"].astype(str) == str(label))
+            & (pd.to_numeric(daily_means["k_mid"], errors="coerce") > 0)
+        ].copy()
+        daily_sub = keep_to_cutoff(daily_sub, k_cut)
+        for date_str, one_day in daily_sub.groupby("date_str", observed=True):
+            r = ratio_frame(
+                one_day,
+                one_day,
+                "data_spectrum",
+                "theory_spectrum_expected",
+                normalize_mean=bool(args.combined_ratio_normalize),
+                k_max=k_cut,
+            )
+            if r.empty:
+                continue
+            r["date_str"] = str(date_str)
+            r["domain_group"] = spec.group
+            r["domain_label"] = spec.label
+            daily_ratios.append(r)
+    daily_ratio = pd.concat(daily_ratios, ignore_index=True) if daily_ratios else pd.DataFrame()
+    return {
+        "monthly": sub,
+        "daily": daily_sub,
+        "ratio": monthly_ratio,
+        "daily_ratio": daily_ratio,
+        "scaled": scaled,
+        "k_cut": k_cut,
+        "resolution_label": label,
+    }
+
+
+def plot_combined_domain_data_expected(
+    args: argparse.Namespace,
+    year: int,
+    smooth: float,
+    group: str,
+    specs: list[DomainSpec],
+    profile: str,
+    variant: str,
+):
+    if not specs:
+        return
+    panel = {}
+    monthly_frames = []
+    daily_frames = []
+    ratio_frames = []
+    for spec in specs:
+        curves = monthly_curves_for_domain(args, year, smooth, spec, profile, variant)
+        panel[spec.label] = curves
+        if not curves["monthly"].empty:
+            monthly_frames.append(curves["monthly"])
+        if not curves["daily"].empty:
+            daily_frames.append(curves["daily"])
+        if not curves["ratio"].empty:
+            ratio_frames.append(curves["ratio"])
+    if not monthly_frames:
+        print(f"No combined spectrum data for group={group}, profile={profile}, variant={variant}", flush=True)
+        return
+
+    n_rows = max(int(s.n_rows) for s in specs)
+    n_cols = max(int(s.n_cols) for s in specs)
+    fig_w = max(4.2 * n_cols, 5.0)
+    fig_h = max(3.25 * n_rows, 3.7)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(fig_w, fig_h), sharex=True, sharey=True)
+    axes = np.asarray(axes).reshape(n_rows, n_cols)
+    for ax in axes.ravel():
+        ax.set_visible(False)
+
+    ylim = positive_ylim(
+        *(f.get("data_spectrum") for f in monthly_frames),
+        *(f.get("theory_spectrum_expected") for f in monthly_frames),
+        *(f.get("data_spectrum") for f in daily_frames),
+    )
+    freq_label = DIRECTION_SPECS.get(profile, DIRECTION_SPECS["radial"])["frequency_label"]
+    for spec in specs:
+        ax = axes[int(spec.row), int(spec.col)]
+        ax.set_visible(True)
+        curves = panel[spec.label]
+        monthly = curves["monthly"]
+        daily = curves["daily"]
+        ratio = curves["ratio"]
+        k_cut = curves.get("k_cut", np.nan)
+        if not daily.empty:
+            for d_i, (_, ds) in enumerate(daily.groupby("date_str", observed=True)):
+                ds = ds.replace([np.inf, -np.inf], np.nan).dropna(subset=["k_mid", "data_spectrum"])
+                if not ds.empty:
+                    label = "daily mean spectra" if spec == specs[0] and d_i == 0 else None
+                    ax.plot(ds["k_mid"], ds["data_spectrum"], color="0.35", alpha=0.28, linewidth=0.85, label=label, zorder=1)
+        if not monthly.empty:
+            expected = monthly.dropna(subset=["k_mid", "theory_spectrum_expected"])
+            data = monthly.dropna(subset=["k_mid", "data_spectrum"])
+            if not expected.empty:
+                ax.plot(
+                    expected["k_mid"],
+                    expected["theory_spectrum_expected"],
+                    color="tab:red",
+                    linewidth=1.85,
+                    linestyle="--",
+                    label="finite-sample E[I]",
+                    zorder=3,
+                )
+            if not data.empty:
+                ax.plot(
+                    data["k_mid"],
+                    data["data_spectrum"],
+                    color="black",
+                    linewidth=2.15,
+                    label="30-day mean I",
+                    zorder=4,
+                )
+        if not ratio.empty:
+            add_ratio_axis(ax, ratio, ylabel="I / E[I]" if int(spec.col) == n_cols - 1 else None)
+            ax.plot(
+                [],
+                [],
+                color="tab:blue",
+                linewidth=1.35,
+                linestyle=":",
+                label="profiled I / E[I] (mean=1)",
+            )
+        ax.set_title(f"{spec.title}\ndata k <= {k_cut:.2g}" if np.isfinite(k_cut) else spec.title, fontsize=8.5)
+        ax.set_yscale("log")
+        ax.set_ylim(*ylim)
+        ax.grid(alpha=0.22)
+        if int(spec.row) == n_rows - 1:
+            ax.set_xlabel(freq_label)
+        if int(spec.col) == 0:
+            ax.set_ylabel("spectrum")
+    first_ax = axes.ravel()[0]
+    if first_ax.get_visible():
+        first_ax.legend(fontsize=7, handlelength=1.4)
+
+    profile_label = DIRECTION_SPECS.get(profile, DIRECTION_SPECS["radial"])["label"]
+    fig.suptitle(
+        f"{year}-{args.month:02d}, smooth={smooth}, {variant}: {group} {profile_label} I vs E[I], x1 all-grid fits",
+        fontsize=12,
+    )
+    fig.tight_layout()
+    out_dir = combined_output_dir(args, smooth, year)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    profile_file = "norm" if profile == "radial" else profile
+    plot_path = out_dir / f"{year}{args.month:02d}_{group}_{variant}_data_vs_expected_{profile_file}.png"
+    fig.savefig(plot_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    curve_csv = out_dir / f"{year}{args.month:02d}_{group}_{variant}_data_vs_expected_{profile_file}.csv"
+    write_csv(pd.concat(monthly_frames, ignore_index=True), curve_csv)
+    if ratio_frames:
+        ratio_csv = out_dir / f"{year}{args.month:02d}_{group}_{variant}_ratio_{profile_file}.csv"
+        write_csv(pd.concat(ratio_frames, ignore_index=True), ratio_csv)
+        print(f"Saved combined ratio CSV: {ratio_csv}", flush=True)
+    print(f"Saved combined I-vs-E[I] plot: {plot_path}", flush=True)
+    print(f"Saved combined curve CSV: {curve_csv}", flush=True)
+    combined_top_copy(args, year, smooth, plot_path)
+
+
+def plot_combined_domain_expected_continuous(
+    args: argparse.Namespace,
+    year: int,
+    smooth: float,
+    group: str,
+    specs: list[DomainSpec],
+    profile: str,
+    variant: str,
+):
+    if not specs:
+        return
+    panel = {}
+    scaled_frames = []
+    for spec in specs:
+        curves = monthly_curves_for_domain(args, year, smooth, spec, profile, variant)
+        panel[spec.label] = curves
+        if not curves["scaled"].empty:
+            scaled_frames.append(curves["scaled"])
+    if not scaled_frames:
+        print(f"No combined E[I]-vs-continuous data for group={group}, profile={profile}, variant={variant}", flush=True)
+        return
+
+    n_rows = max(int(s.n_rows) for s in specs)
+    n_cols = max(int(s.n_cols) for s in specs)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(max(4.2 * n_cols, 5.0), max(3.1 * n_rows, 3.6)), sharex=True, sharey=True)
+    axes = np.asarray(axes).reshape(n_rows, n_cols)
+    for ax in axes.ravel():
+        ax.set_visible(False)
+
+    ylim = positive_ylim(
+        *(f.get("theory_spectrum_expected") for f in scaled_frames),
+        *(f.get("theory_spectrum_expected_latent") for f in scaled_frames),
+        *(f.get("theory_spectrum_continuous_scaled") for f in scaled_frames),
+        *(f.get("theory_spectrum_continuous_observed_scaled") for f in scaled_frames),
+    )
+    freq_label = DIRECTION_SPECS.get(profile, DIRECTION_SPECS["radial"])["frequency_label"]
+    for spec in specs:
+        ax = axes[int(spec.row), int(spec.col)]
+        ax.set_visible(True)
+        scaled = panel[spec.label]["scaled"]
+        k_cut = panel[spec.label].get("k_cut", np.nan)
+        if scaled.empty:
+            ax.set_title(spec.title, fontsize=8.5)
+            ax.set_yscale("log")
+            ax.grid(alpha=0.22)
+            continue
+        latent = scaled.dropna(subset=["theory_spectrum_expected_latent", "theory_spectrum_continuous_scaled"])
+        observed = scaled.dropna(subset=["theory_spectrum_expected", "theory_spectrum_continuous_observed_scaled"])
+        if not latent.empty:
+            ax.plot(
+                latent["k_mid"],
+                latent["theory_spectrum_expected_latent"],
+                color="tab:red",
+                linewidth=1.85,
+                linestyle="--",
+                label="finite-sample E[I] latent",
+                zorder=3,
+            )
+            ax.plot(
+                latent["k_mid"],
+                latent["theory_spectrum_continuous_scaled"],
+                color="tab:green",
+                linewidth=1.75,
+                label="continuous S latent (profiled)",
+                zorder=4,
+            )
+            ratio_df = ratio_frame(
+                latent,
+                latent,
+                "theory_spectrum_expected_latent",
+                "theory_spectrum_continuous_scaled",
+                k_max=k_cut,
+            )
+            add_ratio_axis(ax, ratio_df, ylabel="E[I] / S" if int(spec.col) == n_cols - 1 else None, color="tab:blue")
+            ax.plot([], [], color="tab:blue", linewidth=1.35, linestyle=":", label="E[I] / continuous S")
+        if not observed.empty:
+            ax.plot(
+                observed["k_mid"],
+                observed["theory_spectrum_expected"],
+                color="tab:orange",
+                linewidth=1.65,
+                linestyle="--",
+                label="finite-sample E[I] observed",
+                zorder=3,
+            )
+            ax.plot(
+                observed["k_mid"],
+                observed["theory_spectrum_continuous_observed_scaled"],
+                color="tab:purple",
+                linewidth=1.5,
+                linestyle="-.",
+                label="continuous S+nugget (profiled)",
+                zorder=4,
+            )
+        ax.set_title(f"{spec.title}\ndata k <= {k_cut:.2g}" if np.isfinite(k_cut) else spec.title, fontsize=8.5)
+        ax.set_yscale("log")
+        ax.set_ylim(*ylim)
+        ax.grid(alpha=0.22)
+        if int(spec.row) == n_rows - 1:
+            ax.set_xlabel(freq_label)
+        if int(spec.col) == 0:
+            ax.set_ylabel("spectrum")
+    first_ax = axes.ravel()[0]
+    if first_ax.get_visible():
+        first_ax.legend(fontsize=6.7, handlelength=1.3)
+
+    profile_label = DIRECTION_SPECS.get(profile, DIRECTION_SPECS["radial"])["label"]
+    fig.suptitle(
+        f"{year}-{args.month:02d}, smooth={smooth}, {variant}: {group} {profile_label} E[I] vs continuous spectrum",
+        fontsize=12,
+    )
+    fig.tight_layout()
+    out_dir = combined_output_dir(args, smooth, year)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    profile_file = "norm" if profile == "radial" else profile
+    plot_path = out_dir / f"{year}{args.month:02d}_{group}_{variant}_expected_vs_continuous_{profile_file}.png"
+    fig.savefig(plot_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    scaled_csv = out_dir / f"{year}{args.month:02d}_{group}_{variant}_expected_vs_continuous_{profile_file}.csv"
+    write_csv(pd.concat(scaled_frames, ignore_index=True), scaled_csv)
+    print(f"Saved combined E[I]-vs-continuous plot: {plot_path}", flush=True)
+    print(f"Saved combined E[I]-vs-continuous CSV: {scaled_csv}", flush=True)
+    combined_top_copy(args, year, smooth, plot_path)
+
+
+def make_combined_domain_plots(args: argparse.Namespace, specs: list[DomainSpec], year: int, smooth: float):
+    if args.skip_combined_plots:
+        return
+    variants = [v for v in parse_names(args.variants) if v in VARIANTS]
+    profiles = [p for p in parse_names(args.combined_profiles) if p in DIRECTION_SPECS]
+    groups = []
+    for spec in specs:
+        if spec.group not in groups:
+            groups.append(spec.group)
+    for group in groups:
+        group_specs = [s for s in specs if s.group == group]
+        for variant in variants:
+            for profile in profiles:
+                plot_combined_domain_data_expected(args, year, smooth, group, group_specs, profile, variant)
+                plot_combined_domain_expected_continuous(args, year, smooth, group, group_specs, profile, variant)
+
+
+def output_dir_for_domain(args: argparse.Namespace, smooth: float, year: int, spec: DomainSpec) -> Path:
+    return Path(args.output_root) / f"{year}_{args.month:02d}" / f"smooth_{smooth_tag(smooth)}" / spec.group / spec.label
+
+
 def output_dir_for(args: argparse.Namespace, smooth: float, year: int) -> Path:
-    return Path(args.output_root) / f"{year}_{args.month:02d}" / f"smooth_{smooth_tag(smooth)}"
+    return (
+        Path(args.output_root)
+        / f"{year}_{args.month:02d}"
+        / f"smooth_{smooth_tag(smooth)}"
+        / str(getattr(args, "domain_group", "full"))
+        / str(getattr(args, "domain_label", "full"))
+    )
 
 
 def main() -> None:
@@ -1900,26 +2666,47 @@ def main() -> None:
     years = parse_int_list_or_range(args.years)
     days = parse_int_list_or_range(args.days)
     smooths = parse_float_list(args.smooths)
+    domain_specs = build_domain_specs(args)
     device = select_device(args.device, args.cuda_fallback)
 
     print(
         f"Run config: years={years}, month={args.month}, days={days[0]}..{days[-1]}, "
         f"smooths={smooths}, block_prefixes={[block_prefix_label(s) for s in parse_block_prefixes(args.block_prefixes)]}, "
         f"variants={parse_names(args.variants)}, region=lat {args.lat_range} lon {args.lon_range}, "
+        f"domain_modes={parse_names(args.domain_modes)}, n_domains={len(domain_specs)}, "
         f"hann_taper={bool(args.hann)}, device={device}",
         flush=True,
     )
+    for spec in domain_specs:
+        print(
+            f"Domain {spec.group}/{spec.label}: lat={range_arg(spec.lat_range)} "
+            f"lon={range_arg(spec.lon_range)} panel=({spec.row},{spec.col})",
+            flush=True,
+        )
 
     for year in years:
-        ctx = build_month_context(args, year, days)
+        built_specs = []
+        for spec in domain_specs:
+            dargs = domain_args(args, spec)
+            try:
+                ctx = build_month_context(dargs, year, days)
+            except Exception as exc:
+                print(f"ERROR domain context failed for {spec.group}/{spec.label}: {exc}", flush=True)
+                continue
+            built_specs.append(spec)
+            for smooth in smooths:
+                out_dir = output_dir_for(dargs, smooth, year)
+                out_dir.mkdir(parents=True, exist_ok=True)
+                print(
+                    f"\n=== year={year} smooth={smooth} domain={spec.group}/{spec.label} out={out_dir} ===",
+                    flush=True,
+                )
+                if not dargs.make_monthly_only:
+                    for day in days:
+                        process_day(dargs, ctx, smooth, day, out_dir, device)
+                make_monthly_average(dargs, ctx, smooth, out_dir)
         for smooth in smooths:
-            out_dir = output_dir_for(args, smooth, year)
-            out_dir.mkdir(parents=True, exist_ok=True)
-            print(f"\n=== year={year} smooth={smooth} out={out_dir} ===", flush=True)
-            if not args.make_monthly_only:
-                for day in days:
-                    process_day(args, ctx, smooth, day, out_dir, device)
-            make_monthly_average(args, ctx, smooth, out_dir)
+            make_combined_domain_plots(args, built_specs, year, smooth)
 
 
 if __name__ == "__main__":

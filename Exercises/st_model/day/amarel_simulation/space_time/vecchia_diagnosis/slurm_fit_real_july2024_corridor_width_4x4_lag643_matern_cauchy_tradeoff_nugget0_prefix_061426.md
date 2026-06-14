@@ -1,7 +1,7 @@
-# Real July 2023-2025 Corridor Lag643 Matérn vs Cauchy Nugget-Zero Prefix Test
+# Real July 2024 Corridor Lag643 Matérn vs Cauchy Nugget-Zero Tradeoff Test
 
-This run compares Matérn smooth=0.3 against year-specific fixed generalized
-Cauchy candidates with the same real-data space-time Vecchia geometry:
+This run focuses only on July 2024, using the same real-data space-time Vecchia
+geometry as the earlier 2023-2025 run:
 
 ```text
 model geometry: corridor-width cluster Vecchia
@@ -9,39 +9,42 @@ block shape: 4x4
 lag pattern: 6/4/3
 ordering: block-center max-min prefixes
 prefixes: 100, 200, 400, 600, 800, all
-years: 2023, 2024, 2025
+year: 2024 only
 days: July day_idx 0..14 by default
 nugget: fixed 0
 ```
 
-Year-specific model variants:
+Model variants:
 
 ```text
-2023: matern_s03, gc_a075_b1, gc_a07_b1
-2024: matern_s03, gc_a075_b05, gc_a08_b05
-2025: matern_s03, gc_a075_b1, gc_a075_b05, gc_a07_b1
+matern_s03      baseline Matérn smooth=0.3
+gc_a075_b1      main GC candidate from pure-space checks
+gc_a07_b1       lower-alpha b=1 sensitivity
+gc_a08_b1       higher-alpha b=1 sensitivity
+gc_a07_b05      low-beta tradeoff candidate
+gc_a075_b05     low-beta tradeoff candidate
 ```
 
 Main outputs:
 
 ```text
-real_july2023_2025_corridor_lag643_matern_cauchy_nugget0_prefix_all_fits.csv
-real_july2023_2025_corridor_lag643_matern_cauchy_nugget0_prefix_monthly_param_summary.csv
-real_july2023_2025_corridor_lag643_matern_cauchy_nugget0_prefix_monthly_loss_summary.csv
-monthly_average_plots/real_YYYY_parameter_median_by_blockmaxmin.png
-monthly_average_plots/real_YYYY_parameter_median_by_blockmaxmin_symlog.png
-monthly_average_plots/real_YYYY_loss_mean_median_by_blockmaxmin.png
-monthly_average_plots/real_2023_2025_loss_per_valid_median_heatmap.png
+real_july2024_corridor_lag643_matern_cauchy_tradeoff_nugget0_prefix_all_fits.csv
+real_july2024_corridor_lag643_matern_cauchy_tradeoff_nugget0_prefix_monthly_param_summary.csv
+real_july2024_corridor_lag643_matern_cauchy_tradeoff_nugget0_prefix_monthly_loss_summary.csv
+monthly_average_plots/real_2024_parameter_median_by_blockmaxmin.png
+monthly_average_plots/real_2024_parameter_median_by_blockmaxmin_symlog.png
+monthly_average_plots/real_2024_loss_mean_median_by_blockmaxmin.png
+monthly_average_plots/real_2024_loss_per_valid_median_heatmap.png
 ```
 
 The parameter-tracking plot legend includes the mean final negative likelihood
-loss for each model/year. Use `loss_per_valid_median` for prefix comparisons,
-because raw final objectives change with the number of valid observations.
+loss for each model. Use `loss_per_valid_median` for prefix comparisons, because
+raw final objectives change with the number of valid observations.
 
 Amarel output root:
 
 ```text
-/home/jl2815/tco/exercise_output/summer/real_july2023_2025_corridor_lag643_matern_cauchy_nugget0_prefix_061426
+/home/jl2815/tco/exercise_output/summer/real_july2024_corridor_lag643_matern_cauchy_tradeoff_nugget0_prefix_061426
 ```
 
 ## 1. Upload From Local Mac
@@ -50,19 +53,19 @@ Run from the local Mac:
 
 ```bash
 REMOTE_DIR="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time"
-REMOTE_REAL_DIR="${REMOTE_DIR}/real_data"
+REMOTE_DIAG_DIR="${REMOTE_DIR}/vecchia_diagnosis"
 LOCAL_ROOT="/Users/joonwonlee/Documents/GEMS_TCO-1"
-LOCAL_REAL="${LOCAL_ROOT}/Exercises/st_model/day/amarel_simulation/space_time/real_data"
+LOCAL_DIAG="${LOCAL_ROOT}/Exercises/st_model/day/amarel_simulation/space_time/vecchia_diagnosis"
 
-ssh jl2815@amarel.rutgers.edu "mkdir -p ${REMOTE_REAL_DIR} /home/jl2815/tco/exercise_output/summer/logs"
+ssh jl2815@amarel.rutgers.edu "mkdir -p ${REMOTE_DIAG_DIR} /home/jl2815/tco/exercise_output/summer/logs"
 
 scp -r "${LOCAL_ROOT}/src/GEMS_TCO" \
   "jl2815@amarel.rutgers.edu:/home/jl2815/tco/"
 
 scp \
-  "${LOCAL_REAL}/fit_real_july2023_2025_corridor_width_4x4_lag643_matern_cauchy_nugget0_prefix_061426.py" \
-  "${LOCAL_REAL}/slurm_fit_real_july2023_2025_corridor_width_4x4_lag643_matern_cauchy_nugget0_prefix_061426.md" \
-  "jl2815@amarel.rutgers.edu:${REMOTE_REAL_DIR}/"
+  "${LOCAL_DIAG}/fit_real_july2024_corridor_width_4x4_lag643_matern_cauchy_tradeoff_nugget0_prefix_061426.py" \
+  "${LOCAL_DIAG}/slurm_fit_real_july2024_corridor_width_4x4_lag643_matern_cauchy_tradeoff_nugget0_prefix_061426.md" \
+  "jl2815@amarel.rutgers.edu:${REMOTE_DIAG_DIR}/"
 ```
 
 ## 2. Submit On Amarel
@@ -70,17 +73,17 @@ scp \
 On Amarel:
 
 ```bash
-cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/real_data
-nano run_real_july2023_2025_matern_cauchy_nugget0_prefix_061426.sh
+cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/vecchia_diagnosis
+nano run_real_july2024_matern_cauchy_tradeoff_nugget0_prefix_061426.sh
 ```
 
 Paste:
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name=real2325_n0mc
-#SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/real2325_n0mc_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/summer/logs/real2325_n0mc_%j.err
+#SBATCH --job-name=real24_n0mc
+#SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/real24_n0mc_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/summer/logs/real24_n0mc_%j.err
 #SBATCH --time=24:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -114,8 +117,8 @@ export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:128
 
-SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/real_data/fit_real_july2023_2025_corridor_width_4x4_lag643_matern_cauchy_nugget0_prefix_061426.py"
-OUTDIR="/home/jl2815/tco/exercise_output/summer/real_july2023_2025_corridor_lag643_matern_cauchy_nugget0_prefix_061426"
+SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/vecchia_diagnosis/fit_real_july2024_corridor_width_4x4_lag643_matern_cauchy_tradeoff_nugget0_prefix_061426.py"
+OUTDIR="/home/jl2815/tco/exercise_output/summer/real_july2024_corridor_lag643_matern_cauchy_tradeoff_nugget0_prefix_061426"
 MONTHLY_OUTDIR="${OUTDIR}/monthly_average_plots"
 
 mkdir -p "${OUTDIR}" "${MONTHLY_OUTDIR}"
@@ -136,13 +139,13 @@ print("cuda devices", torch.cuda.device_count())
 PY
 
 python "${SCRIPT}" \
-  --real-years 2023 2024 2025 \
+  --real-years 2024 \
   --month 7 \
   --days 0,15 \
   --space 1,1 \
   --lat-range=-3,2 \
   --lon-range=121,131 \
-  --model-variants matern_s03 gc_a075_b1 gc_a07_b1 gc_a075_b05 gc_a08_b05 \
+  --model-variants matern_s03 gc_a075_b1 gc_a07_b1 gc_a08_b1 gc_a07_b05 gc_a075_b05 \
   --block-prefixes 100 200 400 600 800 all \
   --nugget-mode zero \
   --real-reference-advec-lon-abs 0.126 \
@@ -170,7 +173,7 @@ echo "Finished: $(date)"
 Submit:
 
 ```bash
-sbatch run_real_july2023_2025_matern_cauchy_nugget0_prefix_061426.sh
+sbatch run_real_july2024_matern_cauchy_tradeoff_nugget0_prefix_061426.sh
 ```
 
 ## 3. Pull Results To Local
@@ -180,6 +183,6 @@ Run from the local Mac:
 ```bash
 mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26"
 
-scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/real_july2023_2025_corridor_lag643_matern_cauchy_nugget0_prefix_061426" \
+scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/real_july2024_corridor_lag643_matern_cauchy_tradeoff_nugget0_prefix_061426" \
   "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/"
 ```

@@ -191,13 +191,41 @@ def count_valid(day_map: dict[str, torch.Tensor]) -> tuple[int, int]:
     return n_valid, n_total
 
 
+PARAMETER_CSV_COLUMNS = [
+    "year",
+    "month",
+    "day_idx",
+    "day",
+    "status",
+    "error",
+    "loss",
+    "time_s",
+    "est_sigmasq",
+    "est_range_lat",
+    "est_range_lon",
+    "est_range_time",
+    "est_advec_lat",
+    "est_advec_lon",
+    "est_nugget",
+]
+
+
 def append_jsonl(path: Path, row: dict[str, Any]) -> None:
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(clean_json_value(row), sort_keys=True) + "\n")
 
 
+def save_json(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.write_text(
+        json.dumps(clean_json_value(rows), indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+
 def save_rows(csv_path: Path, rows: list[dict[str, Any]], decimals: int = 6) -> None:
     df = pd.DataFrame(rows)
+    cols = [c for c in PARAMETER_CSV_COLUMNS if c in df.columns]
+    df = df[cols].copy()
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     df[numeric_cols] = df[numeric_cols].round(decimals)
     df.to_csv(csv_path, index=False, float_format=f"%.{decimals}f")
@@ -334,7 +362,8 @@ def main() -> None:
     output_root = args.output_root or default_output_root()
     output_root.mkdir(parents=True, exist_ok=True)
 
-    csv_path = output_root / "real_july_corridor_width_4x4_lag643_all_fits.csv"
+    csv_path = output_root / "real_july_corridor_width_4x4_lag643_parameter_fits.csv"
+    json_path = output_root / "real_july_corridor_width_4x4_lag643_all_fits.json"
     jsonl_path = output_root / "real_july_corridor_width_4x4_lag643_all_fits.jsonl"
     summary_path = output_root / "running_summary.txt"
     config_path = output_root / "run_config.json"
@@ -517,6 +546,7 @@ def main() -> None:
                         "precompute_s": float(precompute_s),
                         "fit_s": float(fit_s),
                         "total_s": float(precompute_s + fit_s),
+                        "time_s": float(precompute_s + fit_s),
                         **{f"est_{k}": float(est[k]) for k in P_LABELS},
                         **cluster_summary,
                     }
@@ -545,11 +575,13 @@ def main() -> None:
 
             rows.append(clean_json_value(row))
             append_jsonl(jsonl_path, row)
+            save_json(json_path, rows)
             save_rows(csv_path, rows, decimals=args.round_decimals)
             write_running_summary(summary_path, rows)
 
     print("\nDone.")
     print("csv:", csv_path)
+    print("json:", json_path)
     print("jsonl:", jsonl_path)
     print("summary:", summary_path)
 

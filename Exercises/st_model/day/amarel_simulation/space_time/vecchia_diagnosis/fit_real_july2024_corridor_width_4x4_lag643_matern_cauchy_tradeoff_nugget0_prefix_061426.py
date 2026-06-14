@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Real July ST corridor Vecchia Matérn-vs-Cauchy prefix test.
+"""Real July 2024 ST corridor Vecchia Matérn-vs-Cauchy nugget-zero tradeoff test.
 
 This is the focused comparison requested after the pure-space spectral checks:
 
-  - Matérn with fixed smooth=0.3;
-  - generalized Cauchy candidates with fixed alpha/beta;
+  - Matérn with fixed smooth=0.3 and nugget fixed at zero;
+  - 2024 generalized Cauchy candidates with fixed alpha/beta and nugget fixed at zero;
   - the same 4x4 corridor lag-643 Vecchia geometry;
   - max-min block-prefix fits at 100, 200, 400, 600, 800, and all blocks;
-  - real July data for 2022-2025 by default.
+  - real July 2024 data by default.
 
 The output includes final Vecchia objective values from each fitted model, both
-raw and normalized by the number of valid observations.
+raw and normalized by the number of valid observations. Parameter-tracking plot
+legends include the mean final negative likelihood loss by model/year.
 """
 
 from __future__ import annotations
@@ -85,7 +86,7 @@ DEFAULT_REAL_INIT_PHYSICAL = {
     "range_time": 1.50,
     "advec_lat": 0.0218,
     "advec_lon": -0.1689,
-    "nugget": 0.247,
+    "nugget": 0.0,
 }
 
 VARIANT_SPECS: dict[str, dict[str, Any]] = {
@@ -96,48 +97,54 @@ VARIANT_SPECS: dict[str, dict[str, Any]] = {
         "gc_beta": np.nan,
         "label": "Matern s=0.3",
     },
-    "gc_a06_b25": {
+    "gc_a075_b1": {
         "family": "cauchy",
         "smooth": np.nan,
-        "gc_alpha": 0.6,
-        "gc_beta": 2.5,
-        "label": "GC a=0.6 b=2.5",
+        "gc_alpha": 0.75,
+        "gc_beta": 1.0,
+        "label": "GC a=0.75 b=1",
     },
-    "gc_a06_b35": {
+    "gc_a07_b1": {
         "family": "cauchy",
         "smooth": np.nan,
-        "gc_alpha": 0.6,
-        "gc_beta": 3.5,
-        "label": "GC a=0.6 b=3.5",
+        "gc_alpha": 0.7,
+        "gc_beta": 1.0,
+        "label": "GC a=0.7 b=1",
     },
-    "gc_a08_b4": {
+    "gc_a08_b1": {
         "family": "cauchy",
         "smooth": np.nan,
         "gc_alpha": 0.8,
-        "gc_beta": 4.0,
-        "label": "GC a=0.8 b=4",
+        "gc_beta": 1.0,
+        "label": "GC a=0.8 b=1",
     },
-    "gc_a06_b6": {
+    "gc_a07_b05": {
         "family": "cauchy",
         "smooth": np.nan,
-        "gc_alpha": 0.6,
-        "gc_beta": 6.0,
-        "label": "GC a=0.6 b=6",
+        "gc_alpha": 0.7,
+        "gc_beta": 0.5,
+        "label": "GC a=0.7 b=0.5",
     },
-    "gc_a08_b6": {
+    "gc_a075_b05": {
         "family": "cauchy",
         "smooth": np.nan,
-        "gc_alpha": 0.8,
-        "gc_beta": 6.0,
-        "label": "GC a=0.8 b=6",
+        "gc_alpha": 0.75,
+        "gc_beta": 0.5,
+        "label": "GC a=0.75 b=0.5",
     },
 }
 
-ALL_FITS_CSV = "real_july2022_2025_corridor_lag643_matern_cauchy_prefix_all_fits.csv"
-PARAM_SUMMARY_CSV = "real_july2022_2025_corridor_lag643_matern_cauchy_prefix_monthly_param_summary.csv"
-LOSS_SUMMARY_CSV = "real_july2022_2025_corridor_lag643_matern_cauchy_prefix_monthly_loss_summary.csv"
-MISSING_CSV = "real_july2022_2025_corridor_lag643_matern_cauchy_prefix_missing.csv"
-JSONL_NAME = "real_july2022_2025_corridor_lag643_matern_cauchy_prefix_all_fits.jsonl"
+YEAR_VARIANT_DEFAULTS: dict[int, list[str]] = {
+    2024: ["matern_s03", "gc_a075_b1", "gc_a07_b1", "gc_a08_b1", "gc_a07_b05", "gc_a075_b05"],
+}
+
+DEFAULT_MODEL_VARIANTS = list(dict.fromkeys(v for vals in YEAR_VARIANT_DEFAULTS.values() for v in vals))
+
+ALL_FITS_CSV = "real_july2024_corridor_lag643_matern_cauchy_tradeoff_nugget0_prefix_all_fits.csv"
+PARAM_SUMMARY_CSV = "real_july2024_corridor_lag643_matern_cauchy_tradeoff_nugget0_prefix_monthly_param_summary.csv"
+LOSS_SUMMARY_CSV = "real_july2024_corridor_lag643_matern_cauchy_tradeoff_nugget0_prefix_monthly_loss_summary.csv"
+MISSING_CSV = "real_july2024_corridor_lag643_matern_cauchy_tradeoff_nugget0_prefix_missing.csv"
+JSONL_NAME = "real_july2024_corridor_lag643_matern_cauchy_tradeoff_nugget0_prefix_all_fits.jsonl"
 
 
 def default_data_root() -> Path:
@@ -149,8 +156,8 @@ def default_data_root() -> Path:
 
 def default_output_root() -> Path:
     if Path("/home/jl2815").exists():
-        return Path("/home/jl2815/tco/exercise_output/summer/real_july2022_2025_corridor_lag643_matern_cauchy_betatail_061326")
-    return Path("/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/real_july2022_2025_corridor_lag643_matern_cauchy_betatail_061326")
+        return Path("/home/jl2815/tco/exercise_output/summer/real_july2024_corridor_lag643_matern_cauchy_tradeoff_nugget0_prefix_061426")
+    return Path("/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/real_july2024_corridor_lag643_matern_cauchy_tradeoff_nugget0_prefix_061426")
 
 
 def clean_json_value(value: Any) -> Any:
@@ -441,6 +448,11 @@ def variant_spec(name: str) -> dict[str, Any]:
     return {**VARIANT_SPECS[name], "model_variant": name}
 
 
+def variants_for_year(year: int, requested_variants: list[str]) -> list[str]:
+    allowed = set(YEAR_VARIANT_DEFAULTS.get(int(year), requested_variants))
+    return [name for name in requested_variants if name in allowed]
+
+
 def build_model(spec: dict[str, Any], source_map: dict[str, torch.Tensor], grid_coords_np: np.ndarray, args: argparse.Namespace):
     family = str(spec["family"])
     nugget_mode = str(args.nugget_mode)
@@ -681,13 +693,30 @@ def make_loss_summary(ok: pd.DataFrame) -> pd.DataFrame:
 def model_style(model_variant: str):
     styles = {
         "matern_s03": ("tab:blue", "o", "-"),
-        "gc_a06_b25": ("tab:green", "s", "-"),
-        "gc_a06_b35": ("tab:red", "D", "-"),
-        "gc_a08_b4": ("tab:purple", "^", "-"),
-        "gc_a06_b6": ("tab:orange", "P", "-"),
-        "gc_a08_b6": ("tab:brown", "X", "-"),
+        "gc_a075_b1": ("tab:green", "s", "-"),
+        "gc_a07_b1": ("tab:red", "D", "-"),
+        "gc_a08_b1": ("tab:orange", "P", "-"),
+        "gc_a07_b05": ("tab:purple", "^", "--"),
+        "gc_a075_b05": ("tab:brown", "v", "--"),
     }
     return styles.get(str(model_variant), ("0.25", "o", "-"))
+
+
+def year_model_loss_lookup(loss_summary: pd.DataFrame | None) -> dict[tuple[int, str], float]:
+    if loss_summary is None or loss_summary.empty:
+        return {}
+    lookup: dict[tuple[int, str], float] = {}
+    for (year, model_variant), sub in loss_summary.groupby(["year", "model_variant"], dropna=False):
+        vals = pd.to_numeric(sub["loss_mean"], errors="coerce").dropna().to_numpy(dtype=float)
+        if vals.size:
+            lookup[(int(year), str(model_variant))] = float(np.mean(vals))
+    return lookup
+
+
+def label_with_loss(base_label: str, loss_mean: float | None) -> str:
+    if loss_mean is None or not np.isfinite(float(loss_mean)):
+        return base_label
+    return f"{base_label} loss={float(loss_mean):.3g}"
 
 
 def ordered_prefixes(df: pd.DataFrame) -> tuple[list[int], list[str]]:
@@ -704,9 +733,15 @@ def ordered_prefixes(df: pd.DataFrame) -> tuple[list[int], list[str]]:
     )
 
 
-def plot_param_summary(summary: pd.DataFrame, out_dir: Path, monthly_out_dir: Path | None = None) -> None:
+def plot_param_summary(
+    summary: pd.DataFrame,
+    out_dir: Path,
+    monthly_out_dir: Path | None = None,
+    loss_summary: pd.DataFrame | None = None,
+) -> None:
     if summary.empty:
         return
+    loss_lookup = year_model_loss_lookup(loss_summary)
     plot_dirs = [out_dir / "monthly_average_plots"]
     if monthly_out_dir is not None:
         plot_dirs.append(monthly_out_dir)
@@ -729,7 +764,8 @@ def plot_param_summary(summary: pd.DataFrame, out_dir: Path, monthly_out_dir: Pa
                 p10 = pd.to_numeric(sub_model["p10"], errors="coerce").to_numpy(dtype=float)
                 p90 = pd.to_numeric(sub_model["p90"], errors="coerce").to_numpy(dtype=float)
                 color, marker, ls = model_style(str(model_variant))
-                label = str(sub_model["model_label"].dropna().iloc[0]) if sub_model["model_label"].notna().any() else str(model_variant)
+                base_label = str(sub_model["model_label"].dropna().iloc[0]) if sub_model["model_label"].notna().any() else str(model_variant)
+                label = label_with_loss(base_label, loss_lookup.get((int(year), str(model_variant))))
                 finite = np.isfinite(y)
                 ax.plot(x_pos[finite], y[finite], marker=marker, linestyle=ls, color=color, linewidth=1.7, label=label)
                 if finite.sum() >= 2:
@@ -757,7 +793,8 @@ def plot_param_summary(summary: pd.DataFrame, out_dir: Path, monthly_out_dir: Pa
                 p10 = pd.to_numeric(sub_model["p10"], errors="coerce").to_numpy(dtype=float)
                 p90 = pd.to_numeric(sub_model["p90"], errors="coerce").to_numpy(dtype=float)
                 color, marker, ls = model_style(str(model_variant))
-                label = str(sub_model["model_label"].dropna().iloc[0]) if sub_model["model_label"].notna().any() else str(model_variant)
+                base_label = str(sub_model["model_label"].dropna().iloc[0]) if sub_model["model_label"].notna().any() else str(model_variant)
+                label = label_with_loss(base_label, loss_lookup.get((int(year), str(model_variant))))
                 finite = np.isfinite(y)
                 ax.plot(x_pos[finite], y[finite], marker=marker, linestyle=ls, color=color, linewidth=1.7, label=label)
                 if finite.sum() >= 2:
@@ -850,7 +887,7 @@ def plot_loss_summary(loss_summary: pd.DataFrame, out_dir: Path, monthly_out_dir
         fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
         fig.tight_layout()
         for plot_dir in plot_dirs:
-            fig.savefig(plot_dir / "real_2022_2025_loss_per_valid_median_heatmap.png", dpi=180, bbox_inches="tight")
+            fig.savefig(plot_dir / "real_2024_loss_per_valid_median_heatmap.png", dpi=180, bbox_inches="tight")
         plt.close(fig)
 
 
@@ -904,7 +941,7 @@ def refresh_outputs(
     loss_summary = make_loss_summary(ok)
     if not param_summary.empty:
         save_rows(out_dir / PARAM_SUMMARY_CSV, param_summary)
-        plot_param_summary(param_summary, out_dir, monthly_out_dir)
+        plot_param_summary(param_summary, out_dir, monthly_out_dir, loss_summary)
     if not loss_summary.empty:
         save_rows(out_dir / LOSS_SUMMARY_CSV, loss_summary)
         plot_loss_summary(loss_summary, out_dir, monthly_out_dir)
@@ -923,16 +960,16 @@ def refresh_outputs(
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Real July ST Matérn-vs-generalized-Cauchy prefix test.")
-    parser.add_argument("--real-years", nargs="+", default=["2022", "2023", "2024", "2025"])
+    parser = argparse.ArgumentParser(description="Real July 2024 ST Matérn-vs-generalized-Cauchy nugget-zero tradeoff prefix test.")
+    parser.add_argument("--real-years", nargs="+", default=["2024"])
     parser.add_argument("--month", type=int, default=7)
     parser.add_argument("--days", default="0,15", help="'0,15' means day_idx 0..14; use '0,31' for all July.")
     parser.add_argument("--space", default="1,1")
     parser.add_argument("--lat-range", default="-3,2")
     parser.add_argument("--lon-range", default="121,131")
-    parser.add_argument("--model-variants", nargs="+", default=["matern_s03", "gc_a06_b35", "gc_a06_b6", "gc_a08_b4", "gc_a08_b6"])
+    parser.add_argument("--model-variants", nargs="+", default=DEFAULT_MODEL_VARIANTS)
     parser.add_argument("--block-prefixes", nargs="+", default=["100", "200", "400", "600", "800", "all"])
-    parser.add_argument("--nugget-mode", choices=["estimated", "zero"], default="estimated")
+    parser.add_argument("--nugget-mode", choices=["zero"], default="zero")
     parser.add_argument("--data-root", type=Path, default=None)
     parser.add_argument("--real-reference-advec-lon-abs", type=float, default=REFERENCE_ADVEC_LON_ABS)
     parser.add_argument("--daily-stride", type=int, default=2)
@@ -976,7 +1013,7 @@ def completed_keys(rows: list[dict[str, Any]]) -> set[tuple[int, int, str, int, 
                 int(row["day_idx"]),
                 str(row["model_variant"]),
                 int(row["block_prefix_requested"]),
-                str(row.get("nugget_mode", "estimated")),
+                str(row.get("nugget_mode", "zero")),
             )
         )
     return keys
@@ -1000,6 +1037,7 @@ def main() -> None:
     print("out_dir:", out_dir, flush=True)
     print("years:", parse_int_tokens(args.real_years), "days:", parse_day_idxs(args.days), flush=True)
     print("model_variants:", model_variants, flush=True)
+    print("year_variant_defaults:", YEAR_VARIANT_DEFAULTS, flush=True)
     print("block_prefixes:", block_prefixes, flush=True)
     print("nugget_mode:", args.nugget_mode, flush=True)
 
@@ -1014,6 +1052,7 @@ def main() -> None:
         "device": str(device),
         "args": clean_json_value(vars(args)),
         "model_variants": {name: clean_json_value(variant_spec(name)) for name in model_variants},
+        "year_variant_defaults": YEAR_VARIANT_DEFAULTS,
         "block_prefixes": block_prefixes,
         "density_definition": "first K max-min ordered 4x4 regular-grid target blocks; all cells inside selected blocks are kept",
         "init_physical": DEFAULT_REAL_INIT_PHYSICAL,
@@ -1022,8 +1061,12 @@ def main() -> None:
 
     assets = load_real_assets(args)
     for asset in assets:
+        asset_model_variants = variants_for_year(int(asset["year"]), model_variants)
+        if not asset_model_variants:
+            print(f"Skipping {asset['day']}: no requested variants are enabled for year {asset['year']}", flush=True)
+            continue
         for block_prefix in block_prefixes:
-            for model_variant in model_variants:
+            for model_variant in asset_model_variants:
                 key = (
                     int(asset["year"]),
                     int(asset["day_idx"]),

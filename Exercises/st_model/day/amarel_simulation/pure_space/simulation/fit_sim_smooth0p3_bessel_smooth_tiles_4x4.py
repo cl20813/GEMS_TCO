@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pure-space smooth-estimation test on smooth=0.3 simulation data.
 
-This wrapper reuses the production 4x4 tile Bessel-Matern fitters and points
+This wrapper reuses the canonical pure-space Bessel-Matern fitters and points
 them at the reusable July ST simulation pickle generated with true smooth
 nu=0.3.  It keeps the Vecchia and dense full-likelihood outputs in separate
 folders so the two estimators can be compared without mixing results.
@@ -91,11 +91,11 @@ def methods_for(args: argparse.Namespace) -> list[str]:
 
 def method_paths(method: str, args: argparse.Namespace) -> dict[str, Path]:
     if method == "full":
-        script = PURE_SPACE_DIR / "fit_july2024_bessel_smooth_full_likelihood_tiles_4x4.py"
+        script = PURE_SPACE_DIR / "fit_real_july2022_2025_bessel_smooth_full_likelihood_tiles_2x4.py"
         out_dir = Path(args.out_root) / "full_likelihood_4x4"
         monthly_dir = Path(args.out_root) / "monthly_output" / "full_likelihood_4x4"
     elif method == "vecchia":
-        script = PURE_SPACE_DIR / "fit_july2024_bessel_smooth_vecchia_cluster_4x4_cond2_tiles_4x4.py"
+        script = PURE_SPACE_DIR / "fit_real_july2022_2025_bessel_smooth_vecchia_tiles_2x4.py"
         out_dir = Path(args.out_root) / "vecchia_cluster_4x4_cond2_tiles_4x4"
         monthly_dir = Path(args.out_root) / "monthly_output" / "vecchia_cluster_4x4_cond2_tiles_4x4"
     else:

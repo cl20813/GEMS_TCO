@@ -1,5 +1,9 @@
 # Real July 2024 x1 Slice/Tile Spectral Ratio Diagnostics, 2026-06-09
 
+Legacy 2024-only runbook.  The maintained script now lives in this
+`spectral_analysis` folder as `real_july2022_2025_spectrum_ratio_plot.py`; this
+runbook pins `--years "2024"` to reproduce the old 2024-only run.
+
 This run checks whether the strange latitude-direction `I / E[I]` ratio is a
 large-scale trend problem by fitting independent x1/full-resolution domains.
 
@@ -46,17 +50,17 @@ Transfer the run script:
 
 ```bash
 ssh jl2815@amarel.rutgers.edu \
-  'mkdir -p /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space /home/jl2815/tco/exercise_output/logs'
+  'mkdir -p /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/spectral_analysis /home/jl2815/tco/exercise_output/logs'
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/pure_space/real_july2024_spline_smooth_spectral_x1_slice_tile_060926.py" \
-  "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/"
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/pure_space/spectral_analysis/real_july2022_2025_spectrum_ratio_plot.py" \
+  "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/spectral_analysis/"
 ```
 
 ## Submit
 
 ```bash
 ssh jl2815@amarel.rutgers.edu
-cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space
+cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/spectral_analysis
 nano slurm_real_july2024_spline_smooth_spectral_x1_slice_tile_060926.sh
 sbatch slurm_real_july2024_spline_smooth_spectral_x1_slice_tile_060926.sh
 ```
@@ -101,7 +105,7 @@ export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
-SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/real_july2024_spline_smooth_spectral_x1_slice_tile_060926.py"
+SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/spectral_analysis/real_july2022_2025_spectrum_ratio_plot.py"
 OUTROOT="/home/jl2815/tco/exercise_output/summer/real_data/spline_smooth_spectral_x1_slice_tile_060926"
 TOPPLOTS="${OUTROOT}/monthly_plots_top"
 LOGROOT="/home/jl2815/tco/exercise_output/logs"

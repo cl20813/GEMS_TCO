@@ -70,8 +70,8 @@ scp -r "${LOCAL_ROOT}/src/GEMS_TCO" \
   "jl2815@amarel.rutgers.edu:/home/jl2815/tco/"
 
 scp \
-  "${LOCAL_PURE}/fit_july2024_bessel_smooth_full_likelihood_tiles_4x4.py" \
-  "${LOCAL_PURE}/fit_july2024_bessel_smooth_vecchia_cluster_4x4_cond2_tiles_4x4.py" \
+  "${LOCAL_PURE}/fit_real_july2022_2025_bessel_smooth_full_likelihood_tiles_2x4.py" \
+  "${LOCAL_PURE}/fit_real_july2022_2025_bessel_smooth_vecchia_tiles_2x4.py" \
   "jl2815@amarel.rutgers.edu:${REMOTE_DIR}/"
 
 scp \

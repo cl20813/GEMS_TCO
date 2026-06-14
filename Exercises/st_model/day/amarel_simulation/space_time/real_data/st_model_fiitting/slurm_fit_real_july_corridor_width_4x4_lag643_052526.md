@@ -21,29 +21,36 @@ Outputs are written on Amarel under:
 The main running files are:
 
 ```text
-real_july_corridor_width_4x4_lag643_all_fits.csv
+real_july_corridor_width_4x4_lag643_parameter_fits.csv
+real_july_corridor_width_4x4_lag643_all_fits.json
 real_july_corridor_width_4x4_lag643_all_fits.jsonl
 running_summary.txt
 run_config.json
 ```
 
+The JSON/JSONL files keep the full per-fit telemetry.  The CSV is intentionally
+clean: identifiers, status/error, loss, `time_s`, and estimated physical
+parameters only.
+
 ## Transfer Files
 
 ```bash
-ssh jl2815@amarel.rutgers.edu 'mkdir -p /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/real_data /home/jl2815/tco/exercise_output/logs'
+ssh jl2815@amarel.rutgers.edu 'mkdir -p /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/real_data/st_model_fiitting /home/jl2815/tco/exercise_output/logs'
 
 scp -r "/Users/joonwonlee/Documents/GEMS_TCO-1/src/GEMS_TCO" \
     jl2815@amarel.rutgers.edu:/home/jl2815/tco/
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/real_data/fit_real_july_corridor_width_4x4_lag643_052526.py" \
-    jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/real_data/
+scp \
+    "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/real_data/st_model_fiitting/fit_real_july_corridor_width_4x4_lag643_052526.py" \
+    "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/real_data/st_model_fiitting/slurm_fit_real_july_corridor_width_4x4_lag643_052526.md" \
+    jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/real_data/st_model_fiitting/
 ```
 
 ## Submit Slurm Job
 
 ```bash
 ssh jl2815@amarel.rutgers.edu
-cd ./jobscript/tco/gp_exercise
+cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/real_data/st_model_fiitting
 nano fit_real_july_corridor_width_4x4_lag643_052526.sh
 sbatch fit_real_july_corridor_width_4x4_lag643_052526.sh
 ```
@@ -82,7 +89,7 @@ export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
-SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/real_data/fit_real_july_corridor_width_4x4_lag643_052526.py"
+SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/real_data/st_model_fiitting/fit_real_july_corridor_width_4x4_lag643_052526.py"
 OUTDIR="/home/jl2815/tco/exercise_output/estimates/day/real_july_corridor_width_4x4_lag643_052526"
 
 mkdir -p "${OUTDIR}"

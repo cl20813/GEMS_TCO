@@ -88,7 +88,7 @@ def fit_paths(args: argparse.Namespace) -> dict[str, Path]:
     out_dir = Path(args.out_root) / "vecchia_cluster_4x4_cond2_tiles_2x4"
     monthly_dir = Path(args.out_root) / "monthly_output" / "vecchia_cluster_4x4_cond2_tiles_2x4"
     return {
-        "script": PURE_SPACE_DIR / "fit_july2024_bessel_smooth_vecchia_cluster_4x4_cond2_tiles_2x4.py",
+        "script": PURE_SPACE_DIR / "fit_real_july2022_2025_bessel_smooth_vecchia_tiles_2x4.py",
         "out_dir": out_dir,
         "monthly_dir": monthly_dir,
         "manifest": out_dir / "manifest_hours.csv",

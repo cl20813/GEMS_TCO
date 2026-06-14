@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""July 2024 tile-wise anisotropic Matern fits with cluster Vecchia.
+"""Real July 2022-2025 tile-wise anisotropic Matern fits with cluster Vecchia.
 
-This is the Vecchia counterpart to the full-likelihood 2x4 tile experiment.
-Each hour is split into 2x4 tiles; inside each tile, targets are 4x4 grid-cell
-clusters and each cluster conditions on two previous max-min cluster blocks.
+This is the canonical pure-space Vecchia run for July real GEMS TCO data.  It is
+configured for latitude -3..2, longitude 121..131, and a 2x4 spatial tile grid;
+the exact year is controlled by --month and --input.  Inside each tile, targets
+are 4x4 grid-cell clusters and each cluster conditions on two previous max-min
+cluster blocks.
 
 The covariance is anisotropic pure-space Matern with estimated smoothness and
 the same phi reparameterization used in the space-time code.
@@ -50,7 +52,7 @@ except ImportError:
         vecchia_batches_to_numpy,
     )
 
-from fit_july2024_bessel_smooth_full_likelihood_tiles_2x4 import (
+from fit_real_july2022_2025_bessel_smooth_full_likelihood_tiles_2x4 import (
     assign_tiles,
     choose_hour,
     deterministic_subset,
@@ -79,12 +81,12 @@ def parse_block_shape(text: str) -> tuple[int, int]:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="July 2024 2x4 tile Bessel-smooth 4x4-cond2 Vecchia fits.")
+    p = argparse.ArgumentParser(description="Real July 2022-2025 2x4 tile Bessel-smooth Vecchia fits.")
     p.add_argument("--mode", choices=["manifest", "fit", "summarize", "all"], required=True)
     p.add_argument("--input", default=os.environ.get("DATA_PATH"))
     p.add_argument("--output-dir", default=os.environ.get(
         "OUTDIR",
-        "/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/vecchia_cluster_4x4_cond2",
+        "/home/jl2815/tco/exercise_output/summer/real_july2022_2025_bessel_smooth/vecchia_tiles_2x4",
     ))
     p.add_argument("--monthly-output-dir", default=os.environ.get("MONTHLY_OUTDIR", ""))
     p.add_argument("--manifest", default=None)
@@ -114,7 +116,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--target-chunk-size", type=int, default=int(os.environ.get("TARGET_CHUNK_SIZE", "128")))
     p.add_argument("--min-target-points", type=int, default=int(os.environ.get("MIN_TARGET_POINTS", "1")))
 
-    p.add_argument("--nugget-mode", choices=["free", "fixed0"], default=os.environ.get("NUGGET_MODE", "free"))
+    p.add_argument("--nugget-mode", choices=["free", "fixed0"], default=os.environ.get("NUGGET_MODE", "fixed0"))
     p.add_argument("--mean-design", choices=["lat", "latlon"], default=os.environ.get("MEAN_DESIGN", "lat"))
     p.add_argument("--range-lat-init", type=float, default=float(os.environ.get("RANGE_LAT_INIT", "0.35")))
     p.add_argument("--range-lon-init", type=float, default=float(os.environ.get("RANGE_LON_INIT", "0.35")))

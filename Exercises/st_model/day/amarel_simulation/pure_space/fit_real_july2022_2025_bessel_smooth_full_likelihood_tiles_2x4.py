@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""July 2024 tile-wise anisotropic Matern fits with exact full likelihood.
+"""Real July 2022-2025 tile-wise anisotropic Matern fits with exact full likelihood.
 
-This entrypoint fits the first 240 observed July 2024 hours.  Each hour is
-split into a configurable lat/lon tile grid, and each tile is fitted independently with
-an anisotropic pure-space Matern covariance:
+This entrypoint is the canonical pure-space full-likelihood run for July real
+GEMS TCO data.  It is configured for latitude -3..2, longitude 121..131, and a
+2x4 spatial tile grid; the exact year is controlled by --month and --input.
+Each tile is fitted independently with an anisotropic pure-space Matern covariance:
 
     sigmasq, range_lat, range_lon, smooth, nugget
 
@@ -89,12 +90,12 @@ def parse_block_shape(text: str) -> tuple[int, int]:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="July 2024 tile-wise Bessel-smooth full likelihood fits.")
+    p = argparse.ArgumentParser(description="Real July 2022-2025 2x4 tile Bessel-smooth full likelihood fits.")
     p.add_argument("--mode", choices=["manifest", "fit", "summarize", "all"], required=True)
     p.add_argument("--input", default=os.environ.get("DATA_PATH"))
     p.add_argument("--output-dir", default=os.environ.get(
         "OUTDIR",
-        "/home/jl2815/tco/exercise_output/summer/july2024_bessel_smooth/full_likelihood_4x4",
+        "/home/jl2815/tco/exercise_output/summer/real_july2022_2025_bessel_smooth/full_likelihood_tiles_2x4",
     ))
     p.add_argument("--monthly-output-dir", default=os.environ.get("MONTHLY_OUTDIR", ""))
     p.add_argument("--manifest", default=None)
@@ -112,7 +113,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--coords", choices=["raw", "lonlat"], default=os.environ.get("COORDS", "raw"))
     p.add_argument("--lat-range", type=parse_float_pair, default=parse_float_pair(os.environ.get("LAT_RANGE", "-3,2")))
     p.add_argument("--lon-range", type=parse_float_pair, default=parse_float_pair(os.environ.get("LON_RANGE", "121,131")))
-    p.add_argument("--tile-y", type=int, default=int(os.environ.get("TILE_Y", "4")))
+    p.add_argument("--tile-y", type=int, default=int(os.environ.get("TILE_Y", "2")))
     p.add_argument("--tile-x", type=int, default=int(os.environ.get("TILE_X", "4")))
     p.add_argument("--min-tile-points", type=int, default=int(os.environ.get("MIN_TILE_POINTS", "200")))
     p.add_argument("--tile-max-points", type=int, default=int(os.environ.get("TILE_MAX_POINTS", "0")))
@@ -136,7 +137,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--qc-tile-workers", type=int, default=int(os.environ.get("QC_TILE_WORKERS", "0")),
                    help="Workers for first-stage Vecchia QC tiles; 0 reuses --tile-workers.")
 
-    p.add_argument("--nugget-mode", choices=["free", "fixed0"], default=os.environ.get("NUGGET_MODE", "free"))
+    p.add_argument("--nugget-mode", choices=["free", "fixed0"], default=os.environ.get("NUGGET_MODE", "fixed0"))
     p.add_argument("--mean-design", choices=["constant", "lat", "latlon"], default=os.environ.get("MEAN_DESIGN", "lat"))
     p.add_argument("--range-lat-init", type=float, default=float(os.environ.get("RANGE_LAT_INIT", "0.35")))
     p.add_argument("--range-lon-init", type=float, default=float(os.environ.get("RANGE_LON_INIT", "0.35")))
@@ -1168,6 +1169,8 @@ def run_all(args: argparse.Namespace) -> None:
 
 def main() -> None:
     args = parse_args()
+    if int(args.tile_y) != 2 or int(args.tile_x) != 4:
+        print(f"WARNING: expected 2x4 tiles, got {args.tile_y}x{args.tile_x}")
     if args.mode == "manifest":
         make_manifest(args)
     elif args.mode == "fit":

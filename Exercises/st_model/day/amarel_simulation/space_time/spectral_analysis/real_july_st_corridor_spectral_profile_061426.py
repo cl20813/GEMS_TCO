@@ -11,8 +11,12 @@ This is the ST analogue of the pure-space spline-smooth spectral diagnostic:
      window to compute finite-sample E[J(omega)J(omega)^*].
   5. Compare data I against finite-sample E[I], and finite-sample E[I]
      against a no-window continuous-like covariance spectrum.
-  6. Also keep the 8x8 Cholesky-whitened/profiled ratio used by the earlier
-     ST diagnostic.
+  6. Whiten J(omega) with the fitted 8x8 finite-sample cross-periodogram
+     matrix, profile the covariance scale, and pool by frequency direction.
+
+The monthly plots are intentionally small in number: each year folder compares
+Matérn smooth=0.3 nugget0 against that year's selected generalized Cauchy
+nugget0 candidate across norm, latitude, longitude, and diagonal frequencies.
 
 The diagnostic is intentionally no-taper: only the missing-data window enters
 the expected periodogram.  This matches the Vecchia fitting target more closely
@@ -42,8 +46,10 @@ import torch
 
 
 HERE = Path(__file__).resolve().parent
-REAL_DATA_DIR = HERE / "real_data"
-for path in [HERE, REAL_DATA_DIR]:
+SPACE_TIME_DIR = HERE.parent
+REAL_DATA_DIR = SPACE_TIME_DIR / "real_data"
+DIAGNOSIS_DIR = SPACE_TIME_DIR / "vecchia_diagnosis"
+for path in [HERE, SPACE_TIME_DIR, REAL_DATA_DIR, DIAGNOSIS_DIR]:
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
@@ -69,7 +75,7 @@ from GEMS_TCO.vecchia_st_generalized_cauchy import (
     RealDataCorridorWidth4x4Lag643NoNuggetGeneralizedCauchyFit,
 )
 
-from fit_real_july2023_2025_corridor_width_4x4_lag643_matern_cauchy_nugget0_prefix_061426 import (
+from fit_real_july2024_corridor_width_4x4_lag643_matern_cauchy_tradeoff_nugget0_prefix_061426 import (
     DEFAULT_REAL_INIT_PHYSICAL,
     DTYPE,
     P_LABELS,
@@ -110,41 +116,6 @@ VARIANT_SPECS: dict[str, dict[str, Any]] = {
         "gc_beta": 1.0,
         "label": "GC a=0.75 b=1 nugget0",
     },
-    "gc_a07_b1": {
-        "family": "cauchy",
-        "smooth": np.nan,
-        "gc_alpha": 0.7,
-        "gc_beta": 1.0,
-        "label": "GC a=0.7 b=1 nugget0",
-    },
-    "gc_a065_b1": {
-        "family": "cauchy",
-        "smooth": np.nan,
-        "gc_alpha": 0.65,
-        "gc_beta": 1.0,
-        "label": "GC a=0.65 b=1 nugget0",
-    },
-    "gc_a07_b05": {
-        "family": "cauchy",
-        "smooth": np.nan,
-        "gc_alpha": 0.7,
-        "gc_beta": 0.5,
-        "label": "GC a=0.7 b=0.5 nugget0",
-    },
-    "gc_a08_b05": {
-        "family": "cauchy",
-        "smooth": np.nan,
-        "gc_alpha": 0.8,
-        "gc_beta": 0.5,
-        "label": "GC a=0.8 b=0.5 nugget0",
-    },
-    "gc_a09_b05": {
-        "family": "cauchy",
-        "smooth": np.nan,
-        "gc_alpha": 0.9,
-        "gc_beta": 0.5,
-        "label": "GC a=0.9 b=0.5 nugget0",
-    },
     "gc_a08_b1": {
         "family": "cauchy",
         "smooth": np.nan,
@@ -152,26 +123,12 @@ VARIANT_SPECS: dict[str, dict[str, Any]] = {
         "gc_beta": 1.0,
         "label": "GC a=0.8 b=1 nugget0",
     },
-    "gc_a075_b07": {
-        "family": "cauchy",
-        "smooth": np.nan,
-        "gc_alpha": 0.75,
-        "gc_beta": 0.7,
-        "label": "GC a=0.75 b=0.7 nugget0",
-    },
-    "gc_a075_b05": {
-        "family": "cauchy",
-        "smooth": np.nan,
-        "gc_alpha": 0.75,
-        "gc_beta": 0.5,
-        "label": "GC a=0.75 b=0.5 nugget0",
-    },
 }
 
 YEAR_VARIANT_DEFAULTS: dict[int, list[str]] = {
-    2023: ["matern_s03", "gc_a07_b1", "gc_a075_b1", "gc_a065_b1"],
-    2024: ["matern_s03", "gc_a07_b05", "gc_a09_b05", "gc_a08_b1"],
-    2025: ["matern_s03", "gc_a075_b1", "gc_a075_b07", "gc_a075_b05"],
+    2023: ["matern_s03", "gc_a075_b1"],
+    2024: ["matern_s03", "gc_a08_b1"],
+    2025: ["matern_s03", "gc_a075_b1"],
 }
 
 DEFAULT_MODEL_VARIANTS = list(dict.fromkeys(v for vals in YEAR_VARIANT_DEFAULTS.values() for v in vals))
@@ -179,8 +136,8 @@ DEFAULT_MODEL_VARIANTS = list(dict.fromkeys(v for vals in YEAR_VARIANT_DEFAULTS.
 
 def default_output_root() -> Path:
     if Path("/home/jl2815").exists():
-        return Path("/home/jl2815/tco/exercise_output/summer/st_corridor_spectral_profile_matern_cauchy_nugget0_refine_061426")
-    return Path("/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/st_corridor_spectral_profile_matern_cauchy_nugget0_refine_061426")
+        return Path("/home/jl2815/tco/exercise_output/summer/st_corridor_spectral_profile_2023_2025_matern_gc_nugget0_061426")
+    return Path("/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/st_corridor_spectral_profile_2023_2025_matern_gc_nugget0_061426")
 
 
 def append_jsonl(path: Path, row: dict[str, Any]) -> None:
@@ -383,14 +340,32 @@ def direction_cases(n1: int, n2: int, delta_lat: float, delta_lon: float) -> dic
     ii, jj = np.meshgrid(np.arange(n1), np.arange(n2), indexing="ij")
     ci, cj = n1 // 2, n2 // 2
     return {
-        "radial": (np.sqrt(g_lat**2 + g_lon**2), np.ones((n1, n2), dtype=bool)),
-        "latitude_ns": (np.abs(g_lat), np.abs(jj - cj) <= 0),
-        "longitude_ew": (np.abs(g_lon), np.abs(ii - ci) <= 0),
-        "diagonal_ne_sw": (
+        "norm": (np.sqrt(g_lat**2 + g_lon**2), np.ones((n1, n2), dtype=bool)),
+        "lat": (np.abs(g_lat), np.abs(jj - cj) <= 0),
+        "lon": (np.abs(g_lon), np.abs(ii - ci) <= 0),
+        "diag": (
             np.sqrt(g_lat**2 + g_lon**2),
             np.abs((ii - ci) / max(ci, 1) - (jj - cj) / max(cj, 1)) <= (1.0 / max(ci, cj, 1)),
         ),
     }
+
+
+def direction_title(direction: str) -> str:
+    return {
+        "norm": "Norm frequency",
+        "lat": "Latitude frequency",
+        "lon": "Longitude frequency",
+        "diag": "Diagonal frequency",
+    }.get(str(direction), str(direction))
+
+
+def direction_xlabel(direction: str) -> str:
+    return {
+        "norm": "norm frequency",
+        "lat": "latitude frequency",
+        "lon": "longitude frequency",
+        "diag": "diagonal frequency",
+    }.get(str(direction), "frequency")
 
 
 def profile_rows_from_spectral_grids(
@@ -411,7 +386,10 @@ def profile_rows_from_spectral_grids(
     delta_lon: float,
 ) -> list[dict[str, Any]]:
     n1, n2 = data_shifted.shape
+    expected_profile_shifted = expected_shifted * float(whitened_scale)
+    continuous_profile_shifted = continuous_shifted * float(whitened_scale)
     ratio_i_ei = data_shifted / expected_shifted
+    ratio_i_ei_profile = data_shifted / expected_profile_shifted
     ratio_ei_cont = expected_shifted / continuous_shifted
     whitened_ratio = whitened_shifted / float(whitened_scale)
     cases = direction_cases(n1, n2, delta_lat=delta_lat, delta_lon=delta_lon)
@@ -420,29 +398,40 @@ def profile_rows_from_spectral_grids(
         x_all = x_grid[mask2d].reshape(-1)
         data_all = data_shifted[mask2d].reshape(-1)
         expected_all = expected_shifted[mask2d].reshape(-1)
+        expected_profile_all = expected_profile_shifted[mask2d].reshape(-1)
         continuous_all = continuous_shifted[mask2d].reshape(-1)
+        continuous_profile_all = continuous_profile_shifted[mask2d].reshape(-1)
         ratio_i_all = ratio_i_ei[mask2d].reshape(-1)
+        ratio_i_profile_all = ratio_i_ei_profile[mask2d].reshape(-1)
         ratio_ec_all = ratio_ei_cont[mask2d].reshape(-1)
         whitened_all = whitened_ratio[mask2d].reshape(-1)
         finite = (
             np.isfinite(x_all)
             & np.isfinite(data_all)
             & np.isfinite(expected_all)
+            & np.isfinite(expected_profile_all)
             & np.isfinite(continuous_all)
+            & np.isfinite(continuous_profile_all)
             & np.isfinite(ratio_i_all)
+            & np.isfinite(ratio_i_profile_all)
             & np.isfinite(ratio_ec_all)
             & np.isfinite(whitened_all)
             & (x_all >= 0)
             & (expected_all > 0)
+            & (expected_profile_all > 0)
             & (continuous_all > 0)
+            & (continuous_profile_all > 0)
         )
         x = x_all[finite]
         if x.size == 0:
             continue
         data_vals_all = data_all[finite]
         expected_vals_all = expected_all[finite]
+        expected_profile_vals_all = expected_profile_all[finite]
         continuous_vals_all = continuous_all[finite]
+        continuous_profile_vals_all = continuous_profile_all[finite]
         ratio_i_vals_all = ratio_i_all[finite]
+        ratio_i_profile_vals_all = ratio_i_profile_all[finite]
         ratio_ec_vals_all = ratio_ec_all[finite]
         whitened_vals_all = whitened_all[finite]
         xmax = float(np.nanmax(x))
@@ -458,8 +447,11 @@ def profile_rows_from_spectral_grids(
                 continue
             data_vals = data_vals_all[sel]
             expected_vals = expected_vals_all[sel]
+            expected_profile_vals = expected_profile_vals_all[sel]
             continuous_vals = continuous_vals_all[sel]
+            continuous_profile_vals = continuous_profile_vals_all[sel]
             ratio_i_vals = ratio_i_vals_all[sel]
+            ratio_i_profile_vals = ratio_i_profile_vals_all[sel]
             ratio_ec_vals = ratio_ec_vals_all[sel]
             whitened_vals = whitened_vals_all[sel]
             rows.append(
@@ -483,11 +475,17 @@ def profile_rows_from_spectral_grids(
                     "k_mid": float(0.5 * (bins[b] + bins[b + 1])),
                     "data_spectrum_mean": float(np.nanmean(data_vals)),
                     "expected_spectrum_mean": float(np.nanmean(expected_vals)),
+                    "expected_spectrum_profile_mean": float(np.nanmean(expected_profile_vals)),
                     "continuous_spectrum_mean": float(np.nanmean(continuous_vals)),
+                    "continuous_spectrum_profile_mean": float(np.nanmean(continuous_profile_vals)),
                     "ratio_I_over_EI_mean": float(np.nanmean(ratio_i_vals)),
                     "ratio_I_over_EI_median": float(np.nanmedian(ratio_i_vals)),
                     "ratio_I_over_EI_p10": float(np.nanquantile(ratio_i_vals, 0.10)),
                     "ratio_I_over_EI_p90": float(np.nanquantile(ratio_i_vals, 0.90)),
+                    "ratio_I_over_EI_profile_mean": float(np.nanmean(ratio_i_profile_vals)),
+                    "ratio_I_over_EI_profile_median": float(np.nanmedian(ratio_i_profile_vals)),
+                    "ratio_I_over_EI_profile_p10": float(np.nanquantile(ratio_i_profile_vals, 0.10)),
+                    "ratio_I_over_EI_profile_p90": float(np.nanquantile(ratio_i_profile_vals, 0.90)),
                     "ratio_EI_over_continuous_mean": float(np.nanmean(ratio_ec_vals)),
                     "ratio_EI_over_continuous_median": float(np.nanmedian(ratio_ec_vals)),
                     "whitened_ratio_mean": float(np.nanmean(whitened_vals)),
@@ -740,15 +738,17 @@ def refresh_outputs(out_dir: Path, fit_rows: list[dict[str, Any]], profile_rows:
         save_rows(out_dir / "st_corridor_spectral_monthly_summary.csv", monthly)
         band_table = make_ratio_band_table(monthly)
         save_rows(out_dir / BAND_TABLE_CSV, band_table)
-        plot_profile_monthly_summary(monthly, out_dir / "st_corridor_spectral_monthly_I_over_EI_profile.png", metric="ratio_I_over_EI_mean")
+        plot_profile_monthly_summary(monthly, out_dir / "st_corridor_spectral_monthly_I_over_EI_profile_sigma_ratio.png", metric="ratio_I_over_EI_profile_mean")
         plot_profile_monthly_summary(monthly, out_dir / "st_corridor_spectral_monthly_EI_over_continuous_profile.png", metric="ratio_EI_over_continuous_mean")
         plot_profile_monthly_summary(monthly, out_dir / "st_corridor_spectral_monthly_whitened_profile.png", metric="whitened_ratio_mean")
+        plot_directional_year_outputs(monthly, out_dir / "monthly_average_plots")
         if top_plot_dir is not None:
             top_plot_dir.mkdir(parents=True, exist_ok=True)
             save_rows(top_plot_dir / BAND_TABLE_CSV, band_table)
-            plot_profile_monthly_summary(monthly, top_plot_dir / "st_corridor_spectral_monthly_I_over_EI_profile.png", metric="ratio_I_over_EI_mean")
+            plot_profile_monthly_summary(monthly, top_plot_dir / "st_corridor_spectral_monthly_I_over_EI_profile_sigma_ratio.png", metric="ratio_I_over_EI_profile_mean")
             plot_profile_monthly_summary(monthly, top_plot_dir / "st_corridor_spectral_monthly_EI_over_continuous_profile.png", metric="ratio_EI_over_continuous_mean")
             plot_profile_monthly_summary(monthly, top_plot_dir / "st_corridor_spectral_monthly_whitened_profile.png", metric="whitened_ratio_mean")
+            plot_directional_year_outputs(monthly, top_plot_dir)
 
     lines = [
         f"Updated: {datetime.now().isoformat(timespec='seconds')}",
@@ -823,6 +823,7 @@ def make_profile_monthly_summary(profile: pd.DataFrame) -> pd.DataFrame:
         vals = pd.to_numeric(sub["ratio_I_over_EI_mean"], errors="coerce").dropna().to_numpy(dtype=float)
         if vals.size == 0:
             continue
+        vals_profile = pd.to_numeric(sub["ratio_I_over_EI_profile_mean"], errors="coerce").dropna().to_numpy(dtype=float)
         ratio_ei_cont = pd.to_numeric(sub["ratio_EI_over_continuous_mean"], errors="coerce").dropna().to_numpy(dtype=float)
         whitened = pd.to_numeric(sub["whitened_ratio_mean"], errors="coerce").dropna().to_numpy(dtype=float)
         rows.append(
@@ -837,11 +838,17 @@ def make_profile_monthly_summary(profile: pd.DataFrame) -> pd.DataFrame:
                 "n_days": int(vals.size),
                 "data_spectrum_mean": float(np.nanmean(pd.to_numeric(sub["data_spectrum_mean"], errors="coerce"))),
                 "expected_spectrum_mean": float(np.nanmean(pd.to_numeric(sub["expected_spectrum_mean"], errors="coerce"))),
+                "expected_spectrum_profile_mean": float(np.nanmean(pd.to_numeric(sub["expected_spectrum_profile_mean"], errors="coerce"))),
                 "continuous_spectrum_mean": float(np.nanmean(pd.to_numeric(sub["continuous_spectrum_mean"], errors="coerce"))),
+                "continuous_spectrum_profile_mean": float(np.nanmean(pd.to_numeric(sub["continuous_spectrum_profile_mean"], errors="coerce"))),
                 "ratio_I_over_EI_mean": float(np.mean(vals)),
                 "ratio_I_over_EI_median": float(np.median(vals)),
                 "ratio_I_over_EI_p10": float(np.quantile(vals, 0.10)),
                 "ratio_I_over_EI_p90": float(np.quantile(vals, 0.90)),
+                "ratio_I_over_EI_profile_mean": float(np.mean(vals_profile)) if vals_profile.size else np.nan,
+                "ratio_I_over_EI_profile_median": float(np.median(vals_profile)) if vals_profile.size else np.nan,
+                "ratio_I_over_EI_profile_p10": float(np.quantile(vals_profile, 0.10)) if vals_profile.size else np.nan,
+                "ratio_I_over_EI_profile_p90": float(np.quantile(vals_profile, 0.90)) if vals_profile.size else np.nan,
                 "ratio_EI_over_continuous_mean": float(np.mean(ratio_ei_cont)) if ratio_ei_cont.size else np.nan,
                 "ratio_EI_over_continuous_median": float(np.median(ratio_ei_cont)) if ratio_ei_cont.size else np.nan,
                 "ratio_EI_over_continuous_p10": float(np.quantile(ratio_ei_cont, 0.10)) if ratio_ei_cont.size else np.nan,
@@ -897,12 +904,16 @@ def make_ratio_band_table(monthly: pd.DataFrame) -> pd.DataFrame:
                 "n_bins": int(len(sub)),
                 "ratio_I_over_EI_mean": float(np.nanmean(pd.to_numeric(sub["ratio_I_over_EI_mean"], errors="coerce"))),
                 "ratio_I_over_EI_median": float(np.nanmedian(pd.to_numeric(sub["ratio_I_over_EI_median"], errors="coerce"))),
+                "ratio_I_over_EI_profile_mean": float(np.nanmean(pd.to_numeric(sub["ratio_I_over_EI_profile_mean"], errors="coerce"))),
+                "ratio_I_over_EI_profile_median": float(np.nanmedian(pd.to_numeric(sub["ratio_I_over_EI_profile_median"], errors="coerce"))),
                 "ratio_EI_over_continuous_mean": float(np.nanmean(pd.to_numeric(sub["ratio_EI_over_continuous_mean"], errors="coerce"))),
                 "ratio_EI_over_continuous_median": float(np.nanmedian(pd.to_numeric(sub["ratio_EI_over_continuous_median"], errors="coerce"))),
                 "whitened_ratio_mean": float(np.nanmean(pd.to_numeric(sub["whitened_ratio_mean"], errors="coerce"))),
                 "data_spectrum_mean": float(np.nanmean(pd.to_numeric(sub["data_spectrum_mean"], errors="coerce"))),
                 "expected_spectrum_mean": float(np.nanmean(pd.to_numeric(sub["expected_spectrum_mean"], errors="coerce"))),
+                "expected_spectrum_profile_mean": float(np.nanmean(pd.to_numeric(sub["expected_spectrum_profile_mean"], errors="coerce"))),
                 "continuous_spectrum_mean": float(np.nanmean(pd.to_numeric(sub["continuous_spectrum_mean"], errors="coerce"))),
+                "continuous_spectrum_profile_mean": float(np.nanmean(pd.to_numeric(sub["continuous_spectrum_profile_mean"], errors="coerce"))),
             }
         )
     return pd.DataFrame(rows)
@@ -915,10 +926,11 @@ def plot_profile_monthly_summary(monthly: pd.DataFrame, path: Path, metric: str 
         return
     band_cols = {
         "ratio_I_over_EI_mean": ("ratio_I_over_EI_p10", "ratio_I_over_EI_p90"),
+        "ratio_I_over_EI_profile_mean": ("ratio_I_over_EI_profile_p10", "ratio_I_over_EI_profile_p90"),
         "ratio_EI_over_continuous_mean": ("ratio_EI_over_continuous_p10", "ratio_EI_over_continuous_p90"),
         "whitened_ratio_mean": ("whitened_ratio_p10", "whitened_ratio_p90"),
     }
-    directions = ["radial", "latitude_ns", "longitude_ew", "diagonal_ne_sw"]
+    directions = ["norm", "lat", "lon", "diag"]
     fig, axes = plt.subplots(2, 2, figsize=(13, 9), sharey=True)
     for ax, direction in zip(axes.ravel(), directions):
         sub_dir = monthly[monthly["direction"] == direction].copy()
@@ -936,15 +948,16 @@ def plot_profile_monthly_summary(monthly: pd.DataFrame, path: Path, metric: str 
                 if ok.any():
                     ax.fill_between(x[ok], lo[ok], hi[ok], color=line.get_color(), alpha=0.12, linewidth=0)
         ax.axhline(1.0, color="0.25", linestyle="--", linewidth=1.0)
-        ax.set_title(direction)
-        ax.set_xlabel("spatial frequency")
+        ax.set_title(direction_title(direction))
+        ax.set_xlabel(direction_xlabel(direction))
         ax.set_yscale("log")
         ax.set_ylim(0.2, 5.0)
         ax.grid(alpha=0.25, which="both")
     ylabel = {
         "ratio_I_over_EI_mean": "data I / finite-sample E[I]",
+        "ratio_I_over_EI_profile_mean": "observed I / fitted finite-sample E[I] (profile sigma)",
         "ratio_EI_over_continuous_mean": "finite-sample E[I] / continuous-like spectrum",
-        "whitened_ratio_mean": "profiled whitened power",
+        "whitened_ratio_mean": "8x8 whitened power after profile sigma scaling (target = 1)",
     }.get(metric, metric)
     axes[0, 0].set_ylabel(ylabel)
     axes[1, 0].set_ylabel(ylabel)
@@ -954,6 +967,100 @@ def plot_profile_monthly_summary(monthly: pd.DataFrame, path: Path, metric: str 
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=180, bbox_inches="tight")
     plt.close(fig)
+
+
+def _plot_model_pair_lines(
+    ax: plt.Axes,
+    sub_year_dir: pd.DataFrame,
+    y_cols: tuple[str, str],
+    labels: tuple[str, str],
+) -> None:
+    for model_variant, sub_model in sub_year_dir.groupby("model_variant", dropna=False):
+        sub_model = sub_model.sort_values("k_mid")
+        model_label = str(sub_model["model_label"].dropna().iloc[0]) if sub_model["model_label"].notna().any() else str(model_variant)
+        line = ax.plot(
+            pd.to_numeric(sub_model["k_mid"], errors="coerce"),
+            pd.to_numeric(sub_model[y_cols[0]], errors="coerce"),
+            linewidth=1.9,
+            label=f"{model_label}: {labels[0]}",
+        )[0]
+        ax.plot(
+            pd.to_numeric(sub_model["k_mid"], errors="coerce"),
+            pd.to_numeric(sub_model[y_cols[1]], errors="coerce"),
+            color=line.get_color(),
+            linestyle="--",
+            linewidth=1.7,
+            label=f"{model_label}: {labels[1]}",
+        )
+
+
+def plot_directional_year_outputs(monthly: pd.DataFrame, base_dir: Path) -> None:
+    if monthly.empty:
+        return
+    directions = ["norm", "lat", "lon", "diag"]
+    for year, sub_year in monthly.groupby("year", dropna=False):
+        year_dir = base_dir / f"year_{int(year)}"
+        year_dir.mkdir(parents=True, exist_ok=True)
+        for direction in directions:
+            sub = sub_year[sub_year["direction"] == direction].copy()
+            if sub.empty:
+                continue
+
+            fig, ax = plt.subplots(figsize=(8.5, 5.4))
+            _plot_model_pair_lines(
+                ax,
+                sub,
+                ("data_spectrum_mean", "expected_spectrum_profile_mean"),
+                ("I", "E[I]"),
+            )
+            ax.set_title(f"Real July {int(year)}: I vs fitted E[I], {direction_title(direction)}")
+            ax.set_xlabel(direction_xlabel(direction))
+            ax.set_ylabel("Spectral density with profile sigma: observed I and fitted finite-sample E[I]")
+            ax.set_yscale("log")
+            ax.grid(alpha=0.25, which="both")
+            ax.legend(fontsize=8)
+            fig.tight_layout()
+            fig.savefig(year_dir / f"I_vs_EI_profile_sigma_{direction}.png", dpi=180, bbox_inches="tight")
+            plt.close(fig)
+
+            fig, ax = plt.subplots(figsize=(8.5, 5.4))
+            _plot_model_pair_lines(
+                ax,
+                sub,
+                ("expected_spectrum_profile_mean", "continuous_spectrum_profile_mean"),
+                ("E[I]", "theoretic continuous"),
+            )
+            ax.set_title(f"Real July {int(year)}: fitted E[I] vs theoretical continuous spectrum, {direction_title(direction)}")
+            ax.set_xlabel(direction_xlabel(direction))
+            ax.set_ylabel("Spectral density with profile sigma: fitted finite-sample E[I] and theoretical continuous spectrum")
+            ax.set_yscale("log")
+            ax.grid(alpha=0.25, which="both")
+            ax.legend(fontsize=8)
+            fig.tight_layout()
+            fig.savefig(year_dir / f"EI_vs_theoretic_continuous_{direction}.png", dpi=180, bbox_inches="tight")
+            plt.close(fig)
+
+            fig, ax = plt.subplots(figsize=(8.5, 5.4))
+            for model_variant, sub_model in sub.groupby("model_variant", dropna=False):
+                sub_model = sub_model.sort_values("k_mid")
+                model_label = str(sub_model["model_label"].dropna().iloc[0]) if sub_model["model_label"].notna().any() else str(model_variant)
+                ax.plot(
+                    pd.to_numeric(sub_model["k_mid"], errors="coerce"),
+                    pd.to_numeric(sub_model["whitened_ratio_mean"], errors="coerce"),
+                    linewidth=1.9,
+                    label=model_label,
+                )
+            ax.axhline(1.0, color="0.25", linestyle="--", linewidth=1.0)
+            ax.set_title(f"Real July {int(year)}: 8x8 whitened power, {direction_title(direction)}")
+            ax.set_xlabel(direction_xlabel(direction))
+            ax.set_ylabel("8x8 whitened power after profile sigma scaling (target = 1)")
+            ax.set_yscale("log")
+            ax.set_ylim(0.2, 5.0)
+            ax.grid(alpha=0.25, which="both")
+            ax.legend(fontsize=8)
+            fig.tight_layout()
+            fig.savefig(year_dir / f"whitened_8x8_power_{direction}.png", dpi=180, bbox_inches="tight")
+            plt.close(fig)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -1151,7 +1258,8 @@ def main() -> None:
     print("\nDone.", flush=True)
     print("fits:", out_dir / FIT_CSV, flush=True)
     print("profiles:", out_dir / PROFILE_CSV, flush=True)
-    print("I/EI monthly plot:", out_dir / "st_corridor_spectral_monthly_I_over_EI_profile.png", flush=True)
+    print("I/EI profile-sigma monthly ratio plot:", out_dir / "st_corridor_spectral_monthly_I_over_EI_profile_sigma_ratio.png", flush=True)
+    print("directional monthly plots:", out_dir / "monthly_average_plots", flush=True)
     print("ratio band table:", out_dir / BAND_TABLE_CSV, flush=True)
 
 
