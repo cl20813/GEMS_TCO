@@ -27,19 +27,33 @@ Main outputs:
 st_corridor_spectral_all_fits.csv
 st_corridor_spectral_profiles.csv
 st_corridor_spectral_monthly_summary.csv
-st_corridor_spectral_ratio_band_table.csv
-monthly_average_plots/year_2023/I_vs_EI_profile_sigma_norm.png
-monthly_average_plots/year_2023/EI_vs_theoretic_continuous_norm.png
-monthly_average_plots/year_2023/whitened_8x8_power_norm.png
+st_corridor_spectral_representative_frequency_band_table.csv
+monthly_average_plots/year_2023/marginal_timeavg_spatial_I_vs_Ediag_profile_sigma_norm.png
+monthly_average_plots/year_2023/marginal_timeavg_spatial_Ediag_vs_continuous_profile_sigma_norm.png
+monthly_average_plots/year_2023/whitened_8x8_I_vs_EI_target1_norm.png
+monthly_average_plots/year_2023/st_corridor_spectral_monthly_summary.csv
+monthly_average_plots/year_2023/st_corridor_spectral_representative_frequency_band_table.csv
 ```
 
 The direction suffixes are `norm`, `lat`, `lon`, and `diag`.  The y labels are
 fixed by plot family so the Matérn-vs-GC comparison is visually consistent:
 
 ```text
-I vs EI: spectral density with profile sigma, observed I and fitted finite-sample E[I]
-EI vs continuous: spectral density with profile sigma, fitted finite-sample E[I] and theoretical continuous spectrum
-whitened: 8x8 whitened power after profile sigma scaling, target = 1
+marginal timeavg I vs Ediag: marginal time-averaged spatial spectrum with profile sigma, observed I and diagonal fitted E[I]
+marginal timeavg Ediag vs continuous: marginal time-averaged spatial spectrum with profile sigma, diagonal fitted E[I] and theoretical continuous spectrum
+whitened 8x8 I vs EI: 8x8-whitened I / E[I] quadratic power, target = 1
+```
+
+No per-hour spectrum files are written.  The detailed profile CSV is already
+binned by day, direction, model, and frequency bin; the research-facing outputs
+are the monthly summary, representative frequency-band table, and monthly plots.
+The representative table reports:
+
+```text
+lowest_frequency_bin
+low_frequency_bins_1_5
+mid_frequency_band
+high_frequency_band
 ```
 
 Amarel output root:
@@ -199,7 +213,8 @@ tail -n 80 /home/jl2815/tco/exercise_output/summer/logs/stspec_y_<JOBID>_0.out
 
 ## 3. Pull Results To Local
 
-After the array finishes, copy the monthly comparison plots:
+After the array finishes, copy the research-facing monthly plots and summary
+tables:
 
 ```bash
 LOCAL_OUT="/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/st_corridor_spectral_profile_2023_2025_matern_gc_nugget0_061426"
@@ -211,7 +226,18 @@ scp -r "jl2815@amarel.rutgers.edu:${REMOTE_OUT}/monthly_average_plots" \
   "${LOCAL_OUT}/"
 ```
 
-To copy the full CSV/log output:
+This brings back the year folders, for example:
+
+```text
+monthly_average_plots/year_2023/
+  marginal_timeavg_spatial_I_vs_Ediag_profile_sigma_norm.png
+  marginal_timeavg_spatial_Ediag_vs_continuous_profile_sigma_norm.png
+  whitened_8x8_I_vs_EI_target1_norm.png
+  st_corridor_spectral_monthly_summary.csv
+  st_corridor_spectral_representative_frequency_band_table.csv
+```
+
+To copy the full CSV/log output, including daily binned profiles and fit logs:
 
 ```bash
 scp -r "jl2815@amarel.rutgers.edu:${REMOTE_OUT}" \

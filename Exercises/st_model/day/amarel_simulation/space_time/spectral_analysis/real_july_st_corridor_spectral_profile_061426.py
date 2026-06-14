@@ -99,7 +99,8 @@ DELTA_LON_BASE = 0.063
 T_STEPS = 8
 FIT_CSV = "st_corridor_spectral_all_fits.csv"
 PROFILE_CSV = "st_corridor_spectral_profiles.csv"
-BAND_TABLE_CSV = "st_corridor_spectral_ratio_band_table.csv"
+MONTHLY_SUMMARY_CSV = "st_corridor_spectral_monthly_summary.csv"
+BAND_TABLE_CSV = "st_corridor_spectral_representative_frequency_band_table.csv"
 
 VARIANT_SPECS: dict[str, dict[str, Any]] = {
     "matern_s03": {
@@ -731,24 +732,41 @@ def refresh_outputs(out_dir: Path, fit_rows: list[dict[str, Any]], profile_rows:
             save_rows(out_dir / "st_corridor_parameter_monthly_summary.csv", summary)
             plot_parameter_monthly_summary(summary, out_dir / "st_corridor_parameter_monthly_summary.png")
             if top_plot_dir is not None:
-                top_plot_dir.mkdir(parents=True, exist_ok=True)
-                plot_parameter_monthly_summary(summary, top_plot_dir / "st_corridor_parameter_monthly_summary.png")
+                for year, sub_summary in summary.groupby("year", dropna=False):
+                    year_dir = top_plot_dir / f"year_{int(year)}"
+                    year_dir.mkdir(parents=True, exist_ok=True)
+                    save_rows(year_dir / "st_corridor_parameter_monthly_summary.csv", sub_summary)
+                    plot_parameter_monthly_summary(sub_summary, year_dir / "st_corridor_parameter_monthly_summary.png")
     if not profile_df.empty:
         monthly = make_profile_monthly_summary(profile_df)
-        save_rows(out_dir / "st_corridor_spectral_monthly_summary.csv", monthly)
+        save_rows(out_dir / MONTHLY_SUMMARY_CSV, monthly)
         band_table = make_ratio_band_table(monthly)
         save_rows(out_dir / BAND_TABLE_CSV, band_table)
-        plot_profile_monthly_summary(monthly, out_dir / "st_corridor_spectral_monthly_I_over_EI_profile_sigma_ratio.png", metric="ratio_I_over_EI_profile_mean")
-        plot_profile_monthly_summary(monthly, out_dir / "st_corridor_spectral_monthly_EI_over_continuous_profile.png", metric="ratio_EI_over_continuous_mean")
-        plot_profile_monthly_summary(monthly, out_dir / "st_corridor_spectral_monthly_whitened_profile.png", metric="whitened_ratio_mean")
+        plot_profile_monthly_summary(
+            monthly,
+            out_dir / "marginal_timeavg_spatial_monthly_I_over_Ediag_profile_sigma_ratio.png",
+            metric="ratio_I_over_EI_profile_mean",
+        )
+        plot_profile_monthly_summary(
+            monthly,
+            out_dir / "marginal_timeavg_spatial_monthly_Ediag_over_continuous_ratio.png",
+            metric="ratio_EI_over_continuous_mean",
+        )
+        plot_profile_monthly_summary(
+            monthly,
+            out_dir / "whitened_8x8_monthly_I_over_EI_target1_ratio.png",
+            metric="whitened_ratio_mean",
+        )
         plot_directional_year_outputs(monthly, out_dir / "monthly_average_plots")
         if top_plot_dir is not None:
             top_plot_dir.mkdir(parents=True, exist_ok=True)
-            save_rows(top_plot_dir / BAND_TABLE_CSV, band_table)
-            plot_profile_monthly_summary(monthly, top_plot_dir / "st_corridor_spectral_monthly_I_over_EI_profile_sigma_ratio.png", metric="ratio_I_over_EI_profile_mean")
-            plot_profile_monthly_summary(monthly, top_plot_dir / "st_corridor_spectral_monthly_EI_over_continuous_profile.png", metric="ratio_EI_over_continuous_mean")
-            plot_profile_monthly_summary(monthly, top_plot_dir / "st_corridor_spectral_monthly_whitened_profile.png", metric="whitened_ratio_mean")
             plot_directional_year_outputs(monthly, top_plot_dir)
+            for year, sub_monthly in monthly.groupby("year", dropna=False):
+                year_dir = top_plot_dir / f"year_{int(year)}"
+                year_dir.mkdir(parents=True, exist_ok=True)
+                save_rows(year_dir / MONTHLY_SUMMARY_CSV, sub_monthly)
+                sub_band = band_table[band_table["year"] == int(year)].copy() if not band_table.empty else pd.DataFrame()
+                save_rows(year_dir / BAND_TABLE_CSV, sub_band)
 
     lines = [
         f"Updated: {datetime.now().isoformat(timespec='seconds')}",
@@ -823,9 +841,15 @@ def make_profile_monthly_summary(profile: pd.DataFrame) -> pd.DataFrame:
         vals = pd.to_numeric(sub["ratio_I_over_EI_mean"], errors="coerce").dropna().to_numpy(dtype=float)
         if vals.size == 0:
             continue
-        vals_profile = pd.to_numeric(sub["ratio_I_over_EI_profile_mean"], errors="coerce").dropna().to_numpy(dtype=float)
+        vals_profile = (
+            pd.to_numeric(sub["ratio_I_over_EI_profile_mean"], errors="coerce").dropna().to_numpy(dtype=float)
+            if "ratio_I_over_EI_profile_mean" in sub.columns
+            else vals
+        )
         ratio_ei_cont = pd.to_numeric(sub["ratio_EI_over_continuous_mean"], errors="coerce").dropna().to_numpy(dtype=float)
         whitened = pd.to_numeric(sub["whitened_ratio_mean"], errors="coerce").dropna().to_numpy(dtype=float)
+        expected_profile_col = "expected_spectrum_profile_mean" if "expected_spectrum_profile_mean" in sub.columns else "expected_spectrum_mean"
+        continuous_profile_col = "continuous_spectrum_profile_mean" if "continuous_spectrum_profile_mean" in sub.columns else "continuous_spectrum_mean"
         rows.append(
             {
                 "year": int(keys[0]),
@@ -838,9 +862,9 @@ def make_profile_monthly_summary(profile: pd.DataFrame) -> pd.DataFrame:
                 "n_days": int(vals.size),
                 "data_spectrum_mean": float(np.nanmean(pd.to_numeric(sub["data_spectrum_mean"], errors="coerce"))),
                 "expected_spectrum_mean": float(np.nanmean(pd.to_numeric(sub["expected_spectrum_mean"], errors="coerce"))),
-                "expected_spectrum_profile_mean": float(np.nanmean(pd.to_numeric(sub["expected_spectrum_profile_mean"], errors="coerce"))),
+                "expected_spectrum_profile_mean": float(np.nanmean(pd.to_numeric(sub[expected_profile_col], errors="coerce"))),
                 "continuous_spectrum_mean": float(np.nanmean(pd.to_numeric(sub["continuous_spectrum_mean"], errors="coerce"))),
-                "continuous_spectrum_profile_mean": float(np.nanmean(pd.to_numeric(sub["continuous_spectrum_profile_mean"], errors="coerce"))),
+                "continuous_spectrum_profile_mean": float(np.nanmean(pd.to_numeric(sub[continuous_profile_col], errors="coerce"))),
                 "ratio_I_over_EI_mean": float(np.mean(vals)),
                 "ratio_I_over_EI_median": float(np.median(vals)),
                 "ratio_I_over_EI_p10": float(np.quantile(vals, 0.10)),
@@ -867,14 +891,14 @@ def make_profile_monthly_summary(profile: pd.DataFrame) -> pd.DataFrame:
 def ratio_band(bin_idx: int, max_bin: int) -> str:
     b = int(bin_idx)
     if b == 0:
-        return "dc_first_bin"
+        return "lowest_frequency_bin"
     if 1 <= b <= 5:
-        return "low_bins_1_5"
+        return "low_frequency_bins_1_5"
     frac = b / max(max_bin, 1)
     if 0.35 <= frac <= 0.55:
-        return "mid_band"
+        return "mid_frequency_band"
     if frac >= 0.80:
-        return "high_band"
+        return "high_frequency_band"
     return ""
 
 
@@ -890,6 +914,12 @@ def make_ratio_band_table(monthly: pd.DataFrame) -> pd.DataFrame:
     rows = []
     group_cols = ["year", "month", "model_variant", "model_label", "direction", "frequency_band"]
     for keys, sub in df.groupby(group_cols, dropna=False):
+        ratio_profile_col = "ratio_I_over_EI_profile_mean" if "ratio_I_over_EI_profile_mean" in sub.columns else "ratio_I_over_EI_mean"
+        ratio_profile_median_col = (
+            "ratio_I_over_EI_profile_median" if "ratio_I_over_EI_profile_median" in sub.columns else "ratio_I_over_EI_median"
+        )
+        expected_profile_col = "expected_spectrum_profile_mean" if "expected_spectrum_profile_mean" in sub.columns else "expected_spectrum_mean"
+        continuous_profile_col = "continuous_spectrum_profile_mean" if "continuous_spectrum_profile_mean" in sub.columns else "continuous_spectrum_mean"
         rows.append(
             {
                 "year": int(keys[0]),
@@ -904,16 +934,16 @@ def make_ratio_band_table(monthly: pd.DataFrame) -> pd.DataFrame:
                 "n_bins": int(len(sub)),
                 "ratio_I_over_EI_mean": float(np.nanmean(pd.to_numeric(sub["ratio_I_over_EI_mean"], errors="coerce"))),
                 "ratio_I_over_EI_median": float(np.nanmedian(pd.to_numeric(sub["ratio_I_over_EI_median"], errors="coerce"))),
-                "ratio_I_over_EI_profile_mean": float(np.nanmean(pd.to_numeric(sub["ratio_I_over_EI_profile_mean"], errors="coerce"))),
-                "ratio_I_over_EI_profile_median": float(np.nanmedian(pd.to_numeric(sub["ratio_I_over_EI_profile_median"], errors="coerce"))),
+                "ratio_I_over_EI_profile_mean": float(np.nanmean(pd.to_numeric(sub[ratio_profile_col], errors="coerce"))),
+                "ratio_I_over_EI_profile_median": float(np.nanmedian(pd.to_numeric(sub[ratio_profile_median_col], errors="coerce"))),
                 "ratio_EI_over_continuous_mean": float(np.nanmean(pd.to_numeric(sub["ratio_EI_over_continuous_mean"], errors="coerce"))),
                 "ratio_EI_over_continuous_median": float(np.nanmedian(pd.to_numeric(sub["ratio_EI_over_continuous_median"], errors="coerce"))),
                 "whitened_ratio_mean": float(np.nanmean(pd.to_numeric(sub["whitened_ratio_mean"], errors="coerce"))),
                 "data_spectrum_mean": float(np.nanmean(pd.to_numeric(sub["data_spectrum_mean"], errors="coerce"))),
                 "expected_spectrum_mean": float(np.nanmean(pd.to_numeric(sub["expected_spectrum_mean"], errors="coerce"))),
-                "expected_spectrum_profile_mean": float(np.nanmean(pd.to_numeric(sub["expected_spectrum_profile_mean"], errors="coerce"))),
+                "expected_spectrum_profile_mean": float(np.nanmean(pd.to_numeric(sub[expected_profile_col], errors="coerce"))),
                 "continuous_spectrum_mean": float(np.nanmean(pd.to_numeric(sub["continuous_spectrum_mean"], errors="coerce"))),
-                "continuous_spectrum_profile_mean": float(np.nanmean(pd.to_numeric(sub["continuous_spectrum_profile_mean"], errors="coerce"))),
+                "continuous_spectrum_profile_mean": float(np.nanmean(pd.to_numeric(sub[continuous_profile_col], errors="coerce"))),
             }
         )
     return pd.DataFrame(rows)
@@ -955,9 +985,9 @@ def plot_profile_monthly_summary(monthly: pd.DataFrame, path: Path, metric: str 
         ax.grid(alpha=0.25, which="both")
     ylabel = {
         "ratio_I_over_EI_mean": "data I / finite-sample E[I]",
-        "ratio_I_over_EI_profile_mean": "observed I / fitted finite-sample E[I] (profile sigma)",
+        "ratio_I_over_EI_profile_mean": "time-averaged marginal spatial I / diagonal E[I] (profile sigma)",
         "ratio_EI_over_continuous_mean": "finite-sample E[I] / continuous-like spectrum",
-        "whitened_ratio_mean": "8x8 whitened power after profile sigma scaling (target = 1)",
+        "whitened_ratio_mean": "8x8-whitened I / E[I] quadratic power (target = 1)",
     }.get(metric, metric)
     axes[0, 0].set_ylabel(ylabel)
     axes[1, 0].set_ylabel(ylabel)
@@ -1013,14 +1043,14 @@ def plot_directional_year_outputs(monthly: pd.DataFrame, base_dir: Path) -> None
                 ("data_spectrum_mean", "expected_spectrum_profile_mean"),
                 ("I", "E[I]"),
             )
-            ax.set_title(f"Real July {int(year)}: I vs fitted E[I], {direction_title(direction)}")
+            ax.set_title(f"Real July {int(year)}: marginal time-averaged spatial I vs diagonal E[I], {direction_title(direction)}")
             ax.set_xlabel(direction_xlabel(direction))
-            ax.set_ylabel("Spectral density with profile sigma: observed I and fitted finite-sample E[I]")
+            ax.set_ylabel("Marginal time-averaged spatial spectrum with profile sigma: observed I and diagonal fitted E[I]")
             ax.set_yscale("log")
             ax.grid(alpha=0.25, which="both")
             ax.legend(fontsize=8)
             fig.tight_layout()
-            fig.savefig(year_dir / f"I_vs_EI_profile_sigma_{direction}.png", dpi=180, bbox_inches="tight")
+            fig.savefig(year_dir / f"marginal_timeavg_spatial_I_vs_Ediag_profile_sigma_{direction}.png", dpi=180, bbox_inches="tight")
             plt.close(fig)
 
             fig, ax = plt.subplots(figsize=(8.5, 5.4))
@@ -1030,14 +1060,14 @@ def plot_directional_year_outputs(monthly: pd.DataFrame, base_dir: Path) -> None
                 ("expected_spectrum_profile_mean", "continuous_spectrum_profile_mean"),
                 ("E[I]", "theoretic continuous"),
             )
-            ax.set_title(f"Real July {int(year)}: fitted E[I] vs theoretical continuous spectrum, {direction_title(direction)}")
+            ax.set_title(f"Real July {int(year)}: marginal time-averaged diagonal E[I] vs continuous spectrum, {direction_title(direction)}")
             ax.set_xlabel(direction_xlabel(direction))
-            ax.set_ylabel("Spectral density with profile sigma: fitted finite-sample E[I] and theoretical continuous spectrum")
+            ax.set_ylabel("Marginal time-averaged spatial spectrum with profile sigma: diagonal fitted E[I] and theoretical continuous spectrum")
             ax.set_yscale("log")
             ax.grid(alpha=0.25, which="both")
             ax.legend(fontsize=8)
             fig.tight_layout()
-            fig.savefig(year_dir / f"EI_vs_theoretic_continuous_{direction}.png", dpi=180, bbox_inches="tight")
+            fig.savefig(year_dir / f"marginal_timeavg_spatial_Ediag_vs_continuous_profile_sigma_{direction}.png", dpi=180, bbox_inches="tight")
             plt.close(fig)
 
             fig, ax = plt.subplots(figsize=(8.5, 5.4))
@@ -1051,15 +1081,15 @@ def plot_directional_year_outputs(monthly: pd.DataFrame, base_dir: Path) -> None
                     label=model_label,
                 )
             ax.axhline(1.0, color="0.25", linestyle="--", linewidth=1.0)
-            ax.set_title(f"Real July {int(year)}: 8x8 whitened power, {direction_title(direction)}")
+            ax.set_title(f"Real July {int(year)}: 8x8-whitened I vs E[I], {direction_title(direction)}")
             ax.set_xlabel(direction_xlabel(direction))
-            ax.set_ylabel("8x8 whitened power after profile sigma scaling (target = 1)")
+            ax.set_ylabel("8x8-whitened I / E[I] quadratic power (target = 1)")
             ax.set_yscale("log")
             ax.set_ylim(0.2, 5.0)
             ax.grid(alpha=0.25, which="both")
             ax.legend(fontsize=8)
             fig.tight_layout()
-            fig.savefig(year_dir / f"whitened_8x8_power_{direction}.png", dpi=180, bbox_inches="tight")
+            fig.savefig(year_dir / f"whitened_8x8_I_vs_EI_target1_{direction}.png", dpi=180, bbox_inches="tight")
             plt.close(fig)
 
 
@@ -1258,7 +1288,11 @@ def main() -> None:
     print("\nDone.", flush=True)
     print("fits:", out_dir / FIT_CSV, flush=True)
     print("profiles:", out_dir / PROFILE_CSV, flush=True)
-    print("I/EI profile-sigma monthly ratio plot:", out_dir / "st_corridor_spectral_monthly_I_over_EI_profile_sigma_ratio.png", flush=True)
+    print(
+        "marginal time-averaged spatial I/Ediag monthly ratio plot:",
+        out_dir / "marginal_timeavg_spatial_monthly_I_over_Ediag_profile_sigma_ratio.png",
+        flush=True,
+    )
     print("directional monthly plots:", out_dir / "monthly_average_plots", flush=True)
     print("ratio band table:", out_dir / BAND_TABLE_CSV, flush=True)
 
