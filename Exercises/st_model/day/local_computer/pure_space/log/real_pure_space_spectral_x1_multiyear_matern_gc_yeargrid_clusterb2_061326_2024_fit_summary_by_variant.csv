@@ -1,0 +1,5 @@
+year,variant,model_label,nugget_mode,n_slices,loss_mean,loss_median,sigmasq_median,range_lat_median,range_lon_median,nugget_median,total_s_sum
+2024,gc_a0p7_b3p0_nugget0,GC a=0.7 b=3 nugget0,nugget0,24,1.4435,1.4510,15.6498,1.9783,2.8715,0.0000,33.9537
+2024,gc_a0p7_b3p5_nugget0,GC a=0.7 b=3.5 nugget0,nugget0,24,1.5072,1.5032,15.6460,2.4551,3.5792,0.0000,32.8257
+2024,gc_a0p7_b4p0_nugget0,GC a=0.7 b=4 nugget0,nugget0,24,1.5188,1.5065,15.6534,2.9643,4.3360,0.0000,35.2214
+2024,matern_s03_nugget0,Matern s=0.3 nugget0,nugget0,24,1.3115,1.3266,16.4653,0.3452,0.4794,0.0000,39.1393

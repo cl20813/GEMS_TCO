@@ -1,0 +1,16 @@
+frequency_band,k_bin_start,k_bin_end,k_mid_min,k_mid_max,variant,model_label,n_bins,ratio_mean,ratio_median,ratio_min,ratio_max
+ultra_low,0,4,0.5729,5.1561,matern_s03_nugget0,Matern s=0.3 nugget0,5,1.6576,0.6754,0.6466,5.1977
+ultra_low,0,4,0.5729,5.1561,gc_a0p8_b0p5_nugget0,GC a=0.8 b=0.5 nugget0,5,1.1349,0.8562,0.7917,2.1676
+ultra_low,0,4,0.5729,5.1561,gc_a0p9_b0p5_nugget0,GC a=0.9 b=0.5 nugget0,5,1.3940,0.9435,0.9296,2.8885
+low_mid,5,14,6.3019,16.6141,matern_s03_nugget0,Matern s=0.3 nugget0,10,0.8765,0.8690,0.7604,1.0436
+low_mid,5,14,6.3019,16.6141,gc_a0p8_b0p5_nugget0,GC a=0.8 b=0.5 nugget0,10,0.9527,0.9431,0.9003,1.0616
+low_mid,5,14,6.3019,16.6141,gc_a0p9_b0p5_nugget0,GC a=0.9 b=0.5 nugget0,10,0.9666,0.9547,0.9253,1.0500
+mid,15,29,17.7599,33.8012,matern_s03_nugget0,Matern s=0.3 nugget0,15,1.0949,1.0937,1.0121,1.2077
+mid,15,29,17.7599,33.8012,gc_a0p8_b0p5_nugget0,GC a=0.8 b=0.5 nugget0,15,1.0594,1.0523,0.9916,1.1592
+mid,15,29,17.7599,33.8012,gc_a0p9_b0p5_nugget0,GC a=0.9 b=0.5 nugget0,15,1.0383,1.0322,0.9697,1.1393
+high,30,49,34.9470,56.7172,matern_s03_nugget0,Matern s=0.3 nugget0,20,1.0667,1.0707,0.9883,1.1583
+high,30,49,34.9470,56.7172,gc_a0p8_b0p5_nugget0,GC a=0.8 b=0.5 nugget0,20,1.0484,1.0508,0.9846,1.1256
+high,30,49,34.9470,56.7172,gc_a0p9_b0p5_nugget0,GC a=0.9 b=0.5 nugget0,20,1.0551,1.0566,0.9998,1.1240
+very_high,50,69,57.8630,79.6333,matern_s03_nugget0,Matern s=0.3 nugget0,20,0.9234,0.9242,0.8350,1.0765
+very_high,50,69,57.8630,79.6333,gc_a0p8_b0p5_nugget0,GC a=0.8 b=0.5 nugget0,20,0.9362,0.9347,0.8520,1.0813
+very_high,50,69,57.8630,79.6333,gc_a0p9_b0p5_nugget0,GC a=0.9 b=0.5 nugget0,20,0.9640,0.9609,0.8813,1.1057

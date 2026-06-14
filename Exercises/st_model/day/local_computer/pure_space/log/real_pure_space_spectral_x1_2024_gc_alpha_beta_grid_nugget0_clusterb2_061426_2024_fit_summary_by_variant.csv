@@ -1,0 +1,14 @@
+year,variant,model_label,nugget_mode,n_slices,loss_mean,loss_median,sigmasq_median,range_lat_median,range_lon_median,nugget_median,total_s_sum
+2024,gc_a0p75_b0p5_nugget0,GC a=0.75 b=0.5 nugget0,nugget0,40,1.3673,1.3758,21.3564,0.2580,0.3238,0.0000,61.0992
+2024,gc_a0p75_b1p0_nugget0,GC a=0.75 b=1 nugget0,nugget0,40,1.2773,1.2899,15.9825,0.4696,0.5708,0.0000,60.7720
+2024,gc_a0p85_b0p5_nugget0,GC a=0.85 b=0.5 nugget0,nugget0,40,1.4818,1.4748,16.5743,0.1307,0.1648,0.0000,61.2432
+2024,gc_a0p85_b1p0_nugget0,GC a=0.85 b=1 nugget0,nugget0,40,1.2869,1.3113,13.9147,0.2352,0.2906,0.0000,54.6949
+2024,gc_a0p8_b0p5_nugget0,GC a=0.8 b=0.5 nugget0,nugget0,40,1.4268,1.4166,18.1852,0.1763,0.2221,0.0000,59.0054
+2024,gc_a0p8_b1p0_nugget0,GC a=0.8 b=1 nugget0,nugget0,40,1.2795,1.3013,14.6055,0.3196,0.3902,0.0000,55.7532
+2024,gc_a0p95_b0p5_nugget0,GC a=0.95 b=0.5 nugget0,nugget0,40,1.6322,1.5859,15.1687,0.0841,0.1065,0.0000,74.0865
+2024,gc_a0p95_b1p0_nugget0,GC a=0.95 b=1 nugget0,nugget0,40,1.3320,1.3573,12.9200,0.1484,0.1844,0.0000,57.9451
+2024,gc_a0p9_b0p5_nugget0,GC a=0.9 b=0.5 nugget0,nugget0,40,1.5451,1.5054,15.7923,0.1026,0.1298,0.0000,62.7597
+2024,gc_a0p9_b1p0_nugget0,GC a=0.9 b=1 nugget0,nugget0,40,1.2993,1.3031,13.3681,0.1830,0.2265,0.0000,54.5853
+2024,gc_a1p0_b0p5_nugget0,GC a=1 b=0.5 nugget0,nugget0,40,1.8040,1.8291,14.6547,0.0712,0.0903,0.0000,63.2873
+2024,gc_a1p0_b1p0_nugget0,GC a=1 b=1 nugget0,nugget0,40,1.3601,1.3490,12.5327,0.1241,0.1555,0.0000,60.9382
+2024,matern_s03_nugget0,Matern s=0.3 nugget0,nugget0,40,1.2812,1.2959,16.2442,0.4001,0.5171,0.0000,67.1629

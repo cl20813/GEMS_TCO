@@ -1,0 +1,41 @@
+frequency_band,k_bin_start,k_bin_end,k_mid_min,k_mid_max,variant,model_label,n_bins,ratio_mean,ratio_median,ratio_min,ratio_max
+ultra_low,0,4,0.5729,5.1561,matern_s03_nugget0,Matern s=0.3 nugget0,5,1.6036,0.8410,0.7833,3.6366
+ultra_low,0,4,0.5729,5.1561,matern_s03_nugget_free,Matern s=0.3 nugget free,5,1.2535,0.8032,0.7453,2.4145
+ultra_low,0,4,0.5729,5.1561,gc_a0p7_b3p0_nugget0,GC a=0.7 b=3 nugget0,5,1.1656,0.9887,0.8820,1.5212
+ultra_low,0,4,0.5729,5.1561,gc_a0p7_b3p0_nugget_free,GC a=0.7 b=3 nugget free,5,1.0493,0.9324,0.8071,1.3030
+ultra_low,0,4,0.5729,5.1561,gc_a0p7_b3p5_nugget0,GC a=0.7 b=3.5 nugget0,5,1.1920,0.9859,0.8859,1.6235
+ultra_low,0,4,0.5729,5.1561,gc_a0p7_b3p5_nugget_free,GC a=0.7 b=3.5 nugget free,5,1.0647,0.9281,0.8070,1.3518
+ultra_low,0,4,0.5729,5.1561,gc_a0p7_b4p0_nugget0,GC a=0.7 b=4 nugget0,5,1.2134,0.9830,0.8884,1.7089
+ultra_low,0,4,0.5729,5.1561,gc_a0p7_b4p0_nugget_free,GC a=0.7 b=4 nugget free,5,1.0771,0.9244,0.8065,1.4082
+low_mid,5,14,6.3019,16.6141,matern_s03_nugget0,Matern s=0.3 nugget0,10,0.7714,0.7694,0.6201,0.8825
+low_mid,5,14,6.3019,16.6141,matern_s03_nugget_free,Matern s=0.3 nugget free,10,0.8550,0.8403,0.6467,0.9967
+low_mid,5,14,6.3019,16.6141,gc_a0p7_b3p0_nugget0,GC a=0.7 b=3 nugget0,10,0.8905,0.8940,0.7635,0.9688
+low_mid,5,14,6.3019,16.6141,gc_a0p7_b3p0_nugget_free,GC a=0.7 b=3 nugget free,10,0.9102,0.9210,0.7487,1.0103
+low_mid,5,14,6.3019,16.6141,gc_a0p7_b3p5_nugget0,GC a=0.7 b=3.5 nugget0,10,0.8838,0.8873,0.7578,0.9625
+low_mid,5,14,6.3019,16.6141,gc_a0p7_b3p5_nugget_free,GC a=0.7 b=3.5 nugget free,10,0.9068,0.9173,0.7441,1.0084
+low_mid,5,14,6.3019,16.6141,gc_a0p7_b4p0_nugget0,GC a=0.7 b=4 nugget0,10,0.8784,0.8820,0.7529,0.9574
+low_mid,5,14,6.3019,16.6141,gc_a0p7_b4p0_nugget_free,GC a=0.7 b=4 nugget free,10,0.9041,0.9143,0.7403,1.0069
+mid,15,29,17.7599,33.8012,matern_s03_nugget0,Matern s=0.3 nugget0,15,1.0091,1.0072,0.9002,1.1090
+mid,15,29,17.7599,33.8012,matern_s03_nugget_free,Matern s=0.3 nugget free,15,1.0989,1.1025,1.0150,1.1600
+mid,15,29,17.7599,33.8012,gc_a0p7_b3p0_nugget0,GC a=0.7 b=3 nugget0,15,1.0255,1.0282,0.9536,1.0908
+mid,15,29,17.7599,33.8012,gc_a0p7_b3p0_nugget_free,GC a=0.7 b=3 nugget free,15,1.0694,1.0737,1.0001,1.1223
+mid,15,29,17.7599,33.8012,gc_a0p7_b3p5_nugget0,GC a=0.7 b=3.5 nugget0,15,1.0224,1.0237,0.9497,1.0900
+mid,15,29,17.7599,33.8012,gc_a0p7_b3p5_nugget_free,GC a=0.7 b=3.5 nugget free,15,1.0698,1.0748,1.0002,1.1236
+mid,15,29,17.7599,33.8012,gc_a0p7_b4p0_nugget0,GC a=0.7 b=4 nugget0,15,1.0199,1.0200,0.9467,1.0893
+mid,15,29,17.7599,33.8012,gc_a0p7_b4p0_nugget_free,GC a=0.7 b=4 nugget free,15,1.0701,1.0755,1.0002,1.1245
+high,30,49,34.9470,56.7172,matern_s03_nugget0,Matern s=0.3 nugget0,20,1.0775,1.0778,1.0245,1.1451
+high,30,49,34.9470,56.7172,matern_s03_nugget_free,Matern s=0.3 nugget free,20,1.0717,1.0760,0.9879,1.1698
+high,30,49,34.9470,56.7172,gc_a0p7_b3p0_nugget0,GC a=0.7 b=3 nugget0,20,1.0461,1.0475,0.9917,1.1167
+high,30,49,34.9470,56.7172,gc_a0p7_b3p0_nugget_free,GC a=0.7 b=3 nugget free,20,1.0497,1.0548,0.9789,1.1364
+high,30,49,34.9470,56.7172,gc_a0p7_b3p5_nugget0,GC a=0.7 b=3.5 nugget0,20,1.0472,1.0482,0.9935,1.1169
+high,30,49,34.9470,56.7172,gc_a0p7_b3p5_nugget_free,GC a=0.7 b=3.5 nugget free,20,1.0507,1.0558,0.9794,1.1377
+high,30,49,34.9470,56.7172,gc_a0p7_b4p0_nugget0,GC a=0.7 b=4 nugget0,20,1.0480,1.0488,0.9950,1.1170
+high,30,49,34.9470,56.7172,gc_a0p7_b4p0_nugget_free,GC a=0.7 b=4 nugget free,20,1.0514,1.0565,0.9798,1.1387
+very_high,50,69,57.8630,79.6333,matern_s03_nugget0,Matern s=0.3 nugget0,20,0.9786,0.9737,0.9269,1.0254
+very_high,50,69,57.8630,79.6333,matern_s03_nugget_free,Matern s=0.3 nugget free,20,0.9218,0.9178,0.8598,0.9805
+very_high,50,69,57.8630,79.6333,gc_a0p7_b3p0_nugget0,GC a=0.7 b=3 nugget0,20,0.9475,0.9433,0.8971,0.9925
+very_high,50,69,57.8630,79.6333,gc_a0p7_b3p0_nugget_free,GC a=0.7 b=3 nugget free,20,0.9221,0.9185,0.8647,0.9748
+very_high,50,69,57.8630,79.6333,gc_a0p7_b3p5_nugget0,GC a=0.7 b=3.5 nugget0,20,0.9497,0.9455,0.8996,0.9945
+very_high,50,69,57.8630,79.6333,gc_a0p7_b3p5_nugget_free,GC a=0.7 b=3.5 nugget free,20,0.9222,0.9185,0.8645,0.9752
+very_high,50,69,57.8630,79.6333,gc_a0p7_b4p0_nugget0,GC a=0.7 b=4 nugget0,20,0.9515,0.9473,0.9015,0.9961
+very_high,50,69,57.8630,79.6333,gc_a0p7_b4p0_nugget_free,GC a=0.7 b=4 nugget free,20,0.9222,0.9186,0.8644,0.9754

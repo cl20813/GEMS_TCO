@@ -1,0 +1,26 @@
+frequency_band,k_bin_start,k_bin_end,k_mid_min,k_mid_max,variant,model_label,n_bins,ratio_mean,ratio_median,ratio_min,ratio_max
+ultra_low,0,4,0.5729,5.1561,matern_s03_nugget0,Matern s=0.3 nugget0,5,1.6036,0.8410,0.7833,3.6366
+ultra_low,0,4,0.5729,5.1561,gc_a0p75_b1p0_nugget0,GC a=0.75 b=1 nugget0,5,1.0775,1.0375,0.8945,1.3619
+ultra_low,0,4,0.5729,5.1561,gc_a0p75_b1p5_nugget0,GC a=0.75 b=1.5 nugget0,5,1.1990,1.0555,0.9424,1.5472
+ultra_low,0,4,0.5729,5.1561,gc_a0p8_b1p0_nugget0,GC a=0.8 b=1 nugget0,5,1.2158,1.1071,0.9852,1.5786
+ultra_low,0,4,0.5729,5.1561,gc_a0p8_b1p5_nugget0,GC a=0.8 b=1.5 nugget0,5,1.3852,1.1265,1.0452,1.8704
+low_mid,5,14,6.3019,16.6141,matern_s03_nugget0,Matern s=0.3 nugget0,10,0.7714,0.7694,0.6201,0.8825
+low_mid,5,14,6.3019,16.6141,gc_a0p75_b1p0_nugget0,GC a=0.75 b=1 nugget0,10,0.9353,0.9343,0.8138,1.0054
+low_mid,5,14,6.3019,16.6141,gc_a0p75_b1p5_nugget0,GC a=0.75 b=1.5 nugget0,10,0.9140,0.9100,0.8044,0.9887
+low_mid,5,14,6.3019,16.6141,gc_a0p8_b1p0_nugget0,GC a=0.8 b=1 nugget0,10,0.9353,0.9338,0.8385,1.0253
+low_mid,5,14,6.3019,16.6141,gc_a0p8_b1p5_nugget0,GC a=0.8 b=1.5 nugget0,10,0.9064,0.9036,0.8241,1.0009
+mid,15,29,17.7599,33.8012,matern_s03_nugget0,Matern s=0.3 nugget0,15,1.0091,1.0072,0.9002,1.1090
+mid,15,29,17.7599,33.8012,gc_a0p75_b1p0_nugget0,GC a=0.75 b=1 nugget0,15,1.0381,1.0471,0.9700,1.0920
+mid,15,29,17.7599,33.8012,gc_a0p75_b1p5_nugget0,GC a=0.75 b=1.5 nugget0,15,1.0237,1.0285,0.9527,1.0870
+mid,15,29,17.7599,33.8012,gc_a0p8_b1p0_nugget0,GC a=0.8 b=1 nugget0,15,1.0235,1.0295,0.9536,1.0838
+mid,15,29,17.7599,33.8012,gc_a0p8_b1p5_nugget0,GC a=0.8 b=1.5 nugget0,15,1.0038,1.0036,0.9303,1.0759
+high,30,49,34.9470,56.7172,matern_s03_nugget0,Matern s=0.3 nugget0,20,1.0775,1.0778,1.0245,1.1451
+high,30,49,34.9470,56.7172,gc_a0p75_b1p0_nugget0,GC a=0.75 b=1 nugget0,20,1.0427,1.0442,0.9880,1.1145
+high,30,49,34.9470,56.7172,gc_a0p75_b1p5_nugget0,GC a=0.75 b=1.5 nugget0,20,1.0469,1.0470,0.9963,1.1143
+high,30,49,34.9470,56.7172,gc_a0p8_b1p0_nugget0,GC a=0.8 b=1 nugget0,20,1.0468,1.0462,0.9982,1.1118
+high,30,49,34.9470,56.7172,gc_a0p8_b1p5_nugget0,GC a=0.8 b=1.5 nugget0,20,1.0511,1.0472,1.0071,1.1101
+very_high,50,69,57.8630,79.6333,matern_s03_nugget0,Matern s=0.3 nugget0,20,0.9786,0.9737,0.9269,1.0254
+very_high,50,69,57.8630,79.6333,gc_a0p75_b1p0_nugget0,GC a=0.75 b=1 nugget0,20,0.9445,0.9405,0.8943,0.9889
+very_high,50,69,57.8630,79.6333,gc_a0p75_b1p5_nugget0,GC a=0.75 b=1.5 nugget0,20,0.9555,0.9515,0.9065,0.9986
+very_high,50,69,57.8630,79.6333,gc_a0p8_b1p0_nugget0,GC a=0.8 b=1 nugget0,20,0.9611,0.9572,0.9133,1.0025
+very_high,50,69,57.8630,79.6333,gc_a0p8_b1p5_nugget0,GC a=0.8 b=1.5 nugget0,20,0.9748,0.9707,0.9283,1.0141

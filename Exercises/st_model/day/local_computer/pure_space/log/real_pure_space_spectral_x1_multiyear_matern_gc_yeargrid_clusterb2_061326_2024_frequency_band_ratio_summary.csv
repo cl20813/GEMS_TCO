@@ -1,0 +1,21 @@
+frequency_band,k_bin_start,k_bin_end,k_mid_min,k_mid_max,variant,model_label,n_bins,ratio_mean,ratio_median,ratio_min,ratio_max
+ultra_low,0,4,0.5729,5.1561,matern_s03_nugget0,Matern s=0.3 nugget0,5,1.6576,0.6754,0.6466,5.1977
+ultra_low,0,4,0.5729,5.1561,gc_a0p7_b3p0_nugget0,GC a=0.7 b=3 nugget0,5,1.2685,0.7898,0.7416,2.9873
+ultra_low,0,4,0.5729,5.1561,gc_a0p7_b3p5_nugget0,GC a=0.7 b=3.5 nugget0,5,1.2955,0.7856,0.7414,3.1174
+ultra_low,0,4,0.5729,5.1561,gc_a0p7_b4p0_nugget0,GC a=0.7 b=4 nugget0,5,1.3172,0.7820,0.7407,3.2237
+low_mid,5,14,6.3019,16.6141,matern_s03_nugget0,Matern s=0.3 nugget0,10,0.8765,0.8690,0.7604,1.0436
+low_mid,5,14,6.3019,16.6141,gc_a0p7_b3p0_nugget0,GC a=0.7 b=3 nugget0,10,0.9226,0.9088,0.8474,1.0531
+low_mid,5,14,6.3019,16.6141,gc_a0p7_b3p5_nugget0,GC a=0.7 b=3.5 nugget0,10,0.9185,0.9049,0.8428,1.0495
+low_mid,5,14,6.3019,16.6141,gc_a0p7_b4p0_nugget0,GC a=0.7 b=4 nugget0,10,0.9151,0.9016,0.8389,1.0466
+mid,15,29,17.7599,33.8012,matern_s03_nugget0,Matern s=0.3 nugget0,15,1.0949,1.0937,1.0121,1.2077
+mid,15,29,17.7599,33.8012,gc_a0p7_b3p0_nugget0,GC a=0.7 b=3 nugget0,15,1.0705,1.0646,0.9976,1.1744
+mid,15,29,17.7599,33.8012,gc_a0p7_b3p5_nugget0,GC a=0.7 b=3.5 nugget0,15,1.0691,1.0645,0.9953,1.1739
+mid,15,29,17.7599,33.8012,gc_a0p7_b4p0_nugget0,GC a=0.7 b=4 nugget0,15,1.0680,1.0644,0.9934,1.1734
+high,30,49,34.9470,56.7172,matern_s03_nugget0,Matern s=0.3 nugget0,20,1.0667,1.0707,0.9883,1.1583
+high,30,49,34.9470,56.7172,gc_a0p7_b3p0_nugget0,GC a=0.7 b=3 nugget0,20,1.0480,1.0522,0.9769,1.1318
+high,30,49,34.9470,56.7172,gc_a0p7_b3p5_nugget0,GC a=0.7 b=3.5 nugget0,20,1.0488,1.0530,0.9779,1.1323
+high,30,49,34.9470,56.7172,gc_a0p7_b4p0_nugget0,GC a=0.7 b=4 nugget0,20,1.0494,1.0537,0.9787,1.1327
+very_high,50,69,57.8630,79.6333,matern_s03_nugget0,Matern s=0.3 nugget0,20,0.9234,0.9242,0.8350,1.0765
+very_high,50,69,57.8630,79.6333,gc_a0p7_b3p0_nugget0,GC a=0.7 b=3 nugget0,20,0.9205,0.9204,0.8348,1.0685
+very_high,50,69,57.8630,79.6333,gc_a0p7_b3p5_nugget0,GC a=0.7 b=3.5 nugget0,20,0.9218,0.9217,0.8360,1.0698
+very_high,50,69,57.8630,79.6333,gc_a0p7_b4p0_nugget0,GC a=0.7 b=4 nugget0,20,0.9228,0.9226,0.8370,1.0708
