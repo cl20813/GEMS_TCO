@@ -716,7 +716,7 @@ def year_model_loss_lookup(loss_summary: pd.DataFrame | None) -> dict[tuple[int,
 def label_with_loss(base_label: str, loss_mean: float | None) -> str:
     if loss_mean is None or not np.isfinite(float(loss_mean)):
         return base_label
-    return f"{base_label} loss={float(loss_mean):.3g}"
+    return f"{base_label} loss={float(loss_mean):.5f}"
 
 
 def ordered_prefixes(df: pd.DataFrame) -> tuple[list[int], list[str]]:
