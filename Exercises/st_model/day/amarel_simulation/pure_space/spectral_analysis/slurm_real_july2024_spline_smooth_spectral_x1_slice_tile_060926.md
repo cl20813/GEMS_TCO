@@ -1,7 +1,7 @@
 # Real July 2024 x1 Slice/Tile Spectral Ratio Diagnostics, 2026-06-09
 
 Legacy 2024-only runbook.  The maintained script now lives in this
-`spectral_analysis` folder as `real_july2022_2025_spectrum_ratio_plot.py`; this
+`spectral_analysis` folder as `real_july2023_2025_spectrum_ratio_plot.py`; this
 runbook pins `--years "2024"` to reproduce the old 2024-only run.
 
 This run checks whether the strange latitude-direction `I / E[I]` ratio is a
@@ -52,7 +52,7 @@ Transfer the run script:
 ssh jl2815@amarel.rutgers.edu \
   'mkdir -p /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/spectral_analysis /home/jl2815/tco/exercise_output/logs'
 
-scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/pure_space/spectral_analysis/real_july2022_2025_spectrum_ratio_plot.py" \
+scp "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/pure_space/spectral_analysis/real_july2023_2025_spectrum_ratio_plot.py" \
   "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/spectral_analysis/"
 ```
 
@@ -105,7 +105,7 @@ export MKL_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
-SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/spectral_analysis/real_july2022_2025_spectrum_ratio_plot.py"
+SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/spectral_analysis/real_july2023_2025_spectrum_ratio_plot.py"
 OUTROOT="/home/jl2815/tco/exercise_output/summer/real_data/spline_smooth_spectral_x1_slice_tile_060926"
 TOPPLOTS="${OUTROOT}/monthly_plots_top"
 LOGROOT="/home/jl2815/tco/exercise_output/logs"

@@ -106,7 +106,7 @@ Paste this bash block into nano, then save:
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=96G
+#SBATCH --mem=128G
 #SBATCH --time=24:00:00
 #SBATCH --array=0-2
 #SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/stspec_y_%A_%a.out
@@ -141,7 +141,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:128
 SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/spectral_analysis/real_july_st_corridor_spectral_profile_061426.py"
 OUTROOT="/home/jl2815/tco/exercise_output/summer/st_corridor_spectral_profile_2023_2025_matern_gc_nugget0_061426"
 
-YEARS=(2023 2024 2025)
+YEARS=(2024)
 YEAR="${YEARS[$SLURM_ARRAY_TASK_ID]}"
 if [[ "${YEAR}" == "2024" ]]; then
   MODEL_VARIANTS=(matern_s03 gc_a08_b1)
@@ -195,6 +195,8 @@ python "${SCRIPT}" \
   --suppress-fit-prints
 
 echo "Finished: $(date)"
+
+
 ```
 
 Submit:

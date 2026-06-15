@@ -1054,6 +1054,28 @@ def plot_directional_year_outputs(monthly: pd.DataFrame, base_dir: Path) -> None
             plt.close(fig)
 
             fig, ax = plt.subplots(figsize=(8.5, 5.4))
+            for model_variant, sub_model in sub.groupby("model_variant", dropna=False):
+                sub_model = sub_model.sort_values("k_mid")
+                model_label = str(sub_model["model_label"].dropna().iloc[0]) if sub_model["model_label"].notna().any() else str(model_variant)
+                ax.plot(
+                    pd.to_numeric(sub_model["k_mid"], errors="coerce"),
+                    pd.to_numeric(sub_model["ratio_I_over_EI_profile_mean"], errors="coerce"),
+                    linewidth=1.9,
+                    label=model_label,
+                )
+            ax.axhline(1.0, color="0.25", linestyle="--", linewidth=1.0)
+            ax.set_title(f"Real July {int(year)}: marginal time-averaged spatial I / diagonal E[I], {direction_title(direction)}")
+            ax.set_xlabel(direction_xlabel(direction))
+            ax.set_ylabel("Marginal time-averaged spatial I / diagonal E[I] with profile sigma (target = 1)")
+            ax.set_yscale("log")
+            ax.set_ylim(0.2, 5.0)
+            ax.grid(alpha=0.25, which="both")
+            ax.legend(fontsize=8)
+            fig.tight_layout()
+            fig.savefig(year_dir / f"marginal_timeavg_spatial_I_over_Ediag_profile_sigma_target1_{direction}.png", dpi=180, bbox_inches="tight")
+            plt.close(fig)
+
+            fig, ax = plt.subplots(figsize=(8.5, 5.4))
             _plot_model_pair_lines(
                 ax,
                 sub,
