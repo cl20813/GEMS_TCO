@@ -29,7 +29,7 @@ st_corridor_spectral_profiles.csv
 st_corridor_spectral_monthly_summary.csv
 st_corridor_spectral_representative_frequency_band_table.csv
 monthly_average_plots/year_2023/marginal_timeavg_spatial_I_vs_Ediag_profile_sigma_norm.png
-monthly_average_plots/year_2023/marginal_timeavg_spatial_Ediag_vs_continuous_profile_sigma_norm.png
+monthly_average_plots/year_2023/marginal_timeavg_spatial_Ediag_over_continuous_ratio_norm.png
 monthly_average_plots/year_2023/whitened_8x8_I_vs_EI_target1_norm.png
 monthly_average_plots/year_2023/st_corridor_spectral_monthly_summary.csv
 monthly_average_plots/year_2023/st_corridor_spectral_representative_frequency_band_table.csv
@@ -40,7 +40,7 @@ fixed by plot family so the Matérn-vs-GC comparison is visually consistent:
 
 ```text
 marginal timeavg I vs Ediag: marginal time-averaged spatial spectrum with profile sigma, observed I and diagonal fitted E[I]
-marginal timeavg Ediag vs continuous: marginal time-averaged spatial spectrum with profile sigma, diagonal fitted E[I] and theoretical continuous spectrum
+marginal timeavg Ediag / continuous: ratio of finite-sample diagonal E[I] to theoretical continuous spectrum
 whitened 8x8 I vs EI: 8x8-whitened I / E[I] quadratic power, target = 1
 ```
 
@@ -233,7 +233,7 @@ This brings back the year folders, for example:
 ```text
 monthly_average_plots/year_2023/
   marginal_timeavg_spatial_I_vs_Ediag_profile_sigma_norm.png
-  marginal_timeavg_spatial_Ediag_vs_continuous_profile_sigma_norm.png
+  marginal_timeavg_spatial_Ediag_over_continuous_ratio_norm.png
   whitened_8x8_I_vs_EI_target1_norm.png
   st_corridor_spectral_monthly_summary.csv
   st_corridor_spectral_representative_frequency_band_table.csv

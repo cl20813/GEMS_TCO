@@ -5,7 +5,7 @@ This is the canonical pure-space spectrum-ratio plot script for real July GEMS
 TCO data over latitude -3..2 and longitude 121..131.
 
   years:          2023, 2024, 2025 by default
-  variants:       year-specific Matérn smooth 0.3 and generalized Cauchy models
+  variants:       Matérn smooth 0.3 baseline and one year-specific generalized Cauchy model
   block prefix:   all only by default, so every fit is x1/full-resolution
   domains:        full -3..2, 121..131 spatial domain by default
 
@@ -94,13 +94,6 @@ VARIANTS = {
         "row_title": "GC a=0.75 b=1, nugget fixed 0",
         "plot_label": "GC a=0.75 b=1 nugget0",
     },
-    "gc_a075_b05": {
-        "family": "cauchy",
-        "gc_alpha": 0.75,
-        "gc_beta": 0.5,
-        "row_title": "GC a=0.75 b=0.5, nugget fixed 0",
-        "plot_label": "GC a=0.75 b=0.5 nugget0",
-    },
     "gc_a08_b1": {
         "family": "cauchy",
         "gc_alpha": 0.8,
@@ -108,19 +101,12 @@ VARIANTS = {
         "row_title": "GC a=0.8 b=1, nugget fixed 0",
         "plot_label": "GC a=0.8 b=1 nugget0",
     },
-    "gc_a08_b05": {
-        "family": "cauchy",
-        "gc_alpha": 0.8,
-        "gc_beta": 0.5,
-        "row_title": "GC a=0.8 b=0.5, nugget fixed 0",
-        "plot_label": "GC a=0.8 b=0.5 nugget0",
-    },
 }
 
 YEAR_VARIANTS = {
-    2023: ["matern_s03", "gc_a075_b1", "gc_a075_b05"],
-    2024: ["matern_s03", "gc_a08_b1", "gc_a08_b05"],
-    2025: ["matern_s03", "gc_a075_b1", "gc_a075_b05", "gc_a08_b05"],
+    2023: ["matern_s03", "gc_a075_b1"],
+    2024: ["matern_s03", "gc_a08_b1"],
+    2025: ["matern_s03", "gc_a075_b1"],
 }
 
 
@@ -183,13 +169,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--days", default="1,30", help="Inclusive day range or comma list. Default uses July days 1..30.")
     p.add_argument("--smooths", default="0.3")
     p.add_argument("--block-prefixes", default="all")
-    p.add_argument("--variants", default="matern_s03,gc_a075_b1,gc_a075_b05,gc_a08_b1,gc_a08_b05")
+    p.add_argument("--variants", default="matern_s03,gc_a075_b1,gc_a08_b1")
     p.add_argument("--neighbors", type=int, default=2, help="Deprecated alias; cluster B2 uses --cluster-neighbor-blocks.")
     p.add_argument("--cluster-neighbor-blocks", type=int, default=2)
     p.add_argument("--cluster-block-shape", default="4x4")
     p.add_argument("--mean-design", default="lat", choices=["lat", "base", "latlon", "hour_spatial"])
     p.add_argument("--data-root", default=getattr(config, "amarel_data_load_path", "/home/jl2815/tco/data/"))
-    p.add_argument("--output-root", default="/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_2025_pure_space_matern_gc_spectrum_ratio_plot")
+    p.add_argument("--output-root", default="/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_2025_pure_space_matern_gc_final_spectrum_ratio_plot")
     p.add_argument("--top-plot-dir", default="", help="Optional top-level folder that receives copies of monthly plot PNGs.")
     p.add_argument("--expanded-bounds", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--lat-range", default="-3,2")
@@ -1757,6 +1743,12 @@ def profile_ratio_label(ratio_df):
     return label
 
 
+def label_with_loss(model_label: str, loss: float | None) -> str:
+    if loss is None or not np.isfinite(float(loss)):
+        return str(model_label)
+    return f"{model_label} loss={float(loss):.5f}"
+
+
 def cutoff_from_frame(df: pd.DataFrame, fallback: float) -> float:
     if df is not None and not df.empty and "data_k_max" in df.columns and df["data_k_max"].notna().any():
         val = float(pd.to_numeric(df["data_k_max"], errors="coerce").dropna().iloc[0])
@@ -1817,9 +1809,12 @@ def format_fit_label(source_df, variant, resolution_label):
     nugget = float(pd.to_numeric(df["est_nugget"], errors="coerce").median())
     gc_alpha = float(pd.to_numeric(df.get("est_gc_alpha", pd.Series(np.nan, index=df.index)), errors="coerce").median())
     gc_beta = float(pd.to_numeric(df.get("est_gc_beta", pd.Series(np.nan, index=df.index)), errors="coerce").median())
+    loss = float(pd.to_numeric(df.get("loss", pd.Series(np.nan, index=df.index)), errors="coerce").median())
     if not np.isfinite(sigmasq) or not np.isfinite(range_lat) or not np.isfinite(range_lon):
         return None
     label = f"fit median: sigma^2={sigmasq:.3g}\nrange_lat={range_lat:.3g}, range_lon={range_lon:.3g}"
+    if np.isfinite(loss):
+        label += f"\nloss={loss:.5f}"
     if np.isfinite(phi3):
         label += f"\nphi3={phi3:.3g}"
     if np.isfinite(gc_alpha) and np.isfinite(gc_beta):
@@ -1827,6 +1822,36 @@ def format_fit_label(source_df, variant, resolution_label):
     if np.isfinite(nugget) and abs(nugget) > EPS:
         label += f"\nnugget={nugget:.3g}"
     return label
+
+
+def median_loss_for_domain(
+    args: argparse.Namespace,
+    year: int,
+    smooth: float,
+    spec: DomainSpec,
+    variant: str,
+    resolution_label: str,
+) -> float:
+    out_dir = output_dir_for_domain(args, smooth, year, spec)
+    frames = []
+    for path in sorted((out_dir / "daily_csv").glob("*_fits.csv")):
+        try:
+            frames.append(pd.read_csv(path))
+        except pd.errors.EmptyDataError:
+            continue
+    if not frames:
+        return np.nan
+    df = pd.concat(frames, ignore_index=True)
+    if "loss" not in df.columns or "variant" not in df.columns or "resolution_label" not in df.columns:
+        return np.nan
+    mask = (
+        (df["variant"].astype(str) == str(variant))
+        & (df["resolution_label"].astype(str) == str(resolution_label))
+    )
+    if "status" in df.columns:
+        mask &= df["status"].astype(str).isin(["ok", "warn"])
+    vals = pd.to_numeric(df.loc[mask, "loss"], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+    return float(vals.median()) if not vals.empty else np.nan
 
 
 def ensure_profile_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -2531,6 +2556,7 @@ def monthly_curves_for_domain(
 
     labels_order = [block_prefix_label(s) for s in parse_block_prefixes(args.block_prefixes)]
     label = labels_order[0] if labels_order else "all"
+    median_loss = median_loss_for_domain(args, year, smooth, spec, variant, label)
     sub = monthly[
         (monthly["variant"].astype(str) == str(variant))
         & (monthly["profile"].astype(str) == str(profile))
@@ -2556,6 +2582,8 @@ def monthly_curves_for_domain(
             "month": int(args.month),
             "smooth": float(smooth),
             "variant": variant,
+            "model_label": VARIANTS.get(variant, {}).get("plot_label", variant),
+            "median_loss": median_loss,
             "profile": profile,
             "resolution_label": label,
             "domain_group": spec.group,
@@ -2880,7 +2908,13 @@ def plot_combined_domain_model_ratio_compare(
             if ratio is None or ratio.empty:
                 continue
             ratio = ratio.copy()
-            ratio["model_label"] = VARIANTS.get(variant, {}).get("plot_label", variant)
+            base_label = VARIANTS.get(variant, {}).get("plot_label", variant)
+            loss = (
+                float(pd.to_numeric(ratio["median_loss"], errors="coerce").dropna().iloc[0])
+                if "median_loss" in ratio.columns and ratio["median_loss"].notna().any()
+                else np.nan
+            )
+            ratio["model_label"] = label_with_loss(base_label, loss)
             panel[spec.label][variant] = ratio
             ratio_frames.append(ratio)
     if not ratio_frames:
@@ -2915,7 +2949,7 @@ def plot_combined_domain_model_ratio_compare(
                 linewidth=1.85 if variant == "matern_s03" else 1.55,
                 linestyle="-" if variant == "matern_s03" else "--",
                 color=colors[v_i % len(colors)],
-                label=VARIANTS.get(variant, {}).get("plot_label", variant),
+                label=str(rr["model_label"].dropna().iloc[0]) if "model_label" in rr.columns and rr["model_label"].notna().any() else VARIANTS.get(variant, {}).get("plot_label", variant),
             )
         ax.set_title(spec.title, fontsize=8.5)
         ax.set_yscale("log")

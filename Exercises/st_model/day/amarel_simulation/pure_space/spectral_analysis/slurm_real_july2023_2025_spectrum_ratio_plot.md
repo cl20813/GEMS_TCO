@@ -7,9 +7,9 @@ Canonical pure-space spectrum-ratio runbook.
 - nugget: fixed `0`
 - baseline: Matérn smooth `0.3`
 - model candidates:
-  - 2023: `matern_s03`, `gc_a075_b1`, `gc_a075_b05`
-  - 2024: `matern_s03`, `gc_a08_b1`, `gc_a08_b05`
-  - 2025: `matern_s03`, `gc_a075_b1`, `gc_a075_b05`, `gc_a08_b05`
+  - 2023: `matern_s03`, `gc_a075_b1`
+  - 2024: `matern_s03`, `gc_a08_b1`
+  - 2025: `matern_s03`, `gc_a075_b1`
 - averaging: pure-space hourly mean over July, usually `30 days x 8 hours = 240 hours`
 - no whitening: temporal 8x8 whitening is only for the spatio-temporal diagnostic
 - profiles: norm, latitude, longitude, and NE-SW diagonal
@@ -47,8 +47,8 @@ On Amarel:
 
 ```bash
 cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/spectral_analysis
-nano run_real_july2023_2025_pure_space_matern_gc_spectrum_ratio_plot.sh
-sbatch run_real_july2023_2025_pure_space_matern_gc_spectrum_ratio_plot.sh
+nano run_real_july2023_2025_pure_space_matern_gc_final_spectrum_ratio_plot.sh
+sbatch run_real_july2023_2025_pure_space_matern_gc_final_spectrum_ratio_plot.sh
 ```
 
 Paste:
@@ -88,11 +88,11 @@ export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
 SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/spectral_analysis/real_july2023_2025_spectrum_ratio_plot.py"
-OUTROOT="/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_2025_pure_space_matern_gc_spectrum_ratio_plot"
+OUTROOT="/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_2025_pure_space_matern_gc_final_spectrum_ratio_plot"
 TOPPLOTS="${OUTROOT}/monthly_plots_top"
 YEARS=(2023 2024 2025)
 YEAR="${YEARS[${SLURM_ARRAY_TASK_ID:-0}]}"
-VARIANTS="matern_s03,gc_a075_b1,gc_a075_b05,gc_a08_b1,gc_a08_b05"
+VARIANTS="matern_s03,gc_a075_b1,gc_a08_b1"
 
 mkdir -p "${OUTROOT}" "${TOPPLOTS}" /home/jl2815/tco/exercise_output/logs
 export MPLCONFIGDIR="${OUTROOT}/.mplconfig_${SLURM_JOB_ID:-manual}_${SLURM_ARRAY_TASK_ID:-0}"
@@ -101,7 +101,7 @@ mkdir -p "${MPLCONFIGDIR}"
 echo "Running on: $(hostname)"
 echo "Started: $(date)"
 echo "Year: ${YEAR}"
-echo "Experiment: pure-space spectrum ratio, Matern s=0.3 baseline plus year-specific GC, nugget0"
+echo "Experiment: pure-space spectrum ratio, Matern s=0.3 baseline plus final year-specific GC, nugget0"
 echo "Output root: ${OUTROOT}"
 echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}"
 nvidia-smi || true
@@ -146,7 +146,7 @@ echo "Finished: $(date)"
 Remote output root:
 
 ```text
-/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_2025_pure_space_matern_gc_spectrum_ratio_plot
+/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_2025_pure_space_matern_gc_final_spectrum_ratio_plot
 ```
 
 Most important comparison plots:
@@ -174,8 +174,8 @@ YYYY_07/smooth_0p3/<domain_group>/<domain_label>/monthly_average/
 Run from the local Mac:
 
 ```bash
-LOCAL_OUT="/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/real_july2023_2025_pure_space_matern_gc_spectrum_ratio_plot"
-REMOTE_OUT="/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_2025_pure_space_matern_gc_spectrum_ratio_plot"
+LOCAL_OUT="/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/real_july2023_2025_pure_space_matern_gc_final_spectrum_ratio_plot"
+REMOTE_OUT="/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_2025_pure_space_matern_gc_final_spectrum_ratio_plot"
 
 mkdir -p "${LOCAL_OUT}"
 

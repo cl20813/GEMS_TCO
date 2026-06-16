@@ -1,24 +1,19 @@
-#!/usr/bin/env python3
-"""Eigenvalue-decomposition diagnostics for real July GEMS group-Vecchia fits.
+"""Pure-space eigen diagnostics comparing Matern and generalized Cauchy Vecchia fits.
 
-This is the real-data companion to
-``Exercises/st_model/day/pure_space/simulation/eig_diag_sim_july_pure_space.py``.
-It reads the expanded July ``tco_grid`` pickle, fits a pure-space isotropic
-Matérn covariance model to each selected hour/spatial unit with block/group
-Vecchia, and plots the Figure 13.5-style cumulative sums of whitened
-covariance-eigenbasis scores.
+This 2026-06-16 version is a no-QC, nugget-fixed-0 comparison script for real
+July GEMS data.  It keeps the group/block Vecchia geometry from the earlier
+2-stage QC eigen diagnostic, but removes the outlier-removal refit so the
+covariance kernels are compared on the same observations.
 
-The two supported reductions are:
+Default comparison:
 
-  1. global:   whole expanded domain.
-  2. tiles4x4: split the observed domain into 16 coordinate tiles.
-  3. sparse:   whole-domain x4 thinning, using grid row/column indices
-               when the coordinates form an expanded grid.
+  2023: Matern smooth=0.3 vs GC alpha=0.75 beta=1
+  2024: Matern smooth=0.3 vs GC alpha=0.8  beta=1
+  2025: Matern smooth=0.3 vs GC alpha=0.75 beta=1
 
-The fitting likelihood profiles the mean by GLS through the underlying
-Vecchia likelihood.  The eigen diagnostic then uses the residual projection
-R = I - Q Q' before decomposing R Sigma R, matching the restricted-likelihood
-style diagnostic requested for the real-data comparison.
+Diagnostics are written for 2x4 coordinate tiles and whole-domain x4 thinning.
+Loss columns include both the raw Vecchia negative log-likelihood objective and
+loss_per_obs = raw loss / number of valid observations.
 """
 
 from __future__ import annotations
@@ -36,6 +31,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
+
+os.environ.setdefault("MPLCONFIGDIR", str(Path(os.environ.get("TMPDIR", "/tmp")) / "matplotlib"))
 import matplotlib
 
 matplotlib.use("Agg")
@@ -47,8 +44,14 @@ try:
         ClusterSpaceIsoTrendVecchiaFit as _ClusterSpaceIsoTrendVecchiaFit,
         ClusterSpaceIsoNoNuggetTrendVecchiaFit as _ClusterSpaceIsoNoNuggetTrendVecchiaFit,
     )
+    from GEMS_TCO.kernels_space_aniso_cauchy_cluster_060326 import (
+        ClusterSpaceAnisoCauchyFixedBetaNoNuggetTrendVecchiaFit,
+        cauchy_phi_init_from_natural,
+    )
 except ImportError:
-    for candidate in [Path(__file__).parents[5] / "src", Path("/home/jl2815/tco")]:
+    _here = Path(__file__).resolve()
+    _candidates = [p / "src" for p in _here.parents] + [Path("/home/jl2815/tco")]
+    for candidate in _candidates:
         if (candidate / "GEMS_TCO").is_dir() and str(candidate) not in sys.path:
             sys.path.insert(0, str(candidate))
             break
@@ -56,6 +59,10 @@ except ImportError:
     from GEMS_TCO.kernels_space_iso_cluster_052426 import (
         ClusterSpaceIsoTrendVecchiaFit as _ClusterSpaceIsoTrendVecchiaFit,
         ClusterSpaceIsoNoNuggetTrendVecchiaFit as _ClusterSpaceIsoNoNuggetTrendVecchiaFit,
+    )
+    from GEMS_TCO.kernels_space_aniso_cauchy_cluster_060326 import (
+        ClusterSpaceAnisoCauchyFixedBetaNoNuggetTrendVecchiaFit,
+        cauchy_phi_init_from_natural,
     )
 
 
@@ -65,39 +72,93 @@ ROUND_DECIMALS = 6
 BROWN_BRIDGE_Q95 = 1.3581015157406195
 
 
-class MicroergodicClusterIsoTrendVecchiaFit(_ClusterSpaceIsoTrendVecchiaFit):
+class AnisotropicClusterTrendVecchiaFit(_ClusterSpaceIsoTrendVecchiaFit):
     def _raw_params(self, params: torch.Tensor):
-        phi1 = torch.exp(params[0])
-        phi2 = torch.exp(params[1])
-        sigmasq = phi1 / phi2
-        range_space = 1.0 / phi2
-        nugget = torch.exp(params[2])
-        return sigmasq, range_space, range_space, nugget
+        sigmasq = torch.exp(params[0])
+        range_lat = torch.exp(params[1])
+        range_lon = torch.exp(params[2])
+        nugget = torch.exp(params[3])
+        return sigmasq, range_lat, range_lon, nugget
+
+    def _cov_from_deltas(self, d_lat, d_lon, params: torch.Tensor):
+        sigmasq, range_lat, range_lon, _ = self._raw_params(params)
+        scaled = torch.sqrt(
+            d_lat.new_tensor(1e-8)
+            + (d_lat / range_lat).pow(2)
+            + (d_lon / range_lon).pow(2)
+        )
+        return sigmasq * self._matern_corr(scaled)
 
     def _convert_params(self, raw):
-        phi1 = float(np.exp(raw[0]))
-        phi2 = float(np.exp(raw[1]))
-        return {"sigmasq": phi1 / phi2, "range": 1.0 / phi2, "nugget": float(np.exp(raw[2]))}
+        return {
+            "sigmasq": float(np.exp(raw[0])),
+            "range_lat": float(np.exp(raw[1])),
+            "range_lon": float(np.exp(raw[2])),
+            "nugget": float(np.exp(raw[3])),
+        }
 
 
-class MicroergodicClusterIsoNoNuggetTrendVecchiaFit(_ClusterSpaceIsoNoNuggetTrendVecchiaFit):
+class AnisotropicClusterNoNuggetTrendVecchiaFit(_ClusterSpaceIsoNoNuggetTrendVecchiaFit):
     def _raw_params(self, params: torch.Tensor):
-        phi1 = torch.exp(params[0])
-        phi2 = torch.exp(params[1])
-        sigmasq = phi1 / phi2
-        range_space = 1.0 / phi2
+        sigmasq = torch.exp(params[0])
+        range_lat = torch.exp(params[1])
+        range_lon = torch.exp(params[2])
         nugget = params.new_tensor(0.0)
-        return sigmasq, range_space, range_space, nugget
+        return sigmasq, range_lat, range_lon, nugget
+
+    def _cov_from_deltas(self, d_lat, d_lon, params: torch.Tensor):
+        sigmasq, range_lat, range_lon, _ = self._raw_params(params)
+        scaled = torch.sqrt(
+            d_lat.new_tensor(1e-8)
+            + (d_lat / range_lat).pow(2)
+            + (d_lon / range_lon).pow(2)
+        )
+        return sigmasq * self._matern_corr(scaled)
 
     def _convert_params(self, raw):
-        phi1 = float(np.exp(raw[0]))
-        phi2 = float(np.exp(raw[1]))
-        return {"sigmasq": phi1 / phi2, "range": 1.0 / phi2, "nugget": 0.0}
+        return {
+            "sigmasq": float(np.exp(raw[0])),
+            "range_lat": float(np.exp(raw[1])),
+            "range_lon": float(np.exp(raw[2])),
+            "nugget": 0.0,
+        }
 
 
 VARIANTS = {
-    "nugget0": {"class": MicroergodicClusterIsoNoNuggetTrendVecchiaFit, "n_params": 2},
-    "nugget_free": {"class": MicroergodicClusterIsoTrendVecchiaFit, "n_params": 3},
+    "matern_s03": {
+        "class": AnisotropicClusterNoNuggetTrendVecchiaFit,
+        "n_params": 3,
+        "family": "matern",
+        "smooth": 0.3,
+        "label": "Matern s=0.3",
+        "plot_color": "black",
+    },
+    "gc_a075_b1": {
+        "class": ClusterSpaceAnisoCauchyFixedBetaNoNuggetTrendVecchiaFit,
+        "n_params": 3,
+        "family": "cauchy",
+        "smooth": 0.5,
+        "gc_alpha": 0.75,
+        "gc_beta": 1.0,
+        "label": "GC a=0.75 b=1",
+        "plot_color": "#1f77b4",
+    },
+    "gc_a08_b1": {
+        "class": ClusterSpaceAnisoCauchyFixedBetaNoNuggetTrendVecchiaFit,
+        "n_params": 3,
+        "family": "cauchy",
+        "smooth": 0.5,
+        "gc_alpha": 0.8,
+        "gc_beta": 1.0,
+        "label": "GC a=0.8 b=1",
+        "plot_color": "#1f77b4",
+    },
+}
+
+YEAR_VARIANTS = {
+    2023: ["matern_s03", "gc_a075_b1"],
+    2024: ["matern_s03", "gc_a08_b1"],
+    2025: ["matern_s03", "gc_a075_b1"],
 }
 
 
@@ -110,7 +171,7 @@ class UnitSpec:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Real-data July eigenvalue diagnostics after pure-space group Vecchia fitting.")
+    p = argparse.ArgumentParser(description="No-QC real-data July eigenvalue diagnostics comparing Matern and GC pure-space group Vecchia fits.")
     p.add_argument("--input", required=True, help="Real July tco_grid pickle, e.g. tco_grid_lat-3to7_lon111to131_24_07.pkl")
     p.add_argument("--output-root", required=True)
     p.add_argument("--year", type=int, default=2024)
@@ -119,12 +180,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--hours", default="first", help="'first', 'all', hour range/list such as 0,23, or exact slot list")
     p.add_argument("--hour-match", default="slot", choices=["slot", "utc"],
                    help="For numeric --hours: slot is within-day observed slot; utc uses timestamp hour.")
-    p.add_argument("--smooth", type=float, default=0.5)
-    p.add_argument("--regions", default="global,tiles4x4,sparse")
-    p.add_argument("--tile-y", type=int, default=4)
+    p.add_argument("--model-variants", default="auto", help="auto uses year-specific Matern-vs-GC pair; otherwise comma list.")
+    p.add_argument("--regions", default="tiles,sparse")
+    p.add_argument("--tile-y", type=int, default=2)
     p.add_argument("--tile-x", type=int, default=4)
     p.add_argument("--sparse-strides", default="4")
-    p.add_argument("--variants", default="nugget0")
     p.add_argument("--cluster-neighbor-blocks", type=int, default=2,
                    help="Number of previous max-min cluster blocks used for conditioning.")
     p.add_argument("--cluster-block-shape", default="4x4",
@@ -144,6 +204,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--lbfgs-eval", type=int, default=20)
     p.add_argument("--sigmasq-init", type=float, default=10.0)
     p.add_argument("--range-init", type=float, default=0.2)
+    p.add_argument("--range-lat-init", type=float, default=None)
+    p.add_argument("--range-lon-init", type=float, default=None)
     p.add_argument("--nugget-init", type=float, default=1.0)
     p.add_argument("--min-points", type=int, default=80)
     p.add_argument("--max-points", type=int, default=0)
@@ -151,6 +213,16 @@ def parse_args() -> argparse.Namespace:
                    help="Optional deterministic cap for dense eigendecomposition per unit. 0 uses all selected points.")
     p.add_argument("--sample-seed", type=int, default=202407)
     p.add_argument("--cov-jitter", type=float, default=1e-8)
+    p.add_argument(
+        "--save-hourly-plots",
+        action="store_true",
+        help="Also save each hour/unit eigen diagnostic plot. By default only monthly-average outputs are plotted.",
+    )
+    p.add_argument(
+        "--save-hourly-rows",
+        action="store_true",
+        help="Also save per-hour fit and eigen summary CSV rows. By default only monthly aggregated outputs are written.",
+    )
     p.add_argument("--eigenvalue-rtol", type=float, default=1e-10)
     p.add_argument("--eigenvalue-atol", type=float, default=1e-12)
     p.add_argument("--brown-bridge-q", type=float, default=BROWN_BRIDGE_Q95)
@@ -364,7 +436,7 @@ def tile_units(tensor: torch.Tensor, tile_y: int, tile_x: int) -> list[UnitSpec]
             idx = np.flatnonzero(keep).astype(np.int64)
             name = f"tile_r{iy + 1}c{ix + 1}_of_{tile_y}x{tile_x}"
             label = f"tile row {iy + 1}/{tile_y}, col {ix + 1}/{tile_x}"
-            units.append(UnitSpec("tiles4x4", name, label, tensor[idx].contiguous()))
+            units.append(UnitSpec(f"tiles{tile_y}x{tile_x}", name, label, tensor[idx].contiguous()))
     return units
 
 
@@ -396,62 +468,131 @@ def build_units(tensor: torch.Tensor, args: argparse.Namespace) -> list[UnitSpec
     units: list[UnitSpec] = []
     if "global" in regions:
         units.append(UnitSpec("global", "global", "whole expanded domain", tensor.contiguous()))
-    if "tiles4x4" in regions:
+    if {"tiles", "tiles2x4", "tiles4x4"}.intersection(regions):
         units.extend(tile_units(tensor, args.tile_y, args.tile_x))
     if "sparse" in regions:
         for stride in parse_int_list_or_range(args.sparse_strides):
             units.append(grid_sparse_unit(tensor, stride))
-    unknown = regions.difference({"global", "tiles4x4", "sparse"})
+    unknown = regions.difference({"global", "tiles", "tiles2x4", "tiles4x4", "sparse"})
     if unknown:
         raise ValueError(f"Unknown --regions entries: {sorted(unknown)}")
     return units
 
 
 def build_model(variant: str, smooth: float, input_tensor: torch.Tensor, coords: np.ndarray, args: argparse.Namespace):
-    return VARIANTS[variant]["class"](
-        smooth=float(smooth),
-        input_map={"t0": input_tensor},
-        grid_coords=np.asarray(coords, dtype=np.float64),
-        block_shape=parse_block_shape(args.cluster_block_shape),
-        n_neighbor_blocks=int(args.cluster_neighbor_blocks),
-        target_chunk_size=int(args.target_chunk_size),
-        min_target_points=int(args.min_target_points),
-        mean_design=args.mean_design,
-    )
+    info = VARIANTS[variant]
+    kwargs = {
+        "smooth": float(info.get("smooth", smooth)),
+        "input_map": {"t0": input_tensor},
+        "grid_coords": np.asarray(coords, dtype=np.float64),
+        "block_shape": parse_block_shape(args.cluster_block_shape),
+        "n_neighbor_blocks": int(args.cluster_neighbor_blocks),
+        "target_chunk_size": int(args.target_chunk_size),
+        "min_target_points": int(args.min_target_points),
+        "mean_design": args.mean_design,
+    }
+    if info.get("family") == "cauchy":
+        kwargs["gc_alpha"] = float(info["gc_alpha"])
+        kwargs["gc_beta"] = float(info["gc_beta"])
+    return info["class"](**kwargs)
 
 
 def init_params(variant: str, args: argparse.Namespace, device: torch.device) -> list[torch.Tensor]:
-    init_phi2 = 1.0 / max(float(args.range_init), EPS)
-    init_phi1 = float(args.sigmasq_init) * init_phi2
-    vals = [init_phi1, init_phi2]
-    if VARIANTS[variant]["n_params"] == 3:
-        vals.append(args.nugget_init)
+    range_lat_init = float(args.range_lat_init) if args.range_lat_init is not None else float(args.range_init)
+    range_lon_init = float(args.range_lon_init) if args.range_lon_init is not None else float(args.range_init)
+    info = VARIANTS[variant]
+    if info.get("family") == "cauchy":
+        init = cauchy_phi_init_from_natural(
+            sigmasq=float(args.sigmasq_init),
+            range_lat=max(range_lat_init, EPS),
+            range_lon=max(range_lon_init, EPS),
+            gc_beta=float(info["gc_beta"]),
+        )
+        vals = [init["phi1"], init["phi2"], init["phi3"]]
+    else:
+        vals = [float(args.sigmasq_init), max(range_lat_init, EPS), max(range_lon_init, EPS)]
+    if int(info["n_params"]) != len(vals):
+        raise ValueError(f"Unexpected n_params={info['n_params']} for {variant}; init has {len(vals)} values")
     return [torch.tensor(math.log(float(v)), device=device, dtype=DTYPE, requires_grad=True) for v in vals]
 
 
 def backmap(raw: list[float], variant: str) -> dict:
-    phi1 = float(math.exp(raw[0]))
-    phi2 = float(math.exp(raw[1]))
-    return {
-        "sigmasq": phi1 / phi2,
-        "range": 1.0 / phi2,
-        "phi1": phi1,
-        "phi2": phi2,
-        "nugget": float(math.exp(raw[2])) if VARIANTS[variant]["n_params"] == 3 else 0.0,
-    }
+    info = VARIANTS[variant]
+    if info.get("family") == "cauchy":
+        phi1 = float(math.exp(raw[0]))
+        phi2 = float(math.exp(raw[1]))
+        phi3 = float(math.exp(raw[2]))
+        range_lon = 1.0 / max(phi2, EPS)
+        range_lat = 1.0 / max(phi2 * math.sqrt(max(phi3, EPS)), EPS)
+        sigmasq = phi1 / max(phi2, EPS)
+        out = {
+            "sigmasq": sigmasq,
+            "range_lat": range_lat,
+            "range_lon": range_lon,
+            "range": math.sqrt(max(range_lat * range_lon, EPS)),
+            "nugget": 0.0,
+            "phi1": phi1,
+            "phi2": phi2,
+            "phi3": phi3,
+            "gc_alpha": float(info["gc_alpha"]),
+            "gc_beta": float(info["gc_beta"]),
+        }
+    else:
+        sigmasq = float(math.exp(raw[0]))
+        range_lat = float(math.exp(raw[1]))
+        range_lon = float(math.exp(raw[2]))
+        out = {
+            "sigmasq": sigmasq,
+            "range_lat": range_lat,
+            "range_lon": range_lon,
+            "range": math.sqrt(max(range_lat * range_lon, EPS)),
+            "nugget": 0.0,
+            "gc_alpha": np.nan,
+            "gc_beta": np.nan,
+        }
+    out["model_family"] = str(info["family"])
+    out["model_label"] = str(info["label"])
+    return out
 
 
-def fit_variant(variant: str, smooth: float, input_tensor: torch.Tensor, coords: np.ndarray, args: argparse.Namespace, device: torch.device) -> tuple[dict, float]:
+def raw_to_float_list(raw) -> list[float]:
+    vals = []
+    for x in raw:
+        if isinstance(x, torch.Tensor):
+            vals.append(float(x.detach().cpu().item()))
+        else:
+            vals.append(float(x))
+    return vals
+
+
+def fit_variant_model(
+    variant: str,
+    smooth: float,
+    input_tensor: torch.Tensor,
+    coords: np.ndarray,
+    args: argparse.Namespace,
+    device: torch.device,
+):
     model = build_model(variant, smooth, input_tensor.contiguous(), coords, args)
     model.precompute_conditioning_sets()
     params = init_params(variant, args, device)
     opt = model.set_optimizer(params, lr=1.0, max_iter=args.lbfgs_eval, max_eval=args.lbfgs_eval, history_size=10)
     raw, _ = model.fit_vecc_lbfgs(params, opt, max_steps=args.lbfgs_steps, grad_tol=1e-5)
-    est = backmap(raw, variant)
-    loss = float(raw[-1])
+    raw_vals = raw_to_float_list(raw)
+    n_params = int(VARIANTS[variant]["n_params"])
+    raw_params = raw_vals[:n_params]
+    est = backmap(raw_params, variant)
+    est["raw_params"] = raw_params
+    loss = float(raw_vals[-1])
     cluster_summary = model.cluster_summary()
-    del model, params, opt
-    return {**est, **cluster_summary}, loss
+    del params, opt
+    return {**est, **cluster_summary}, loss, model, raw_params
+
+
+def fit_variant(variant: str, smooth: float, input_tensor: torch.Tensor, coords: np.ndarray, args: argparse.Namespace, device: torch.device) -> tuple[dict, float]:
+    est, loss, model, _ = fit_variant_model(variant, smooth, input_tensor, coords, args, device)
+    del model
+    return est, loss
 
 
 def design_matrix_np(coords: np.ndarray, mean_design: str) -> np.ndarray:
@@ -469,31 +610,43 @@ def design_matrix_np(coords: np.ndarray, mean_design: str) -> np.ndarray:
 
 
 def fitted_covariance_torch(coords: np.ndarray, est: dict, smooth: float, eig_device: torch.device, jitter: float) -> torch.Tensor:
-    nu = float(smooth)
     x = torch.as_tensor(coords, device=eig_device, dtype=DTYPE)
-    scaled_dist = torch.cdist(x, x) / max(float(est["range"]), EPS)
-    if nu == 0.5:
-        corr = torch.exp(-scaled_dist)
-    elif nu == 1.5:
-        corr = (1.0 + scaled_dist) * torch.exp(-scaled_dist)
+    diff = x.unsqueeze(1) - x.unsqueeze(0)
+    range_lat = max(float(est.get("range_lat", est.get("range", 1.0))), EPS)
+    range_lon = max(float(est.get("range_lon", est.get("range", 1.0))), EPS)
+    scaled_dist = torch.sqrt(
+        diff[..., 0].pow(2) / (range_lat ** 2)
+        + diff[..., 1].pow(2) / (range_lon ** 2)
+        + EPS
+    )
+    family = str(est.get("model_family", "matern"))
+    if family == "cauchy":
+        alpha = max(float(est.get("gc_alpha", 0.75)), EPS)
+        beta = max(float(est.get("gc_beta", 1.0)), EPS)
+        corr = torch.pow(1.0 + torch.pow(scaled_dist, alpha), -beta / alpha)
     else:
-        r_np = scaled_dist.detach().cpu().numpy()
-        coeffs = _build_matern_spline_coeffs(nu)
-        r_clip = np.clip(r_np, 0.0, float(coeffs["r_max"]))
-        knots = coeffs["knots"]
-        idx = np.searchsorted(knots, r_clip.ravel(), side="right") - 1
-        idx = np.clip(idx, 0, len(knots) - 2)
-        dx = r_clip.ravel() - knots[idx]
-        corr_np = (
-            coeffs["a"][idx]
-            + dx * (coeffs["b"][idx] + dx * (coeffs["c"][idx] + dx * coeffs["d"][idx]))
-        ).reshape(r_np.shape)
-        corr_np = np.nan_to_num(corr_np, nan=0.0, posinf=0.0, neginf=0.0).clip(min=0.0)
-        corr = torch.as_tensor(corr_np, device=eig_device, dtype=DTYPE)
+        nu = float(smooth)
+        if nu == 0.5:
+            corr = torch.exp(-scaled_dist)
+        elif nu == 1.5:
+            corr = (1.0 + scaled_dist) * torch.exp(-scaled_dist)
+        else:
+            r_np = scaled_dist.detach().cpu().numpy()
+            coeffs = _build_matern_spline_coeffs(nu)
+            r_clip = np.clip(r_np, 0.0, float(coeffs["r_max"]))
+            knots = coeffs["knots"]
+            idx = np.searchsorted(knots, r_clip.ravel(), side="right") - 1
+            idx = np.clip(idx, 0, len(knots) - 2)
+            dx = r_clip.ravel() - knots[idx]
+            corr_np = (
+                coeffs["a"][idx]
+                + dx * (coeffs["b"][idx] + dx * (coeffs["c"][idx] + dx * coeffs["d"][idx]))
+            ).reshape(r_np.shape)
+            corr_np = np.nan_to_num(corr_np, nan=0.0, posinf=0.0, neginf=0.0).clip(min=0.0)
+            corr = torch.as_tensor(corr_np, device=eig_device, dtype=DTYPE)
     cov = float(est["sigmasq"]) * corr
     cov.diagonal().add_(max(float(est.get("nugget", 0.0)), 0.0) + max(float(jitter), 0.0))
     return cov
-
 
 def eigen_diagnostic(z: np.ndarray, coords: np.ndarray, est: dict, smooth: float, mean_design: str, args: argparse.Namespace, eig_device: torch.device) -> tuple[pd.DataFrame, dict]:
     n = int(len(z))
@@ -692,6 +845,101 @@ def plot_monthly_tile_overview(avg_rows: pd.DataFrame, title: str, out_path: Pat
     plt.close(fig)
 
 
+
+def model_plot_label(variant: str, summary: pd.DataFrame | None = None) -> str:
+    info = VARIANTS.get(str(variant), {})
+    label = str(info.get("label", variant))
+    if summary is not None and not summary.empty and "loss_per_obs" in summary.columns:
+        vals = pd.to_numeric(summary.loc[summary["variant"] == variant, "loss_per_obs"], errors="coerce").dropna().to_numpy(float)
+        if vals.size:
+            label += f" loss/obs={float(np.mean(vals)):.5f}"
+    return label
+
+
+def plot_sparse_model_comparison(avg: pd.DataFrame, summary: pd.DataFrame, out_path: Path, year: int) -> None:
+    sub = avg[avg["family"] == "sparse"].copy()
+    if sub.empty:
+        return
+    for unit, g_unit in sub.groupby("unit", sort=True):
+        fig, ax = plt.subplots(figsize=(6.2, 5.2))
+        for variant, g in g_unit.groupby("variant", sort=True):
+            g = g.sort_values("frac_index")
+            color = VARIANTS.get(str(variant), {}).get("plot_color", None)
+            label = model_plot_label(str(variant), summary)
+            ax.plot(g["frac_index"], g["scaled_cumsum_mean"], color=color, linewidth=2.0, label=label)
+            sd = g["scaled_cumsum_std"].fillna(0.0).to_numpy(float)
+            x = g["frac_index"].to_numpy(float)
+            y = g["scaled_cumsum_mean"].to_numpy(float)
+            ax.fill_between(x, y - sd, y + sd, color=color, alpha=0.10, linewidth=0)
+        ax.plot([0, 1], [0, 1], color="0.50", linewidth=1.1)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, max(1.05, float(np.nanmax(g_unit["scaled_cumsum_mean"].to_numpy(float))) * 1.05))
+        ax.set_xlabel("eigenvalue rank fraction")
+        ax.set_ylabel("cumulative sum / m")
+        ax.set_title(f"Real July {year}: x4 sparse eigen diagnostic, model comparison")
+        ax.grid(alpha=0.20)
+        ax.legend(fontsize=8)
+        fig.tight_layout()
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(out_path.parent / f"model_comparison_sparse_{unit}.png", dpi=180, bbox_inches="tight")
+        plt.close(fig)
+
+
+def plot_tile_model_comparison(avg: pd.DataFrame, summary: pd.DataFrame, out_path: Path, year: int, tile_y: int, tile_x: int) -> None:
+    tile_family = f"tiles{int(tile_y)}x{int(tile_x)}"
+    sub = avg[avg["family"] == tile_family].copy()
+    if sub.empty:
+        return
+    fig, axes = plt.subplots(tile_y, tile_x, figsize=(3.3 * tile_x, 3.0 * tile_y), squeeze=False)
+    for iy in range(tile_y):
+        for ix in range(tile_x):
+            unit = f"tile_r{iy + 1}c{ix + 1}_of_{tile_y}x{tile_x}"
+            ax = axes[iy, ix]
+            d = sub[sub["unit"] == unit]
+            if d.empty:
+                ax.set_visible(False)
+                continue
+            for variant, g in d.groupby("variant", sort=True):
+                g = g.sort_values("frac_index")
+                color = VARIANTS.get(str(variant), {}).get("plot_color", None)
+                ax.plot(g["frac_index"], g["scaled_cumsum_mean"], color=color, linewidth=1.5, label=model_plot_label(str(variant), summary))
+            ax.plot([0, 1], [0, 1], color="0.55", linewidth=0.9)
+            ax.set_title(f"r{iy + 1} c{ix + 1}", fontsize=8)
+            ax.set_xlim(0, 1)
+            ymax = max(1.05, float(np.nanmax(d["scaled_cumsum_mean"].to_numpy(float))) * 1.05)
+            ax.set_ylim(0, ymax)
+            ax.tick_params(labelsize=7)
+            ax.grid(alpha=0.16)
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    if handles:
+        fig.legend(handles, labels, loc="upper center", ncol=2, fontsize=8)
+    fig.suptitle(f"Real July {year}: {tile_y}x{tile_x} tile eigen diagnostic, Matern vs GC", y=0.995)
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
+def write_model_comparison_outputs(avg_rows: list[pd.DataFrame], summary_rows: list[dict], out_root: Path, args: argparse.Namespace) -> None:
+    if not avg_rows:
+        return
+    d = pd.concat(avg_rows, ignore_index=True)
+    if d.empty:
+        return
+    keys = ["variant", "family", "unit", "frac_index"]
+    avg = (
+        d.groupby(keys, as_index=False)
+        .agg(
+            scaled_cumsum_mean=("scaled_cumsum", "mean"),
+            scaled_cumsum_std=("scaled_cumsum", "std"),
+            n_curves=("scaled_cumsum", "count"),
+            n_eigen_mean=("n_eigen", "mean"),
+        )
+        .sort_values(keys)
+    )
+    summary = pd.DataFrame(summary_rows) if summary_rows else pd.DataFrame()
+    plot_sparse_model_comparison(avg, summary, out_root / "model_comparison_sparse_x4.png", int(args.year))
+    plot_tile_model_comparison(avg, summary, out_root / f"model_comparison_tiles{int(args.tile_y)}x{int(args.tile_x)}.png", int(args.year), int(args.tile_y), int(args.tile_x))
 def write_monthly_average_outputs(avg_rows: list[pd.DataFrame], out_root: Path, args: argparse.Namespace) -> None:
     if not avg_rows:
         return
@@ -711,22 +959,67 @@ def write_monthly_average_outputs(avg_rows: list[pd.DataFrame], out_root: Path, 
     )
     avg.round(ROUND_DECIMALS).to_csv(out_root / "real_eigen_monthly_average_curves.csv", index=False, float_format="%.6f")
     for (variant, family, unit), g in avg.groupby(["variant", "family", "unit"], sort=True):
-        if family == "tiles4x4":
+        if str(family).startswith("tiles"):
             continue
         plot_average_curve(
             g,
-            f"monthly average eigen diagnostic: {variant}, {unit}, nu={args.smooth}",
+            f"monthly average eigen diagnostic: {model_plot_label(str(variant))}, {unit}",
             out_root / f"{variant}_{unit}_monthly_average_eigdiag.png",
         )
-    tile_avg = avg[(avg["family"] == "tiles4x4")]
+    tile_family = f"tiles{int(args.tile_y)}x{int(args.tile_x)}"
+    tile_avg = avg[(avg["family"] == tile_family)]
     for variant, g in tile_avg.groupby("variant", sort=True):
         plot_monthly_tile_overview(
             g,
-            f"monthly average eigen diagnostic: {variant}, 4x4 tiles, nu={args.smooth}",
-            out_root / f"{variant}_tiles4x4_monthly_average_overview.png",
+            f"monthly average eigen diagnostic: {model_plot_label(str(variant))}, {args.tile_y}x{args.tile_x} tiles",
+            out_root / f"{variant}_{tile_family}_monthly_average_overview.png",
             int(args.tile_y),
             int(args.tile_x),
         )
+
+
+def write_monthly_fit_summary(summary_rows: list[dict], out_root: Path) -> None:
+    if not summary_rows:
+        return
+    d = pd.DataFrame(summary_rows)
+    if d.empty:
+        return
+    keys = ["variant", "family", "unit"]
+    agg: dict[str, tuple[str, str]] = {
+        "n_hours": ("hour_key", "nunique"),
+        "n_obs_mean": ("n_obs", "mean"),
+        "n_obs_min": ("n_obs", "min"),
+        "n_obs_max": ("n_obs", "max"),
+        "n_eigen_mean": ("n_eigen", "mean"),
+        "bridge_D_mean": ("max_abs_bridge_scaled", "mean"),
+        "bridge_D_max": ("max_abs_bridge_scaled", "max"),
+        "loss_mean": ("loss", "mean"),
+        "loss_per_obs_mean": ("loss_per_obs", "mean"),
+        "sigmasq_mean": ("sigmasq", "mean"),
+        "nugget_mean": ("nugget", "mean"),
+    }
+    for name in ["range", "range_lat", "range_lon"]:
+        if name in d.columns:
+            agg[f"{name}_mean"] = (name, "mean")
+    optional = {
+        "n_qc_removed_sum": ("n_qc_removed", "sum"),
+        "n_qc_removed_mean": ("n_qc_removed", "mean"),
+        "n_qc_removed_max": ("n_qc_removed", "max"),
+        "qc_refit_rate": ("qc_refit", "mean"),
+        "qc_max_abs_whitened_mean": ("qc_max_abs_whitened", "mean"),
+        "qc_max_abs_whitened_max": ("qc_max_abs_whitened", "max"),
+    }
+    for out_col, spec in optional.items():
+        if spec[0] in d.columns:
+            if spec[0] == "qc_refit":
+                d[spec[0]] = d[spec[0]].astype(bool).astype(float)
+            agg[out_col] = spec
+    monthly = d.groupby(keys, as_index=False).agg(**agg).sort_values(keys)
+    monthly.round(ROUND_DECIMALS).to_csv(
+        out_root / "real_eigen_monthly_fit_summary.csv",
+        index=False,
+        float_format="%.6f",
+    )
 
 
 def write_math_notes(out_root: Path) -> None:
@@ -735,7 +1028,7 @@ def write_math_notes(out_root: Path) -> None:
 
 This run uses the real expanded-bound July tco_grid pickle, not a simulated ozone field.
 
-Fitting uses pure-space isotropic block/group Vecchia.  The requested default
+Fitting uses pure-space anisotropic block/group Vecchia.  The requested default
 geometry is 4x4 grid-cell target blocks, conditioning on the two previous
 max-min cluster blocks.
 
@@ -762,16 +1055,17 @@ tests, because parameters are fitted.
 
 def main() -> None:
     args = parse_args()
-    if float(args.smooth) <= 0.0:
-        raise SystemExit("--smooth must be positive.")
-    variants = parse_name_list(args.variants)
+    if str(args.model_variants).strip().lower() == "auto":
+        variants = list(YEAR_VARIANTS.get(int(args.year), ["matern_s03"]))
+    else:
+        variants = parse_name_list(args.model_variants)
     for variant in variants:
         if variant not in VARIANTS:
-            raise ValueError(f"Unknown variant {variant!r}; use {sorted(VARIANTS)}")
+            raise ValueError(f"Unknown model variant {variant!r}; use {sorted(VARIANTS)}")
 
     fit_device = select_device(args.device, args.cuda_fallback)
     eig_device = select_eig_device(args.eig_device, fit_device, args.cuda_fallback)
-    out_root = Path(args.output_root) / f"nu{smooth_tag(args.smooth)}"
+    out_root = Path(args.output_root) / f"year{int(args.year)}"
     out_root.mkdir(parents=True, exist_ok=True)
     write_math_notes(out_root)
 
@@ -780,7 +1074,11 @@ def main() -> None:
     if not selected:
         raise ValueError("No selected hours. Check --days, --hours, and --hour-match.")
     print(f"REAL DATA: input={args.input}", flush=True)
-    print(f"fit_device={fit_device}, eig_device={eig_device}, selected_hours={len(selected)}, smooth={args.smooth}", flush=True)
+    print(
+        f"fit_device={fit_device}, eig_device={eig_device}, selected_hours={len(selected)}, "
+        f"model_variants={variants}, nugget fixed 0, no QC",
+        flush=True,
+    )
 
     all_fit_rows = []
     all_summary_rows = []
@@ -791,7 +1089,8 @@ def main() -> None:
         day_label = f"{args.year}{args.month:02d}{ts.day:02d}"
         hour_label = f"h{ts.hour:02d}{ts.minute:02d}"
         hour_dir = out_root / f"{day_label}_{hour_label}"
-        hour_dir.mkdir(parents=True, exist_ok=True)
+        if args.save_hourly_plots or args.save_curves:
+            hour_dir.mkdir(parents=True, exist_ok=True)
         print(f"\n[real {day_label} {hour_label}] key={key}, rows={len(df)}", flush=True)
 
         tensor_full = hour_tensor(df, args, fit_device)
@@ -809,27 +1108,43 @@ def main() -> None:
             print(f"  {unit.name}: n={n_valid}", flush=True)
 
             for variant in variants:
-                png_path = hour_dir / f"{variant}_{unit.name}_eigdiag.png"
-                curve_csv_path = hour_dir / f"{variant}_{unit.name}_curve.csv"
-                if args.skip_existing and png_path.exists():
-                    print(f"    {variant}: plot exists, skip", flush=True)
+                t0 = time.time()
+                coords_all = unit_tensor[:, 0:2].detach().cpu().numpy().astype(np.float64)
+                variant_smooth = float(VARIANTS[variant].get("smooth", 0.3))
+                est, loss = fit_variant(variant, variant_smooth, unit_tensor, coords_all, args, fit_device)
+                qc_tensor = unit_tensor
+                qc = {
+                    "qc_whitened_threshold": 0.0,
+                    "qc_max_abs_whitened": np.nan,
+                    "n_qc_initial_fit": int(n_valid),
+                    "n_qc_removed": 0,
+                    "n_qc_fit": int(n_valid),
+                    "qc_refit": False,
+                }
+                fit_seconds = time.time() - t0
+                fit_tensor, fit_coords, z = valid_tensor_view(qc_tensor)
+                n_after_qc = int(fit_tensor.shape[0])
+                if n_after_qc < int(args.min_points):
+                    print(
+                        f"    {variant}: too few valid points ({n_after_qc}), skip eigen diagnostic",
+                        flush=True,
+                    )
                     continue
 
-                t0 = time.time()
-                est, loss = fit_variant(variant, args.smooth, fit_tensor, fit_coords, args, fit_device)
-                fit_seconds = time.time() - t0
-
                 t1 = time.time()
-                curve, summary = eigen_diagnostic(z, fit_coords, est, args.smooth, args.mean_design, args, eig_device)
+                curve, summary = eigen_diagnostic(z, fit_coords, est, variant_smooth, args.mean_design, args, eig_device)
                 eig_seconds = time.time() - t1
 
                 title = (
                     f"real {day_label} {hour_label}, {variant}, {unit.label}\n"
-                    f"nu={args.smooth}, n={summary['n_obs']}, m={summary['n_eigen']}, "
+                    f"{VARIANTS[variant]['label']}, n={summary['n_obs']}, m={summary['n_eigen']}, "
                     f"D={summary['max_abs_bridge_scaled']:.3f}"
                 )
-                plot_eigen_curve(curve, title, png_path)
+                if args.save_hourly_plots:
+                    png_path = hour_dir / f"{variant}_{unit.name}_eigdiag.png"
+                    plot_eigen_curve(curve, title, png_path)
                 if args.save_curves:
+                    curve_csv_path = hour_dir / f"{variant}_{unit.name}_curve.csv"
                     curve.round(ROUND_DECIMALS).to_csv(curve_csv_path, index=False, float_format="%.6f")
 
                 row_base = {
@@ -842,11 +1157,17 @@ def main() -> None:
                     "unit": unit.name,
                     "unit_label": unit.label,
                     "variant": variant,
-                    "smooth": float(args.smooth),
+                    "model_label": str(VARIANTS[variant]["label"]),
+                    "model_family": str(VARIANTS[variant]["family"]),
+                    "smooth": float(VARIANTS[variant].get("smooth", np.nan)),
+                    "gc_alpha": float(VARIANTS[variant].get("gc_alpha", np.nan)),
+                    "gc_beta": float(VARIANTS[variant].get("gc_beta", np.nan)),
                     "coords": args.coords,
                     "loss": loss,
+                    "loss_per_obs": float(loss) / max(float(n_after_qc), 1.0),
                     "fit_seconds": fit_seconds,
                     "eig_seconds": eig_seconds,
+                    **qc,
                     **est,
                 }
                 all_fit_rows.append(row_base)
@@ -862,35 +1183,37 @@ def main() -> None:
                     family=unit.family,
                     unit=unit.name,
                     variant=variant,
-                    smooth=float(args.smooth),
+                    smooth=float(VARIANTS[variant].get("smooth", np.nan)),
                 )
                 all_avg_curve_rows.append(avg_curve)
-                if unit.family == "tiles4x4":
+                if args.save_hourly_plots and str(unit.family).startswith("tiles"):
                     tile_label = (
                         f"{unit.name.replace('_of_', '\nof ')}\n"
                         f"D={summary['max_abs_bridge_scaled']:.2f}"
                     )
                     overview_curves.setdefault((variant, unit.family), []).append((tile_label, curve))
                 print(
-                    f"    {variant}: sigmasq={est['sigmasq']:.4g}, range={est['range']:.4g}, "
-                    f"nugget={est['nugget']:.4g}, D={summary['max_abs_bridge_scaled']:.3f}, "
-                    f"saved {png_path.name}",
+                    f"    {variant}: sigmasq={est['sigmasq']:.4g}, "
+                    f"range_lat={est.get('range_lat', np.nan):.4g}, range_lon={est.get('range_lon', np.nan):.4g}, "
+                    f"nugget={est['nugget']:.4g}, loss/obs={float(loss) / max(float(n_after_qc), 1.0):.5f}, "
+                    f"D={summary['max_abs_bridge_scaled']:.3f}",
                     flush=True,
                 )
                 gc.collect()
                 if fit_device.type == "cuda" or eig_device.type == "cuda":
                     torch.cuda.empty_cache()
 
-        for (variant, family), curves in overview_curves.items():
-            out_path = hour_dir / f"{variant}_{family}_overview.png"
-            plot_tile_overview(curves, f"real {day_label} {hour_label}, {variant}, {family}", out_path)
-            print(f"  saved overview {out_path.name}", flush=True)
+        if args.save_hourly_plots:
+            for (variant, family), curves in overview_curves.items():
+                out_path = hour_dir / f"{variant}_{family}_overview.png"
+                plot_tile_overview(curves, f"real {day_label} {hour_label}, {variant}, {family}", out_path)
+                print(f"  saved overview {out_path.name}", flush=True)
 
-        if all_fit_rows:
+        if args.save_hourly_rows and all_fit_rows:
             pd.DataFrame(all_fit_rows).round(ROUND_DECIMALS).to_csv(
                 out_root / "real_eigen_fit_rows.csv", index=False, float_format="%.6f"
             )
-        if all_summary_rows:
+        if args.save_hourly_rows and all_summary_rows:
             pd.DataFrame(all_summary_rows).round(ROUND_DECIMALS).to_csv(
                 out_root / "real_eigen_diagnostic_summary.csv", index=False, float_format="%.6f"
             )
@@ -899,6 +1222,8 @@ def main() -> None:
                 out_root / "real_eigen_diagnostic_curves.csv", index=False, float_format="%.6f"
             )
         write_monthly_average_outputs(all_avg_curve_rows, out_root, args)
+        write_monthly_fit_summary(all_summary_rows, out_root)
+        write_model_comparison_outputs(all_avg_curve_rows, all_summary_rows, out_root, args)
 
 
 if __name__ == "__main__":

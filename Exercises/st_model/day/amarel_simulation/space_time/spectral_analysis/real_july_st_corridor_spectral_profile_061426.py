@@ -469,6 +469,7 @@ def profile_rows_from_spectral_grids(
                     "gc_alpha": float(spec["gc_alpha"]) if pd.notna(spec["gc_alpha"]) else np.nan,
                     "gc_beta": float(spec["gc_beta"]) if pd.notna(spec["gc_beta"]) else np.nan,
                     "nugget_mode": "zero",
+                    "loss": float(est.get("loss", np.nan)),
                     "direction": direction,
                     "bin_idx": int(b),
                     "k_min": float(bins[b]),
@@ -670,6 +671,8 @@ def fit_full_asset(
     lat_mean = float(model.lat_mean_val)
     est = backmap_params(out, nugget_mode="zero")
     cluster_summary = model.cluster_summary()
+    loss = float(out[-1])
+    est["loss"] = loss
 
     row = {
         "fit_id": int(fit_id),
@@ -703,7 +706,7 @@ def fit_full_asset(
         "block_shape": f"{BLOCK_SHAPE[0]}x{BLOCK_SHAPE[1]}",
         "lag_pattern": f"{LAG_COUNTS[0]}/{LAG_COUNTS[1]}/{LAG_COUNTS[2]}",
         "reference_advec_lon_abs": float(reference_advec_lon_abs),
-        "loss": float(out[-1]),
+        "loss": loss,
         "steps_raw": int(steps_ran),
         "precompute_s": float(precompute_s),
         "fit_s": float(fit_s),
@@ -848,6 +851,7 @@ def make_profile_monthly_summary(profile: pd.DataFrame) -> pd.DataFrame:
         )
         ratio_ei_cont = pd.to_numeric(sub["ratio_EI_over_continuous_mean"], errors="coerce").dropna().to_numpy(dtype=float)
         whitened = pd.to_numeric(sub["whitened_ratio_mean"], errors="coerce").dropna().to_numpy(dtype=float)
+        loss_vals = pd.to_numeric(sub.get("loss", pd.Series(np.nan, index=sub.index)), errors="coerce").dropna().to_numpy(dtype=float)
         expected_profile_col = "expected_spectrum_profile_mean" if "expected_spectrum_profile_mean" in sub.columns else "expected_spectrum_mean"
         continuous_profile_col = "continuous_spectrum_profile_mean" if "continuous_spectrum_profile_mean" in sub.columns else "continuous_spectrum_mean"
         rows.append(
@@ -860,6 +864,8 @@ def make_profile_monthly_summary(profile: pd.DataFrame) -> pd.DataFrame:
                 "bin_idx": int(keys[5]),
                 "k_mid": float(np.nanmean(pd.to_numeric(sub["k_mid"], errors="coerce"))),
                 "n_days": int(vals.size),
+                "loss_median": float(np.median(loss_vals)) if loss_vals.size else np.nan,
+                "loss_mean": float(np.mean(loss_vals)) if loss_vals.size else np.nan,
                 "data_spectrum_mean": float(np.nanmean(pd.to_numeric(sub["data_spectrum_mean"], errors="coerce"))),
                 "expected_spectrum_mean": float(np.nanmean(pd.to_numeric(sub["expected_spectrum_mean"], errors="coerce"))),
                 "expected_spectrum_profile_mean": float(np.nanmean(pd.to_numeric(sub[expected_profile_col], errors="coerce"))),
@@ -966,7 +972,7 @@ def plot_profile_monthly_summary(monthly: pd.DataFrame, path: Path, metric: str 
         sub_dir = monthly[monthly["direction"] == direction].copy()
         for (year, model_variant), sub in sub_dir.groupby(["year", "model_variant"], dropna=False):
             sub = sub.sort_values("k_mid")
-            model_label = str(sub["model_label"].dropna().iloc[0]) if sub["model_label"].notna().any() else str(model_variant)
+            model_label = model_label_with_loss(sub)
             label = f"{int(year)}, {model_label}"
             line = ax.plot(sub["k_mid"], sub[metric], linewidth=1.6, label=label)[0]
             lo_col, hi_col = band_cols.get(metric, ("", ""))
@@ -1007,7 +1013,7 @@ def _plot_model_pair_lines(
 ) -> None:
     for model_variant, sub_model in sub_year_dir.groupby("model_variant", dropna=False):
         sub_model = sub_model.sort_values("k_mid")
-        model_label = str(sub_model["model_label"].dropna().iloc[0]) if sub_model["model_label"].notna().any() else str(model_variant)
+        model_label = model_label_with_loss(sub_model)
         line = ax.plot(
             pd.to_numeric(sub_model["k_mid"], errors="coerce"),
             pd.to_numeric(sub_model[y_cols[0]], errors="coerce"),
@@ -1022,6 +1028,14 @@ def _plot_model_pair_lines(
             linewidth=1.7,
             label=f"{model_label}: {labels[1]}",
         )
+
+
+def model_label_with_loss(sub_model: pd.DataFrame) -> str:
+    model_label = str(sub_model["model_label"].dropna().iloc[0]) if sub_model["model_label"].notna().any() else str(sub_model["model_variant"].dropna().iloc[0])
+    loss = float(pd.to_numeric(sub_model.get("loss_median", pd.Series(np.nan, index=sub_model.index)), errors="coerce").median())
+    if np.isfinite(loss):
+        return f"{model_label} loss={loss:.5f}"
+    return model_label
 
 
 def plot_directional_year_outputs(monthly: pd.DataFrame, base_dir: Path) -> None:
@@ -1056,7 +1070,7 @@ def plot_directional_year_outputs(monthly: pd.DataFrame, base_dir: Path) -> None
             fig, ax = plt.subplots(figsize=(8.5, 5.4))
             for model_variant, sub_model in sub.groupby("model_variant", dropna=False):
                 sub_model = sub_model.sort_values("k_mid")
-                model_label = str(sub_model["model_label"].dropna().iloc[0]) if sub_model["model_label"].notna().any() else str(model_variant)
+                model_label = model_label_with_loss(sub_model)
                 ax.plot(
                     pd.to_numeric(sub_model["k_mid"], errors="coerce"),
                     pd.to_numeric(sub_model["ratio_I_over_EI_profile_mean"], errors="coerce"),
@@ -1076,26 +1090,31 @@ def plot_directional_year_outputs(monthly: pd.DataFrame, base_dir: Path) -> None
             plt.close(fig)
 
             fig, ax = plt.subplots(figsize=(8.5, 5.4))
-            _plot_model_pair_lines(
-                ax,
-                sub,
-                ("expected_spectrum_profile_mean", "continuous_spectrum_profile_mean"),
-                ("E[I]", "theoretic continuous"),
-            )
-            ax.set_title(f"Real July {int(year)}: marginal time-averaged diagonal E[I] vs continuous spectrum, {direction_title(direction)}")
+            for model_variant, sub_model in sub.groupby("model_variant", dropna=False):
+                sub_model = sub_model.sort_values("k_mid")
+                model_label = model_label_with_loss(sub_model)
+                ax.plot(
+                    pd.to_numeric(sub_model["k_mid"], errors="coerce"),
+                    pd.to_numeric(sub_model["ratio_EI_over_continuous_mean"], errors="coerce"),
+                    linewidth=1.9,
+                    label=model_label,
+                )
+            ax.axhline(1.0, color="0.25", linestyle="--", linewidth=1.0)
+            ax.set_title(f"Real July {int(year)}: marginal time-averaged diagonal E[I] / continuous spectrum, {direction_title(direction)}")
             ax.set_xlabel(direction_xlabel(direction))
-            ax.set_ylabel("Marginal time-averaged spatial spectrum with profile sigma: diagonal fitted E[I] and theoretical continuous spectrum")
+            ax.set_ylabel("Finite-sample diagonal E[I] / continuous-like spectrum (target = 1)")
             ax.set_yscale("log")
+            ax.set_ylim(0.2, 5.0)
             ax.grid(alpha=0.25, which="both")
             ax.legend(fontsize=8)
             fig.tight_layout()
-            fig.savefig(year_dir / f"marginal_timeavg_spatial_Ediag_vs_continuous_profile_sigma_{direction}.png", dpi=180, bbox_inches="tight")
+            fig.savefig(year_dir / f"marginal_timeavg_spatial_Ediag_over_continuous_ratio_{direction}.png", dpi=180, bbox_inches="tight")
             plt.close(fig)
 
             fig, ax = plt.subplots(figsize=(8.5, 5.4))
             for model_variant, sub_model in sub.groupby("model_variant", dropna=False):
                 sub_model = sub_model.sort_values("k_mid")
-                model_label = str(sub_model["model_label"].dropna().iloc[0]) if sub_model["model_label"].notna().any() else str(model_variant)
+                model_label = model_label_with_loss(sub_model)
                 ax.plot(
                     pd.to_numeric(sub_model["k_mid"], errors="coerce"),
                     pd.to_numeric(sub_model["whitened_ratio_mean"], errors="coerce"),
