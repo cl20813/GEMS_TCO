@@ -425,6 +425,19 @@ def smooth_tag(smooth: float) -> str:
     return s.replace(".", "p").replace("-", "m")
 
 
+def domain_path_parts(group: str, label: str) -> list[str]:
+    group = str(group)
+    label = str(label)
+    if group == label:
+        return [group]
+    return [group, label]
+
+
+def domain_file_prefix(group: str, label: str) -> str:
+    parts = domain_path_parts(group, label)
+    return "_".join(parts)
+
+
 def month_file_token(value: float) -> str:
     value = float(value)
     if value.is_integer():
@@ -2007,6 +2020,44 @@ def write_csv(df: pd.DataFrame, path: Path):
     df.to_csv(path, index=False, float_format=f"%.{ROUND_DECIMALS}f")
 
 
+def existing_day_has_requested_variants(
+    fit_path: Path,
+    spec_path: Path,
+    plot_path: Path,
+    variants: list[str],
+    labels: list[str],
+) -> bool:
+    if not (fit_path.exists() and spec_path.exists() and plot_path.exists()):
+        return False
+    try:
+        fit_df = pd.read_csv(fit_path)
+        spec_df = pd.read_csv(spec_path)
+    except Exception:
+        return False
+    if fit_df.empty or spec_df.empty or "variant" not in fit_df.columns or "variant" not in spec_df.columns:
+        return False
+    fit_variants = set(fit_df["variant"].astype(str))
+    spec_variants = set(spec_df["variant"].astype(str))
+    missing_variants = [v for v in variants if v not in fit_variants or v not in spec_variants]
+    if missing_variants:
+        print(
+            f"Existing day files are incomplete; missing variants {missing_variants}. Recomputing {fit_path.parent.parent.name}.",
+            flush=True,
+        )
+        return False
+    if "resolution_label" in fit_df.columns and "resolution_label" in spec_df.columns:
+        fit_pairs = set(zip(fit_df["variant"].astype(str), fit_df["resolution_label"].astype(str)))
+        spec_pairs = set(zip(spec_df["variant"].astype(str), spec_df["resolution_label"].astype(str)))
+        missing_pairs = [(v, label) for v in variants for label in labels if (v, label) not in fit_pairs or (v, label) not in spec_pairs]
+        if missing_pairs:
+            print(
+                f"Existing day files are incomplete; missing variant/domain pairs {missing_pairs[:6]}. Recomputing {fit_path.parent.parent.name}.",
+                flush=True,
+            )
+            return False
+    return True
+
+
 def process_day(
     args: argparse.Namespace,
     ctx: MonthContext,
@@ -2021,7 +2072,10 @@ def process_day(
     fit_path = daily_dir / f"{date_str}_fits.csv"
     spec_path = daily_dir / f"{date_str}_spectral_profiles.csv"
     plot_path = plot_dir / f"{date_str}_data_vs_expected_periodogram.png"
-    if args.skip_existing and spec_path.exists() and fit_path.exists() and plot_path.exists():
+    block_prefixes = parse_block_prefixes(args.block_prefixes)
+    labels_order = [block_prefix_label(s) for s in block_prefixes]
+    variants = variants_for_year(ctx.year, parse_names(args.variants))
+    if args.skip_existing and existing_day_has_requested_variants(fit_path, spec_path, plot_path, variants, labels_order):
         print(f"Skip existing day {date_str}", flush=True)
         return
     entries = ctx.entries_by_day.get(day, [])
@@ -2030,8 +2084,6 @@ def process_day(
     fit_rows = []
     spectral_rows = []
     ordering_cache = {}
-    block_prefixes = parse_block_prefixes(args.block_prefixes)
-    variants = variants_for_year(ctx.year, parse_names(args.variants))
 
     for hour_idx, (ts, key, df) in enumerate(entries[:8]):
         hour_t = hour_tensor(ctx, df, hour_idx, args, device)
@@ -2054,6 +2106,19 @@ def process_day(
     spec_df = pd.DataFrame(spectral_rows)
     write_csv(fit_df, fit_path)
     write_csv(spec_df, spec_path)
+    fit_variants = sorted(fit_df["variant"].astype(str).unique()) if "variant" in fit_df.columns else []
+    spec_variants = sorted(spec_df["variant"].astype(str).unique()) if "variant" in spec_df.columns else []
+    print(f"{date_str} requested variants={variants}", flush=True)
+    print(f"{date_str} fit variants={fit_variants}", flush=True)
+    print(f"{date_str} spectral variants={spec_variants}", flush=True)
+    missing_fit = [v for v in variants if v not in fit_variants]
+    missing_spec = [v for v in variants if v not in spec_variants]
+    if missing_fit or missing_spec:
+        raise RuntimeError(
+            f"{date_str} missing requested variants after processing: "
+            f"fit missing={missing_fit}, spectral missing={missing_spec}. "
+            f"Check that the Amarel script/slurm is the current GC-enabled version."
+        )
     if not spec_df.empty:
         plot_daily(args, ctx, smooth, day, spec_df, plot_path)
     print(f"Saved day {date_str}: {fit_path}, {spec_path}, {plot_path}", flush=True)
@@ -2063,7 +2128,10 @@ def publish_monthly_plot(args: argparse.Namespace, ctx: MonthContext, smooth: fl
     top_dir = Path(args.top_plot_dir) if str(args.top_plot_dir).strip() else Path(args.output_root) / "monthly_plots_top"
     year_dir = top_dir / f"{ctx.year}_{ctx.month:02d}"
     year_dir.mkdir(parents=True, exist_ok=True)
-    domain_prefix = f"{getattr(args, 'domain_group', 'full')}_{getattr(args, 'domain_label', 'full')}"
+    domain_prefix = domain_file_prefix(
+        getattr(args, "domain_group", "full"),
+        getattr(args, "domain_label", "full"),
+    )
     dest = year_dir / f"smooth_{smooth_tag(smooth)}_{domain_prefix}_{plot_path.name}"
     shutil.copy2(plot_path, dest)
     print(f"Copied monthly plot to top folder: {dest}", flush=True)
@@ -3002,7 +3070,12 @@ def make_combined_domain_plots(args: argparse.Namespace, specs: list[DomainSpec]
 
 
 def output_dir_for_domain(args: argparse.Namespace, smooth: float, year: int, spec: DomainSpec) -> Path:
-    return Path(args.output_root) / f"{year}_{args.month:02d}" / f"smooth_{smooth_tag(smooth)}" / spec.group / spec.label
+    return (
+        Path(args.output_root)
+        / f"{year}_{args.month:02d}"
+        / f"smooth_{smooth_tag(smooth)}"
+        / Path(*domain_path_parts(spec.group, spec.label))
+    )
 
 
 def output_dir_for(args: argparse.Namespace, smooth: float, year: int) -> Path:
@@ -3010,8 +3083,10 @@ def output_dir_for(args: argparse.Namespace, smooth: float, year: int) -> Path:
         Path(args.output_root)
         / f"{year}_{args.month:02d}"
         / f"smooth_{smooth_tag(smooth)}"
-        / str(getattr(args, "domain_group", "full"))
-        / str(getattr(args, "domain_label", "full"))
+        / Path(*domain_path_parts(
+            getattr(args, "domain_group", "full"),
+            getattr(args, "domain_label", "full"),
+        ))
     )
 
 

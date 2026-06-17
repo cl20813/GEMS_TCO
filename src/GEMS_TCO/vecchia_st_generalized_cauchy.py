@@ -20,6 +20,9 @@ import torch
 from GEMS_TCO.vecchia_realdata_corridor_width_4x4_lag643 import (
     RealDataCorridorWidth4x4Lag643VecchiaFit,
 )
+from GEMS_TCO.vecchia_realdata_corridor_width_4x4_lag432 import (
+    RealDataCorridorWidth4x4Lag432VecchiaFit,
+)
 
 
 class _STGeneralizedCauchyMixin:
@@ -224,7 +227,97 @@ class RealDataCorridorWidth4x4Lag643NoNuggetGeneralizedCauchyFit(
         self._init_st_cauchy(gc_alpha=gc_alpha, gc_beta=gc_beta)
 
 
+class RealDataCorridorWidth4x4Lag432GeneralizedCauchyFit(
+    _STGeneralizedCauchyMixin,
+    RealDataCorridorWidth4x4Lag432VecchiaFit,
+):
+    """4x4 lag-432 corridor model with fixed generalized Cauchy alpha/beta."""
+
+    def __init__(
+        self,
+        gc_alpha: float,
+        gc_beta: float,
+        input_map: dict,
+        grid_coords=None,
+        block_shape=(4, 4),
+        n_neighbor_blocks_t: int = 4,
+        lag1_local_blocks: int = 3,
+        lag2_local_blocks: int = 2,
+        daily_stride: int = 2,
+        lag1_lon_offset: float = 0.126,
+        lag2_lon_offset=None,
+        target_chunk_size: int = 128,
+        min_target_points: int = 1,
+        max_neighbor_search=None,
+        **_ignored,
+    ):
+        if tuple(block_shape) != (4, 4):
+            raise ValueError(f"corridor lag432 requires block_shape=(4, 4), got {block_shape}")
+        if int(n_neighbor_blocks_t) != 4 or int(lag1_local_blocks) != 3 or int(lag2_local_blocks) != 2:
+            raise ValueError(
+                "corridor lag432 requires n_neighbor_blocks_t=4, "
+                "lag1_local_blocks=3, lag2_local_blocks=2"
+            )
+        super().__init__(
+            smooth=0.5,
+            input_map=input_map,
+            grid_coords=grid_coords,
+            reference_advec_lon_abs=float(abs(lag1_lon_offset)),
+            daily_stride=daily_stride,
+            target_chunk_size=target_chunk_size,
+            min_target_points=min_target_points,
+            max_neighbor_search=max_neighbor_search,
+        )
+        self._init_st_cauchy(gc_alpha=gc_alpha, gc_beta=gc_beta)
+
+
+class RealDataCorridorWidth4x4Lag432NoNuggetGeneralizedCauchyFit(
+    _STNoNuggetGeneralizedCauchyMixin,
+    RealDataCorridorWidth4x4Lag432VecchiaFit,
+):
+    """4x4 lag-432 corridor generalized Cauchy model with nugget fixed at 0."""
+
+    def __init__(
+        self,
+        gc_alpha: float,
+        gc_beta: float,
+        input_map: dict,
+        grid_coords=None,
+        block_shape=(4, 4),
+        n_neighbor_blocks_t: int = 4,
+        lag1_local_blocks: int = 3,
+        lag2_local_blocks: int = 2,
+        daily_stride: int = 2,
+        lag1_lon_offset: float = 0.126,
+        lag2_lon_offset=None,
+        target_chunk_size: int = 128,
+        min_target_points: int = 1,
+        max_neighbor_search=None,
+        **_ignored,
+    ):
+        if tuple(block_shape) != (4, 4):
+            raise ValueError(f"corridor lag432 requires block_shape=(4, 4), got {block_shape}")
+        if int(n_neighbor_blocks_t) != 4 or int(lag1_local_blocks) != 3 or int(lag2_local_blocks) != 2:
+            raise ValueError(
+                "corridor lag432 requires n_neighbor_blocks_t=4, "
+                "lag1_local_blocks=3, lag2_local_blocks=2"
+            )
+        super().__init__(
+            smooth=0.5,
+            input_map=input_map,
+            grid_coords=grid_coords,
+            reference_advec_lon_abs=float(abs(lag1_lon_offset)),
+            daily_stride=daily_stride,
+            target_chunk_size=target_chunk_size,
+            min_target_points=min_target_points,
+            max_neighbor_search=max_neighbor_search,
+        )
+        self._init_st_cauchy(gc_alpha=gc_alpha, gc_beta=gc_beta)
+
+
 __all__ = [
     "RealDataCorridorWidth4x4Lag643GeneralizedCauchyFit",
     "RealDataCorridorWidth4x4Lag643NoNuggetGeneralizedCauchyFit",
+    "RealDataCorridorWidth4x4Lag432GeneralizedCauchyFit",
+    "RealDataCorridorWidth4x4Lag432NoNuggetGeneralizedCauchyFit",
 ]

@@ -1,4 +1,4 @@
-"""Pure-space eigen diagnostics comparing Matern and generalized Cauchy Vecchia fits.
+"""Pure-space eigen diagnostics comparing generalized Cauchy Vecchia fits.
 
 This 2026-06-16 version is a no-QC, nugget-fixed-0 comparison script for real
 July GEMS data.  It keeps the group/block Vecchia geometry from the earlier
@@ -7,9 +7,9 @@ covariance kernels are compared on the same observations.
 
 Default comparison:
 
-  2023: Matern smooth=0.3 vs GC alpha=0.75 beta=1
-  2024: Matern smooth=0.3 vs GC alpha=0.8  beta=1
-  2025: Matern smooth=0.3 vs GC alpha=0.75 beta=1
+  2023: GC alpha=0.75 beta=1 vs beta=0.5
+  2024: GC alpha=0.8  beta=1 vs beta=0.5
+  2025: GC alpha=0.75 beta=1 vs beta=0.5
 
 Diagnostics are written for 2x4 coordinate tiles and whole-domain x4 thinning.
 Loss columns include both the raw Vecchia negative log-likelihood objective and
@@ -125,14 +125,6 @@ class AnisotropicClusterNoNuggetTrendVecchiaFit(_ClusterSpaceIsoNoNuggetTrendVec
 
 
 VARIANTS = {
-    "matern_s03": {
-        "class": AnisotropicClusterNoNuggetTrendVecchiaFit,
-        "n_params": 3,
-        "family": "matern",
-        "smooth": 0.3,
-        "label": "Matern s=0.3",
-        "plot_color": "black",
-    },
     "gc_a075_b1": {
         "class": ClusterSpaceAnisoCauchyFixedBetaNoNuggetTrendVecchiaFit,
         "n_params": 3,
@@ -142,6 +134,16 @@ VARIANTS = {
         "gc_beta": 1.0,
         "label": "GC a=0.75 b=1",
         "plot_color": "#1f77b4",
+    },
+    "gc_a075_b05": {
+        "class": ClusterSpaceAnisoCauchyFixedBetaNoNuggetTrendVecchiaFit,
+        "n_params": 3,
+        "family": "cauchy",
+        "smooth": 0.5,
+        "gc_alpha": 0.75,
+        "gc_beta": 0.5,
+        "label": "GC a=0.75 b=0.5",
+        "plot_color": "#d62728",
     },
     "gc_a08_b1": {
         "class": ClusterSpaceAnisoCauchyFixedBetaNoNuggetTrendVecchiaFit,
@@ -153,12 +155,22 @@ VARIANTS = {
         "label": "GC a=0.8 b=1",
         "plot_color": "#1f77b4",
     },
+    "gc_a08_b05": {
+        "class": ClusterSpaceAnisoCauchyFixedBetaNoNuggetTrendVecchiaFit,
+        "n_params": 3,
+        "family": "cauchy",
+        "smooth": 0.5,
+        "gc_alpha": 0.8,
+        "gc_beta": 0.5,
+        "label": "GC a=0.8 b=0.5",
+        "plot_color": "#d62728",
+    },
 }
 
 YEAR_VARIANTS = {
-    2023: ["matern_s03", "gc_a075_b1"],
-    2024: ["matern_s03", "gc_a08_b1"],
-    2025: ["matern_s03", "gc_a075_b1"],
+    2023: ["gc_a075_b1", "gc_a075_b05"],
+    2024: ["gc_a08_b1", "gc_a08_b05"],
+    2025: ["gc_a075_b1", "gc_a075_b05"],
 }
 
 
@@ -171,7 +183,7 @@ class UnitSpec:
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="No-QC real-data July eigenvalue diagnostics comparing Matern and GC pure-space group Vecchia fits.")
+    p = argparse.ArgumentParser(description="No-QC real-data July eigenvalue diagnostics comparing GC beta values in pure-space group Vecchia fits.")
     p.add_argument("--input", required=True, help="Real July tco_grid pickle, e.g. tco_grid_lat-3to7_lon111to131_24_07.pkl")
     p.add_argument("--output-root", required=True)
     p.add_argument("--year", type=int, default=2024)
@@ -180,7 +192,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--hours", default="first", help="'first', 'all', hour range/list such as 0,23, or exact slot list")
     p.add_argument("--hour-match", default="slot", choices=["slot", "utc"],
                    help="For numeric --hours: slot is within-day observed slot; utc uses timestamp hour.")
-    p.add_argument("--model-variants", default="auto", help="auto uses year-specific Matern-vs-GC pair; otherwise comma list.")
+    p.add_argument("--model-variants", default="auto", help="auto uses year-specific GC beta=1 vs beta=0.5 pair; otherwise comma list.")
     p.add_argument("--regions", default="tiles,sparse")
     p.add_argument("--tile-y", type=int, default=2)
     p.add_argument("--tile-x", type=int, default=4)
@@ -876,7 +888,7 @@ def plot_sparse_model_comparison(avg: pd.DataFrame, summary: pd.DataFrame, out_p
         ax.set_ylim(0, max(1.05, float(np.nanmax(g_unit["scaled_cumsum_mean"].to_numpy(float))) * 1.05))
         ax.set_xlabel("eigenvalue rank fraction")
         ax.set_ylabel("cumulative sum / m")
-        ax.set_title(f"Real July {year}: x4 sparse eigen diagnostic, model comparison")
+        ax.set_title(f"Real July {year}: x4 sparse eigen diagnostic, GC beta comparison")
         ax.grid(alpha=0.20)
         ax.legend(fontsize=8)
         fig.tight_layout()
@@ -913,7 +925,7 @@ def plot_tile_model_comparison(avg: pd.DataFrame, summary: pd.DataFrame, out_pat
     handles, labels = axes[0, 0].get_legend_handles_labels()
     if handles:
         fig.legend(handles, labels, loc="upper center", ncol=2, fontsize=8)
-    fig.suptitle(f"Real July {year}: {tile_y}x{tile_x} tile eigen diagnostic, Matern vs GC", y=0.995)
+    fig.suptitle(f"Real July {year}: {tile_y}x{tile_x} tile eigen diagnostic, GC beta comparison", y=0.995)
     fig.tight_layout(rect=[0, 0, 1, 0.94])
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=180, bbox_inches="tight")
@@ -1056,7 +1068,7 @@ tests, because parameters are fitted.
 def main() -> None:
     args = parse_args()
     if str(args.model_variants).strip().lower() == "auto":
-        variants = list(YEAR_VARIANTS.get(int(args.year), ["matern_s03"]))
+        variants = list(YEAR_VARIANTS.get(int(args.year), ["gc_a075_b1", "gc_a075_b05"]))
     else:
         variants = parse_name_list(args.model_variants)
     for variant in variants:
@@ -1187,8 +1199,9 @@ def main() -> None:
                 )
                 all_avg_curve_rows.append(avg_curve)
                 if args.save_hourly_plots and str(unit.family).startswith("tiles"):
+                    tile_name = unit.name.replace("_of_", "\nof ")
                     tile_label = (
-                        f"{unit.name.replace('_of_', '\nof ')}\n"
+                        f"{tile_name}\n"
                         f"D={summary['max_abs_bridge_scaled']:.2f}"
                     )
                     overview_curves.setdefault((variant, unit.family), []).append((tile_label, curve))

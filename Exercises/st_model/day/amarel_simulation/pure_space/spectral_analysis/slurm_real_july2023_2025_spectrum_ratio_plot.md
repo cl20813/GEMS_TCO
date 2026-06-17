@@ -58,7 +58,7 @@ Paste:
 #SBATCH --job-name=ps_spec_gc
 #SBATCH --output=/home/jl2815/tco/exercise_output/logs/ps_spec_gc_%A_%a.out
 #SBATCH --error=/home/jl2815/tco/exercise_output/logs/ps_spec_gc_%A_%a.err
-#SBATCH --time=24:00:00
+#SBATCH --time=8:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -135,8 +135,7 @@ srun python "${SCRIPT}" \
   --lbfgs-eval 20 \
   --lbfgs-history 10 \
   --radial-bins 70 \
-  --radial-qmax 0.985 \
-  --skip-existing
+  --radial-qmax 0.985
 
 echo "Finished: $(date)"
 ```

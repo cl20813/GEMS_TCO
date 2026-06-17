@@ -1,4 +1,4 @@
-# Real July Pure-Space Eigen Diagnostic: Matern vs Generalized Cauchy, Nugget 0
+# Real July Pure-Space Eigen Diagnostic: Generalized Cauchy Beta Comparison, Nugget 0
 
 This run compares pure-space group-Vecchia eigen diagnostics for July real data.
 It uses no QC refit and fixes the nugget at 0 for every model.
@@ -8,9 +8,9 @@ Settings:
 ```text
 years: 2023, 2024, 2025
 models:
-  2023: matern_s03 vs gc_a075_b1
-  2024: matern_s03 vs gc_a08_b1
-  2025: matern_s03 vs gc_a075_b1
+  2023: gc_a075_b1 vs gc_a075_b05
+  2024: gc_a08_b1 vs gc_a08_b05
+  2025: gc_a075_b1 vs gc_a075_b05
 domain: lat -3..7, lon 111..131 input files
 regions: 2x4 coordinate tiles + whole-domain sparse x4 stride
 Vecchia: 4x4 target blocks, condition on 2 previous max-min cluster blocks
@@ -50,21 +50,21 @@ On Amarel:
 
 ```bash
 cd ./jobscript/tco/gp_exercise
-nano eig_diag_real_july_gv_matern_gc_nugget0_2x4_x4_061626.sh
-sbatch eig_diag_real_july_gv_matern_gc_nugget0_2x4_x4_061626.sh
+nano eig_diag_real_july_gv_gc_beta_nugget0_2x4_x4_061626.sh
+sbatch eig_diag_real_july_gv_gc_beta_nugget0_2x4_x4_061626.sh
 ```
 
 Paste:
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name=eig_gv_mgc24
-#SBATCH --output=/home/jl2815/tco/exercise_output/logs/eig_gv_mgc24_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/logs/eig_gv_mgc24_%j.err
+#SBATCH --job-name=eig_gv_gcbeta
+#SBATCH --output=/home/jl2815/tco/exercise_output/logs/eig_gv_gcbeta_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/logs/eig_gv_gcbeta_%j.err
 #SBATCH --time=24:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
-#SBATCH --mem=64G
+#SBATCH --mem=128G
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
 
@@ -86,7 +86,7 @@ export NUMEXPR_NUM_THREADS=1
 
 SCRIPT=/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/pure_space/eigen_diagnostic/eig_diag_real_july_group_vecchia_matern_gc_nugget0_2x4_x4_061626.py
 DATA_ROOT=/home/jl2815/tco/data
-BASE_ROOT=/home/jl2815/tco/exercise_output/summer/eigen_analysis/group_vecchia_matern_gc_nugget0_2x4_x4_061626
+BASE_ROOT=/home/jl2815/tco/exercise_output/summer/eigen_analysis/group_vecchia_gc_beta_nugget0_2x4_x4_061626
 
 YEARS=(2023 2024 2025)
 MONTH=7

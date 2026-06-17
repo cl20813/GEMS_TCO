@@ -1,6 +1,6 @@
-# Space-Time Corridor Spectral Profile Diagnostic v2, 2023-2025 Matérn vs GC
+# Space-Time Corridor Spectral Profile Diagnostic v3: GC b=0.5 Standard vs Heads300
 
-Testing runbook for the real July space-time spectral diagnostic v2.
+Testing runbook for the real July space-time spectral diagnostic v3.
 
 ```text
 model geometry: corridor Vecchia cluster
@@ -11,15 +11,21 @@ nugget: fixed 0
 data: real GEMS TCO July, lat [-3, 2], lon [121, 131]
 diagnostic: 8x8 finite-sample cross-periodogram whitening, pooled by frequency direction
 directions: norm, lat, lon, diag
+heads variant: add one exact full-GP likelihood on 300 early max-min head points per time slot
 ```
 
 Model variants:
 
 ```text
-2023: matern_s03, gc_a075_b1, gc_a075_b05
-2024: matern_s03, gc_a08_b1, gc_a08_b05
-2025: matern_s03, gc_a075_b1, gc_a075_b05
+2023: gc_a075_b05_standard, gc_a075_b05_heads300
+2024: gc_a08_b05_standard,  gc_a08_b05_heads300
+2025: gc_a075_b05_standard, gc_a075_b05_heads300
 ```
+
+The heads300 objective keeps the original Vecchia tail objective and adds an
+exact likelihood contribution on up to `300 * 8 = 2400` single head points per
+day.  The head points are not removed from the Vecchia tail, so loss values are
+pseudo-likelihood diagnostics; compare spectral ratios and parameter stability.
 
 Main outputs:
 
@@ -40,33 +46,10 @@ monthly_average_plots/year_2023/st_corridor_spectral_monthly_summary.csv
 monthly_average_plots/year_2023/st_corridor_spectral_representative_frequency_band_table.csv
 ```
 
-The direction suffixes are `norm`, `lat`, `lon`, and `diag`.  The primary
-research-facing plots are ratio plots:
-
-```text
-marginal timeavg I over Ediag: marginal time-averaged spatial I / diagonal E[I], target = 1
-marginal timeavg Ediag / continuous: ratio of finite-sample diagonal E[I] to theoretical continuous spectrum
-whitened 8x8 I vs EI: 8x8-whitened I / E[I] quadratic power, target = 1
-ratio_triptych_<direction>: the three ratios above in one figure
-year_<year>/daily_norm_ratio_plots: day-level norm-frequency I / E[I] only, for outlier checks
-```
-
-No per-hour spectrum files are written.  The detailed profile CSV is already
-binned by day, direction, model, and frequency bin; the research-facing outputs
-are the monthly summary, representative frequency-band table, and monthly plots.
-The representative table reports:
-
-```text
-lowest_frequency_bin
-low_frequency_bins_1_5
-mid_frequency_band
-high_frequency_band
-```
-
 Amarel output root:
 
 ```text
-/home/jl2815/tco/exercise_output/summer/st_corridor_spectral_profile_2023_2025_matern_gc_nugget0_v2_061426
+/home/jl2815/tco/exercise_output/summer/st_corridor_spectral_profile_2023_2025_gc_b05_heads300_v3_061626
 ```
 
 ## 1. Upload Scripts To Amarel
@@ -88,8 +71,8 @@ scp -r "${LOCAL_ROOT}/src/GEMS_TCO" \
   "jl2815@amarel.rutgers.edu:/home/jl2815/tco/"
 
 scp \
-  "${LOCAL_SPECTRAL}/real_july_st_corridor_spectral_profile_v2_061426.py" \
-  "${LOCAL_SPECTRAL}/slurm_real_july_st_corridor_spectral_profile_v2_061426.md" \
+  "${LOCAL_SPECTRAL}/real_july_st_corridor_spectral_profile_v3_heads300_gc_b05_061626.py" \
+  "${LOCAL_SPECTRAL}/slurm_real_july_st_corridor_spectral_profile_v3_heads300_gc_b05_061626.md" \
   "jl2815@amarel.rutgers.edu:${REMOTE_SPECTRAL}/"
 
 scp \
@@ -102,22 +85,22 @@ scp \
 On Amarel, create the Slurm script:
 
 ```bash
-nano /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/spectral_analysis/slurm_real_july_st_corridor_spectral_profile_v2_061426.sh
+nano /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/spectral_analysis/slurm_real_july_st_corridor_spectral_profile_v3_heads300_gc_b05_061626.sh
 ```
 
 Paste this bash block into nano, then save:
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name=stspec_v2
+#SBATCH --job-name=stspec_v3h
 #SBATCH --partition=gpu-redhat
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=128G
-#SBATCH --time=6:00:00
+#SBATCH --time=12:00:00
 #SBATCH --array=0-2
-#SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/stspec_v2_%A_%a.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/summer/logs/stspec_v2_%A_%a.err
+#SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/stspec_v3h_%A_%a.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/summer/logs/stspec_v3h_%A_%a.err
 
 set -euo pipefail
 
@@ -145,17 +128,15 @@ export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:128
 
-SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/spectral_analysis/real_july_st_corridor_spectral_profile_v2_061426.py"
-OUTROOT="/home/jl2815/tco/exercise_output/summer/st_corridor_spectral_profile_2023_2025_matern_gc_nugget0_v2_061426"
+SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/spectral_analysis/real_july_st_corridor_spectral_profile_v3_heads300_gc_b05_061626.py"
+OUTROOT="/home/jl2815/tco/exercise_output/summer/st_corridor_spectral_profile_2023_2025_gc_b05_heads300_v3_061626"
 
 YEARS=(2023 2024 2025)
 YEAR="${YEARS[$SLURM_ARRAY_TASK_ID]}"
-if [[ "${YEAR}" == "2023" ]]; then
-  MODEL_VARIANTS=(matern_s03 gc_a075_b1 gc_a075_b05)
-elif [[ "${YEAR}" == "2024" ]]; then
-  MODEL_VARIANTS=(matern_s03 gc_a08_b1 gc_a08_b05)
+if [[ "${YEAR}" == "2024" ]]; then
+  MODEL_VARIANTS=(gc_a08_b05_standard gc_a08_b05_heads300)
 else
-  MODEL_VARIANTS=(matern_s03 gc_a075_b1 gc_a075_b05)
+  MODEL_VARIANTS=(gc_a075_b05_standard gc_a075_b05_heads300)
 fi
 
 OUTDIR="${OUTROOT}/year_${YEAR}"
@@ -209,7 +190,7 @@ echo "Finished: $(date)"
 Submit:
 
 ```bash
-sbatch /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/spectral_analysis/slurm_real_july_st_corridor_spectral_profile_v2_061426.sh
+sbatch /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/spectral_analysis/slurm_real_july_st_corridor_spectral_profile_v3_heads300_gc_b05_061626.sh
 ```
 
 Check status/logs:
@@ -217,45 +198,7 @@ Check status/logs:
 ```bash
 squeue -u jl2815
 
-tail -n 80 /home/jl2815/tco/exercise_output/summer/logs/stspec_v2_<JOBID>_0.out
-```
-
-## 3. Pull Results To Local
-
-After the array finishes, copy the research-facing monthly plots and summary
-tables:
-
-```bash
-LOCAL_OUT="/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/st_corridor_spectral_profile_2023_2025_matern_gc_nugget0_v2_061426"
-REMOTE_OUT="/home/jl2815/tco/exercise_output/summer/st_corridor_spectral_profile_2023_2025_matern_gc_nugget0_v2_061426"
-
-mkdir -p "${LOCAL_OUT}"
-
-scp -r "jl2815@amarel.rutgers.edu:${REMOTE_OUT}/monthly_average_plots" \
-  "${LOCAL_OUT}/"
-```
-
-This brings back the year folders, for example:
-
-```text
-monthly_average_plots/year_2023/
-  ratio_triptych_norm.png
-  ratio_triptych_lat.png
-  ratio_triptych_lon.png
-  ratio_triptych_diag.png
-  marginal_timeavg_spatial_I_over_Ediag_profile_sigma_target1_norm.png
-  marginal_timeavg_spatial_Ediag_over_continuous_ratio_norm.png
-  whitened_8x8_I_vs_EI_target1_norm.png
-  st_corridor_spectral_monthly_summary.csv
-  st_corridor_spectral_representative_frequency_band_table.csv
-monthly_average_plots/year_2023/daily_norm_ratio_plots/
-  dayidx_00_norm_I_over_EI_profile_ratio.png
-  daily_norm_I_over_EI_profile_ratio_rows.csv
-```
-
-To copy the full CSV/log output, including daily binned profiles and fit logs:
-
-```bash
-scp -r "jl2815@amarel.rutgers.edu:${REMOTE_OUT}" \
-  "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/"
+tail -n 80 /home/jl2815/tco/exercise_output/summer/logs/stspec_v3h_<JOBID>_0.out
+tail -n 80 /home/jl2815/tco/exercise_output/summer/logs/stspec_v3h_<JOBID>_1.out
+tail -n 80 /home/jl2815/tco/exercise_output/summer/logs/stspec_v3h_<JOBID>_2.out
 ```

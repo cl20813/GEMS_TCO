@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Space-time corridor Vecchia Matérn/Cauchy fit + multivariate spectral profile diagnostic.
+Space-time corridor Vecchia generalized Cauchy heads300 spectral profile diagnostic.
 
 This is the ST analogue of the pure-space spline-smooth spectral diagnostic:
 
@@ -15,8 +15,9 @@ This is the ST analogue of the pure-space spline-smooth spectral diagnostic:
      matrix, profile the covariance scale, and pool by frequency direction.
 
 The monthly plots are intentionally small in number: each year folder compares
-Matérn smooth=0.3 nugget0 against that year's selected generalized Cauchy
-nugget0 candidate across norm, latitude, longitude, and diagonal frequencies.
+the fixed year-specific generalized Cauchy nugget0 model with and without an
+exact pseudo-likelihood contribution on 300 early max-min head points per time
+slot (up to 2400 points per day).
 
 The diagnostic is intentionally no-taper: only the missing-data window enters
 the expected periodogram.  This matches the Vecchia fitting target more closely
@@ -32,6 +33,7 @@ import math
 import sys
 import time
 import traceback
+import types
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
@@ -103,47 +105,44 @@ MONTHLY_SUMMARY_CSV = "st_corridor_spectral_monthly_summary.csv"
 BAND_TABLE_CSV = "st_corridor_spectral_representative_frequency_band_table.csv"
 
 VARIANT_SPECS: dict[str, dict[str, Any]] = {
-    "matern_s03": {
-        "family": "matern",
-        "smooth": 0.3,
-        "gc_alpha": np.nan,
-        "gc_beta": np.nan,
-        "label": "Matern s=0.3 nugget0",
-    },
-    "gc_a075_b1": {
-        "family": "cauchy",
-        "smooth": np.nan,
-        "gc_alpha": 0.75,
-        "gc_beta": 1.0,
-        "label": "GC a=0.75 b=1 nugget0",
-    },
-    "gc_a075_b05": {
+    "gc_a075_b05_standard": {
         "family": "cauchy",
         "smooth": np.nan,
         "gc_alpha": 0.75,
         "gc_beta": 0.5,
-        "label": "GC a=0.75 b=0.5 nugget0",
+        "head_points_per_time": 0,
+        "label": "GC a=0.75 b=0.5 standard",
     },
-    "gc_a08_b1": {
+    "gc_a075_b05_heads300": {
         "family": "cauchy",
         "smooth": np.nan,
-        "gc_alpha": 0.8,
-        "gc_beta": 1.0,
-        "label": "GC a=0.8 b=1 nugget0",
+        "gc_alpha": 0.75,
+        "gc_beta": 0.5,
+        "head_points_per_time": 300,
+        "label": "GC a=0.75 b=0.5 + heads300",
     },
-    "gc_a08_b05": {
+    "gc_a08_b05_standard": {
         "family": "cauchy",
         "smooth": np.nan,
         "gc_alpha": 0.8,
         "gc_beta": 0.5,
-        "label": "GC a=0.8 b=0.5 nugget0",
+        "head_points_per_time": 0,
+        "label": "GC a=0.8 b=0.5 standard",
+    },
+    "gc_a08_b05_heads300": {
+        "family": "cauchy",
+        "smooth": np.nan,
+        "gc_alpha": 0.8,
+        "gc_beta": 0.5,
+        "head_points_per_time": 300,
+        "label": "GC a=0.8 b=0.5 + heads300",
     },
 }
 
 YEAR_VARIANT_DEFAULTS: dict[int, list[str]] = {
-    2023: ["matern_s03", "gc_a075_b1", "gc_a075_b05"],
-    2024: ["matern_s03", "gc_a08_b1", "gc_a08_b05"],
-    2025: ["matern_s03", "gc_a075_b1", "gc_a075_b05"],
+    2023: ["gc_a075_b05_standard", "gc_a075_b05_heads300"],
+    2024: ["gc_a08_b05_standard", "gc_a08_b05_heads300"],
+    2025: ["gc_a075_b05_standard", "gc_a075_b05_heads300"],
 }
 
 DEFAULT_MODEL_VARIANTS = list(dict.fromkeys(v for vals in YEAR_VARIANT_DEFAULTS.values() for v in vals))
@@ -151,8 +150,8 @@ DEFAULT_MODEL_VARIANTS = list(dict.fromkeys(v for vals in YEAR_VARIANT_DEFAULTS.
 
 def default_output_root() -> Path:
     if Path("/home/jl2815").exists():
-        return Path("/home/jl2815/tco/exercise_output/summer/st_corridor_spectral_profile_2023_2025_matern_gc_nugget0_v2_061426")
-    return Path("/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/st_corridor_spectral_profile_2023_2025_matern_gc_nugget0_v2_061426")
+        return Path("/home/jl2815/tco/exercise_output/summer/st_corridor_spectral_profile_2023_2025_gc_b05_heads300_v3_061626")
+    return Path("/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/st_corridor_spectral_profile_2023_2025_gc_b05_heads300_v3_061626")
 
 
 def append_jsonl(path: Path, row: dict[str, Any]) -> None:
@@ -634,6 +633,97 @@ def compute_spectral_profile(
     return rows, stats
 
 
+def _sync_if_cuda(device: torch.device) -> None:
+    if torch.device(device).type == "cuda":
+        torch.cuda.synchronize(device)
+
+
+def select_head_center_rows(model, heads_per_time: int) -> tuple[torch.Tensor, torch.Tensor]:
+    """Pick one center-nearest observed point from each early max-min cluster per time slot."""
+    all_data = [v.to(model.device, dtype=torch.float32) for v in model.input_map.values()]
+    n_grid = int(all_data[0].shape[0])
+    real_data = torch.cat(all_data, dim=0).contiguous()
+    if not model.cluster_points:
+        raise RuntimeError("Run model.precompute_conditioning_sets() before selecting heads.")
+    centroids = np.asarray(model.cluster_centroids, dtype=np.float64)
+    head_local: list[int] = []
+    for cluster_idx in range(min(int(heads_per_time), len(model.cluster_points))):
+        pts = np.asarray(model.cluster_points[cluster_idx], dtype=np.int64)
+        center = centroids[cluster_idx]
+        grid_xy = np.asarray(model.grid_coords[:n_grid], dtype=np.float64)[pts]
+        j = int(np.argmin(np.sum((grid_xy - center) ** 2, axis=1)))
+        head_local.append(int(pts[j]))
+
+    head_idx: list[int] = []
+    valid_mask = ~torch.isnan(real_data[:, 2])
+    for time_idx in range(len(all_data)):
+        offset = time_idx * n_grid
+        for local_idx in head_local:
+            global_idx = offset + int(local_idx)
+            if bool(valid_mask[global_idx].detach().cpu().item()):
+                head_idx.append(global_idx)
+    head_idx_t = torch.tensor(head_idx, device=model.device, dtype=torch.long)
+    return real_data[head_idx_t].contiguous().to(torch.float64), head_idx_t
+
+
+def install_head_augmented_pseudolikelihood(model, heads_per_time: int):
+    """Add exact full-GP likelihood on selected head points to the existing Vecchia objective."""
+    heads_data, head_idx = select_head_center_rows(model, heads_per_time=heads_per_time)
+    model.Heads_data = heads_data
+    model._heads_tensor_stored = head_idx
+    model.n_heads_augmented = int(heads_data.shape[0])
+    model.n_heads_per_time_requested = int(heads_per_time)
+    model._heads_accumulate_calls = 0
+    model._heads_accumulate_s = 0.0
+    tail_accumulate = model._accumulate_gls_stats
+    tail_cluster_summary = model.cluster_summary
+
+    def _accumulate_with_heads(self, params, include_y_quad=True, catch_cholesky=False):
+        tail_stats = tail_accumulate(params, include_y_quad=include_y_quad, catch_cholesky=catch_cholesky)
+        if tail_stats is None:
+            return None
+        XT_Sinv_X, XT_Sinv_y, yT_Sinv_y, log_det, total_N = tail_stats
+        if self.Heads_data is None or self.Heads_data.shape[0] == 0:
+            return XT_Sinv_X, XT_Sinv_y, yT_Sinv_y, log_det, total_N
+        _sync_if_cuda(self.device)
+        heads_t0 = time.time()
+        X_h, y_h = self._head_design_response()
+        cov = self.matern_cov_aniso_STABLE_log_reparam(params, self.Heads_data, self.Heads_data)
+        try:
+            L = torch.linalg.cholesky(cov)
+        except torch.linalg.LinAlgError:
+            if catch_cholesky:
+                self._log_cholesky_failure(params, "Heads exact block")
+                return None
+            raise
+        Z_X = torch.linalg.solve_triangular(L, X_h, upper=False)
+        Z_y = torch.linalg.solve_triangular(L, y_h, upper=False)
+        log_det = log_det + 2.0 * torch.sum(torch.log(torch.diagonal(L)))
+        XT_Sinv_X = XT_Sinv_X + Z_X.T @ Z_X
+        XT_Sinv_y = XT_Sinv_y + Z_X.T @ Z_y
+        if include_y_quad:
+            yT_Sinv_y = yT_Sinv_y + (Z_y.T @ Z_y).squeeze()
+        total_N = int(total_N) + int(self.Heads_data.shape[0])
+        _sync_if_cuda(self.device)
+        self._heads_accumulate_calls += 1
+        self._heads_accumulate_s += time.time() - heads_t0
+        return XT_Sinv_X, XT_Sinv_y, yT_Sinv_y, log_det, total_N
+
+    def _cluster_summary_with_heads(self):
+        out = dict(tail_cluster_summary())
+        out["heads_per_time_requested"] = int(self.n_heads_per_time_requested)
+        out["n_heads_exact"] = int(self.n_heads_augmented)
+        out["n_pseudo_observations"] = int(out.get("n_target_points", 0)) + int(self.n_heads_augmented)
+        out["heads_accumulate_calls"] = int(getattr(self, "_heads_accumulate_calls", 0))
+        out["heads_accumulate_s"] = float(getattr(self, "_heads_accumulate_s", 0.0))
+        out["heads_strategy"] = "center_points_first_ordered_clusters"
+        return out
+
+    model._accumulate_gls_stats = types.MethodType(_accumulate_with_heads, model)
+    model.cluster_summary = types.MethodType(_cluster_summary_with_heads, model)
+    return model
+
+
 def fit_full_asset(
     asset: dict[str, Any],
     spec: dict[str, Any],
@@ -679,7 +769,18 @@ def fit_full_asset(
 
     t0 = time.time()
     model.precompute_conditioning_sets()
+    head_points_per_time = int(spec.get("head_points_per_time", 0) or 0)
+    if head_points_per_time > 0:
+        install_head_augmented_pseudolikelihood(model, heads_per_time=head_points_per_time)
     precompute_s = time.time() - t0
+    base_likelihood = model.vecchia_batched_likelihood
+    model._loss_eval_calls = 0
+
+    def _counted_likelihood(params):
+        model._loss_eval_calls += 1
+        return base_likelihood(params)
+
+    model.vecchia_batched_likelihood = _counted_likelihood
     optimizer = model.set_optimizer(
         params_list,
         lr=float(args.lbfgs_lr),
@@ -722,6 +823,8 @@ def fit_full_asset(
         "model_variant": str(spec["model_variant"]),
         "model_family": str(spec["family"]),
         "model_label": str(spec["label"]),
+        "head_points_per_time": int(head_points_per_time),
+        "head_augmented": bool(head_points_per_time > 0),
         "smooth": float(spec["smooth"]) if pd.notna(spec["smooth"]) else np.nan,
         "gc_alpha": float(spec["gc_alpha"]) if pd.notna(spec["gc_alpha"]) else np.nan,
         "gc_beta": float(spec["gc_beta"]) if pd.notna(spec["gc_beta"]) else np.nan,
@@ -744,6 +847,9 @@ def fit_full_asset(
         "reference_advec_lon_abs": float(reference_advec_lon_abs),
         "loss": loss,
         "steps_raw": int(steps_ran),
+        "loss_eval_calls": int(getattr(model, "_loss_eval_calls", 0)),
+        "heads_accumulate_calls": int(getattr(model, "_heads_accumulate_calls", 0)),
+        "heads_accumulate_s": float(getattr(model, "_heads_accumulate_s", 0.0)),
         "precompute_s": float(precompute_s),
         "fit_s": float(fit_s),
         "total_s": float(precompute_s + fit_s),
