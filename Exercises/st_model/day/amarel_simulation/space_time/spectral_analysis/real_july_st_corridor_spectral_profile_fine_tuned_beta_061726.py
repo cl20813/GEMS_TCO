@@ -14,9 +14,11 @@ This is the ST analogue of the pure-space spline-smooth spectral diagnostic:
   6. Whiten J(omega) with the fitted 8x8 finite-sample cross-periodogram
      matrix, profile the covariance scale, and pool by frequency direction.
 
-The monthly plots are intentionally small in number: each year folder compares
-Matérn smooth=0.3 nugget0 against that year's selected generalized Cauchy
-nugget0 candidate across norm, latitude, longitude, and diagonal frequencies.
+This fine-tuned beta run compares the Matérn smooth=0.3 nugget0 baseline
+against one year/day-specific alternative for July 2023-2025.  The tuned
+variant uses GC a=0.75 for 2023/2025, GC a=0.8 for 2024, day-specific beta
+values, and Matérn smooth=0.3 on days where the GC low-frequency behavior is
+less natural.
 
 The diagnostic is intentionally no-taper: only the missing-data window enters
 the expected periodogram.  This matches the Vecchia fitting target more closely
@@ -100,6 +102,9 @@ FIT_CSV = "st_corridor_spectral_all_fits.csv"
 PROFILE_CSV = "st_corridor_spectral_profiles.csv"
 MONTHLY_SUMMARY_CSV = "st_corridor_spectral_monthly_summary.csv"
 BAND_TABLE_CSV = "st_corridor_spectral_representative_frequency_band_table.csv"
+BASELINE_COMPARISON_CSV = "st_corridor_spectral_baseline_comparison.csv"
+BASELINE_VARIANT = "matern_s03"
+TUNED_VARIANT = "fine_tuned_beta"
 
 VARIANT_SPECS: dict[str, dict[str, Any]] = {
     "matern_s03": {
@@ -116,6 +121,13 @@ VARIANT_SPECS: dict[str, dict[str, Any]] = {
         "gc_beta": 1.0,
         "label": "GC a=0.75 b=1 nugget0",
     },
+    "gc_a075_b3": {
+        "family": "cauchy",
+        "smooth": np.nan,
+        "gc_alpha": 0.75,
+        "gc_beta": 3.0,
+        "label": "GC a=0.75 b=3 nugget0",
+    },
     "gc_a075_b05": {
         "family": "cauchy",
         "smooth": np.nan,
@@ -123,12 +135,40 @@ VARIANT_SPECS: dict[str, dict[str, Any]] = {
         "gc_beta": 0.5,
         "label": "GC a=0.75 b=0.5 nugget0",
     },
+    "gc_a075_b4": {
+        "family": "cauchy",
+        "smooth": np.nan,
+        "gc_alpha": 0.75,
+        "gc_beta": 4.0,
+        "label": "GC a=0.75 b=4 nugget0",
+    },
+    TUNED_VARIANT: {
+        "family": "day_specific",
+        "smooth": np.nan,
+        "gc_alpha": np.nan,
+        "gc_beta": np.nan,
+        "label": "Fine-tuned beta day-specific nugget0",
+    },
     "gc_a08_b1": {
         "family": "cauchy",
         "smooth": np.nan,
         "gc_alpha": 0.8,
         "gc_beta": 1.0,
         "label": "GC a=0.8 b=1 nugget0",
+    },
+    "gc_a08_b3": {
+        "family": "cauchy",
+        "smooth": np.nan,
+        "gc_alpha": 0.8,
+        "gc_beta": 3.0,
+        "label": "GC a=0.8 b=3 nugget0",
+    },
+    "gc_a08_b4": {
+        "family": "cauchy",
+        "smooth": np.nan,
+        "gc_alpha": 0.8,
+        "gc_beta": 4.0,
+        "label": "GC a=0.8 b=4 nugget0",
     },
     "gc_a08_b05": {
         "family": "cauchy",
@@ -140,18 +180,117 @@ VARIANT_SPECS: dict[str, dict[str, Any]] = {
 }
 
 YEAR_VARIANT_DEFAULTS: dict[int, list[str]] = {
-    2023: ["matern_s03", "gc_a075_b1", "gc_a075_b05"],
-    2024: ["matern_s03", "gc_a08_b1", "gc_a08_b05"],
-    2025: ["matern_s03", "gc_a075_b1", "gc_a075_b05"],
+    2023: [BASELINE_VARIANT, TUNED_VARIANT],
+    2024: [BASELINE_VARIANT, TUNED_VARIANT],
+    2025: [BASELINE_VARIANT, TUNED_VARIANT],
 }
 
 DEFAULT_MODEL_VARIANTS = list(dict.fromkeys(v for vals in YEAR_VARIANT_DEFAULTS.values() for v in vals))
 
+FINE_TUNED_BETA_DAY_VARIANTS: dict[int, dict[int, str]] = {
+    2023: {
+    0: "gc_a075_b05",
+    1: "gc_a075_b4",
+    2: "gc_a075_b05",
+    3: "gc_a075_b4",
+    4: "gc_a075_b05",
+    5: "gc_a075_b05",
+    6: "matern_s03",
+    7: "gc_a075_b1",
+    8: "matern_s03",
+    9: "matern_s03",
+    10: "gc_a075_b1",
+    11: "gc_a075_b3",
+    12: "gc_a075_b05",
+    13: "gc_a075_b05",
+    14: "matern_s03",
+    15: "gc_a075_b1",
+    16: "gc_a075_b05",
+    17: "gc_a075_b05",
+    18: "gc_a075_b1",
+    19: "gc_a075_b05",
+    20: "gc_a075_b05",
+    21: "gc_a075_b05",
+    22: "gc_a075_b1",
+    23: "gc_a075_b05",
+    24: "gc_a075_b05",
+    25: "gc_a075_b05",
+    26: "gc_a075_b05",
+    27: "gc_a075_b05",
+    28: "gc_a075_b05",
+    29: "matern_s03",
+    },
+    2024: {
+    0: "gc_a08_b05",
+    1: "gc_a08_b05",
+    2: "gc_a08_b3",
+    3: "gc_a08_b05",
+    4: "gc_a08_b3",
+    5: "matern_s03",
+    6: "gc_a08_b1",
+    7: "matern_s03",
+    8: "gc_a08_b05",
+    9: "gc_a08_b05",
+    10: "gc_a08_b05",
+    11: "gc_a08_b05",
+    12: "gc_a08_b05",
+    13: "gc_a08_b05",
+    14: "gc_a08_b4",
+    15: "gc_a08_b05",
+    16: "gc_a08_b05",
+    17: "gc_a08_b05",
+    18: "gc_a08_b1",
+    19: "gc_a08_b05",
+    20: "gc_a08_b05",
+    21: "gc_a08_b05",
+    22: "gc_a08_b05",
+    23: "gc_a08_b05",
+    24: "gc_a08_b05",
+    25: "gc_a08_b1",
+    26: "gc_a08_b1",
+    27: "gc_a08_b05",
+    28: "gc_a08_b1",
+    29: "gc_a08_b05",
+    },
+    2025: {
+    0: "gc_a075_b05",
+    1: "gc_a075_b05",
+    2: "gc_a075_b05",
+    3: "gc_a075_b1",
+    4: "matern_s03",
+    5: "gc_a075_b3",
+    6: "gc_a075_b4",
+    7: "gc_a075_b05",
+    8: "gc_a075_b05",
+    9: "gc_a075_b05",
+    10: "gc_a075_b05",
+    11: "gc_a075_b05",
+    12: "gc_a075_b05",
+    13: "gc_a075_b05",
+    14: "gc_a075_b4",
+    15: "gc_a075_b1",
+    16: "matern_s03",
+    17: "gc_a075_b05",
+    18: "gc_a075_b05",
+    19: "gc_a075_b05",
+    20: "gc_a075_b05",
+    21: "gc_a075_b05",
+    22: "gc_a075_b1",
+    23: "gc_a075_b05",
+    24: "gc_a075_b05",
+    25: "gc_a075_b05",
+    26: "matern_s03",
+    27: "matern_s03",
+    28: "gc_a075_b05",
+    29: "gc_a075_b1",
+    },
+}
+
 
 def default_output_root() -> Path:
     if Path("/home/jl2815").exists():
-        return Path("/home/jl2815/tco/exercise_output/summer/st_corridor_spectral_profile_2023_2025_matern_gc_nugget0_v2_061426")
-    return Path("/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/st_corridor_spectral_profile_2023_2025_matern_gc_nugget0_v2_061426")
+        return Path("/home/jl2815/tco/exercise_output/summer/st_corridor_spectral_profile_2023_2025_fine_tuned_beta_nugget0_061726")
+    return Path("/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/st_corridor_spectral_profile_2023_2025_fine_tuned_beta_nugget0_061726")
 
 
 def append_jsonl(path: Path, row: dict[str, Any]) -> None:
@@ -170,10 +309,28 @@ def raw_params_from_est(est: dict[str, float]) -> torch.Tensor:
     return torch.tensor(raw, dtype=torch.float64)
 
 
-def variant_spec(name: str) -> dict[str, Any]:
+def variant_spec(name: str, day_idx: int | None = None, year: int | None = None) -> dict[str, Any]:
     if name not in VARIANT_SPECS:
         raise ValueError(f"Unknown model variant {name!r}. Known: {sorted(VARIANT_SPECS)}")
-    return {**VARIANT_SPECS[name], "model_variant": name}
+    if name != TUNED_VARIANT:
+        return {**VARIANT_SPECS[name], "model_variant": name, "selected_model_variant": name}
+    if day_idx is None:
+        return {**VARIANT_SPECS[name], "model_variant": name, "selected_model_variant": ""}
+    if year is None:
+        raise ValueError(f"{TUNED_VARIANT!r} requires a year when day_idx is provided")
+    selected = FINE_TUNED_BETA_DAY_VARIANTS.get(int(year), {}).get(int(day_idx))
+    if selected is None:
+        raise ValueError(f"No fine-tuned beta model choice for year={year}, day_idx={day_idx}")
+    spec = {**VARIANT_SPECS[selected]}
+    spec.update(
+        {
+            "model_variant": name,
+            "selected_model_variant": selected,
+            "selected_model_label": VARIANT_SPECS[selected]["label"],
+            "label": VARIANT_SPECS[name]["label"],
+        }
+    )
+    return spec
 
 
 def variants_for_year(year: int, requested_variants: list[str]) -> list[str]:
@@ -498,6 +655,8 @@ def profile_rows_from_spectral_grids(
                     "day_idx": int(day_idx),
                     "day": day,
                     "model_variant": str(spec["model_variant"]),
+                    "selected_model_variant": str(spec.get("selected_model_variant", spec["model_variant"])),
+                    "selected_model_label": str(spec.get("selected_model_label", spec["label"])),
                     "model_family": str(spec["family"]),
                     "model_label": str(spec["label"]),
                     "smooth": float(spec["smooth"]) if pd.notna(spec["smooth"]) else np.nan,
@@ -719,6 +878,8 @@ def fit_full_asset(
         "day_idx": int(asset["day_idx"]),
         "day": str(asset["day"]),
         "model_variant": str(spec["model_variant"]),
+        "selected_model_variant": str(spec.get("selected_model_variant", spec["model_variant"])),
+        "selected_model_label": str(spec.get("selected_model_label", spec["label"])),
         "model_family": str(spec["family"]),
         "model_label": str(spec["label"]),
         "smooth": float(spec["smooth"]) if pd.notna(spec["smooth"]) else np.nan,
@@ -759,10 +920,60 @@ def fit_full_asset(
     return row, beta, lat_mean
 
 
+def is_cuda_oom(exc: BaseException) -> bool:
+    return isinstance(exc, torch.cuda.OutOfMemoryError) or "CUDA out of memory" in str(exc)
+
+
+def fit_full_asset_with_oom_retry(
+    asset: dict[str, Any],
+    spec: dict[str, Any],
+    init_physical: dict[str, float],
+    reference_advec_lon_abs: float,
+    fit_id: int,
+    device: torch.device,
+    args: argparse.Namespace,
+) -> tuple[dict[str, Any], torch.Tensor, float]:
+    retry_sizes = [int(args.target_chunk_size)]
+    retry_sizes.extend(int(x) for x in parse_int_tokens([str(args.oom_retry_target_chunk_sizes)]) if int(x) > 0)
+    retry_sizes = list(dict.fromkeys(retry_sizes))
+    last_exc: BaseException | None = None
+    for i, chunk_size in enumerate(retry_sizes):
+        trial_args = argparse.Namespace(**vars(args))
+        trial_args.target_chunk_size = int(chunk_size)
+        try:
+            if i > 0:
+                print(f"Retrying fit_id={fit_id} with target_chunk_size={chunk_size} after CUDA OOM", flush=True)
+            return fit_full_asset(
+                asset=asset,
+                spec=spec,
+                init_physical=init_physical,
+                reference_advec_lon_abs=reference_advec_lon_abs,
+                fit_id=fit_id,
+                device=device,
+                args=trial_args,
+            )
+        except Exception as exc:
+            last_exc = exc
+            if not (device.type == "cuda" and is_cuda_oom(exc) and i < len(retry_sizes) - 1):
+                raise
+            gc.collect()
+            torch.cuda.empty_cache()
+    assert last_exc is not None
+    raise last_exc
+
+
 def refresh_outputs(out_dir: Path, fit_rows: list[dict[str, Any]], profile_rows: list[dict[str, Any]], top_plot_dir: Path | None) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     fit_df = save_rows(out_dir / FIT_CSV, fit_rows) if fit_rows else pd.DataFrame()
     profile_df = save_rows(out_dir / PROFILE_CSV, profile_rows) if profile_rows else pd.DataFrame()
+    baseline_comparison = make_baseline_comparison(fit_df, profile_df)
+    if not baseline_comparison.empty:
+        save_rows(out_dir / BASELINE_COMPARISON_CSV, baseline_comparison)
+        if top_plot_dir is not None:
+            for year, sub_cmp in baseline_comparison.groupby("year", dropna=False):
+                year_dir = top_plot_dir / f"year_{int(year)}"
+                year_dir.mkdir(parents=True, exist_ok=True)
+                save_rows(year_dir / BASELINE_COMPARISON_CSV, sub_cmp)
     if not fit_df.empty:
         ok = fit_df[fit_df["status"] == "ok"].copy()
         if not ok.empty:
@@ -817,7 +1028,76 @@ def refresh_outputs(out_dir: Path, fit_rows: list[dict[str, Any]], profile_rows:
     ]
     if fit_rows:
         lines.append(pd.DataFrame(fit_rows).tail(12).to_string(index=False))
+    if not baseline_comparison.empty:
+        lines.append("\nBaseline comparison tail:")
+        lines.append(baseline_comparison.tail(12).to_string(index=False))
     (out_dir / "running_summary.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def make_baseline_comparison(fit_df: pd.DataFrame, profile_df: pd.DataFrame) -> pd.DataFrame:
+    if fit_df.empty or profile_df.empty:
+        return pd.DataFrame()
+    fit_ok = fit_df[fit_df.get("status", "") == "ok"].copy()
+    if fit_ok.empty:
+        return pd.DataFrame()
+    fit_keep = [
+        "year",
+        "month",
+        "day_idx",
+        "day",
+        "model_variant",
+        "selected_model_variant",
+        "selected_model_label",
+        "model_label",
+        "loss",
+    ]
+    fit_small = fit_ok[[c for c in fit_keep if c in fit_ok.columns]].copy()
+    prof = profile_df.copy()
+    if "ratio_I_over_EI_profile_mean" not in prof.columns:
+        return pd.DataFrame()
+    prof["ratio_error_abslog"] = np.abs(np.log(pd.to_numeric(prof["ratio_I_over_EI_profile_mean"], errors="coerce")))
+    prof["ratio_error_sqlog"] = np.square(np.log(pd.to_numeric(prof["ratio_I_over_EI_profile_mean"], errors="coerce")))
+    prof["low_frequency_band"] = pd.to_numeric(prof["bin_idx"], errors="coerce").between(0, 5)
+    score_rows = []
+    group_cols = ["year", "month", "day_idx", "day", "model_variant", "direction"]
+    for keys, sub in prof.groupby(group_cols, dropna=False):
+        all_err = pd.to_numeric(sub["ratio_error_abslog"], errors="coerce").dropna().to_numpy(dtype=float)
+        all_sq = pd.to_numeric(sub["ratio_error_sqlog"], errors="coerce").dropna().to_numpy(dtype=float)
+        low = sub[sub["low_frequency_band"]].copy()
+        low_err = pd.to_numeric(low["ratio_error_abslog"], errors="coerce").dropna().to_numpy(dtype=float)
+        score_rows.append(
+            {
+                "year": int(keys[0]),
+                "month": int(keys[1]),
+                "day_idx": int(keys[2]),
+                "day": str(keys[3]),
+                "model_variant": str(keys[4]),
+                "direction": str(keys[5]),
+                "ratio_abslog_mean": float(np.nanmean(all_err)) if all_err.size else np.nan,
+                "ratio_rmslog": float(np.sqrt(np.nanmean(all_sq))) if all_sq.size else np.nan,
+                "low_bin0_5_ratio_abslog_mean": float(np.nanmean(low_err)) if low_err.size else np.nan,
+            }
+        )
+    scores = pd.DataFrame(score_rows)
+    if scores.empty:
+        return pd.DataFrame()
+    scores = scores.merge(fit_small, on=["year", "month", "day_idx", "day", "model_variant"], how="left")
+    baseline = scores[scores["model_variant"] == BASELINE_VARIANT].copy()
+    tuned = scores[scores["model_variant"] == TUNED_VARIANT].copy()
+    if baseline.empty or tuned.empty:
+        return pd.DataFrame()
+    merge_cols = ["year", "month", "day_idx", "day", "direction"]
+    cmp = tuned.merge(
+        baseline,
+        on=merge_cols,
+        suffixes=("_tuned", "_baseline"),
+        how="inner",
+    )
+    cmp["loss_delta_tuned_minus_baseline"] = pd.to_numeric(cmp["loss_tuned"], errors="coerce") - pd.to_numeric(cmp["loss_baseline"], errors="coerce")
+    cmp["ratio_abslog_improvement"] = pd.to_numeric(cmp["ratio_abslog_mean_baseline"], errors="coerce") - pd.to_numeric(cmp["ratio_abslog_mean_tuned"], errors="coerce")
+    cmp["ratio_rmslog_improvement"] = pd.to_numeric(cmp["ratio_rmslog_baseline"], errors="coerce") - pd.to_numeric(cmp["ratio_rmslog_tuned"], errors="coerce")
+    cmp["low_bin0_5_ratio_abslog_improvement"] = pd.to_numeric(cmp["low_bin0_5_ratio_abslog_mean_baseline"], errors="coerce") - pd.to_numeric(cmp["low_bin0_5_ratio_abslog_mean_tuned"], errors="coerce")
+    return cmp.sort_values(["year", "month", "day_idx", "direction"]).reset_index(drop=True)
 
 
 def make_fit_summary(ok: pd.DataFrame) -> pd.DataFrame:
@@ -1113,6 +1393,8 @@ def plot_daily_norm_ratio_outputs(profile: pd.DataFrame, base_dir: Path) -> None
         "day_idx",
         "day",
         "model_variant",
+        "selected_model_variant",
+        "selected_model_label",
         "model_label",
         "loss",
         "bin_idx",
@@ -1179,6 +1461,11 @@ def _plot_model_pair_lines(
 
 def model_label_with_loss(sub_model: pd.DataFrame) -> str:
     model_label = str(sub_model["model_label"].dropna().iloc[0]) if sub_model["model_label"].notna().any() else str(sub_model["model_variant"].dropna().iloc[0])
+    if "model_variant" in sub_model.columns and "selected_model_label" in sub_model.columns:
+        variants = sub_model["model_variant"].dropna().astype(str).unique()
+        selected = sub_model["selected_model_label"].dropna().astype(str).unique()
+        if len(variants) == 1 and variants[0] == TUNED_VARIANT and len(selected) == 1:
+            model_label = f"{model_label}: {selected[0]}"
     if "loss_median" in sub_model.columns:
         loss_source = sub_model["loss_median"]
     elif "loss" in sub_model.columns:
@@ -1271,7 +1558,7 @@ def plot_directional_year_outputs(monthly: pd.DataFrame, base_dir: Path) -> None
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Fit full-grid ST corridor Vecchia and compute 8x8-whitened spectral profiles.")
+    parser = argparse.ArgumentParser(description="Fit 2023-2025 full-grid ST corridor Vecchia baseline and fine-tuned beta spectral profiles.")
     parser.add_argument("--model-variants", nargs="+", default=DEFAULT_MODEL_VARIANTS)
     parser.add_argument("--days", default="0,30", help="'0,30' means July day_idx 0..29.")
     parser.add_argument("--real-years", nargs="+", default=["2023", "2024", "2025"])
@@ -1287,6 +1574,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--real-reference-advec-lon-abs", type=float, default=REFERENCE_ADVEC_LON_ABS)
     parser.add_argument("--daily-stride", type=int, default=2)
     parser.add_argument("--target-chunk-size", type=int, default=128)
+    parser.add_argument("--oom-retry-target-chunk-sizes", default="64,32,16")
     parser.add_argument("--min-target-points", type=int, default=1)
     parser.add_argument("--lbfgs-lr", type=float, default=1.0)
     parser.add_argument("--lbfgs-steps", type=int, default=5)
@@ -1367,6 +1655,7 @@ def main() -> None:
         "args": clean_json_value(vars(args)),
         "model_variants": {name: clean_json_value(variant_spec(name)) for name in model_variants},
         "year_variant_defaults": YEAR_VARIANT_DEFAULTS,
+        "fine_tuned_beta_day_variants": FINE_TUNED_BETA_DAY_VARIANTS,
         "years": years,
         "model_spec_real": corridor_width_643_spec(args.real_reference_advec_lon_abs),
         "default_real_init_physical": DEFAULT_REAL_INIT_PHYSICAL,
@@ -1390,7 +1679,7 @@ def main() -> None:
             print(f"Skipping {asset['day']}: no requested variants are enabled for year {asset['year']}", flush=True)
             continue
         for model_variant in asset_model_variants:
-            spec = variant_spec(model_variant)
+            spec = variant_spec(model_variant, day_idx=int(asset["day_idx"]), year=int(asset["year"]))
             key = (int(asset["year"]), int(asset["day_idx"]), str(model_variant))
             if args.skip_existing and key in done:
                 print(f"Skipping existing ok fit: {key}", flush=True)
@@ -1408,6 +1697,8 @@ def main() -> None:
                 "day_idx": int(asset["day_idx"]),
                 "day": str(asset["day"]),
                 "model_variant": str(model_variant),
+                "selected_model_variant": str(spec.get("selected_model_variant", spec["model_variant"])),
+                "selected_model_label": str(spec.get("selected_model_label", spec["label"])),
                 "model_family": str(spec["family"]),
                 "model_label": str(spec["label"]),
                 "smooth": float(spec["smooth"]) if pd.notna(spec["smooth"]) else np.nan,
@@ -1419,7 +1710,7 @@ def main() -> None:
                 "lag_pattern": f"{LAG_COUNTS[0]}/{LAG_COUNTS[1]}/{LAG_COUNTS[2]}",
             }
             try:
-                row, beta, lat_mean = fit_full_asset(
+                row, beta, lat_mean = fit_full_asset_with_oom_retry(
                     asset=asset,
                     spec=spec,
                     init_physical=DEFAULT_REAL_INIT_PHYSICAL,

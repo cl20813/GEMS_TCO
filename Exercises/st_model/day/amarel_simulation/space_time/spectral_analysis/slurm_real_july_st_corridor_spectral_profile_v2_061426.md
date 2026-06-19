@@ -80,21 +80,17 @@ REMOTE_DIAG="${REMOTE_SPACE_TIME}/vecchia_diagnosis"
 LOCAL_ROOT="/Users/joonwonlee/Documents/GEMS_TCO-1"
 LOCAL_SPACE_TIME="${LOCAL_ROOT}/Exercises/st_model/day/amarel_simulation/space_time"
 LOCAL_SPECTRAL="${LOCAL_SPACE_TIME}/spectral_analysis"
-LOCAL_DIAG="${LOCAL_SPACE_TIME}/vecchia_diagnosis"
 
-ssh jl2815@amarel.rutgers.edu "mkdir -p ${REMOTE_SPECTRAL} ${REMOTE_DIAG} /home/jl2815/tco/exercise_output/summer/logs"
+ssh jl2815@amarel.rutgers.edu "mkdir -p ${REMOTE_SPECTRAL} /home/jl2815/tco/exercise_output/summer/logs"
 
 scp -r "${LOCAL_ROOT}/src/GEMS_TCO" \
   "jl2815@amarel.rutgers.edu:/home/jl2815/tco/"
 
 scp \
+  "${LOCAL_SPECTRAL}/st_corridor_common.py" \
   "${LOCAL_SPECTRAL}/real_july_st_corridor_spectral_profile_v2_061426.py" \
   "${LOCAL_SPECTRAL}/slurm_real_july_st_corridor_spectral_profile_v2_061426.md" \
   "jl2815@amarel.rutgers.edu:${REMOTE_SPECTRAL}/"
-
-scp \
-  "${LOCAL_DIAG}/fit_real_july2024_corridor_width_4x4_lag643_matern_cauchy_tradeoff_nugget0_prefix_061426.py" \
-  "jl2815@amarel.rutgers.edu:${REMOTE_DIAG}/"
 ```
 
 ## 2. Submit On Amarel
