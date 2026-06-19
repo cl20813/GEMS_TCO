@@ -1,7 +1,19 @@
-# Real July 2023 ST Vecchia Conditional Eigen Diagnostic
+# Real July 2023 ST Vecchia Max-Min Ordered Conditional Diagnostic
 
-This run applies the conditional-eigen Vecchia diagnostic to real July GEMS
-data rather than simulation pickles.
+This run applies the max-min ordered Vecchia conditional diagnostic to real
+July GEMS data rather than simulation pickles.  It uses the same
+conditional-eigen scores as the eigen-sort run, but the cumulative curve is
+ordered by default as:
+
+```text
+max-min target-block rank -> local conditional eigen rank, with hour_idx pooled
+```
+
+This pools the same spatial max-min prefix across the 8 hourly slots, so the
+cumulative curve does not restart the spatial coarse-to-fine axis at every hour.
+
+The run also writes local-rank eigenvalue stability summaries, so overlap among
+rank-wise eigenvalue distributions can be checked directly.
 
 ```text
 years       = 2023
@@ -65,13 +77,17 @@ fits/diagnoses each tile separately, which is the high-frequency/local check.
 Main outputs:
 
 ```text
-real_july2023_vecchia_conditional_eig_matern_gc_baselines_finetuned_domains_061926_summary.csv
-daily_plots_full/year_2023/real_2023_dayDD_full_vecchia_conditional_eig_comparison.png
-daily_plots_tile_2x4/year_2023/real_2023_dayDD_tile_2x4_vecchia_conditional_eig_panel.png
+real_july2023_vecchia_conditional_maxmin_order_matern_gc_baselines_finetuned_domains_061926_summary.csv
+real_july2023_vecchia_conditional_maxmin_order_matern_gc_baselines_finetuned_domains_061926_local_rank_eigenvalue_stability_daily.csv
+real_july2023_vecchia_conditional_maxmin_order_matern_gc_baselines_finetuned_domains_061926_local_rank_eigenvalue_stability_monthly.csv
+real_july2023_vecchia_conditional_maxmin_order_matern_gc_baselines_finetuned_domains_061926_adjacent_local_rank_iqr_gaps_daily.csv
+real_july2023_vecchia_conditional_maxmin_order_matern_gc_baselines_finetuned_domains_061926_adjacent_local_rank_iqr_gaps_monthly.csv
+daily_plots_full/year_2023/real_2023_dayDD_full_vecchia_conditional_maxmin_order_comparison.png
+daily_plots_tile_2x4/year_2023/real_2023_dayDD_tile_2x4_vecchia_conditional_maxmin_order_panel.png
 monthly_average_full/year_2023/full/full/
 monthly_average_tile_2x4/year_2023/tile_2x4/tile_y01_x01/
 monthly_average_plots_full/year_2023/full/
-monthly_average_plots_tile_2x4/year_2023/real_2023_tile_2x4_monthly_average_vecchia_conditional_eig_comparison.png
+monthly_average_plots_tile_2x4/year_2023/real_2023_tile_2x4_monthly_average_vecchia_conditional_maxmin_order_comparison.png
 run_config.json
 ```
 
@@ -90,9 +106,9 @@ scp -r "${LOCAL_ROOT}/src/GEMS_TCO" \
   "jl2815@amarel.rutgers.edu:/home/jl2815/tco/"
 
 scp \
-  "${LOCAL_DIR}/vecchia_conditional_eig_sim_july_st_smooth0p3_matern_gc075b05_nugget0_061826.py" \
-  "${LOCAL_DIR}/vecchia_conditional_eig_real_july2023_matern_gc_baselines_finetuned_domains_061926.py" \
-  "${LOCAL_DIR}/slurm_vecchia_conditional_eig_real_july2023_matern_gc_baselines_finetuned_domains_061926.md" \
+  "${LOCAL_DIR}/vecchia_conditional_eigen_sort_common_engine_061926.py" \
+  "${LOCAL_DIR}/vecchia_conditional_maxmin_order_real_july2023_matern_gc_baselines_finetuned_domains_061926.py" \
+  "${LOCAL_DIR}/slurm_vecc_con_maxmin_order_real_july2023_matern_gc_baselines_finetuned_domains_061926.md" \
   "jl2815@amarel.rutgers.edu:${REMOTE_DIR}/"
 ```
 
@@ -108,16 +124,16 @@ On Amarel:
 
 ```bash
 cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/eigen_analysis
-nano run_vecchia_conditional_eig_real_july2023_baselines_finetuned_domains_061926.sh
+nano run_vecc_con_maxmin_order_real_july2023_baselines_finetuned_domains_061926.sh
 ```
 
 Paste:
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name=real23_eig_ft
-#SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/real23_eig_ft_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/summer/logs/real23_eig_ft_%j.err
+#SBATCH --job-name=real23_mm_ft
+#SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/real23_mm_ft_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/summer/logs/real23_mm_ft_%j.err
 #SBATCH --time=12:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -151,9 +167,9 @@ export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:128
 
-SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/eigen_analysis/vecchia_conditional_eig_real_july2023_matern_gc_baselines_finetuned_domains_061926.py"
+SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/eigen_analysis/vecchia_conditional_maxmin_order_real_july2023_matern_gc_baselines_finetuned_domains_061926.py"
 DATA_ROOT="/home/jl2815/tco/data"
-OUTROOT="/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_vecchia_conditional_eig_matern_gc_baselines_finetuned_domains_061926"
+OUTROOT="/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_vecchia_conditional_maxmin_order_matern_gc_baselines_finetuned_domains_061926"
 YEAR="2023"
 OUTDIR="${OUTROOT}/year_${YEAR}"
 
@@ -206,6 +222,7 @@ python "${SCRIPT}" \
   --grad-tol 1e-5 \
   --device cuda \
   --cuda-fallback error \
+  --maxmin-order-mode block_rank \
   --resample-grid 200 \
   --suppress-fit-prints \
   --out-dir "${OUTDIR}"
@@ -216,7 +233,7 @@ echo "Finished: $(date)"
 Submit:
 
 ```bash
-sbatch run_vecchia_conditional_eig_real_july2023_baselines_finetuned_domains_061926.sh
+sbatch run_vecc_con_maxmin_order_real_july2023_baselines_finetuned_domains_061926.sh
 ```
 
 ## 3. Monitor
@@ -224,7 +241,7 @@ sbatch run_vecchia_conditional_eig_real_july2023_baselines_finetuned_domains_061
 ```bash
 squeue -u jl2815
 
-tail -f /home/jl2815/tco/exercise_output/summer/logs/real23_eig_ft_<JOBID>.out
+tail -f /home/jl2815/tco/exercise_output/summer/logs/real23_mm_ft_<JOBID>.out
 ```
 
 ## 4. Pull Results To Local
@@ -234,6 +251,6 @@ Run from the local Mac:
 ```bash
 mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26"
 
-scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_vecchia_conditional_eig_matern_gc_baselines_finetuned_domains_061926" \
+scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_vecchia_conditional_maxmin_order_matern_gc_baselines_finetuned_domains_061926" \
   "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/"
 ```

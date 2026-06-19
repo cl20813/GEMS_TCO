@@ -36,12 +36,12 @@ fits/diagnoses each tile separately, which is the high-frequency/local check.
 Main outputs:
 
 ```text
-real_july2023_2025_vecchia_conditional_eig_matern_gc_yearly_domains_061826_summary.csv
-daily_plots/year_YYYY/full/full/real_YYYY_dayDD_full_vecchia_conditional_eig_comparison.png
+real_july2023_2025_vecchia_conditional_eigen_sort_matern_gc_yearly_domains_061926_summary.csv
+daily_plots/year_YYYY/full/full/real_YYYY_dayDD_full_vecchia_conditional_eigen_sort_comparison.png
 monthly_average/year_YYYY/full/full/
 monthly_average/year_YYYY/center400/center_b400/
 monthly_average/year_YYYY/tile_2x4/tile_y01_x01/
-monthly_average_plots/year_YYYY/tile_2x4/real_YYYY_tile_2x4_monthly_average_vecchia_conditional_eig_comparison.png
+monthly_average_plots/year_YYYY/tile_2x4/real_YYYY_tile_2x4_monthly_average_vecchia_conditional_eigen_sort_comparison.png
 run_config.json
 ```
 
@@ -60,9 +60,9 @@ scp -r "${LOCAL_ROOT}/src/GEMS_TCO" \
   "jl2815@amarel.rutgers.edu:/home/jl2815/tco/"
 
 scp \
-  "${LOCAL_DIR}/vecchia_conditional_eig_sim_july_st_smooth0p3_matern_gc075b05_nugget0_061826.py" \
-  "${LOCAL_DIR}/vecchia_conditional_eig_real_july2023_2025_matern_gc_yearly_domains_061826.py" \
-  "${LOCAL_DIR}/slurm_vecchia_conditional_eig_real_july2023_2025_matern_gc_yearly_domains_061826.md" \
+  "${LOCAL_DIR}/vecchia_conditional_eigen_sort_common_engine_061926.py" \
+  "${LOCAL_DIR}/vecchia_conditional_eigen_sort_real_july2023_2025_matern_gc_yearly_domains_061926.py" \
+  "${LOCAL_DIR}/slurm_vecc_con_eigen_sort_real_july2023_2025_matern_gc_yearly_domains_061926.md" \
   "jl2815@amarel.rutgers.edu:${REMOTE_DIR}/"
 ```
 
@@ -80,7 +80,7 @@ On Amarel:
 
 ```bash
 cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/eigen_analysis
-nano run_vecchia_conditional_eig_real_july_domains_061826.sh
+nano run_vecc_con_eigen_sort_real_july_domains_061926.sh
 ```
 
 Paste:
@@ -124,9 +124,9 @@ export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:128
 
-SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/eigen_analysis/vecchia_conditional_eig_real_july2023_2025_matern_gc_yearly_domains_061826.py"
+SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/eigen_analysis/vecchia_conditional_eigen_sort_real_july2023_2025_matern_gc_yearly_domains_061926.py"
 DATA_ROOT="/home/jl2815/tco/data"
-OUTROOT="/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_2025_vecchia_conditional_eig_matern_gc_yearly_domains_061826"
+OUTROOT="/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_2025_vecchia_conditional_eigen_sort_matern_gc_yearly_domains_061926"
 YEARS=(2023 2024 2025)
 YEAR="${YEARS[${SLURM_ARRAY_TASK_ID:-0}]}"
 OUTDIR="${OUTROOT}/year_${YEAR}"
@@ -191,7 +191,7 @@ echo "Finished: $(date)"
 Submit:
 
 ```bash
-sbatch run_vecchia_conditional_eig_real_july_domains_061826.sh
+sbatch run_vecc_con_eigen_sort_real_july_domains_061926.sh
 ```
 
 ## 3. Monitor
@@ -211,6 +211,6 @@ Run from the local Mac:
 ```bash
 mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26"
 
-scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_2025_vecchia_conditional_eig_matern_gc_yearly_domains_061826" \
+scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_2025_vecchia_conditional_eigen_sort_matern_gc_yearly_domains_061926" \
   "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/"
 ```

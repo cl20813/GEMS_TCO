@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
-"""Real July 2023 ST Vecchia conditional eigen diagnostics.
+"""Real July 2023-2025 ST Vecchia conditional eigen diagnostics.
 
 This is the real-data counterpart of
-``vecchia_conditional_eig_sim_july_st_smooth0p3_matern_gc075b05_nugget0_061826.py``.
+``vecchia_conditional_eigen_sort_common_engine_061926.py``.
 It reuses that script's fit/eigen engine, but builds day assets from the real
 GEMS July pickles and runs three domain families:
 
   - full: the whole x1 July grid;
+  - center400: first 400 max-min ordered 4x4 block centers, i.e. about
+    400 * 16 spatial rows over 8 daily time slots;
   - tile_2x4: eight spatial tiles, each fitted and diagnosed separately.
 
-The default comparison has three model groups for 2023 only:
+The default comparison is year-specific:
 
-  - baseline Matérn smooth=0.3;
-  - baseline GC a=0.75, b=1;
-  - day-specific fine-tuned GC alpha/beta from the table below.
+  - 2023: Matérn smooth=0.3 vs GC a=0.75, b=0.5;
+  - 2024: Matérn smooth=0.3 vs GC a=0.8, b=0.5;
+  - 2025: Matérn smooth=0.3 vs GC a=0.75, b=0.5.
 
 Daily comparison plots are written for the full domain by default.  Monthly
 average plots are refreshed after every completed domain/day, including a
@@ -49,7 +51,7 @@ for path in [HERE, SPACE_TIME_DIR]:
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-import vecchia_conditional_eig_sim_july_st_smooth0p3_matern_gc075b05_nugget0_061826 as sim_eig  # noqa: E402
+import vecchia_conditional_eigen_sort_common_engine_061926 as sim_eig  # noqa: E402
 
 from GEMS_TCO import configuration as config  # noqa: E402
 from GEMS_TCO import orderings  # noqa: E402
@@ -60,8 +62,7 @@ DTYPE = sim_eig.DTYPE
 ROUND_DECIMALS = sim_eig.ROUND_DECIMALS
 LOSS_DECIMALS = sim_eig.LOSS_DECIMALS
 BROWN_BRIDGE_Q95 = sim_eig.BROWN_BRIDGE_Q95
-RUN_STEM = "real_july2023_vecchia_conditional_eig_matern_gc_baselines_finetuned_domains_061926"
-FINE_TUNED_VARIANT = "fine_tuned_gc"
+RUN_STEM = "real_july2023_2025_vecchia_conditional_eigen_sort_matern_gc_yearly_domains_061926"
 
 MODEL_SPECS: dict[str, dict[str, Any]] = {
     "matern_s03": {
@@ -72,59 +73,28 @@ MODEL_SPECS: dict[str, dict[str, Any]] = {
         "label": "Matern s=0.3 nugget0",
         "color": "#1f77b4",
     },
-    "gc_a075_b1": {
-        "family": "cauchy",
-        "smooth": np.nan,
-        "gc_alpha": 0.75,
-        "gc_beta": 1.0,
-        "label": "Baseline GC a=0.75 b=1 nugget0",
-        "color": "#d62728",
-    },
-    FINE_TUNED_VARIANT: {
+    "gc_a075_b05": {
         "family": "cauchy",
         "smooth": np.nan,
         "gc_alpha": 0.75,
         "gc_beta": 0.5,
-        "label": "Fine tuned GC nugget0",
+        "label": "GC a=0.75 b=0.5 nugget0",
+        "color": "#d62728",
+    },
+    "gc_a08_b05": {
+        "family": "cauchy",
+        "smooth": np.nan,
+        "gc_alpha": 0.8,
+        "gc_beta": 0.5,
+        "label": "GC a=0.8 b=0.5 nugget0",
         "color": "#2ca02c",
     },
 }
 
 YEAR_MODEL_DEFAULTS: dict[int, list[str]] = {
-    2023: ["matern_s03", "gc_a075_b1", FINE_TUNED_VARIANT],
-}
-
-FINE_TUNED_GC_BY_DAY_IDX: dict[int, tuple[float, float]] = {
-    0: (0.75, 0.5),
-    1: (0.75, 4.0),
-    2: (0.75, 0.5),
-    3: (0.75, 4.0),
-    4: (0.8, 0.5),
-    5: (0.9, 0.5),
-    6: (0.9, 0.5),
-    7: (0.75, 1.0),
-    8: (1.0, 0.5),
-    9: (0.75, 0.5),
-    10: (0.9, 1.0),
-    11: (0.8, 3.0),
-    12: (0.9, 0.5),
-    13: (1.0, 0.5),
-    14: (0.8, 0.5),
-    15: (0.8, 1.0),
-    16: (0.8, 0.5),
-    17: (0.75, 0.5),
-    18: (0.8, 1.0),
-    19: (0.9, 0.5),
-    20: (0.9, 0.5),
-    21: (0.75, 0.5),
-    22: (0.8, 1.0),
-    23: (0.75, 0.5),
-    24: (0.9, 0.5),
-    25: (0.75, 0.5),
-    26: (0.75, 0.5),
-    27: (0.9, 0.5),
-    28: (0.8, 0.5),
-    29: (0.9, 0.5),
+    2023: ["matern_s03", "gc_a075_b05"],
+    2024: ["matern_s03", "gc_a08_b05"],
+    2025: ["matern_s03", "gc_a075_b05"],
 }
 
 sim_eig.RUN_STEM = RUN_STEM
@@ -214,26 +184,6 @@ def variants_for_year(year: int, requested: list[str]) -> list[str]:
     if not requested or "year_default" in requested:
         return list(YEAR_MODEL_DEFAULTS[int(year)])
     return [name for name in requested if name in MODEL_SPECS]
-
-
-def fine_tuned_spec_for_day(day_idx: int) -> dict[str, Any]:
-    if int(day_idx) not in FINE_TUNED_GC_BY_DAY_IDX:
-        raise ValueError(f"No fine-tuned GC spec for day_idx={day_idx}")
-    alpha, beta = FINE_TUNED_GC_BY_DAY_IDX[int(day_idx)]
-    return {
-        **MODEL_SPECS[FINE_TUNED_VARIANT],
-        "gc_alpha": float(alpha),
-        "gc_beta": float(beta),
-        "label": "Fine tuned GC day-specific nugget0",
-        "selected_model_label": f"Fine tuned GC a={alpha:g} b={beta:g} nugget0",
-    }
-
-
-def prepare_model_spec_for_asset(model_variant: str, asset: sim_eig.DayAsset) -> None:
-    if model_variant != FINE_TUNED_VARIANT:
-        return
-    MODEL_SPECS[FINE_TUNED_VARIANT] = fine_tuned_spec_for_day(int(asset.day_idx))
-    sim_eig.MODEL_SPECS = MODEL_SPECS
 
 
 def grid_row_col_maps(grid_coords_np: np.ndarray) -> tuple[np.ndarray, np.ndarray, int, int]:
@@ -542,81 +492,6 @@ def monthly_table_for_domain(all_avg: pd.DataFrame, keys: list[str]) -> pd.DataF
     )
 
 
-def monthly_roots_for_domain(out_dir: Path, domain_group: str) -> tuple[Path, Path]:
-    group = str(domain_group)
-    if group == "full":
-        return out_dir / "monthly_average_full", out_dir / "monthly_average_plots_full"
-    if group.startswith("tile_"):
-        return out_dir / f"monthly_average_{group}", out_dir / f"monthly_average_plots_{group}"
-    return out_dir / "monthly_average_other", out_dir / "monthly_average_plots_other"
-
-
-def plot_tile_daily_panel_outputs(all_avg: pd.DataFrame, summary: pd.DataFrame, out_dir: Path) -> None:
-    if all_avg.empty:
-        return
-    tile_avg = all_avg[all_avg["domain_group"].astype(str).str.startswith("tile_")].copy()
-    if tile_avg.empty:
-        return
-    for (year, day_idx, day, domain_group), sub_day_group in tile_avg.groupby(
-        ["year", "day_idx", "day", "domain_group"],
-        sort=True,
-    ):
-        tile_meta = (
-            sub_day_group[["domain_label", "domain_title", "tile_row", "tile_col", "tile_n_rows", "tile_n_cols"]]
-            .drop_duplicates()
-            .copy()
-        )
-        if tile_meta.empty:
-            continue
-        n_rows = int(pd.to_numeric(tile_meta["tile_n_rows"], errors="coerce").dropna().max())
-        n_cols = int(pd.to_numeric(tile_meta["tile_n_cols"], errors="coerce").dropna().max())
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(3.7 * n_cols, 3.25 * n_rows), sharex=True, sharey=True)
-        axes_arr = np.asarray(axes).reshape(n_rows, n_cols)
-        y_max = 1.05
-        for _, meta_row in tile_meta.iterrows():
-            r = int(meta_row["tile_row"]) - 1
-            c = int(meta_row["tile_col"]) - 1
-            label = str(meta_row["domain_label"])
-            ax = axes_arr[r, c]
-            tile_daily = sub_day_group[sub_day_group["domain_label"].astype(str) == label]
-            tile_summary = summary[
-                (summary["year"].astype(int) == int(year))
-                & (summary["day_idx"].astype(int) == int(day_idx))
-                & (summary["domain_label"].astype(str) == label)
-            ]
-            for model_variant, g in tile_daily.groupby("model_variant", sort=True):
-                color = MODEL_SPECS.get(str(model_variant), {}).get("color")
-                g = g.sort_values("frac_index")
-                x = g["frac_index"].to_numpy(dtype=np.float64)
-                y = g["scaled_cumsum"].to_numpy(dtype=np.float64)
-                if np.isfinite(y).any():
-                    y_max = max(y_max, float(np.nanmax(y)) * 1.04)
-                ax.plot(x, y, color=color, linewidth=1.65, label=model_label(str(model_variant), tile_summary))
-            grid = np.linspace(0.0, 1.0, 100)
-            ax.plot(grid, grid, color="0.48", linewidth=0.9)
-            ax.set_title(str(meta_row["domain_title"]), fontsize=9)
-            ax.grid(alpha=0.20)
-        for ax in axes_arr.flat:
-            ax.set_xlim(0, 1)
-            ax.set_ylim(0, y_max)
-        handles, labels = axes_arr.flat[0].get_legend_handles_labels()
-        if handles:
-            fig.legend(handles, labels, loc="lower center", ncol=min(len(handles), 3), fontsize=8)
-        fig.supxlabel("projected expected df fraction")
-        fig.supylabel("cumulative squared score / residual df")
-        fig.suptitle(f"Real July {int(year)} day_idx={int(day_idx)} ({day}) {domain_group}: conditional eigen daily panel")
-        fig.tight_layout(rect=(0, 0.06, 1, 0.96))
-        out_path = (
-            out_dir
-            / f"daily_plots_{domain_group}"
-            / f"year_{int(year)}"
-            / f"real_{int(year)}_day{int(day_idx) + 1:02d}_{domain_group}_vecchia_conditional_eig_panel.png"
-        )
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        fig.savefig(out_path, dpi=180, bbox_inches="tight")
-        plt.close(fig)
-
-
 def refresh_monthly_outputs(avg_rows: list[pd.DataFrame], summary_rows: list[dict[str, Any]], out_dir: Path) -> None:
     if not avg_rows:
         return
@@ -631,11 +506,11 @@ def refresh_monthly_outputs(avg_rows: list[pd.DataFrame], summary_rows: list[dic
         summary = pd.DataFrame(columns=["year", "domain_group", "domain_label", "model_variant", "vecchia_loss_per_obs"])
     group_cols = ["year", "domain_group", "domain_label"]
     monthly_all = monthly_table_for_domain(all_avg, group_cols)
-    plot_tile_daily_panel_outputs(all_avg, summary, out_dir)
+    monthly_root = out_dir / "monthly_average"
+    plot_root = out_dir / "monthly_average_plots"
 
     for (year, domain_group, domain_label), monthly in monthly_all.groupby(group_cols, sort=True):
         token = safe_path_token(str(domain_label))
-        monthly_root, plot_root = monthly_roots_for_domain(out_dir, str(domain_group))
         domain_dir = monthly_root / f"year_{int(year)}" / str(domain_group) / token
         domain_dir.mkdir(parents=True, exist_ok=True)
         daily = all_avg[
@@ -662,7 +537,7 @@ def refresh_monthly_outputs(avg_rows: list[pd.DataFrame], summary_rows: list[dic
         plot_monthly_comparison(
             monthly,
             sub_summary,
-            plot_root / f"year_{int(year)}" / str(domain_group) / f"real_{int(year)}_{token}_monthly_average_vecchia_conditional_eig_comparison.png",
+            plot_root / f"year_{int(year)}" / str(domain_group) / f"real_{int(year)}_{token}_monthly_average_vecchia_conditional_eigen_sort_comparison.png",
             title,
         )
 
@@ -675,7 +550,6 @@ def refresh_monthly_outputs(avg_rows: list[pd.DataFrame], summary_rows: list[dic
         if tile_meta.empty:
             continue
         for domain_group, sub_group in sub_year.groupby("domain_group", sort=True):
-            _, plot_root = monthly_roots_for_domain(out_dir, str(domain_group))
             meta_group = tile_meta[tile_meta["domain_group"].astype(str) == str(domain_group)]
             if meta_group.empty:
                 continue
@@ -715,7 +589,7 @@ def refresh_monthly_outputs(avg_rows: list[pd.DataFrame], summary_rows: list[dic
             fig.supylabel("monthly mean cumulative squared score / residual df")
             fig.suptitle(f"Real July {int(year)} {domain_group}: Vecchia conditional eigen monthly averages")
             fig.tight_layout(rect=(0, 0.06, 1, 0.96))
-            out_path = plot_root / f"year_{int(year)}" / f"real_{int(year)}_{domain_group}_monthly_average_vecchia_conditional_eig_comparison.png"
+            out_path = plot_root / f"year_{int(year)}" / str(domain_group) / f"real_{int(year)}_{domain_group}_monthly_average_vecchia_conditional_eigen_sort_comparison.png"
             out_path.parent.mkdir(parents=True, exist_ok=True)
             fig.savefig(out_path, dpi=180, bbox_inches="tight")
             plt.close(fig)
@@ -726,16 +600,16 @@ def save_summary(summary_rows: list[dict[str, Any]], out_dir: Path) -> pd.DataFr
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Real July 2023 ST Vecchia conditional eigen diagnostics.")
+    parser = argparse.ArgumentParser(description="Real July 2023-2025 ST Vecchia conditional eigen diagnostics.")
     parser.add_argument("--data-root", type=Path, default=None)
-    parser.add_argument("--years", nargs="+", default=["2023"])
+    parser.add_argument("--years", nargs="+", default=["2023", "2024", "2025"])
     parser.add_argument("--month", type=int, default=7)
     parser.add_argument("--days", default="0,30", help="'0,30' means day_idx 0..29; use 'all' for day_idx 0..30.")
     parser.add_argument("--hours-per-day", type=int, default=8)
     parser.add_argument("--space", default="1,1")
     parser.add_argument("--lat-range", default="-3,2")
     parser.add_argument("--lon-range", default="121,131")
-    parser.add_argument("--domain-modes", default="full,tile_2x4")
+    parser.add_argument("--domain-modes", default="full,center400,tile_2x4")
     parser.add_argument("--center-block-prefix", type=int, default=400)
     parser.add_argument("--tile-grid", default="2x4")
     parser.add_argument("--daily-plot-domains", default="full")
@@ -779,16 +653,16 @@ def main() -> None:
     run_config = {
         "created": datetime.now().isoformat(timespec="seconds"),
         "script": str(Path(__file__).resolve()),
-        "engine_script": str((HERE / "vecchia_conditional_eig_sim_july_st_smooth0p3_matern_gc075b05_nugget0_061826.py").resolve()),
+        "engine_script": str((HERE / "vecchia_conditional_eigen_sort_common_engine_061926.py").resolve()),
         "src": str(sim_eig.SRC),
         "device": str(device),
         "args": clean_json_value(vars(args)),
         "model_specs": clean_json_value(MODEL_SPECS),
         "year_model_defaults": clean_json_value(YEAR_MODEL_DEFAULTS),
-        "fine_tuned_gc_by_day_idx": clean_json_value(FINE_TUNED_GC_BY_DAY_IDX),
         "init_physical": clean_json_value(sim_eig.TRUE_INIT_PHYSICAL),
         "domain_definition": {
             "full": "whole x1 real July grid",
+            "center400": "first 400 max-min ordered 4x4 block centers, all cells inside each selected block",
             "tile_2x4": "2 latitude by 4 longitude half-open tiles, inclusive on outer upper edges",
         },
         "diagnostic_definition": (
@@ -830,7 +704,6 @@ def main() -> None:
             print(f"\n--- Fitting and diagnosing {model_variant} ---", flush=True)
             model = None
             try:
-                prepare_model_spec_for_asset(str(model_variant), asset)
                 fit_row, model, beta = sim_eig.fit_one_model(asset, model_variant, device, args)
                 params = torch.as_tensor(
                     sim_eig.physical_to_log_phi(
@@ -856,8 +729,6 @@ def main() -> None:
                     **diag_summary,
                     "diag_s": float(diag_s),
                 }
-                if str(model_variant) == FINE_TUNED_VARIANT:
-                    row["selected_model_label"] = str(MODEL_SPECS[FINE_TUNED_VARIANT].get("selected_model_label", ""))
                 print(
                     pd.Series(
                         {
@@ -927,9 +798,11 @@ def main() -> None:
                 day_curves,
                 day_summary_rows,
                 out_dir
-                / f"daily_plots_{domain_group}"
+                / "daily_plots"
                 / f"year_{asset.year}"
-                / f"real_{asset.year}_day{asset.day_idx + 1:02d}_{token}_vecchia_conditional_eig_comparison.png",
+                / domain_group
+                / token
+                / f"real_{asset.year}_day{asset.day_idx + 1:02d}_{token}_vecchia_conditional_eigen_sort_comparison.png",
                 (
                     f"Real July {asset.year} day_idx={asset.day_idx} ({asset.day_label}) "
                     f"{domain_label}: Vecchia conditional eigen diagnostic"
