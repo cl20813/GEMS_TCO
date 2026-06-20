@@ -1,0 +1,219 @@
+{
+  "args": {
+    "brown_bridge_q": 1.3581015157406195,
+    "center_block_prefix": 400,
+    "cuda_fallback": "cpu",
+    "daily_plot_domains": "full",
+    "daily_stride": 2,
+    "data_root": null,
+    "days": "0,1",
+    "device": "cpu",
+    "diag_chunk_size": 64,
+    "domain_modes": "full",
+    "grad_tol": 1e-05,
+    "hours_per_day": 8,
+    "keep_exact_loc": true,
+    "lat_range": "-3,2",
+    "lbfgs_eval": 10,
+    "lbfgs_history": 10,
+    "lbfgs_lr": 1.0,
+    "lbfgs_steps": 3,
+    "lon_range": "121,131",
+    "maxmin_order_mode": "block_rank",
+    "min_target_points": 1,
+    "model_variants": [
+      "matern_s03",
+      "gc_a075_b1",
+      "fine_tuned_gc"
+    ],
+    "month": 7,
+    "out_dir": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/day/local_eigen_analysis/real_july2023_vecchia_conditional_maxmin_order_lag432_one_day_local_061926/day01",
+    "real_reference_advec_lon_abs": 0.126,
+    "require_cuda": false,
+    "resample_grid": 200,
+    "save_daily_curves": true,
+    "space": "1,1",
+    "spline_n_points": 1200,
+    "spline_r_max": 20.0,
+    "suppress_fit_prints": true,
+    "target_chunk_size": 32,
+    "tile_grid": "2x4",
+    "years": [
+      "2023"
+    ]
+  },
+  "created": "2026-06-19T21:06:01",
+  "device": "cpu",
+  "diagnostic_definition": "Vecchia conditional target-block covariance eigenbasis; conditional-eigen scores are projected off the fitted mean-design column space via P=I-Z(Z'Z)^-1Z'; curves are ordered by max-min block -> local eigen rank, hours pooled.",
+  "domain_definition": {
+    "full": "whole x1 real July grid",
+    "tile_2x4": "2 latitude by 4 longitude half-open tiles, inclusive on outer upper edges"
+  },
+  "engine_script": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/eigen_analysis/vecchia_conditional_eigen_sort_common_engine_061926.py",
+  "fine_tuned_gc_by_day_idx": {
+    "0": [
+      0.75,
+      0.5
+    ],
+    "1": [
+      0.75,
+      4.0
+    ],
+    "10": [
+      0.9,
+      1.0
+    ],
+    "11": [
+      0.8,
+      3.0
+    ],
+    "12": [
+      0.9,
+      0.5
+    ],
+    "13": [
+      1.0,
+      0.5
+    ],
+    "14": [
+      0.8,
+      0.5
+    ],
+    "15": [
+      0.8,
+      1.0
+    ],
+    "16": [
+      0.8,
+      0.5
+    ],
+    "17": [
+      0.75,
+      0.5
+    ],
+    "18": [
+      0.8,
+      1.0
+    ],
+    "19": [
+      0.9,
+      0.5
+    ],
+    "2": [
+      0.75,
+      0.5
+    ],
+    "20": [
+      0.9,
+      0.5
+    ],
+    "21": [
+      0.75,
+      0.5
+    ],
+    "22": [
+      0.8,
+      1.0
+    ],
+    "23": [
+      0.75,
+      0.5
+    ],
+    "24": [
+      0.9,
+      0.5
+    ],
+    "25": [
+      0.75,
+      0.5
+    ],
+    "26": [
+      0.75,
+      0.5
+    ],
+    "27": [
+      0.9,
+      0.5
+    ],
+    "28": [
+      0.8,
+      0.5
+    ],
+    "29": [
+      0.9,
+      0.5
+    ],
+    "3": [
+      0.75,
+      4.0
+    ],
+    "4": [
+      0.8,
+      0.5
+    ],
+    "5": [
+      0.9,
+      0.5
+    ],
+    "6": [
+      0.9,
+      0.5
+    ],
+    "7": [
+      0.75,
+      1.0
+    ],
+    "8": [
+      1.0,
+      0.5
+    ],
+    "9": [
+      0.75,
+      0.5
+    ]
+  },
+  "init_physical": {
+    "advec_lat": 0.0218,
+    "advec_lon": -0.1689,
+    "nugget": 0.0,
+    "range_lat": 0.2,
+    "range_lon": 0.25,
+    "range_time": 1.5,
+    "sigmasq": 13.059
+  },
+  "model_specs": {
+    "fine_tuned_gc": {
+      "color": "#2ca02c",
+      "family": "cauchy",
+      "gc_alpha": 0.75,
+      "gc_beta": 0.5,
+      "label": "Fine tuned GC nugget0 lag432",
+      "smooth": NaN
+    },
+    "gc_a075_b1": {
+      "color": "#d62728",
+      "family": "cauchy",
+      "gc_alpha": 0.75,
+      "gc_beta": 1.0,
+      "label": "Baseline GC a=0.75 b=1 nugget0 lag432",
+      "smooth": NaN
+    },
+    "matern_s03": {
+      "color": "#1f77b4",
+      "family": "matern",
+      "gc_alpha": NaN,
+      "gc_beta": NaN,
+      "label": "Matern s=0.3 nugget0 lag432",
+      "smooth": 0.3
+    }
+  },
+  "script": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/eigen_analysis/vecchia_conditional_maxmin_order_real_july2023_matern_gc_baselines_finetuned_domains_061926.py",
+  "src": "/Users/joonwonlee/Documents/GEMS_TCO-1/src",
+  "year_model_defaults": {
+    "2023": [
+      "matern_s03",
+      "gc_a075_b1",
+      "fine_tuned_gc"
+    ]
+  }
+}

@@ -1,0 +1,46 @@
+year,month,day_idx,day,domain_group,domain_label,model_variant,model_label,vecchia_loss_per_obs,mean_y2,max_abs_bridge_scaled,rank_hi,rank_lo,lambda_iqr_gap,iqr_overlaps
+2023,7,0,2023-07-01,full,full,matern_s03,Matern s=0.3 nugget0 lag432,1.310355,1.000060,7.835475,1,2,6.949742,False
+2023,7,0,2023-07-01,full,full,matern_s03,Matern s=0.3 nugget0 lag432,1.310355,1.000060,7.835475,2,3,-3.250405,True
+2023,7,0,2023-07-01,full,full,matern_s03,Matern s=0.3 nugget0 lag432,1.310355,1.000060,7.835475,3,4,1.094167,False
+2023,7,0,2023-07-01,full,full,matern_s03,Matern s=0.3 nugget0 lag432,1.310355,1.000060,7.835475,4,5,-0.309441,True
+2023,7,0,2023-07-01,full,full,matern_s03,Matern s=0.3 nugget0 lag432,1.310355,1.000060,7.835475,5,6,-0.439873,True
+2023,7,0,2023-07-01,full,full,matern_s03,Matern s=0.3 nugget0 lag432,1.310355,1.000060,7.835475,6,7,0.085607,False
+2023,7,0,2023-07-01,full,full,matern_s03,Matern s=0.3 nugget0 lag432,1.310355,1.000060,7.835475,7,8,-0.152514,True
+2023,7,0,2023-07-01,full,full,matern_s03,Matern s=0.3 nugget0 lag432,1.310355,1.000060,7.835475,8,9,0.076165,False
+2023,7,0,2023-07-01,full,full,matern_s03,Matern s=0.3 nugget0 lag432,1.310355,1.000060,7.835475,9,10,0.158575,False
+2023,7,0,2023-07-01,full,full,matern_s03,Matern s=0.3 nugget0 lag432,1.310355,1.000060,7.835475,10,11,-0.089275,True
+2023,7,0,2023-07-01,full,full,matern_s03,Matern s=0.3 nugget0 lag432,1.310355,1.000060,7.835475,11,12,-0.051327,True
+2023,7,0,2023-07-01,full,full,matern_s03,Matern s=0.3 nugget0 lag432,1.310355,1.000060,7.835475,12,13,0.108051,False
+2023,7,0,2023-07-01,full,full,matern_s03,Matern s=0.3 nugget0 lag432,1.310355,1.000060,7.835475,13,14,0.139345,False
+2023,7,0,2023-07-01,full,full,matern_s03,Matern s=0.3 nugget0 lag432,1.310355,1.000060,7.835475,14,15,0.040651,False
+2023,7,0,2023-07-01,full,full,matern_s03,Matern s=0.3 nugget0 lag432,1.310355,1.000060,7.835475,15,16,0.155342,False
+2023,7,0,2023-07-01,full,full,gc_a075_b1,Baseline GC a=0.75 b=1 nugget0 lag432,1.309586,1.000046,8.241083,1,2,6.657582,False
+2023,7,0,2023-07-01,full,full,gc_a075_b1,Baseline GC a=0.75 b=1 nugget0 lag432,1.309586,1.000046,8.241083,2,3,-2.785437,True
+2023,7,0,2023-07-01,full,full,gc_a075_b1,Baseline GC a=0.75 b=1 nugget0 lag432,1.309586,1.000046,8.241083,3,4,1.157332,False
+2023,7,0,2023-07-01,full,full,gc_a075_b1,Baseline GC a=0.75 b=1 nugget0 lag432,1.309586,1.000046,8.241083,4,5,-0.235140,True
+2023,7,0,2023-07-01,full,full,gc_a075_b1,Baseline GC a=0.75 b=1 nugget0 lag432,1.309586,1.000046,8.241083,5,6,-0.380814,True
+2023,7,0,2023-07-01,full,full,gc_a075_b1,Baseline GC a=0.75 b=1 nugget0 lag432,1.309586,1.000046,8.241083,6,7,0.119522,False
+2023,7,0,2023-07-01,full,full,gc_a075_b1,Baseline GC a=0.75 b=1 nugget0 lag432,1.309586,1.000046,8.241083,7,8,-0.143281,True
+2023,7,0,2023-07-01,full,full,gc_a075_b1,Baseline GC a=0.75 b=1 nugget0 lag432,1.309586,1.000046,8.241083,8,9,0.084808,False
+2023,7,0,2023-07-01,full,full,gc_a075_b1,Baseline GC a=0.75 b=1 nugget0 lag432,1.309586,1.000046,8.241083,9,10,0.164197,False
+2023,7,0,2023-07-01,full,full,gc_a075_b1,Baseline GC a=0.75 b=1 nugget0 lag432,1.309586,1.000046,8.241083,10,11,-0.074800,True
+2023,7,0,2023-07-01,full,full,gc_a075_b1,Baseline GC a=0.75 b=1 nugget0 lag432,1.309586,1.000046,8.241083,11,12,-0.051989,True
+2023,7,0,2023-07-01,full,full,gc_a075_b1,Baseline GC a=0.75 b=1 nugget0 lag432,1.309586,1.000046,8.241083,12,13,0.108547,False
+2023,7,0,2023-07-01,full,full,gc_a075_b1,Baseline GC a=0.75 b=1 nugget0 lag432,1.309586,1.000046,8.241083,13,14,0.150962,False
+2023,7,0,2023-07-01,full,full,gc_a075_b1,Baseline GC a=0.75 b=1 nugget0 lag432,1.309586,1.000046,8.241083,14,15,0.040463,False
+2023,7,0,2023-07-01,full,full,gc_a075_b1,Baseline GC a=0.75 b=1 nugget0 lag432,1.309586,1.000046,8.241083,15,16,0.164742,False
+2023,7,0,2023-07-01,full,full,fine_tuned_gc,Fine tuned GC day-specific nugget0,1.309530,1.000053,8.259220,1,2,6.601903,False
+2023,7,0,2023-07-01,full,full,fine_tuned_gc,Fine tuned GC day-specific nugget0,1.309530,1.000053,8.259220,2,3,-2.728669,True
+2023,7,0,2023-07-01,full,full,fine_tuned_gc,Fine tuned GC day-specific nugget0,1.309530,1.000053,8.259220,3,4,1.155760,False
+2023,7,0,2023-07-01,full,full,fine_tuned_gc,Fine tuned GC day-specific nugget0,1.309530,1.000053,8.259220,4,5,-0.219355,True
+2023,7,0,2023-07-01,full,full,fine_tuned_gc,Fine tuned GC day-specific nugget0,1.309530,1.000053,8.259220,5,6,-0.366857,True
+2023,7,0,2023-07-01,full,full,fine_tuned_gc,Fine tuned GC day-specific nugget0,1.309530,1.000053,8.259220,6,7,0.125317,False
+2023,7,0,2023-07-01,full,full,fine_tuned_gc,Fine tuned GC day-specific nugget0,1.309530,1.000053,8.259220,7,8,-0.135283,True
+2023,7,0,2023-07-01,full,full,fine_tuned_gc,Fine tuned GC day-specific nugget0,1.309530,1.000053,8.259220,8,9,0.087241,False
+2023,7,0,2023-07-01,full,full,fine_tuned_gc,Fine tuned GC day-specific nugget0,1.309530,1.000053,8.259220,9,10,0.161586,False
+2023,7,0,2023-07-01,full,full,fine_tuned_gc,Fine tuned GC day-specific nugget0,1.309530,1.000053,8.259220,10,11,-0.070329,True
+2023,7,0,2023-07-01,full,full,fine_tuned_gc,Fine tuned GC day-specific nugget0,1.309530,1.000053,8.259220,11,12,-0.049449,True
+2023,7,0,2023-07-01,full,full,fine_tuned_gc,Fine tuned GC day-specific nugget0,1.309530,1.000053,8.259220,12,13,0.107500,False
+2023,7,0,2023-07-01,full,full,fine_tuned_gc,Fine tuned GC day-specific nugget0,1.309530,1.000053,8.259220,13,14,0.149351,False
+2023,7,0,2023-07-01,full,full,fine_tuned_gc,Fine tuned GC day-specific nugget0,1.309530,1.000053,8.259220,14,15,0.040099,False
+2023,7,0,2023-07-01,full,full,fine_tuned_gc,Fine tuned GC day-specific nugget0,1.309530,1.000053,8.259220,15,16,0.162203,False
