@@ -1,5 +1,10 @@
 # Real July 2023 ST Vecchia Max-Min Ordered Conditional Diagnostic
 
+Deprecated for new runs: use
+`slurm_vecc_con_dual_order_real_july2023_matern_gc_baselines_finetuned_domains_061926.md`
+so the same fitted models produce both max-min ordered and eigenvalue-sorted
+diagnostics in one run.
+
 This run applies the max-min ordered Vecchia conditional diagnostic to real
 July GEMS data rather than simulation pickles.  It uses the same
 conditional-eigen scores as the eigen-sort run, but the cumulative curve is
@@ -169,7 +174,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:128
 
 SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/eigen_analysis/vecchia_conditional_maxmin_order_real_july2023_matern_gc_baselines_finetuned_domains_061926.py"
 DATA_ROOT="/home/jl2815/tco/data"
-OUTROOT="/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_vecchia_conditional_maxmin_order_matern_gc_baselines_finetuned_domains_061926"
+OUTROOT="/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_vecchia_conditional_dual_order_matern_gc_baselines_finetuned_domains_061926"
 YEAR="2023"
 OUTDIR="${OUTROOT}/year_${YEAR}"
 

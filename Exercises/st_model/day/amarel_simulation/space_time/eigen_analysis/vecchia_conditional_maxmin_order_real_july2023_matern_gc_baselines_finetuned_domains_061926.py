@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Real July 2023 ST Vecchia max-min ordered conditional diagnostics.
+"""Real July 2023 ST Vecchia conditional diagnostics.
 
 This is the real-data counterpart of
 ``vecchia_conditional_eigen_sort_common_engine_061926.py``.
@@ -15,9 +15,15 @@ The default comparison has three model groups for 2023 only:
   - baseline GC a=0.75, b=1;
   - day-specific fine-tuned GC alpha/beta from the table below.
 
-Daily comparison plots are written for the full domain by default.  Monthly
-average plots are refreshed after every completed domain/day, including a
-combined 2x4 tile panel.
+For each fitted model/domain/day, both diagnostic orderings are computed from
+the same fitted Vecchia object:
+
+  - max-min ordered: max-min target-block prefix, local eigen-rank, hours pooled;
+  - eigen-sorted: pooled local conditional eigenvalue order.
+
+Daily comparison plots are written as a single two-ordering panel for the full
+domain by default.  Monthly average plots are refreshed after every completed
+domain/day for the max-min ordering, including a combined 2x4 tile panel.
 """
 
 from __future__ import annotations
@@ -60,7 +66,7 @@ DTYPE = sim_eig.DTYPE
 ROUND_DECIMALS = sim_eig.ROUND_DECIMALS
 LOSS_DECIMALS = sim_eig.LOSS_DECIMALS
 BROWN_BRIDGE_Q95 = sim_eig.BROWN_BRIDGE_Q95
-RUN_STEM = "real_july2023_vecchia_conditional_maxmin_order_matern_gc_baselines_finetuned_domains_061926"
+RUN_STEM = "real_july2023_vecchia_conditional_dual_order_matern_gc_baselines_finetuned_domains_061926"
 FINE_TUNED_VARIANT = "fine_tuned_gc"
 MAXMIN_ORDER_LABEL = "max-min block -> local eigen rank -> hour"
 
@@ -505,6 +511,90 @@ def model_label(model_variant: str, summary: pd.DataFrame | None = None) -> str:
     return sim_eig.model_label(model_variant, summary)
 
 
+def _curve_y(curve: pd.DataFrame, residual_df: float | None = None) -> np.ndarray:
+    if "scaled_cumsum" in curve.columns:
+        return curve["scaled_cumsum"].to_numpy(dtype=np.float64)
+    if residual_df is None:
+        residual_df = float(curve["expected"].iloc[-1]) if "expected" in curve.columns and len(curve) else 1.0
+    return curve["cumsum_y2"].to_numpy(dtype=np.float64) / max(float(residual_df), sim_eig.EPS)
+
+
+def plot_dual_daily_comparison(
+    maxmin_curves: dict[str, pd.DataFrame],
+    eigen_curves: dict[str, pd.DataFrame],
+    summary_rows: list[dict[str, Any]],
+    out_path: Path,
+    title: str,
+) -> None:
+    if not maxmin_curves and not eigen_curves:
+        return
+    summary = pd.DataFrame([r for r in summary_rows if r.get("status") == "ok"])
+    styles = {
+        "matern_s03": {"color": "#1f77b4", "linewidth": 2.35, "linestyle": "-", "alpha": 0.85},
+        "gc_a075_b1": {"color": "#d62728", "linewidth": 2.15, "linestyle": "--", "alpha": 0.92},
+        FINE_TUNED_VARIANT: {"color": "#2ca02c", "linewidth": 1.95, "linestyle": "-.", "alpha": 0.96},
+    }
+    fig, axes = plt.subplots(
+        2,
+        2,
+        figsize=(13.2, 8.0),
+        sharex="col",
+        gridspec_kw={"height_ratios": [3.0, 1.2]},
+    )
+    specs = [
+        ("maxmin", "Max-min ordered", maxmin_curves, "maxmin_D"),
+        ("eigen", "Eigenvalue sorted pooling", eigen_curves, "eigen_D"),
+    ]
+    for col, (_, subtitle, curves, d_col) in enumerate(specs):
+        ax = axes[0, col]
+        ax_dev = axes[1, col]
+        y_max = 1.04
+        for model_variant, curve in curves.items():
+            if curve.empty:
+                continue
+            curve = curve.sort_values("frac_index")
+            row_df = summary[summary["model_variant"].astype(str) == str(model_variant)]
+            row = row_df.iloc[-1] if not row_df.empty else pd.Series(dtype=object)
+            x = curve["frac_index"].to_numpy(dtype=np.float64)
+            residual_df = row.get("residual_df", np.nan)
+            y = _curve_y(curve, residual_df if pd.notna(residual_df) else None)
+            if np.isfinite(y).any():
+                y_max = max(y_max, float(np.nanmax(y)) * 1.04)
+            style = styles.get(
+                str(model_variant),
+                {
+                    "color": MODEL_SPECS.get(str(model_variant), {}).get("color"),
+                    "linewidth": 2.0,
+                    "linestyle": "-",
+                    "alpha": 0.9,
+                },
+            )
+            label = model_label(str(model_variant), summary)
+            if d_col in row and pd.notna(row[d_col]):
+                label += f", D={float(row[d_col]):.2f}"
+            ax.plot(x, y, label=label, **style)
+            ax_dev.plot(x, y - x, label=str(model_variant), **style)
+        grid = np.linspace(0.0, 1.0, 200)
+        ax.plot(grid, grid, color="0.25", linewidth=1.25, linestyle=":", alpha=0.9, label="reference y=x")
+        ax_dev.axhline(0.0, color="0.25", linewidth=1.1, linestyle=":", alpha=0.9)
+        ax.set_title(subtitle)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, y_max)
+        ax_dev.set_ylim(-0.025, 0.060)
+        ax.grid(alpha=0.18)
+        ax_dev.grid(alpha=0.18)
+        ax_dev.set_xlabel("projected expected df fraction")
+        if col == 0:
+            ax.set_ylabel("cumulative squared score / residual df")
+            ax_dev.set_ylabel("curve - reference")
+        ax.legend(fontsize=7.4, framealpha=0.88, loc="upper left")
+    fig.suptitle(title, y=0.995)
+    fig.tight_layout()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_monthly_comparison(monthly: pd.DataFrame, summary: pd.DataFrame, out_path: Path, title: str) -> None:
     if monthly.empty:
         return
@@ -845,7 +935,7 @@ def write_eigenvalue_stability_summaries(summary_rows: list[dict[str, Any]], out
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Real July 2023 ST Vecchia max-min ordered conditional diagnostics.")
+    parser = argparse.ArgumentParser(description="Real July 2023 ST Vecchia dual-order conditional diagnostics.")
     parser.add_argument("--data-root", type=Path, default=None)
     parser.add_argument("--years", nargs="+", default=["2023"])
     parser.add_argument("--month", type=int, default=7)
@@ -923,8 +1013,9 @@ def main() -> None:
         },
         "diagnostic_definition": (
             "Vecchia conditional target-block covariance eigenbasis; conditional-eigen scores are projected "
-            "off the fitted mean-design column space via P=I-Z(Z'Z)^-1Z'; curves are ordered by "
-            f"{MAXMIN_ORDER_LABEL}."
+            "off the fitted mean-design column space via P=I-Z(Z'Z)^-1Z'. For each fitted model, "
+            "two curves are computed from the same fitted parameters: max-min ordered by "
+            f"{MAXMIN_ORDER_LABEL}, and pooled sorted by conditional eigenvalue."
         ),
     }
     (out_dir / "run_config.json").write_text(json.dumps(clean_json_value(run_config), indent=2, sort_keys=True), encoding="utf-8")
@@ -955,6 +1046,7 @@ def main() -> None:
         )
         print("=" * 104, flush=True)
         day_curves: dict[str, pd.DataFrame] = {}
+        day_eigen_curves: dict[str, pd.DataFrame] = {}
         day_summary_rows: list[dict[str, Any]] = []
 
         for model_variant in model_variants:
@@ -981,11 +1073,23 @@ def main() -> None:
                 t_diag = time.time()
                 curve, diag_summary = sim_eig.conditional_maxmin_order_curve(model, params, beta, args)
                 diag_s = time.time() - t_diag
+                t_eigen_diag = time.time()
+                eigen_curve, eigen_diag_summary = sim_eig.conditional_eigen_curve(model, params, beta, args)
+                eigen_diag_s = time.time() - t_eigen_diag
                 row = {
                     **fit_row,
                     **domain_fields(asset),
                     **diag_summary,
                     "diag_s": float(diag_s),
+                    "maxmin_diag_s": float(diag_s),
+                    "eigen_diag_s": float(eigen_diag_s),
+                    "maxmin_mean_y2": float(diag_summary.get("mean_y2", np.nan)),
+                    "maxmin_D": float(diag_summary.get("max_abs_bridge_scaled", np.nan)),
+                    "maxmin_n_scores": int(diag_summary.get("n_conditional_scores", 0)),
+                    "eigen_mean_y2": float(eigen_diag_summary.get("mean_y2", np.nan)),
+                    "eigen_D": float(eigen_diag_summary.get("max_abs_bridge_scaled", np.nan)),
+                    "eigen_n_scores": int(eigen_diag_summary.get("n_conditional_scores", 0)),
+                    "eigen_conditional_loss_per_score": float(eigen_diag_summary.get("conditional_loss_per_score", np.nan)),
                 }
                 if str(model_variant) == FINE_TUNED_VARIANT:
                     row["selected_model_label"] = str(MODEL_SPECS[FINE_TUNED_VARIANT].get("selected_model_label", ""))
@@ -997,8 +1101,9 @@ def main() -> None:
                             "conditional_loss/score": f"{row['conditional_loss_per_score']:.{LOSS_DECIMALS}f}",
                             "mean_y2": f"{row['mean_y2']:.5f}",
                             "D": f"{row['max_abs_bridge_scaled']:.5f}",
+                            "eigen_D": f"{row['eigen_D']:.5f}",
                             "n_scores": row["n_conditional_scores"],
-                            "diag_s": f"{diag_s:.1f}",
+                            "diag_s max/eig": f"{diag_s:.1f}/{eigen_diag_s:.1f}",
                         }
                     ).to_string(),
                     flush=True,
@@ -1015,7 +1120,17 @@ def main() -> None:
                     )
                     curve_path.parent.mkdir(parents=True, exist_ok=True)
                     curve.round(ROUND_DECIMALS).to_csv(curve_path, index=False, float_format=f"%.{ROUND_DECIMALS}f")
+                    eigen_curve_path = (
+                        out_dir
+                        / "daily_curves"
+                        / f"year_{asset.year}"
+                        / str(getattr(asset, "domain_group", "domain"))
+                        / token
+                        / f"real_{asset.year}_day{asset.day_idx + 1:02d}_{token}_{model_variant}_conditional_eigen_sorted_curve.csv"
+                    )
+                    eigen_curve.round(ROUND_DECIMALS).to_csv(eigen_curve_path, index=False, float_format=f"%.{ROUND_DECIMALS}f")
                 day_curves[model_variant] = curve
+                day_eigen_curves[model_variant] = eigen_curve
                 avg_rows.append(
                     sim_eig.resample_curve(curve, int(args.resample_grid)).assign(
                         year=int(asset.year),
@@ -1055,18 +1170,18 @@ def main() -> None:
         domain_group = str(getattr(asset, "domain_group", ""))
         if day_curves and (domain_label in daily_plot_domains or domain_group in daily_plot_domains):
             token = safe_path_token(domain_label)
-            sim_eig.plot_daily_comparison(
+            plot_dual_daily_comparison(
                 day_curves,
+                day_eigen_curves,
                 day_summary_rows,
                 out_dir
                 / f"daily_plots_{domain_group}"
                 / f"year_{asset.year}"
-                / f"real_{asset.year}_day{asset.day_idx + 1:02d}_{token}_vecchia_conditional_maxmin_order_comparison.png",
+                / f"real_{asset.year}_day{asset.day_idx + 1:02d}_{token}_vecchia_conditional_dual_order_comparison.png",
                 (
                     f"Real July {asset.year} day_idx={asset.day_idx} ({asset.day_label}) "
-                    f"{domain_label}: Vecchia conditional max-min ordered diagnostic"
+                    f"{domain_label}: Vecchia conditional diagnostics"
                 ),
-                x_label=f"projected expected df fraction, ordered by {MAXMIN_ORDER_LABEL}",
             )
 
         refresh_monthly_outputs(avg_rows, summary_rows, out_dir)
