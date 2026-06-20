@@ -1,45 +1,42 @@
-# Real July 2023 ST Vecchia Max-Min Ordered Conditional Diagnostic
+# Real July 2023-2025 ST Vecchia Dual-Order Conditional Diagnostic
 
-Deprecated for new runs: use
-`slurm_vecc_con_dual_order_real_july2023_2025_matern_gc_year_specific_domains_061926.md`
-so the same fitted models produce both max-min ordered and eigenvalue-sorted
-diagnostics in one run.
-
-This run applies the max-min ordered Vecchia conditional diagnostic to real
-July GEMS data rather than simulation pickles.  It uses the same
-conditional-eigen scores as the eigen-sort run, but the cumulative curve is
-ordered by default as:
+This run applies the dual-order Vecchia conditional diagnostic to real
+July GEMS data rather than simulation pickles.  Each model/domain/day is fitted
+once, then the same conditional residual scores are summarized two ways:
 
 ```text
-max-min target-block rank -> local conditional eigen rank, with hour_idx pooled
+1. max-min target-block rank -> local conditional eigen rank, with hour_idx pooled
+2. global conditional eigenvalue-sorted pooling
 ```
 
-This pools the same spatial max-min prefix across the 8 hourly slots, so the
-cumulative curve does not restart the spatial coarse-to-fine axis at every hour.
+The max-min version pools the same spatial max-min prefix across the 8 hourly
+slots, so the cumulative curve does not restart the spatial coarse-to-fine axis
+at every hour.  The eigenvalue-sorted version is the more direct conditional
+eigen-spectrum check.
 
 The run also writes local-rank eigenvalue stability summaries, so overlap among
 rank-wise eigenvalue distributions can be checked directly.
 
 ```text
-years       = 2023
+years       = 2023, 2024, 2025
 month       = July
 days        = day_idx 0..29, i.e. first 30 complete 8-hour days
 Vecchia     = corridor-width 4x4 target blocks, lag pattern 6/4/3
 nugget      = fixed 0
 domains     = full x1 and 2x4 spatial tiles
-daily plots = full x1 single plot, plus one 2x4 tile panel per day
-monthly     = refreshed after each completed domain/day; full and tile outputs use separate top folders
+daily plots = full x1 dual-order plot, plus one 2x4 tile max-min panel per day
+monthly     = refreshed after each completed domain/day; monthly averages are max-min ordered
 ```
 
-Default model comparison:
+Default year-specific model comparison:
 
 ```text
-1. baseline Matérn smooth=0.3
-2. baseline GC a=0.75, b=1
-3. fine_tuned_gc: day-specific GC alpha/beta table
+2023: baseline Matérn smooth=0.3 vs baseline GC a=0.75 b=1 vs fine_tuned_gc
+2024: baseline Matérn smooth=0.3 vs baseline GC a=0.8 b=1
+2025: baseline Matérn smooth=0.3 vs baseline GC a=0.75 b=1
 ```
 
-Fine-tuned GC table:
+2023 fine-tuned GC table:
 
 ```csv
 day,gc_alpha,gc_beta
@@ -82,12 +79,16 @@ fits/diagnoses each tile separately, which is the high-frequency/local check.
 Main outputs:
 
 ```text
-real_july2023_vecchia_conditional_maxmin_order_matern_gc_baselines_finetuned_domains_061926_summary.csv
-real_july2023_vecchia_conditional_maxmin_order_matern_gc_baselines_finetuned_domains_061926_local_rank_eigenvalue_stability_daily.csv
-real_july2023_vecchia_conditional_maxmin_order_matern_gc_baselines_finetuned_domains_061926_local_rank_eigenvalue_stability_monthly.csv
-real_july2023_vecchia_conditional_maxmin_order_matern_gc_baselines_finetuned_domains_061926_adjacent_local_rank_iqr_gaps_daily.csv
-real_july2023_vecchia_conditional_maxmin_order_matern_gc_baselines_finetuned_domains_061926_adjacent_local_rank_iqr_gaps_monthly.csv
-daily_plots_full/year_2023/real_2023_dayDD_full_vecchia_conditional_maxmin_order_comparison.png
+real_july2023_2025_vecchia_conditional_dual_order_matern_gc_year_specific_domains_061926_summary.csv
+real_july2023_2025_vecchia_conditional_dual_order_matern_gc_year_specific_domains_061926_local_rank_eigenvalue_stability_daily.csv
+real_july2023_2025_vecchia_conditional_dual_order_matern_gc_year_specific_domains_061926_local_rank_eigenvalue_stability_monthly.csv
+real_july2023_2025_vecchia_conditional_dual_order_matern_gc_year_specific_domains_061926_adjacent_local_rank_iqr_gaps_daily.csv
+real_july2023_2025_vecchia_conditional_dual_order_matern_gc_year_specific_domains_061926_adjacent_local_rank_iqr_gaps_monthly.csv
+daily_plots_full/year_2023/real_2023_dayDD_full_vecchia_conditional_dual_order_comparison.png
+daily_plots_full/year_2024/real_2024_dayDD_full_vecchia_conditional_dual_order_comparison.png
+daily_plots_full/year_2025/real_2025_dayDD_full_vecchia_conditional_dual_order_comparison.png
+daily_curves/year_2023/.../*_conditional_maxmin_order_curve.csv
+daily_curves/year_2023/.../*_conditional_eigen_sorted_curve.csv
 daily_plots_tile_2x4/year_2023/real_2023_dayDD_tile_2x4_vecchia_conditional_maxmin_order_panel.png
 monthly_average_full/year_2023/full/full/
 monthly_average_tile_2x4/year_2023/tile_2x4/tile_y01_x01/
@@ -112,8 +113,8 @@ scp -r "${LOCAL_ROOT}/src/GEMS_TCO" \
 
 scp \
   "${LOCAL_DIR}/vecchia_conditional_eigen_sort_common_engine_061926.py" \
-  "${LOCAL_DIR}/vecchia_conditional_maxmin_order_real_july2023_matern_gc_baselines_finetuned_domains_061926.py" \
-  "${LOCAL_DIR}/slurm_vecc_con_maxmin_order_real_july2023_matern_gc_baselines_finetuned_domains_061926.md" \
+  "${LOCAL_DIR}/vecchia_conditional_dual_order_real_july2023_2025_matern_gc_year_specific_domains_061926.py" \
+  "${LOCAL_DIR}/slurm_vecc_con_dual_order_real_july2023_2025_matern_gc_year_specific_domains_061926.md" \
   "jl2815@amarel.rutgers.edu:${REMOTE_DIR}/"
 ```
 
@@ -121,6 +122,8 @@ Expected real-data inputs on Amarel:
 
 ```text
 /home/jl2815/tco/data/pickle_2023/tco_grid_23_07.pkl
+/home/jl2815/tco/data/pickle_2024/tco_grid_24_07.pkl
+/home/jl2815/tco/data/pickle_2025/tco_grid_25_07.pkl
 ```
 
 ## 2. Submit On Amarel
@@ -129,17 +132,17 @@ On Amarel:
 
 ```bash
 cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/eigen_analysis
-nano run_vecc_con_maxmin_order_real_july2023_baselines_finetuned_domains_061926.sh
+nano run_vecc_con_dual_order_real_july2023_2025_year_specific_domains_061926.sh
 ```
 
 Paste:
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name=real23_mm_ft
-#SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/real23_mm_ft_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/summer/logs/real23_mm_ft_%j.err
-#SBATCH --time=12:00:00
+#SBATCH --job-name=real23_25_dual
+#SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/real23_25_dual_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/summer/logs/real23_25_dual_%j.err
+#SBATCH --time=24:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
@@ -172,11 +175,11 @@ export OPENBLAS_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:128
 
-SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/eigen_analysis/vecchia_conditional_maxmin_order_real_july2023_matern_gc_baselines_finetuned_domains_061926.py"
+SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/eigen_analysis/vecchia_conditional_dual_order_real_july2023_2025_matern_gc_year_specific_domains_061926.py"
 DATA_ROOT="/home/jl2815/tco/data"
-OUTROOT="/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_vecchia_conditional_dual_order_matern_gc_baselines_finetuned_domains_061926"
-YEAR="2023"
-OUTDIR="${OUTROOT}/year_${YEAR}"
+OUTROOT="/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_2025_vecchia_conditional_dual_order_matern_gc_year_specific_domains_061926"
+YEARS=(2023 2024 2025)
+OUTDIR="${OUTROOT}"
 
 mkdir -p "${OUTDIR}"
 export MPLCONFIGDIR="${OUTDIR}/.mplconfig_${SLURM_JOB_ID:-manual}"
@@ -184,7 +187,7 @@ mkdir -p "${MPLCONFIGDIR}"
 
 echo "Host: $(hostname)"
 echo "Started: $(date)"
-echo "Year: ${YEAR}"
+echo "Years: ${YEARS[*]}"
 echo "Data root: ${DATA_ROOT}"
 echo "Output dir: ${OUTDIR}"
 echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}"
@@ -202,7 +205,7 @@ PY
 
 python "${SCRIPT}" \
   --data-root "${DATA_ROOT}" \
-  --years "${YEAR}" \
+  --years "${YEARS[@]}" \
   --month 7 \
   --days "0,30" \
   --space "1,1" \
@@ -238,7 +241,7 @@ echo "Finished: $(date)"
 Submit:
 
 ```bash
-sbatch run_vecc_con_maxmin_order_real_july2023_baselines_finetuned_domains_061926.sh
+sbatch run_vecc_con_dual_order_real_july2023_2025_year_specific_domains_061926.sh
 ```
 
 ## 3. Monitor
@@ -246,7 +249,7 @@ sbatch run_vecc_con_maxmin_order_real_july2023_baselines_finetuned_domains_06192
 ```bash
 squeue -u jl2815
 
-tail -f /home/jl2815/tco/exercise_output/summer/logs/real23_mm_ft_<JOBID>.out
+tail -f /home/jl2815/tco/exercise_output/summer/logs/real23_25_dual_<JOBID>.out
 ```
 
 ## 4. Pull Results To Local
@@ -256,6 +259,6 @@ Run from the local Mac:
 ```bash
 mkdir -p "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26"
 
-scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_vecchia_conditional_maxmin_order_matern_gc_baselines_finetuned_domains_061926" \
+scp -r "jl2815@amarel.rutgers.edu:/home/jl2815/tco/exercise_output/summer/real_data/real_july2023_2025_vecchia_conditional_dual_order_matern_gc_year_specific_domains_061926" \
   "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/"
 ```

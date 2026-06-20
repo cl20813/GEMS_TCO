@@ -1,7 +1,7 @@
 # Real July 2023 ST Vecchia Conditional Eigen Diagnostic
 
 Deprecated for new runs: use
-`slurm_vecc_con_dual_order_real_july2023_matern_gc_baselines_finetuned_domains_061926.md`
+`slurm_vecc_con_dual_order_real_july2023_2025_matern_gc_year_specific_domains_061926.md`
 so the same fitted models produce both max-min ordered and eigenvalue-sorted
 diagnostics in one run.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Real July 2023 ST Vecchia conditional diagnostics.
+"""Real July 2023-2025 ST Vecchia conditional diagnostics.
 
 This is the real-data counterpart of
 ``vecchia_conditional_eigen_sort_common_engine_061926.py``.
@@ -9,11 +9,11 @@ GEMS July pickles and runs two domain families:
   - full: the whole x1 July grid;
   - tile_2x4: eight spatial tiles, each fitted and diagnosed separately.
 
-The default comparison has three model groups for 2023 only:
+The default comparison is year-specific:
 
-  - baseline Matérn smooth=0.3;
-  - baseline GC a=0.75, b=1;
-  - day-specific fine-tuned GC alpha/beta from the table below.
+  - 2023: Matérn smooth=0.3, GC a=0.75 b=1, day-specific fine-tuned GC;
+  - 2024: Matérn smooth=0.3, GC a=0.8 b=1;
+  - 2025: Matérn smooth=0.3, GC a=0.75 b=1.
 
 For each fitted model/domain/day, both diagnostic orderings are computed from
 the same fitted Vecchia object:
@@ -66,7 +66,7 @@ DTYPE = sim_eig.DTYPE
 ROUND_DECIMALS = sim_eig.ROUND_DECIMALS
 LOSS_DECIMALS = sim_eig.LOSS_DECIMALS
 BROWN_BRIDGE_Q95 = sim_eig.BROWN_BRIDGE_Q95
-RUN_STEM = "real_july2023_vecchia_conditional_dual_order_matern_gc_baselines_finetuned_domains_061926"
+RUN_STEM = "real_july2023_2025_vecchia_conditional_dual_order_matern_gc_year_specific_domains_061926"
 FINE_TUNED_VARIANT = "fine_tuned_gc"
 MAXMIN_ORDER_LABEL = "max-min block -> local eigen rank -> hour"
 
@@ -87,6 +87,14 @@ MODEL_SPECS: dict[str, dict[str, Any]] = {
         "label": "Baseline GC a=0.75 b=1 nugget0",
         "color": "#d62728",
     },
+    "gc_a08_b1": {
+        "family": "cauchy",
+        "smooth": np.nan,
+        "gc_alpha": 0.8,
+        "gc_beta": 1.0,
+        "label": "Baseline GC a=0.8 b=1 nugget0",
+        "color": "#ff7f0e",
+    },
     FINE_TUNED_VARIANT: {
         "family": "cauchy",
         "smooth": np.nan,
@@ -99,6 +107,8 @@ MODEL_SPECS: dict[str, dict[str, Any]] = {
 
 YEAR_MODEL_DEFAULTS: dict[int, list[str]] = {
     2023: ["matern_s03", "gc_a075_b1", FINE_TUNED_VARIANT],
+    2024: ["matern_s03", "gc_a08_b1"],
+    2025: ["matern_s03", "gc_a075_b1"],
 }
 
 FINE_TUNED_GC_BY_DAY_IDX: dict[int, tuple[float, float]] = {
@@ -532,6 +542,7 @@ def plot_dual_daily_comparison(
     styles = {
         "matern_s03": {"color": "#1f77b4", "linewidth": 2.35, "linestyle": "-", "alpha": 0.85},
         "gc_a075_b1": {"color": "#d62728", "linewidth": 2.15, "linestyle": "--", "alpha": 0.92},
+        "gc_a08_b1": {"color": "#ff7f0e", "linewidth": 2.15, "linestyle": "--", "alpha": 0.92},
         FINE_TUNED_VARIANT: {"color": "#2ca02c", "linewidth": 1.95, "linestyle": "-.", "alpha": 0.96},
     }
     fig, axes = plt.subplots(
@@ -935,9 +946,9 @@ def write_eigenvalue_stability_summaries(summary_rows: list[dict[str, Any]], out
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Real July 2023 ST Vecchia dual-order conditional diagnostics.")
+    parser = argparse.ArgumentParser(description="Real July 2023-2025 ST Vecchia dual-order conditional diagnostics.")
     parser.add_argument("--data-root", type=Path, default=None)
-    parser.add_argument("--years", nargs="+", default=["2023"])
+    parser.add_argument("--years", nargs="+", default=["2023", "2024", "2025"])
     parser.add_argument("--month", type=int, default=7)
     parser.add_argument("--days", default="0,30", help="'0,30' means day_idx 0..29; use 'all' for day_idx 0..30.")
     parser.add_argument("--hours-per-day", type=int, default=8)
