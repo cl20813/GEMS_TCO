@@ -69,6 +69,7 @@ BROWN_BRIDGE_Q95 = sim_eig.BROWN_BRIDGE_Q95
 RUN_STEM = "real_july2023_vecchia_conditional_dual_order_matern_gc_baselines_finetuned_domains_061926"
 FINE_TUNED_VARIANT = "fine_tuned_gc"
 MAXMIN_ORDER_LABEL = "max-min block -> local eigen rank -> hour"
+VALID_DIAGNOSTIC_MODES = {"maxmin", "eigen"}
 
 MODEL_SPECS: dict[str, dict[str, Any]] = {
     "matern_s03": {
@@ -187,6 +188,17 @@ def parse_tokens(values: Iterable[str] | str) -> list[str]:
     if isinstance(values, str):
         values = [values]
     return sim_eig.parse_tokens(values)
+
+
+def parse_diagnostic_modes(values: Iterable[str] | str) -> set[str]:
+    modes = {v.strip().lower().replace("_", "-") for v in parse_tokens(values)}
+    modes = {"maxmin" if v in {"max-min", "max_min"} else v for v in modes}
+    unknown = sorted(modes - VALID_DIAGNOSTIC_MODES)
+    if unknown:
+        raise ValueError(f"Unknown diagnostic mode(s) {unknown}. Use any of {sorted(VALID_DIAGNOSTIC_MODES)}")
+    if not modes:
+        raise ValueError("At least one diagnostic mode is required.")
+    return modes
 
 
 def parse_int_tokens(values: Iterable[str] | str) -> list[int]:
@@ -976,6 +988,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
             "max-min block -> local eigen rank, with hours pooled inside each cell."
         ),
     )
+    parser.add_argument(
+        "--diagnostic-modes",
+        default="maxmin,eigen",
+        help=(
+            "Comma-separated diagnostics to compute: maxmin,eigen. "
+            "Use 'maxmin' for a lower-memory run matching this script's primary diagnostic."
+        ),
+    )
     parser.add_argument("--resample-grid", type=int, default=200)
     parser.add_argument("--save-daily-curves", action="store_true")
     parser.add_argument("--suppress-fit-prints", action="store_true")
@@ -987,6 +1007,7 @@ def main() -> None:
     args = build_arg_parser().parse_args()
     global MAXMIN_ORDER_LABEL
     MAXMIN_ORDER_LABEL = maxmin_order_label(args.maxmin_order_mode)
+    diagnostic_modes = parse_diagnostic_modes(args.diagnostic_modes)
     requested_variants = parse_tokens(args.model_variants)
     known_requested = [v for v in requested_variants if v != "year_default"]
     for variant in known_requested:
@@ -1007,6 +1028,7 @@ def main() -> None:
         "year_model_defaults": clean_json_value(YEAR_MODEL_DEFAULTS),
         "fine_tuned_gc_by_day_idx": clean_json_value(FINE_TUNED_GC_BY_DAY_IDX),
         "init_physical": clean_json_value(sim_eig.TRUE_INIT_PHYSICAL),
+        "diagnostic_modes": sorted(diagnostic_modes),
         "domain_definition": {
             "full": "whole x1 real July grid",
             "tile_2x4": "2 latitude by 4 longitude half-open tiles, inclusive on outer upper edges",
@@ -1024,6 +1046,7 @@ def main() -> None:
     print("device:", device, flush=True)
     print("out_dir:", out_dir, flush=True)
     print("requested_variants:", requested_variants, flush=True)
+    print("diagnostic_modes:", sorted(diagnostic_modes), flush=True)
     print("year defaults:", YEAR_MODEL_DEFAULTS, flush=True)
 
     assets = load_real_domain_assets(args)
@@ -1070,17 +1093,32 @@ def main() -> None:
                     device=device,
                     dtype=DTYPE,
                 )
-                t_diag = time.time()
-                curve, diag_summary = sim_eig.conditional_maxmin_order_curve(model, params, beta, args)
-                diag_s = time.time() - t_diag
-                t_eigen_diag = time.time()
-                eigen_curve, eigen_diag_summary = sim_eig.conditional_eigen_curve(model, params, beta, args)
-                eigen_diag_s = time.time() - t_eigen_diag
+                curve = pd.DataFrame()
+                eigen_curve = pd.DataFrame()
+                diag_summary: dict[str, Any] = {}
+                eigen_diag_summary: dict[str, Any] = {}
+                diag_s = float("nan")
+                eigen_diag_s = float("nan")
+
+                if "maxmin" in diagnostic_modes:
+                    t_diag = time.time()
+                    curve, diag_summary = sim_eig.conditional_maxmin_order_curve(model, params, beta, args)
+                    diag_s = time.time() - t_diag
+                    gc.collect()
+                    if device.type == "cuda":
+                        torch.cuda.empty_cache()
+
+                if "eigen" in diagnostic_modes:
+                    t_eigen_diag = time.time()
+                    eigen_curve, eigen_diag_summary = sim_eig.conditional_eigen_curve(model, params, beta, args)
+                    eigen_diag_s = time.time() - t_eigen_diag
+
+                primary_diag_summary = diag_summary if diag_summary else eigen_diag_summary
                 row = {
                     **fit_row,
                     **domain_fields(asset),
-                    **diag_summary,
-                    "diag_s": float(diag_s),
+                    **primary_diag_summary,
+                    "diag_s": float(diag_s if np.isfinite(diag_s) else eigen_diag_s),
                     "maxmin_diag_s": float(diag_s),
                     "eigen_diag_s": float(eigen_diag_s),
                     "maxmin_mean_y2": float(diag_summary.get("mean_y2", np.nan)),
@@ -1093,6 +1131,8 @@ def main() -> None:
                 }
                 if str(model_variant) == FINE_TUNED_VARIANT:
                     row["selected_model_label"] = str(MODEL_SPECS[FINE_TUNED_VARIANT].get("selected_model_label", ""))
+                diag_s_text = f"{diag_s:.1f}" if np.isfinite(diag_s) else "skip"
+                eigen_diag_s_text = f"{eigen_diag_s:.1f}" if np.isfinite(eigen_diag_s) else "skip"
                 print(
                     pd.Series(
                         {
@@ -1103,44 +1143,49 @@ def main() -> None:
                             "D": f"{row['max_abs_bridge_scaled']:.5f}",
                             "eigen_D": f"{row['eigen_D']:.5f}",
                             "n_scores": row["n_conditional_scores"],
-                            "diag_s max/eig": f"{diag_s:.1f}/{eigen_diag_s:.1f}",
+                            "diag_s max/eig": f"{diag_s_text}/{eigen_diag_s_text}",
                         }
                     ).to_string(),
                     flush=True,
                 )
                 if args.save_daily_curves:
                     token = safe_path_token(str(getattr(asset, "domain_label", "domain")))
-                    curve_path = (
-                        out_dir
-                        / "daily_curves"
-                        / f"year_{asset.year}"
-                        / str(getattr(asset, "domain_group", "domain"))
-                        / token
-                        / f"real_{asset.year}_day{asset.day_idx + 1:02d}_{token}_{model_variant}_conditional_maxmin_order_curve.csv"
+                    if not curve.empty:
+                        curve_path = (
+                            out_dir
+                            / "daily_curves"
+                            / f"year_{asset.year}"
+                            / str(getattr(asset, "domain_group", "domain"))
+                            / token
+                            / f"real_{asset.year}_day{asset.day_idx + 1:02d}_{token}_{model_variant}_conditional_maxmin_order_curve.csv"
+                        )
+                        curve_path.parent.mkdir(parents=True, exist_ok=True)
+                        curve.round(ROUND_DECIMALS).to_csv(curve_path, index=False, float_format=f"%.{ROUND_DECIMALS}f")
+                    if not eigen_curve.empty:
+                        eigen_curve_path = (
+                            out_dir
+                            / "daily_curves"
+                            / f"year_{asset.year}"
+                            / str(getattr(asset, "domain_group", "domain"))
+                            / token
+                            / f"real_{asset.year}_day{asset.day_idx + 1:02d}_{token}_{model_variant}_conditional_eigen_sorted_curve.csv"
+                        )
+                        eigen_curve_path.parent.mkdir(parents=True, exist_ok=True)
+                        eigen_curve.round(ROUND_DECIMALS).to_csv(eigen_curve_path, index=False, float_format=f"%.{ROUND_DECIMALS}f")
+                if not curve.empty:
+                    day_curves[model_variant] = curve
+                    avg_rows.append(
+                        sim_eig.resample_curve(curve, int(args.resample_grid)).assign(
+                            year=int(asset.year),
+                            month=int(asset.month),
+                            day_idx=int(asset.day_idx),
+                            day=str(asset.day_label),
+                            model_variant=str(model_variant),
+                            **domain_fields(asset),
+                        )
                     )
-                    curve_path.parent.mkdir(parents=True, exist_ok=True)
-                    curve.round(ROUND_DECIMALS).to_csv(curve_path, index=False, float_format=f"%.{ROUND_DECIMALS}f")
-                    eigen_curve_path = (
-                        out_dir
-                        / "daily_curves"
-                        / f"year_{asset.year}"
-                        / str(getattr(asset, "domain_group", "domain"))
-                        / token
-                        / f"real_{asset.year}_day{asset.day_idx + 1:02d}_{token}_{model_variant}_conditional_eigen_sorted_curve.csv"
-                    )
-                    eigen_curve.round(ROUND_DECIMALS).to_csv(eigen_curve_path, index=False, float_format=f"%.{ROUND_DECIMALS}f")
-                day_curves[model_variant] = curve
-                day_eigen_curves[model_variant] = eigen_curve
-                avg_rows.append(
-                    sim_eig.resample_curve(curve, int(args.resample_grid)).assign(
-                        year=int(asset.year),
-                        month=int(asset.month),
-                        day_idx=int(asset.day_idx),
-                        day=str(asset.day_label),
-                        model_variant=str(model_variant),
-                        **domain_fields(asset),
-                    )
-                )
+                if not eigen_curve.empty:
+                    day_eigen_curves[model_variant] = eigen_curve
             except Exception as exc:
                 row = {
                     "status": "error",

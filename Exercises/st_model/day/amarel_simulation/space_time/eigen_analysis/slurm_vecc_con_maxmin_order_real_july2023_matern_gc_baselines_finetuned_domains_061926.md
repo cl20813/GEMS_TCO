@@ -1,5 +1,9 @@
 # Real July 2023 ST Vecchia Max-Min Ordered Conditional Diagnostic
 
+For memory-limited runs, the script can now compute only the primary max-min
+diagnostic with `--diagnostic-modes maxmin`.  Use `--diagnostic-modes
+maxmin,eigen` when the two-panel dual-order plot is required.
+
 Deprecated for new runs: use
 `slurm_vecc_con_dual_order_real_july2023_2025_matern_gc_year_specific_domains_061926.md`
 so the same fitted models produce both max-min ordered and eigenvalue-sorted
@@ -228,6 +232,7 @@ python "${SCRIPT}" \
   --device cuda \
   --cuda-fallback error \
   --maxmin-order-mode block_rank \
+  --diagnostic-modes maxmin \
   --resample-grid 200 \
   --suppress-fit-prints \
   --out-dir "${OUTDIR}"
