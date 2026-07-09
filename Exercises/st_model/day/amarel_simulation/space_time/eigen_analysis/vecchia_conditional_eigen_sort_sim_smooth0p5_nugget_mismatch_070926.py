@@ -16,6 +16,7 @@ Experiments:
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import subprocess
 import sys
@@ -123,47 +124,6 @@ class RealDataCorridorWidth4x4Lag643FixedNuggetSplineFit(RealDataCorridorWidth4x
         out["nugget"] = float(self.fixed_nugget)
         return out
 
-    def fit_vecc_lbfgs(self, params_list, optimizer, max_steps: int = 50, grad_tol: float = 1e-5):
-        if not self.is_precomputed:
-            self.precompute_conditioning_sets()
-
-        use_save_on_cpu = self.device.type == "cuda"
-        suffix = " with autograd save_on_cpu" if use_save_on_cpu else ""
-        print(f"--- Starting fixed-nugget ST Matern spline L-BFGS{suffix} ---")
-
-        def closure():
-            optimizer.zero_grad()
-            params = sim_eig.torch.stack([p.reshape(()) for p in params_list])
-            if use_save_on_cpu:
-                with sim_eig.torch.autograd.graph.save_on_cpu(pin_memory=False):
-                    loss = self.vecchia_batched_likelihood(params)
-            else:
-                loss = self.vecchia_batched_likelihood(params)
-            loss.backward()
-            return loss
-
-        loss = None
-        last_iter = 0
-        for i in range(max_steps):
-            last_iter = i
-            loss = optimizer.step(closure)
-            with sim_eig.torch.no_grad():
-                grads = [abs(float(p.grad.detach().item())) for p in params_list if p.grad is not None]
-                max_grad = max(grads) if grads else 0.0
-                print(
-                    f"--- Step {i + 1}/{max_steps} / "
-                    f"Loss: {float(loss.detach().item()):.6f} / Max Grad: {max_grad:.2e} ---"
-                )
-            if max_grad < grad_tol:
-                print(f"Converged: max_grad {max_grad:.2e} < {grad_tol:.2e}")
-                break
-
-        raw = [float(p.detach().cpu().item()) for p in params_list]
-        final_loss = float(loss.detach().cpu().item()) if isinstance(loss, sim_eig.torch.Tensor) else float("nan")
-        final_params = {k: round(float(v), 4) for k, v in self._convert_params(raw).items()}
-        print("Final fixed-nugget ST Matern Params:", final_params)
-        return raw + [final_loss], last_iter
-
 
 _ORIG_BUILD_MODEL = sim_eig.build_model
 _ORIG_FIT_ONE_MODEL = sim_eig.fit_one_model
@@ -172,9 +132,12 @@ _ORIG_FIT_ONE_MODEL = sim_eig.fit_one_model
 def build_model(spec: dict[str, Any], source_map: dict, grid_coords_np: np.ndarray, args: argparse.Namespace):
     family = str(spec.get("family", ""))
     if family == "matern":
+        fixed_nugget = float(spec.get("fixed_nugget", 0.0))
+        if abs(fixed_nugget) <= 1e-15:
+            return _ORIG_BUILD_MODEL(spec, source_map, grid_coords_np, args)
         return RealDataCorridorWidth4x4Lag643FixedNuggetSplineFit(
             smooth=float(spec["smooth"]),
-            fixed_nugget=float(spec.get("fixed_nugget", 0.0)),
+            fixed_nugget=fixed_nugget,
             input_map=source_map,
             grid_coords=grid_coords_np,
             lag1_lon_offset=float(args.real_reference_advec_lon_abs),
@@ -265,12 +228,14 @@ def candidate_data_roots() -> list[Path]:
             base / "july_st_circulant_realpattern_smooth0p5_nugget0_oneday_070926",
             base / "july_st_circulant_realpattern_smooth0p5_nugget0",
             base / "july_st_circulant_realpattern_smooth0p5",
+            base / "july_st_circulant_realpattern",
         ]
     base = Path("/Users/joonwonlee/Documents/GEMS_DATA/simulation")
     return [
         base / "july_st_circulant_realpattern_smooth0p5_nugget0_oneday_070926",
         base / "july_st_circulant_realpattern_smooth0p5_nugget0",
         base / "july_st_circulant_realpattern_smooth0p5",
+        base / "july_st_circulant_realpattern",
     ]
 
 
@@ -432,9 +397,18 @@ def common_cli_args(args: argparse.Namespace, data_root: Path, out_dir: Path, va
     return cli
 
 
-def run_experiment(args: argparse.Namespace, data_root: Path, out_root: Path, experiment: str) -> None:
-    variants = EXPERIMENT_VARIANTS[experiment]
+def run_experiment(
+    args: argparse.Namespace,
+    data_root: Path,
+    out_root: Path,
+    experiment: str,
+    variants: list[str] | None = None,
+    run_stem_suffix: str | None = None,
+) -> None:
+    variants = list(variants or EXPERIMENT_VARIANTS[experiment])
     exp_stem = f"{RUN_STEM}_{experiment}"
+    if run_stem_suffix:
+        exp_stem = f"{exp_stem}_{run_stem_suffix}"
     exp_out = out_root / experiment
     exp_out.mkdir(parents=True, exist_ok=True)
     sim_eig.RUN_STEM = exp_stem
@@ -450,6 +424,172 @@ def run_experiment(args: argparse.Namespace, data_root: Path, out_root: Path, ex
         sim_eig.main()
     finally:
         sys.argv = old_argv
+
+
+def wrapper_worker_cli(args: argparse.Namespace, data_root: Path, out_root: Path, experiment: str, model_variant: str) -> list[str]:
+    cli = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--worker-experiment",
+        str(experiment),
+        "--worker-model-variant",
+        str(model_variant),
+        "--data-root",
+        str(data_root),
+        "--out-root",
+        str(out_root),
+        "--years",
+        *[str(y) for y in args.years],
+        "--month",
+        str(args.month),
+        "--days",
+        str(args.days),
+        "--hours-per-day",
+        str(args.hours_per_day),
+        "--sim-kind",
+        str(args.sim_kind),
+        f"--lat-range={args.lat_range}",
+        f"--lon-range={args.lon_range}",
+        "--real-reference-advec-lon-abs",
+        str(args.real_reference_advec_lon_abs),
+        "--daily-stride",
+        str(args.daily_stride),
+        "--target-chunk-size",
+        str(args.target_chunk_size),
+        "--diag-chunk-size",
+        str(args.diag_chunk_size),
+        "--min-target-points",
+        str(args.min_target_points),
+        "--spline-n-points",
+        str(args.spline_n_points),
+        "--spline-r-max",
+        str(args.spline_r_max),
+        "--lbfgs-lr",
+        str(args.lbfgs_lr),
+        "--lbfgs-steps",
+        str(args.lbfgs_steps),
+        "--lbfgs-eval",
+        str(args.lbfgs_eval),
+        "--lbfgs-history",
+        str(args.lbfgs_history),
+        "--grad-tol",
+        str(args.grad_tol),
+        "--cuda-fallback",
+        str(args.cuda_fallback),
+        "--brown-bridge-q",
+        str(args.brown_bridge_q),
+        "--resample-grid",
+        str(args.resample_grid),
+        "--save-daily-curves",
+    ]
+    if args.device:
+        cli.extend(["--device", str(args.device)])
+    if args.keep_exact_loc:
+        cli.append("--keep-exact-loc")
+    else:
+        cli.append("--no-keep-exact-loc")
+    if args.suppress_fit_prints:
+        cli.append("--suppress-fit-prints")
+    return cli
+
+
+def combined_summary_path(out_root: Path, experiment: str) -> Path:
+    return out_root / experiment / f"{RUN_STEM}_{experiment}_summary.csv"
+
+
+def worker_summary_path(out_root: Path, experiment: str, model_variant: str) -> Path:
+    return out_root / experiment / f"{RUN_STEM}_{experiment}_{model_variant}_summary.csv"
+
+
+def aggregate_isolated_experiment(args: argparse.Namespace, out_root: Path, experiment: str, variants: list[str]) -> None:
+    exp_out = out_root / experiment
+    summary_frames: list[pd.DataFrame] = []
+    for model_variant in variants:
+        path = worker_summary_path(out_root, experiment, model_variant)
+        if not path.exists():
+            raise FileNotFoundError(f"Missing worker summary for {model_variant}: {path}")
+        summary_frames.append(pd.read_csv(path))
+
+    summary = pd.concat(summary_frames, ignore_index=True) if summary_frames else pd.DataFrame()
+    if not summary.empty:
+        numeric_cols = summary.select_dtypes(include=[np.number]).columns
+        summary[numeric_cols] = summary[numeric_cols].round(sim_eig.ROUND_DECIMALS)
+    combined_path = combined_summary_path(out_root, experiment)
+    summary.to_csv(combined_path, index=False, float_format=f"%.{sim_eig.ROUND_DECIMALS}f")
+
+    if summary.empty or "status" not in summary.columns:
+        return
+    ok_summary = summary[summary["status"].astype(str) == "ok"].copy()
+    if ok_summary.empty:
+        return
+
+    avg_rows: list[pd.DataFrame] = []
+    summary_rows = sim_eig.clean_json_value(ok_summary.to_dict(orient="records"))
+    for (year, day_idx), day_summary in ok_summary.groupby(["year", "day_idx"], sort=True):
+        year_int = int(year)
+        day_idx_int = int(day_idx)
+        day_label = str(day_summary["day"].iloc[0]) if "day" in day_summary.columns else f"{year_int}-07-day{day_idx_int + 1:02d}"
+        curves: dict[str, pd.DataFrame] = {}
+        for _, row in day_summary.iterrows():
+            model_variant = str(row["model_variant"])
+            curve_path = (
+                exp_out
+                / "daily_curves"
+                / f"year_{year_int}"
+                / f"sim_{year_int}_day{day_idx_int + 1:02d}_{model_variant}_conditional_eig_curve.csv"
+            )
+            if not curve_path.exists():
+                print(f"WARNING: missing daily curve for combined plot: {curve_path}", flush=True)
+                continue
+            curve = pd.read_csv(curve_path)
+            curves[model_variant] = curve
+            avg_rows.append(
+                sim_eig.resample_curve(curve, int(args.resample_grid)).assign(
+                    year=year_int,
+                    month=int(row["month"]) if "month" in row and pd.notna(row["month"]) else int(args.month),
+                    day_idx=day_idx_int,
+                    day=day_label,
+                    model_variant=model_variant,
+                )
+            )
+        if curves:
+            sim_eig.MODEL_SPECS = MODEL_SPECS
+            sim_eig.plot_daily_comparison(
+                curves,
+                sim_eig.clean_json_value(day_summary.to_dict(orient="records")),
+                exp_out
+                / "daily_plots"
+                / f"year_{year_int}"
+                / f"sim_{year_int}_day{day_idx_int + 1:02d}_vecchia_conditional_eigen_sort_comparison.png",
+                f"Sim July {year_int} day_idx={day_idx_int} ({day_label}): Vecchia conditional eigen diagnostic",
+            )
+
+    for year in sorted({int(df["year"].iloc[0]) for df in avg_rows if not df.empty}):
+        year_avg = [df for df in avg_rows if not df.empty and int(df["year"].iloc[0]) == year]
+        year_summary = [r for r in summary_rows if int(r.get("year")) == year]
+        sim_eig.MODEL_SPECS = MODEL_SPECS
+        sim_eig.write_monthly_outputs(year_avg, year_summary, exp_out, year)
+
+    print(f"Combined isolated summary: {combined_path}", flush=True)
+
+
+def run_isolated_experiment(args: argparse.Namespace, data_root: Path, out_root: Path, experiment: str) -> None:
+    variants = EXPERIMENT_VARIANTS[experiment]
+    exp_out = out_root / experiment
+    exp_out.mkdir(parents=True, exist_ok=True)
+    print("\n" + "#" * 100, flush=True)
+    print(f"Running {experiment} with one fresh Python process per model: variants={variants}", flush=True)
+    print(f"Output: {exp_out}", flush=True)
+    print("#" * 100, flush=True)
+    for model_variant in variants:
+        cmd = wrapper_worker_cli(args, data_root, out_root, experiment, model_variant)
+        print("\n" + "-" * 100, flush=True)
+        print(f"Worker start: {experiment}/{model_variant}", flush=True)
+        print(" ".join(cmd), flush=True)
+        print("-" * 100, flush=True)
+        subprocess.run(cmd, check=True)
+        gc.collect()
+    aggregate_isolated_experiment(args, out_root, experiment, variants)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -487,6 +627,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--resample-grid", type=int, default=200)
     parser.add_argument("--save-daily-curves", action="store_true")
     parser.add_argument("--suppress-fit-prints", action="store_true")
+    parser.add_argument("--isolate-models", dest="isolate_models", action="store_true", default=True)
+    parser.add_argument("--no-isolate-models", dest="isolate_models", action="store_false")
+    parser.add_argument("--worker-experiment", choices=sorted(EXPERIMENT_VARIANTS), default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--worker-model-variant", choices=sorted(MODEL_SPECS), default=None, help=argparse.SUPPRESS)
     parser.add_argument("--seed", type=int, default=20240701)
     parser.add_argument("--mean-intercept", type=float, default=260.0)
     parser.add_argument("--mean-lat-slope", type=float, default=1.0)
@@ -508,6 +652,20 @@ def main() -> None:
 
     ensure_data(args, data_root, args.years, min_hours)
 
+    if args.worker_experiment is not None or args.worker_model_variant is not None:
+        if args.worker_experiment is None or args.worker_model_variant is None:
+            raise ValueError("--worker-experiment and --worker-model-variant must be passed together.")
+        args.save_daily_curves = True
+        run_experiment(
+            args,
+            data_root,
+            out_root,
+            str(args.worker_experiment),
+            variants=[str(args.worker_model_variant)],
+            run_stem_suffix=str(args.worker_model_variant),
+        )
+        return
+
     manifest = {
         "run_stem": RUN_STEM,
         "driver_script": str(Path(__file__).resolve()),
@@ -518,6 +676,12 @@ def main() -> None:
         "model_specs": sim_eig.clean_json_value(MODEL_SPECS),
         "experiments": EXPERIMENT_VARIANTS,
         "args": sim_eig.clean_json_value(vars(args)),
+        "execution": (
+            "model-isolated subprocesses; data generation is a separate subprocess and each fitted model "
+            "runs in a fresh Python process before parent aggregation"
+            if args.isolate_models
+            else "single process per experiment"
+        ),
         "loss_label": f"Vecchia objective per target observation, printed to {LOSS_DECIMALS} decimals",
     }
     (out_root / "experiment_manifest.json").write_text(
@@ -527,7 +691,10 @@ def main() -> None:
 
     experiments = list(EXPERIMENT_VARIANTS) if args.experiment == "both" else [str(args.experiment)]
     for experiment in experiments:
-        run_experiment(args, data_root, out_root, experiment)
+        if args.isolate_models:
+            run_isolated_experiment(args, data_root, out_root, experiment)
+        else:
+            run_experiment(args, data_root, out_root, experiment)
 
     print("\nAll requested mismatch experiments completed.", flush=True)
 

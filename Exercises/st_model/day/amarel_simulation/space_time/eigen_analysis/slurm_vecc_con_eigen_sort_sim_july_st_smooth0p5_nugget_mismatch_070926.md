@@ -1,6 +1,7 @@
 # One-Day Simulated July ST Vecchia Conditional Eigen Diagnostic, Smooth 0.5 Nugget 0
 
-This run creates or reuses one simulated July day from a Matern ST DGP:
+This run fits and diagnoses one pre-generated simulated July day from a Matern
+ST DGP:
 
 ```text
 DGP: Matern smooth=0.5, nugget=0
@@ -16,9 +17,11 @@ diagnostic: Vecchia conditional target-block covariance eigenbasis
 loss label: Vecchia objective per target observation, printed in plot legends
 ```
 
-The Python driver checks the simulation truth JSON before generating anything.
-If a valid smooth=0.5, nugget=0 pickle already exists, it reuses it.  If not,
-it runs the reusable July ST circulant generator with `--max-hours 8`.
+The Python driver can generate the pickle when `--generate-if-missing` is
+passed, but the SLURM fitting job below intentionally does not pass that flag.
+This keeps data generation separate from fitting/eigen analysis, matching the
+real-data reference workflow.  If the data root is missing or has the wrong
+truth JSON, the job fails fast instead of generating inside the fit job.
 
 Two comparison folders are written under the same summer output root:
 
@@ -33,9 +36,9 @@ nugget_mismatch:
   Matern smooth=0.5, nugget fixed 2
 ```
 
-The common engine is not modified.  The new driver patches model specs and a
-fixed-nugget Matern wrapper at runtime, then calls
-`vecchia_conditional_eigen_sort_common_engine_061926.py`.
+The common engine is not modified.  Nugget-0 Matern fits use the same
+`RealDataCorridorWidth4x4Lag643NoNuggetSplineFit` path as the real-data
+reference; only the nugget-2 comparison uses a fixed-nugget wrapper.
 
 Main outputs:
 
@@ -53,18 +56,13 @@ Run from the local Mac:
 
 ```bash
 REMOTE_DIR="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/eigen_analysis"
-REMOTE_SIM_DIR="/home/jl2815/tco/simulate_data"
 LOCAL_ROOT="/Users/joonwonlee/Documents/GEMS_TCO-1"
 LOCAL_DIR="${LOCAL_ROOT}/Exercises/st_model/day/amarel_simulation/space_time/eigen_analysis"
 
-ssh jl2815@amarel.rutgers.edu "mkdir -p ${REMOTE_DIR} ${REMOTE_SIM_DIR} /home/jl2815/tco/exercise_output/summer/logs"
+ssh jl2815@amarel.rutgers.edu "mkdir -p ${REMOTE_DIR} /home/jl2815/tco/exercise_output/summer/logs"
 
 scp -r "${LOCAL_ROOT}/src/GEMS_TCO" \
   "jl2815@amarel.rutgers.edu:/home/jl2815/tco/"
-
-scp \
-  "${LOCAL_ROOT}/simulate_data/generate_july_st_circulant_real_locations_2022_2025.py" \
-  "jl2815@amarel.rutgers.edu:${REMOTE_SIM_DIR}/"
 
 scp \
   "${LOCAL_DIR}/vecchia_conditional_eigen_sort_common_engine_061926.py" \
@@ -73,15 +71,9 @@ scp \
   "jl2815@amarel.rutgers.edu:${REMOTE_DIR}/"
 ```
 
-The one-day generator needs the July real-location template pickle for 2023. If
-it is not already on Amarel, upload it once:
-
-```bash
-ssh jl2815@amarel.rutgers.edu "mkdir -p /home/jl2815/tco/data/pickle_2023"
-
-scp "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2023/tco_grid_23_07.pkl" \
-  "jl2815@amarel.rutgers.edu:/home/jl2815/tco/data/pickle_2023/"
-```
+This fitting job expects an existing smooth=0.5, nugget=0 simulation root on
+Amarel.  The driver checks the truth JSON and reuses the first valid candidate
+under `/home/jl2815/tco/exercise_output/sim_data`.
 
 ## 2. Submit On Amarel
 
@@ -89,31 +81,30 @@ On Amarel:
 
 ```bash
 cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/eigen_analysis
-nano run_vecc_con_eigen_sort_sim_s05_n0_mismatch_070926.sh
-sbatch run_vecc_con_eigen_sort_sim_s05_n0_mismatch_070926.sh
+nano run_vecc_con_eigen_sort_sim_s05_n0_mismatch_cpu_070926.sh
+sbatch run_vecc_con_eigen_sort_sim_s05_n0_mismatch_cpu_070926.sh
 ```
 
 Paste:
 
 ```bash
 #!/bin/bash
-#SBATCH --job-name=st_s05_mismatch
-#SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/st_s05_mismatch_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/summer/logs/st_s05_mismatch_%j.err
+#SBATCH --job-name=st_s05_mismatch_cpu
+#SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/st_s05_mismatch_cpu_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/summer/logs/st_s05_mismatch_cpu_%j.err
 #SBATCH --time=2:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=128G
-#SBATCH --partition=gpu-redhat
-#SBATCH --gres=gpu:1
+#SBATCH --partition=main-redhat
+#SBATCH --nodelist=hal0144
 
 set -euo pipefail
 
 module purge || true
 module use /projects/community/modulefiles || true
 module load anaconda/2024.06-ts840 || true
-module load cuda/12.1.0 || true
 
 if ! command -v conda >/dev/null 2>&1; then
   source "${HOME}/.bashrc" || true
@@ -127,15 +118,12 @@ eval "$(conda shell.bash hook)"
 conda activate faiss_env
 
 export PYTHONPATH="/home/jl2815/tco:/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time:${PYTHONPATH:-}"
-export OMP_NUM_THREADS=1
-export MKL_NUM_THREADS=1
-export OPENBLAS_NUM_THREADS=1
-export NUMEXPR_NUM_THREADS=1
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:128
+export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-12}"
+export MKL_NUM_THREADS="${SLURM_CPUS_PER_TASK:-12}"
+export OPENBLAS_NUM_THREADS="${SLURM_CPUS_PER_TASK:-12}"
+export NUMEXPR_NUM_THREADS="${SLURM_CPUS_PER_TASK:-12}"
 
 SCRIPT="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/eigen_analysis/vecchia_conditional_eigen_sort_sim_smooth0p5_nugget_mismatch_070926.py"
-GENERATOR="/home/jl2815/tco/simulate_data/generate_july_st_circulant_real_locations_2022_2025.py"
-DATA_ROOT="/home/jl2815/tco/exercise_output/sim_data/july_st_circulant_realpattern_smooth0p5_nugget0_oneday_070926"
 OUTROOT="/home/jl2815/tco/exercise_output/summer/sim_july_st_s05_n0_vecchia_conditional_eigen_sort_smooth_nugget_mismatch_070926"
 
 mkdir -p "${OUTROOT}"
@@ -145,11 +133,9 @@ mkdir -p "${MPLCONFIGDIR}"
 echo "Host: $(hostname)"
 echo "Started: $(date)"
 echo "Script: ${SCRIPT}"
-echo "Generator: ${GENERATOR}"
-echo "Data root: ${DATA_ROOT}"
+echo "Data root: auto-resolve validated smooth=0.5 nugget=0 simulation asset"
 echo "Output root: ${OUTROOT}"
 which python
-nvidia-smi || true
 python - <<'PY'
 import numpy, pandas, scipy, torch
 print("numpy", numpy.__version__)
@@ -158,14 +144,12 @@ print("scipy", scipy.__version__)
 print("torch", torch.__version__)
 print("cuda available", torch.cuda.is_available())
 print("cuda devices", torch.cuda.device_count())
+print("torch threads", torch.get_num_threads())
 PY
 
 python "${SCRIPT}" \
   --experiment both \
-  --data-root "${DATA_ROOT}" \
-  --generator-script "${GENERATOR}" \
-  --generator-input-root "/home/jl2815/tco/data" \
-  --generate-if-missing \
+  --isolate-models \
   --out-root "${OUTROOT}" \
   --years 2023 \
   --month 7 \
@@ -177,7 +161,7 @@ python "${SCRIPT}" \
   --keep-exact-loc \
   --real-reference-advec-lon-abs 0.126 \
   --daily-stride 2 \
-  --target-chunk-size 32 \
+  --target-chunk-size 16 \
   --diag-chunk-size 64 \
   --min-target-points 1 \
   --spline-n-points 4000 \
@@ -187,8 +171,8 @@ python "${SCRIPT}" \
   --lbfgs-eval 20 \
   --lbfgs-history 10 \
   --grad-tol 1e-5 \
-  --device cuda \
-  --cuda-fallback error \
+  --device cpu \
+  --cuda-fallback cpu \
   --resample-grid 200 \
   --suppress-fit-prints
 
@@ -198,15 +182,15 @@ echo "Finished: $(date)"
 Submit:
 
 ```bash
-sbatch run_vecc_con_eigen_sort_sim_s05_n0_mismatch_070926.sh
+sbatch run_vecc_con_eigen_sort_sim_s05_n0_mismatch_cpu_070926.sh
 ```
 
 Monitor:
 
 ```bash
 squeue -u jl2815
-tail -f /home/jl2815/tco/exercise_output/summer/logs/st_s05_mismatch_<JOBID>.out
-tail -f /home/jl2815/tco/exercise_output/summer/logs/st_s05_mismatch_<JOBID>.err
+tail -f /home/jl2815/tco/exercise_output/summer/logs/st_s05_mismatch_cpu_<JOBID>.out
+tail -f /home/jl2815/tco/exercise_output/summer/logs/st_s05_mismatch_cpu_<JOBID>.err
 ```
 
 ## 3. Pull Results To Local
