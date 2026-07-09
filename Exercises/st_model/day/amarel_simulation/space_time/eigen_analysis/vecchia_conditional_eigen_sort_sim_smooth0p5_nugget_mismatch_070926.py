@@ -123,6 +123,47 @@ class RealDataCorridorWidth4x4Lag643FixedNuggetSplineFit(RealDataCorridorWidth4x
         out["nugget"] = float(self.fixed_nugget)
         return out
 
+    def fit_vecc_lbfgs(self, params_list, optimizer, max_steps: int = 50, grad_tol: float = 1e-5):
+        if not self.is_precomputed:
+            self.precompute_conditioning_sets()
+
+        use_save_on_cpu = self.device.type == "cuda"
+        suffix = " with autograd save_on_cpu" if use_save_on_cpu else ""
+        print(f"--- Starting fixed-nugget ST Matern spline L-BFGS{suffix} ---")
+
+        def closure():
+            optimizer.zero_grad()
+            params = sim_eig.torch.stack([p.reshape(()) for p in params_list])
+            if use_save_on_cpu:
+                with sim_eig.torch.autograd.graph.save_on_cpu(pin_memory=False):
+                    loss = self.vecchia_batched_likelihood(params)
+            else:
+                loss = self.vecchia_batched_likelihood(params)
+            loss.backward()
+            return loss
+
+        loss = None
+        last_iter = 0
+        for i in range(max_steps):
+            last_iter = i
+            loss = optimizer.step(closure)
+            with sim_eig.torch.no_grad():
+                grads = [abs(float(p.grad.detach().item())) for p in params_list if p.grad is not None]
+                max_grad = max(grads) if grads else 0.0
+                print(
+                    f"--- Step {i + 1}/{max_steps} / "
+                    f"Loss: {float(loss.detach().item()):.6f} / Max Grad: {max_grad:.2e} ---"
+                )
+            if max_grad < grad_tol:
+                print(f"Converged: max_grad {max_grad:.2e} < {grad_tol:.2e}")
+                break
+
+        raw = [float(p.detach().cpu().item()) for p in params_list]
+        final_loss = float(loss.detach().cpu().item()) if isinstance(loss, sim_eig.torch.Tensor) else float("nan")
+        final_params = {k: round(float(v), 4) for k, v in self._convert_params(raw).items()}
+        print("Final fixed-nugget ST Matern Params:", final_params)
+        return raw + [final_loss], last_iter
+
 
 _ORIG_BUILD_MODEL = sim_eig.build_model
 _ORIG_FIT_ONE_MODEL = sim_eig.fit_one_model
@@ -291,20 +332,16 @@ def run_generator(args: argparse.Namespace, data_root: Path, years: list[int], m
         str(TRUE_INIT_PHYSICAL["range_time"]),
         "--advec-lat",
         str(TRUE_INIT_PHYSICAL["advec_lat"]),
-        "--advec-lon",
-        str(TRUE_INIT_PHYSICAL["advec_lon"]),
+        f"--advec-lon={TRUE_INIT_PHYSICAL['advec_lon']}",
         "--nugget",
         "0.0",
         "--mean-intercept",
         str(args.mean_intercept),
         "--mean-lat-slope",
         str(args.mean_lat_slope),
-        "--mean-lat-center",
-        str(args.mean_lat_center),
-        "--lat-range",
-        str(args.lat_range),
-        "--lon-range",
-        str(args.lon_range),
+        f"--mean-lat-center={args.mean_lat_center}",
+        f"--lat-range={args.lat_range}",
+        f"--lon-range={args.lon_range}",
         "--lat-factor-hr",
         str(args.lat_factor_hr),
         "--lon-factor-hr",
@@ -345,10 +382,8 @@ def common_cli_args(args: argparse.Namespace, data_root: Path, out_dir: Path, va
         str(args.days),
         "--hours-per-day",
         str(args.hours_per_day),
-        "--lat-range",
-        str(args.lat_range),
-        "--lon-range",
-        str(args.lon_range),
+        f"--lat-range={args.lat_range}",
+        f"--lon-range={args.lon_range}",
         "--model-variants",
         *variants,
         "--real-reference-advec-lon-abs",
