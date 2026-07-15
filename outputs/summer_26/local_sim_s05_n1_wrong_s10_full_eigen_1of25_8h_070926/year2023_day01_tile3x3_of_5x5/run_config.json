@@ -1,0 +1,98 @@
+{
+  "advec_lat": 0.08,
+  "advec_lon": -0.2,
+  "allow_cli_params": false,
+  "brown_bridge_q": 1.3581015157406195,
+  "coord_source": "auto",
+  "cov_jitter": 1e-08,
+  "day": 1,
+  "eigenvalue_atol": 1e-12,
+  "eigenvalue_rtol": 1e-10,
+  "hour_mode": "first",
+  "hours_per_day": 8,
+  "input": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5/2023_july_st_circulant/sim_july2023_st_circulant_gridded.pkl",
+  "max_spatial_points": 0,
+  "max_total_points": 0,
+  "mean_design": "lat_hour",
+  "model_defaults": {
+    "advec_lat": 0.08,
+    "advec_lon": -0.2,
+    "cov_jitter": 1e-08,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "sigmasq": 10.0
+  },
+  "model_variants": "s10_n1",
+  "month": 7,
+  "output_root": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/local_sim_s05_n1_wrong_s10_full_eigen_1of25_8h_070926",
+  "range_lat": 0.2,
+  "range_lon": 0.3,
+  "range_time": 2.0,
+  "sample_seed": 20240709,
+  "save_selected_points": false,
+  "sigmasq": 10.0,
+  "subset_meta": {
+    "hour_keys": [
+      "y23m07day01_hm00:53",
+      "y23m07day01_hm01:53",
+      "y23m07day01_hm02:48",
+      "y23m07day01_hm03:48",
+      "y23m07day01_hm04:48",
+      "y23m07day01_hm05:48",
+      "y23m07day01_hm06:48",
+      "y23m07day01_hm07:48"
+    ],
+    "n_spatial_by_hour": [
+      682,
+      682,
+      682,
+      682,
+      682,
+      682,
+      682,
+      682
+    ],
+    "tile_bounds": {
+      "lat_max": 0.011200000000598731,
+      "lat_min": -0.9831999999996024,
+      "lon_max": 127.01840000000135,
+      "lon_min": 125.02760000000153
+    },
+    "timestamps": [
+      "2023-07-01T00:53:00+00:00",
+      "2023-07-01T01:53:00+00:00",
+      "2023-07-01T02:48:00+00:00",
+      "2023-07-01T03:48:00+00:00",
+      "2023-07-01T04:48:00+00:00",
+      "2023-07-01T05:48:00+00:00",
+      "2023-07-01T06:48:00+00:00",
+      "2023-07-01T07:48:00+00:00"
+    ]
+  },
+  "tile_col": 3,
+  "tile_grid": "5x5",
+  "tile_row": 3,
+  "time_scale": "slot",
+  "value_col": "ColumnAmountO3",
+  "variants_expanded": [
+    "s10_n1"
+  ],
+  "vecchia_params_by_variant": {
+    "s10_n1": {
+      "advec_lat": 0.078717,
+      "advec_lon": -0.196668,
+      "nugget": 1.0,
+      "range_lat": 0.084564,
+      "range_lon": 0.125513,
+      "range_time": 0.991966,
+      "sigmasq": 6.954943,
+      "source_loss_per_obs": 1.137984,
+      "source_model_variant": "matern_s10_n1_smooth"
+    }
+  },
+  "vecchia_summary": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/local_sim_s05_n1_wrong_s10_vecchia_fit_070926/smoothness_mismatch_dgp1/fit_artifacts/sim_july_st_s05_n0_vecchia_conditional_eigen_sort_smooth_nugget_mismatch_070926_smoothness_mismatch_dgp1_matern_s10_n1_smooth_fit.csv",
+  "x_col": "auto",
+  "y_col": "auto",
+  "year": 2023
+}

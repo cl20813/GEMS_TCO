@@ -1,0 +1,164 @@
+{
+  "args": {
+    "allow_cuda": false,
+    "brown_bridge_q": 1.3581015157406195,
+    "cuda_fallback": "cpu",
+    "daily_stride": 2,
+    "data_root": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5",
+    "days": "0",
+    "device": "cpu",
+    "diag_chunk_size": 16,
+    "experiment": "both_dgp1",
+    "generate_if_missing": false,
+    "generator_input_root": "/Users/joonwonlee/Documents/GEMS_DATA",
+    "generator_script": "/Users/joonwonlee/Documents/GEMS_TCO-1/simulate_data/generate_july_st_circulant_real_locations_2022_2025.py",
+    "grad_tol": 1e-05,
+    "hours_per_day": 8,
+    "hr_pad": 0.1,
+    "isolate_models": true,
+    "keep_exact_loc": true,
+    "lat_factor_hr": 100,
+    "lat_range": "-1,1",
+    "lbfgs_eval": 20,
+    "lbfgs_history": 10,
+    "lbfgs_lr": 1.0,
+    "lbfgs_steps": 5,
+    "lon_factor_hr": 10,
+    "lon_range": "123.5,127.5",
+    "mean_intercept": 260.0,
+    "mean_lat_center": -0.5,
+    "mean_lat_slope": 1.0,
+    "min_target_points": 1,
+    "month": 7,
+    "out_root": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/local_sim_july_st_s05_n1_vecchia_conditional_eigen_sort_smooth_nugget_mismatch_070926",
+    "real_reference_advec_lon_abs": 0.126,
+    "resample_grid": 200,
+    "save_daily_curves": false,
+    "seed": 20240701,
+    "sim_kind": "gridded",
+    "spline_n_points": 4000,
+    "spline_r_max": 30.0,
+    "split_fit_diagnostic": true,
+    "suppress_fit_prints": true,
+    "target_chunk_size": 4,
+    "truth_nugget": 1.0,
+    "worker_experiment": null,
+    "worker_model_variant": null,
+    "worker_stage": "full",
+    "years": [
+      2023
+    ]
+  },
+  "common_engine": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/eigen_analysis/vecchia_conditional_eigen_sort_common_engine_061926.py",
+  "data_root": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5",
+  "driver_script": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/eigen_analysis/vecchia_conditional_eigen_sort_sim_smooth0p5_nugget_mismatch_070926.py",
+  "execution": "model-isolated subprocesses with separate fit-only and diagnostic-only Python processes; fit autograd/optimizer memory is released by process exit before eigen diagnostics",
+  "experiments": {
+    "nugget_mismatch": [
+      "matern_s05_n0_true",
+      "matern_s05_n2_over"
+    ],
+    "nugget_mismatch_dgp1": [
+      "matern_s05_n0_under",
+      "matern_s05_n1_true",
+      "matern_s05_n2_over"
+    ],
+    "smoothness_mismatch": [
+      "matern_s05_n0_true",
+      "matern_s03_n0_rough",
+      "matern_s10_n0_smooth"
+    ],
+    "smoothness_mismatch_dgp1": [
+      "matern_s05_n1_true",
+      "matern_s03_n1_rough",
+      "matern_s10_n1_smooth"
+    ]
+  },
+  "loss_label": "Vecchia objective per target observation, printed to 5 decimals",
+  "model_specs": {
+    "matern_s03_n0_rough": {
+      "color": "#d62728",
+      "family": "matern",
+      "fixed_nugget": 0.0,
+      "gc_alpha": NaN,
+      "gc_beta": NaN,
+      "label": "Matern s=0.3 nugget0 rough",
+      "smooth": 0.3
+    },
+    "matern_s03_n1_rough": {
+      "color": "#d62728",
+      "family": "matern",
+      "fixed_nugget": 1.0,
+      "gc_alpha": NaN,
+      "gc_beta": NaN,
+      "label": "Matern s=0.3 nugget1 rough",
+      "smooth": 0.3
+    },
+    "matern_s05_n0_true": {
+      "color": "#1f77b4",
+      "family": "matern",
+      "fixed_nugget": 0.0,
+      "gc_alpha": NaN,
+      "gc_beta": NaN,
+      "label": "Matern s=0.5 nugget0 true",
+      "smooth": 0.5
+    },
+    "matern_s05_n0_under": {
+      "color": "#1f77b4",
+      "family": "matern",
+      "fixed_nugget": 0.0,
+      "gc_alpha": NaN,
+      "gc_beta": NaN,
+      "label": "Matern s=0.5 nugget0 under",
+      "smooth": 0.5
+    },
+    "matern_s05_n1_true": {
+      "color": "#2ca02c",
+      "family": "matern",
+      "fixed_nugget": 1.0,
+      "gc_alpha": NaN,
+      "gc_beta": NaN,
+      "label": "Matern s=0.5 nugget1 true",
+      "smooth": 0.5
+    },
+    "matern_s05_n2_over": {
+      "color": "#ff7f0e",
+      "family": "matern",
+      "fixed_nugget": 2.0,
+      "gc_alpha": NaN,
+      "gc_beta": NaN,
+      "label": "Matern s=0.5 nugget2 over",
+      "smooth": 0.5
+    },
+    "matern_s10_n0_smooth": {
+      "color": "#2ca02c",
+      "family": "matern",
+      "fixed_nugget": 0.0,
+      "gc_alpha": NaN,
+      "gc_beta": NaN,
+      "label": "Matern s=1.0 nugget0 smooth",
+      "smooth": 1.0
+    },
+    "matern_s10_n1_smooth": {
+      "color": "#9467bd",
+      "family": "matern",
+      "fixed_nugget": 1.0,
+      "gc_alpha": NaN,
+      "gc_beta": NaN,
+      "label": "Matern s=1.0 nugget1 smooth",
+      "smooth": 1.0
+    }
+  },
+  "out_root": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/local_sim_july_st_s05_n1_vecchia_conditional_eigen_sort_smooth_nugget_mismatch_070926",
+  "run_stem": "sim_july_st_s05_n0_vecchia_conditional_eigen_sort_smooth_nugget_mismatch_070926",
+  "truth": {
+    "advec_lat": 0.08,
+    "advec_lon": -0.2,
+    "nugget": 1.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "sigmasq": 10.0,
+    "smooth": 0.5
+  }
+}

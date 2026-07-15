@@ -1,0 +1,121 @@
+{
+  "advec_lat": 0.08,
+  "advec_lon": -0.2,
+  "allow_cli_params": false,
+  "brown_bridge_q": 1.3581015157406195,
+  "coord_source": "auto",
+  "cov_jitter": 1e-08,
+  "day": 1,
+  "eigenvalue_atol": 1e-12,
+  "eigenvalue_rtol": 1e-10,
+  "hour_mode": "first",
+  "hours_per_day": 8,
+  "input": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5/2023_july_st_circulant/sim_july2023_st_circulant_gridded.pkl",
+  "max_spatial_points": 0,
+  "max_total_points": 0,
+  "maxmin_points_per_hour": 400,
+  "mean_design": "lat_hour",
+  "model_defaults": {
+    "advec_lat": 0.08,
+    "advec_lon": -0.2,
+    "cov_jitter": 1e-08,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "sigmasq": 10.0
+  },
+  "model_variants": "advection_n1",
+  "month": 7,
+  "output_root": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/local_sim_s05_n1_parameter_mismatch_full_eigen_maxmin400_071126/advection_mismatch_dgp1",
+  "range_lat": 0.2,
+  "range_lon": 0.3,
+  "range_time": 2.0,
+  "sample_seed": 20240709,
+  "save_selected_points": true,
+  "sigmasq": 10.0,
+  "subset_meta": {
+    "hour_keys": [
+      "y23m07day01_hm00:53",
+      "y23m07day01_hm01:53",
+      "y23m07day01_hm02:48",
+      "y23m07day01_hm03:48",
+      "y23m07day01_hm04:48",
+      "y23m07day01_hm05:48",
+      "y23m07day01_hm06:48",
+      "y23m07day01_hm07:48"
+    ],
+    "maxmin_points_per_hour": 400,
+    "n_spatial_by_hour": [
+      400,
+      387,
+      388,
+      392,
+      387,
+      390,
+      383,
+      386
+    ],
+    "subset_mode": "maxmin",
+    "tile_bounds": {},
+    "timestamps": [
+      "2023-07-01T00:53:00+00:00",
+      "2023-07-01T01:53:00+00:00",
+      "2023-07-01T02:48:00+00:00",
+      "2023-07-01T03:48:00+00:00",
+      "2023-07-01T04:48:00+00:00",
+      "2023-07-01T05:48:00+00:00",
+      "2023-07-01T06:48:00+00:00",
+      "2023-07-01T07:48:00+00:00"
+    ]
+  },
+  "subset_mode": "maxmin",
+  "tile_col": 3,
+  "tile_grid": "5x5",
+  "tile_row": 3,
+  "time_scale": "slot",
+  "value_col": "ColumnAmountO3",
+  "variants_expanded": [
+    "s05_n1_advec_true",
+    "s05_n1_advec_zero",
+    "s05_n1_advec_large"
+  ],
+  "vecchia_params_by_variant": {
+    "s05_n1_advec_large": {
+      "advec_lat": 0.5,
+      "advec_lon": 0.5,
+      "nugget": 1.0,
+      "range_lat": 0.187023,
+      "range_lon": 0.28234,
+      "range_time": 1.881596,
+      "sigmasq": 9.429007,
+      "source_loss_per_obs": 1.140776,
+      "source_model_variant": "matern_s05_n1_advec_large"
+    },
+    "s05_n1_advec_true": {
+      "advec_lat": 0.08,
+      "advec_lon": -0.2,
+      "nugget": 1.0,
+      "range_lat": 0.191013,
+      "range_lon": 0.28788,
+      "range_time": 1.911278,
+      "sigmasq": 9.598685,
+      "source_loss_per_obs": 1.126374,
+      "source_model_variant": "matern_s05_n1_advec_true"
+    },
+    "s05_n1_advec_zero": {
+      "advec_lat": 0.0,
+      "advec_lon": 0.0,
+      "nugget": 1.0,
+      "range_lat": 0.180664,
+      "range_lon": 0.273507,
+      "range_time": 0.932669,
+      "sigmasq": 9.13014,
+      "source_loss_per_obs": 1.147998,
+      "source_model_variant": "matern_s05_n1_advec_zero"
+    }
+  },
+  "vecchia_summary": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/local_sim_s05_n1_vecchia_conditional_eigen_sort_parameter_mismatch_071126/advection_mismatch_dgp1/sim_july_st_s05_vecchia_conditional_eigen_sort_parameter_mismatch_071126_advection_mismatch_dgp1_summary.csv",
+  "x_col": "auto",
+  "y_col": "auto",
+  "year": 2023
+}

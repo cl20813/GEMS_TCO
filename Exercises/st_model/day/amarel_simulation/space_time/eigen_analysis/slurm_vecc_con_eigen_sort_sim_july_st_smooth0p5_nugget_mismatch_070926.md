@@ -38,7 +38,10 @@ nugget_mismatch:
 
 The common engine is not modified.  Nugget-0 Matern fits use the same
 `RealDataCorridorWidth4x4Lag643NoNuggetSplineFit` path as the real-data
-reference; only the nugget-2 comparison uses a fixed-nugget wrapper.
+reference; only the nugget-2 comparison uses a fixed-nugget wrapper.  The
+default run uses separate fit-only and diagnostic-only Python workers for each
+model, so LBFGS/autograd/optimizer memory is released by process exit before
+the conditional-eigen diagnostic starts.
 
 Main outputs:
 
@@ -75,6 +78,13 @@ This fitting job expects an existing smooth=0.5, nugget=0 simulation root on
 Amarel.  The driver checks the truth JSON and reuses the first valid candidate
 under `/home/jl2815/tco/exercise_output/sim_data`.
 
+After upload, make sure the new CPU-safe split driver is on Amarel:
+
+```bash
+grep -n "forces CPU" "${REMOTE_DIR}/vecchia_conditional_eigen_sort_sim_smooth0p5_nugget_mismatch_070926.py"
+grep -n "FIT-ONLY worker" "${REMOTE_DIR}/vecchia_conditional_eigen_sort_sim_smooth0p5_nugget_mismatch_070926.py"
+```
+
 ## 2. Submit On Amarel
 
 On Amarel:
@@ -92,13 +102,13 @@ Paste:
 #SBATCH --job-name=st_s05_mismatch_cpu
 #SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/st_s05_mismatch_cpu_%j.out
 #SBATCH --error=/home/jl2815/tco/exercise_output/summer/logs/st_s05_mismatch_cpu_%j.err
-#SBATCH --time=2:00:00
+#SBATCH --time=12:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=128G
-#SBATCH --partition=main-redhat
-#SBATCH --nodelist=hal0144
+#SBATCH --partition=mem-redhat
+#SBATCH --nodelist=mem010
 
 set -euo pipefail
 
@@ -150,6 +160,7 @@ PY
 python "${SCRIPT}" \
   --experiment both \
   --isolate-models \
+  --split-fit-diagnostic \
   --out-root "${OUTROOT}" \
   --years 2023 \
   --month 7 \
@@ -167,7 +178,7 @@ python "${SCRIPT}" \
   --spline-n-points 4000 \
   --spline-r-max 30.0 \
   --lbfgs-lr 1.0 \
-  --lbfgs-steps 8 \
+  --lbfgs-steps 5 \
   --lbfgs-eval 20 \
   --lbfgs-history 10 \
   --grad-tol 1e-5 \
