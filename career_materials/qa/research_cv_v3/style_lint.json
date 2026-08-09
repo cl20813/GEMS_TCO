@@ -1,0 +1,85 @@
+{
+  "input": "/Users/joonwonlee/Documents/GEMS_TCO-1/career_materials/final/Joonwon_Lee_Quantitative_Research_CV.docx",
+  "fonts_by_char_count": {
+    "Arial": 6654
+  },
+  "direct_run_formatting_runs": 64,
+  "direct_paragraph_formatting_paragraphs": 42,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 1,
+      "text": "JOONWON LEE",
+      "style": "Normal"
+    },
+    {
+      "para_index": 2,
+      "text": "QUANTITATIVE RESEARCH  |  STATISTICAL MACHINE LEARNING  |  MODEL RISK",
+      "style": "Normal"
+    },
+    {
+      "para_index": 41,
+      "text": "Languages: Korean (Native); English (Fluent); Chinese (Basic)",
+      "style": "Normal"
+    }
+  ],
+  "examples": {
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 1,
+        "text": "JOONWON LEE",
+        "style": "Normal"
+      },
+      {
+        "para_index": 2,
+        "text": "QUANTITATIVE RESEARCH  |  STATISTICAL MACHINE LEARNING  |  MODEL RISK",
+        "style": "Normal"
+      },
+      {
+        "para_index": 3,
+        "text": "Piscataway, NJ 08854  |  612-438-9144  |  joonwon.lee22@gmail.com  |  github.com/cl20813",
+        "style": "Normal"
+      },
+      {
+        "para_index": 4,
+        "text": "RESEARCH PROFILE",
+        "style": "Heading 1"
+      },
+      {
+        "para_index": 5,
+        "text": "Statistics Ph.D. candidate developing scalable probabilistic models and diagnostics for high-dimensional dependent data.",
+        "style": "Normal"
+      }
+    ],
+    "direct_run_formatting": [
+      {
+        "para_index": 1,
+        "run_text": "JOONWON LEE",
+        "style": "Normal"
+      },
+      {
+        "para_index": 2,
+        "run_text": "QUANTITATIVE RESEARCH  |  STATISTICAL MACHINE LEARNING  |  MODEL RISK",
+        "style": "Normal"
+      },
+      {
+        "para_index": 3,
+        "run_text": "Piscataway, NJ 08854  |  612-438-9144  |  ",
+        "style": "Normal"
+      },
+      {
+        "para_index": 3,
+        "run_text": "  |  ",
+        "style": "Normal"
+      },
+      {
+        "para_index": 4,
+        "run_text": "RESEARCH PROFILE",
+        "style": "Heading 1"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}

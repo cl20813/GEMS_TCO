@@ -1,0 +1,57 @@
+JOONWON LEE
+Piscataway, NJ 08854 | 612-438-9144 | joonwon.lee22@gmail.com | github.com/cl20813
+
+SUMMARY
+Statistics Ph.D. candidate and research data scientist specializing in statistical measurement, experiment design, hypothesis
+testing, and scalable modeling for large, complex datasets. Translates product and business questions into tractable metrics,
+mathematical models, and validation plans; builds reproducible Python/SQL workflows for data preparation, quality
+assessment, and model evaluation.
+
+EDUCATION
+Ph.D. in Statistics, Rutgers University, Piscataway, NJ
+M.S. in Statistics, University of Minnesota, Minneapolis, MN
+
+Expected Dec 2026 | GPA: 3.8/4.0
+Sep 2021 | GPA: 3.7/4.0
+
+TECHNICAL SKILLS
+Programming and Data Workflows: Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), SQL/MySQL, Linux, Git,
+AWS EC2, HPC/SLURM; data extraction, restructuring, quality validation, and reproducible pipelines
+Statistical Measurement and Modeling: Experimental design, causal inference (fixed effects, propensity-score matching),
+hypothesis and sequential testing, regression (GLM/GLS), predictive modeling, Monte Carlo simulation, model selection and
+validation, performance evaluation, missing-data analysis
+
+EXPERIENCE
+JPMorgan Chase - Summer Quantitative Analytics Associate, Quantitative Finance / Risk Modeling
+Summer 2026
+• Translated a business monitoring question into explicit hypotheses and measurable decision rules, developing and validating a
+Sequential Probability Ratio Test for binary risk indicators.
+• Modeled the cumulative log-likelihood-ratio process as a random walk and applied Brownian-motion approximation and dynamicprogramming probability propagation to evaluate boundary-crossing probabilities, stopping-time distributions, Type I/II error, and
+early-decision tradeoffs.
+Travelers - Data Science Leadership Program, Business Insurance Pricing Team
+Summer 2025
+• Developed an end-to-end LightGBM pricing pipeline across 2.46M+ records, including data preparation, feature processing,
+GLM regression benchmarking, model validation, and performance evaluation on AWS EC2.
+• Presented model diagnostics and feature-attribution findings as pricing and risk-segmentation recommendations, translating
+technical results into clear actions for business stakeholders.
+
+RESEARCH AND ANALYTICAL PROJECTS
+Ph.D. Dissertation Research - Statistical Measurement, Data Quality, and Scalable Modeling
+Sep 2024 - Present
+• Measurement Methodology: Designed scale- and frequency-resolved tests to identify model misspecification and quantify how
+missingness, noise, and dependence affect statistical estimates.
+• Data Preparation and Quality: Built workflows for observation masking, quality filtering, nearest-neighbor construction,
+dependency-aware ordering, and irregular-grid resampling for noisy, partially observed satellite data.
+• Scalable Model Development: Profiled regression mean structures with GLS and calibrated flexible Gaussian-process models
+using reusable Python/PyTorch pipelines, L-BFGS optimization, CPU/GPU execution, and restartable HPC jobs for up to
+145,008 observations per day.
+Economic Policy Research - EITC and Household Labor Supply
+Hanyang University
+• Estimated the effect of the Earned Income Tax Credit on household labor supply using fixed-effects regression and propensityscore matching with observed household covariates.
+
+ADDITIONAL
+Coursework: Econometrics, Machine Learning, Probability Theory, Linear Algebra, Statistical Computing, Stochastic Processes, Advanced
+Theory of Statistics I-II, Data Structures and Algorithms, Microeconomics
+Languages: Korean (Native); English (Fluent); Chinese (Basic)
+
+

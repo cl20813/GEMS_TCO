@@ -1,0 +1,58 @@
+JOONWON LEE
+Piscataway, NJ 08854 | 612-438-9144 | joonwon.lee22@gmail.com | github.com/cl20813
+
+SUMMARY
+Statistics Ph.D. candidate and quantitative researcher with experience in stochastic simulation, scalable likelihood-based
+modeling, statistical diagnostics, and financial risk analytics. Builds modular Python/PyTorch research workflows for large,
+noisy dependent datasets and translates model results into clear, decision-relevant insights. Brings finance-sector
+experience and a strong interest in capital markets, asset allocation, and systematic investment research.
+
+EDUCATION
+Ph.D. in Statistics, Rutgers University, Piscataway, NJ
+M.S. in Statistics, University of Minnesota, Minneapolis, MN
+
+Expected Dec 2026 | GPA: 3.8/4.0
+Sep 2021 | GPA: 3.7/4.0
+
+TECHNICAL SKILLS
+Programming and Research Systems: Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), Linux, Git, AWS EC2,
+HPC/SLURM; reproducible pipelines, cached artifacts, CPU/GPU execution, restartable workflows
+Quantitative Research: Stochastic processes, Monte Carlo simulation, time-series and spatiotemporal modeling, Gaussian
+processes, MLE/GLS, numerical optimization, regression, spectral analysis, predictive modeling, model validation, scenario and
+sensitivity analysis
+
+EXPERIENCE
+JPMorgan Chase - Summer Quantitative Analytics Associate, Quantitative Finance / Risk Modeling
+Summer 2026
+• Developed and validated a Sequential Probability Ratio Test (SPRT) framework for binary risk indicators, modeling the
+cumulative log-likelihood-ratio process as a random walk with statistically controlled decision boundaries.
+• Applied a Brownian-motion approximation and dynamic-programming probability propagation to quantify boundary-crossing
+probabilities, stopping-time distributions, Type I/II error, and early-decision tradeoffs.
+Travelers - Data Science Leadership Program, Business Insurance Pricing Team
+Summer 2025
+• Developed an end-to-end LightGBM pricing pipeline across 2.46M+ records, including data preparation, GLM benchmarking,
+model validation, and performance diagnostics on AWS EC2.
+• Presented model diagnostics and feature-attribution findings as pricing and risk-segmentation recommendations for business
+stakeholders.
+
+QUANTITATIVE RESEARCH AND MARKETS
+Ph.D. Dissertation Research - Scalable Stochastic Modeling and Research Workflows
+Sep 2024 - Present
+• Stochastic Modeling and Simulation: Developed an advection-aware Vecchia likelihood approximation for nonseparable
+Gaussian processes, replacing dense covariance operations with fixed-budget conditioning to fit up to 145,008 observations per
+day.
+• Research Diagnostics: Compared Matérn and generalized Cauchy dependence models and designed scale- and frequencyresolved tests to identify misspecification in smoothness, noise, and dependence.
+• Data and Workflow Engineering: Built modular Python/PyTorch pipelines for quality filtering, missing-data handling, nearestneighbor construction, dependency-aware ordering, irregular-grid resampling, cached outputs, and restartable HPC execution.
+• Estimation and Scalability: Implemented GLS profiling, L-BFGS optimization, Monte Carlo simulation, and CPU/GPU
+execution for repeatable large-scale model estimation and evaluation.
+IMC Prosperity Algorithmic Trading Competition - Top 2.39% of Participants
+Apr 2025
+• Built and evaluated a market-making strategy with inventory-aware quoting, dynamic liquidation rules, and benchmark-driven
+performance analysis.
+
+ADDITIONAL
+Coursework: Econometrics, Machine Learning, Probability Theory, Stochastic Processes, Statistical Computing, Advanced Theory of
+Statistics I-II, Data Structures and Algorithms, Microeconomics
+Languages: Korean (Native); English (Fluent); Chinese (Basic)
+
+

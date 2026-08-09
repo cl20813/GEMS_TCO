@@ -1,0 +1,80 @@
+{
+  "input": "/Users/joonwonlee/Documents/GEMS_TCO-1/career_materials/microsoft/Joonwon_Lee_Microsoft_Data_Scientist_Resume.docx",
+  "fonts_by_char_count": {
+    "Arial": 3108
+  },
+  "direct_run_formatting_runs": 40,
+  "direct_paragraph_formatting_paragraphs": 26,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 1,
+      "text": "JOONWON LEE",
+      "style": "Normal"
+    },
+    {
+      "para_index": 26,
+      "text": "Languages: Korean (Native); English (Fluent); Chinese (Basic)",
+      "style": "Normal"
+    }
+  ],
+  "examples": {
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 1,
+        "text": "JOONWON LEE",
+        "style": "Normal"
+      },
+      {
+        "para_index": 2,
+        "text": "Piscataway, NJ 08854  |  612-438-9144  |  joonwon.lee22@gmail.com  |  github.com/cl20813",
+        "style": "Normal"
+      },
+      {
+        "para_index": 3,
+        "text": "SUMMARY",
+        "style": "Heading 1"
+      },
+      {
+        "para_index": 4,
+        "text": "Statistics Ph.D. candidate and data scientist with experience delivering end-to-end predictive modeling, model validatio",
+        "style": "Normal"
+      },
+      {
+        "para_index": 5,
+        "text": "EDUCATION",
+        "style": "Heading 1"
+      }
+    ],
+    "direct_run_formatting": [
+      {
+        "para_index": 1,
+        "run_text": "JOONWON LEE",
+        "style": "Normal"
+      },
+      {
+        "para_index": 2,
+        "run_text": "Piscataway, NJ 08854  |  612-438-9144  |  ",
+        "style": "Normal"
+      },
+      {
+        "para_index": 2,
+        "run_text": "  |  ",
+        "style": "Normal"
+      },
+      {
+        "para_index": 3,
+        "run_text": "SUMMARY",
+        "style": "Heading 1"
+      },
+      {
+        "para_index": 4,
+        "run_text": "Statistics Ph.D. candidate and data scientist with experience delivering end-to-",
+        "style": "Normal"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}
