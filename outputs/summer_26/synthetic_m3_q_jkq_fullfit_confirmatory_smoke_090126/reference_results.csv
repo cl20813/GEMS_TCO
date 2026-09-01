@@ -1,0 +1,2 @@
+dataset_id,truth_id,direction_deg_grid,speed_cells,signal_regime,replicate,status,common_precompute_s,reference_nll,reference_fit_s,reference_n_iter,reference_func_evals,reference_grad_inf
+a022_s2p0_reference_r00,a022_s2p0,22.5000000000,2.0000000000,reference,0,ok,0.0415951250,1.1321121257,0.6072079170,1,3,0.0036617688

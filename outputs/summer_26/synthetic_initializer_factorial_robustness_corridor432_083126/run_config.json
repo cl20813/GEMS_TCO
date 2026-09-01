@@ -1,0 +1,145 @@
+{
+  "arguments": {
+    "bootstrap_replicates": 2000,
+    "convergence_grad_threshold": 0.001,
+    "daily_stride": 2,
+    "data_root": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5",
+    "device": "cpu",
+    "empirical_ambiguous_min_near_cells": 5,
+    "empirical_max_lat_offset": 20,
+    "empirical_max_lon_offset": 20,
+    "empirical_min_pair_count": 1000,
+    "empirical_near_min_abs_tol": 0.05,
+    "empirical_near_min_rel_tol": 0.01,
+    "empirical_smooth_bandwidth_deg": 0.063,
+    "final_max_eval": 20,
+    "grad_tol": 1e-05,
+    "lat_range": "-3,-1",
+    "lbfgs_history": 10,
+    "lbfgs_lr": 1.0,
+    "local_nll_regret_threshold": 0.002,
+    "lon_range": "121,125",
+    "n_lat": 32,
+    "n_lon": 48,
+    "nuisance_scenarios": "oracle_start,short_time_high_nugget,long_time_low_nugget",
+    "output_root": "outputs/summer_26/synthetic_initializer_factorial_robustness_corridor432_083126",
+    "parameter_failure_threshold": 0.5,
+    "reference_max_eval": 35,
+    "replicates": 5,
+    "reverse_l_above_count": 2,
+    "reverse_l_head_right_cols": 0,
+    "reverse_l_lag_count": 2,
+    "reverse_l_max_eval": 5,
+    "reverse_l_per_lag_count": 14,
+    "reverse_l_right_col_count": 3,
+    "reverse_l_target_chunk_size": 1024,
+    "seed": 831260,
+    "smooth": 0.5,
+    "subgrid_max_condition_number": 100.0,
+    "target_chunk_size": 128,
+    "truth_indices": "all",
+    "year": 2023
+  },
+  "base_truth": {
+    "advec_lat": 0.08,
+    "advec_lon": -0.2,
+    "nugget": 1.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "sigmasq": 10.0
+  },
+  "created": "2026-08-31T16:16:32",
+  "device": "cpu",
+  "failure_definitions": {
+    "convergence_failure": "final gradient infinity norm > 0.001",
+    "local_optimum_failure": "common oracle-corridor NLL regret > 0.002",
+    "parameter_failure": "standardized 7-parameter RMSE > 0.5"
+  },
+  "input_template": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5/2023_july_st_circulant/sim_july2023_st_circulant_gridded.pkl",
+  "methods": [
+    "M3_empirical",
+    "M3_fft_subgrid",
+    "M3_reverseL_s2"
+  ],
+  "nuisance_scenarios": [
+    "oracle_start",
+    "short_time_high_nugget",
+    "long_time_low_nugget"
+  ],
+  "script": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/real_data/advection_direction/synthetic_initializer_factorial_robustness_corridor432_083126.py",
+  "truths": [
+    {
+      "advec_lat": 0.04,
+      "advec_lon": 0.1,
+      "advec_norm": 0.1077032961426901,
+      "direction": "NE",
+      "speed_label": "slow",
+      "speed_scale": 0.5,
+      "truth_id": "slow_NE"
+    },
+    {
+      "advec_lat": 0.04,
+      "advec_lon": -0.1,
+      "advec_norm": 0.1077032961426901,
+      "direction": "NW",
+      "speed_label": "slow",
+      "speed_scale": 0.5,
+      "truth_id": "slow_NW"
+    },
+    {
+      "advec_lat": -0.04,
+      "advec_lon": -0.1,
+      "advec_norm": 0.1077032961426901,
+      "direction": "SW",
+      "speed_label": "slow",
+      "speed_scale": 0.5,
+      "truth_id": "slow_SW"
+    },
+    {
+      "advec_lat": -0.04,
+      "advec_lon": 0.1,
+      "advec_norm": 0.1077032961426901,
+      "direction": "SE",
+      "speed_label": "slow",
+      "speed_scale": 0.5,
+      "truth_id": "slow_SE"
+    },
+    {
+      "advec_lat": 0.08,
+      "advec_lon": 0.2,
+      "advec_norm": 0.2154065922853802,
+      "direction": "NE",
+      "speed_label": "fast",
+      "speed_scale": 1.0,
+      "truth_id": "fast_NE"
+    },
+    {
+      "advec_lat": 0.08,
+      "advec_lon": -0.2,
+      "advec_norm": 0.2154065922853802,
+      "direction": "NW",
+      "speed_label": "fast",
+      "speed_scale": 1.0,
+      "truth_id": "fast_NW"
+    },
+    {
+      "advec_lat": -0.08,
+      "advec_lon": -0.2,
+      "advec_norm": 0.2154065922853802,
+      "direction": "SW",
+      "speed_label": "fast",
+      "speed_scale": 1.0,
+      "truth_id": "fast_SW"
+    },
+    {
+      "advec_lat": -0.08,
+      "advec_lon": 0.2,
+      "advec_norm": 0.2154065922853802,
+      "direction": "SE",
+      "speed_label": "fast",
+      "speed_scale": 1.0,
+      "truth_id": "fast_SE"
+    }
+  ]
+}

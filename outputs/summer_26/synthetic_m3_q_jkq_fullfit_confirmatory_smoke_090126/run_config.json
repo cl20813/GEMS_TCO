@@ -1,0 +1,80 @@
+{
+  "arguments": {
+    "angles_deg": "22.5",
+    "bootstrap_replicates": 50,
+    "convergence_grad_threshold": 0.001,
+    "daily_stride": 2,
+    "data_root": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5",
+    "device": "cpu",
+    "empirical_max_lat_offset": 20,
+    "empirical_max_lon_offset": 20,
+    "empirical_min_pair_count": 1000,
+    "empirical_smooth_bandwidth_deg": 0.063,
+    "final_max_eval": 3,
+    "grad_tol": 1e-05,
+    "jkq_threshold_cells": 0.5,
+    "large_parameter_error_threshold": 0.5,
+    "large_regret_threshold": 0.002,
+    "lat_range": "-3,-1",
+    "lbfgs_history": 10,
+    "lbfgs_lr": 1.0,
+    "lon_range": "121,125",
+    "n_lat": 24,
+    "n_lon": 32,
+    "nuisance_scenarios": "oracle_start",
+    "output_root": "outputs/summer_26/synthetic_m3_q_jkq_fullfit_confirmatory_smoke_090126",
+    "reference_max_eval": 3,
+    "replicates": 1,
+    "resume": false,
+    "seed": 901261,
+    "signal_regimes": "reference",
+    "smooth": 0.5,
+    "speeds_cells": "2.0",
+    "subgrid_max_condition_number": 100.0,
+    "target_chunk_size": 128,
+    "year": 2023
+  },
+  "base_truth": {
+    "advec_lat": 0.08,
+    "advec_lon": -0.2,
+    "nugget": 1.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "sigmasq": 10.0
+  },
+  "common_objective": "oracle-direction fixed corridor",
+  "conditions": [
+    {
+      "advec_lat": 0.0813013988609933,
+      "advec_lon": 0.04821811247800314,
+      "direction_deg_grid": 22.5,
+      "speed_cells": 2.0,
+      "truth_id": "a022_s2p0"
+    }
+  ],
+  "created": "2026-09-01T15:38:32",
+  "device": "cpu",
+  "flag_definitions": {
+    "gradient_nonconvergence": "finite fit with final raw-gradient infinity norm > 0.001",
+    "large_common_regret_flag": "common objective regret > 0.002; operational threshold, not an optimizer failure or statistical test",
+    "large_parameter_error_flag": "standardized seven-parameter RMSE > 0.5; operational threshold",
+    "numerical_failure": "exception, nonfinite objective/gradient/parameters"
+  },
+  "input_template": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5/2023_july_st_circulant/sim_july2023_st_circulant_gridded.pkl",
+  "methods": [
+    "M3_fft",
+    "M3_fft_Q",
+    "M3_fft_JKQ"
+  ],
+  "nuisance_scenarios": [
+    "oracle_start"
+  ],
+  "script": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/real_data/advection_direction/synthetic_m3_q_jkq_fullfit_confirmatory_090126.py",
+  "signal_regimes": {
+    "reference": {
+      "nugget_factor": 1.0,
+      "range_time_factor": 1.0
+    }
+  }
+}

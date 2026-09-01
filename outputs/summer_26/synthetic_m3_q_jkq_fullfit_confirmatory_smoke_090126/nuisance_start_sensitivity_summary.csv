@@ -1,0 +1,4 @@
+method,n_datasets,mean_trace_start_variance,median_trace_start_variance,p90_trace_start_variance
+M3_fft,1,,,
+M3_fft_JKQ,1,,,
+M3_fft_Q,1,,,

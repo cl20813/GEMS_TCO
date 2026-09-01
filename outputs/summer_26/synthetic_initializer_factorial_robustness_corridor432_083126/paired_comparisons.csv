@@ -1,0 +1,11 @@
+baseline,competitor,metric,n_pairs,mean_paired_difference_new_minus_base,median_paired_difference_new_minus_base,paired_win_rate_lower_is_better,cluster_bootstrap_ci_low,cluster_bootstrap_ci_high
+M3_empirical,M3_fft_subgrid,common_nll_regret,120,-0.0000166310,-0.0000053542,0.6000000000,-0.0000844010,0.0000489797
+M3_empirical,M3_fft_subgrid,final_standardized_rmse_7param,120,0.0009318387,0.0002523672,0.4916666667,-0.0088235000,0.0104323253
+M3_empirical,M3_fft_subgrid,final_seed_error_euclid,120,-0.0002398366,-0.0000520167,0.5166666667,-0.0009804949,0.0005391022
+M3_empirical,M3_fft_subgrid,final_fit_s,120,0.0068853798,-0.0162391045,0.5583333333,-0.0268083550,0.0434738265
+M3_empirical,M3_fft_subgrid,end_to_end_s,120,-0.0790546292,-0.0971868550,0.8083333333,-0.1110869422,-0.0431959916
+M3_empirical,M3_reverseL_s2,common_nll_regret,120,0.0009365199,-0.0000013688,0.5333333333,0.0003235187,0.0016568372
+M3_empirical,M3_reverseL_s2,final_standardized_rmse_7param,120,0.0649517129,-0.0006818727,0.5250000000,0.0079044286,0.1359399225
+M3_empirical,M3_reverseL_s2,final_seed_error_euclid,120,0.0371099079,-0.0001321541,0.5083333333,0.0092595185,0.0789529157
+M3_empirical,M3_reverseL_s2,final_fit_s,120,0.0278650893,-0.0014002295,0.5166666667,-0.0173387445,0.0799691073
+M3_empirical,M3_reverseL_s2,end_to_end_s,120,0.6438598871,0.6001064175,0.0083333333,0.5905577585,0.7072047781

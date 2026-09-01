@@ -30,6 +30,12 @@ VALLEY_BANK = ROOT / "valley_bank"
 VALLEY_BANK.mkdir(parents=True, exist_ok=True)
 BLACKROCK = ROOT / "blackrock"
 BLACKROCK.mkdir(parents=True, exist_ok=True)
+BLACKROCK_SAE = ROOT / "blackrock_systematic_active_equity"
+BLACKROCK_SAE.mkdir(parents=True, exist_ok=True)
+RADIX_TRADING = ROOT / "radix_trading"
+RADIX_TRADING.mkdir(parents=True, exist_ok=True)
+THREE_RED_PARTNERS = ROOT / "3red_partners"
+THREE_RED_PARTNERS.mkdir(parents=True, exist_ok=True)
 UPSTART = ROOT / "upstart"
 UPSTART.mkdir(parents=True, exist_ok=True)
 AKUNA_CAPITAL = ROOT / "akuna_capital"
@@ -40,6 +46,34 @@ GOLDMAN_CORE_PLANNING = ROOT / "goldman_sachs_core_planning"
 GOLDMAN_CORE_PLANNING.mkdir(parents=True, exist_ok=True)
 WALLEYE_SINGLE_STOCK_VOL = ROOT / "walleye_single_stock_volatility"
 WALLEYE_SINGLE_STOCK_VOL.mkdir(parents=True, exist_ok=True)
+SENTILINK = ROOT / "sentilink"
+SENTILINK.mkdir(parents=True, exist_ok=True)
+TEZA_TECHNOLOGIES = ROOT / "teza_technologies"
+TEZA_TECHNOLOGIES.mkdir(parents=True, exist_ok=True)
+FREDDIE_MAC = ROOT / "freddie_mac"
+FREDDIE_MAC.mkdir(parents=True, exist_ok=True)
+OPENAI_SAFETY = ROOT / "openai_safety"
+OPENAI_SAFETY.mkdir(parents=True, exist_ok=True)
+CAPITAL_ONE_MODEL_RISK = ROOT / "capital_one_model_risk_audit"
+CAPITAL_ONE_MODEL_RISK.mkdir(parents=True, exist_ok=True)
+CAPITAL_ONE_QUANT_MODELER = ROOT / "capital_one_principal_quant_modeler"
+CAPITAL_ONE_QUANT_MODELER.mkdir(parents=True, exist_ok=True)
+WELLS_FARGO_QA_2027 = ROOT / "wells_fargo_qa_program_2027"
+WELLS_FARGO_QA_2027.mkdir(parents=True, exist_ok=True)
+TOWER_RESEARCH = ROOT / "tower_research_capital"
+TOWER_RESEARCH.mkdir(parents=True, exist_ok=True)
+IMC_TRADING = ROOT / "imc_trading"
+IMC_TRADING.mkdir(parents=True, exist_ok=True)
+NEW_YORK_LIFE = ROOT / "new_york_life"
+NEW_YORK_LIFE.mkdir(parents=True, exist_ok=True)
+VOLEON = ROOT / "voleon"
+VOLEON.mkdir(parents=True, exist_ok=True)
+STATE_STREET = ROOT / "state_street"
+STATE_STREET.mkdir(parents=True, exist_ok=True)
+LIBERTY_MUTUAL = ROOT / "liberty_mutual"
+LIBERTY_MUTUAL.mkdir(parents=True, exist_ok=True)
+VIRTU_FINANCIAL = ROOT / "virtu_financial"
+VIRTU_FINANCIAL.mkdir(parents=True, exist_ok=True)
 
 FONT = "Arial"
 BLACK = RGBColor(0x11, 0x11, 0x11)
@@ -2415,6 +2449,225 @@ def build_blackrock_resume():
     return out
 
 
+def build_blackrock_sae_resume():
+    doc = Document()
+    width = set_cell_free_document_defaults(doc, margin_x=0.68, margin_top=0.50, margin_bottom=0.50)
+    configure_styles(doc, body_size=9.7, body_line=1.0)
+    num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - BlackRock Systematic Active Equity Quantitative Researcher Resume",
+        "Targeted resume for Associate, Quantitative Researcher - Systematic Active Equity at BlackRock",
+        "systematic investing, quantitative research, hypothesis testing, econometrics, machine learning, simulation, "
+        "large datasets, research pipelines, model evaluation, Python",
+    )
+
+    add_name_header(doc, compact=True)
+
+    add_section_heading(doc, "Summary", compact=True)
+    add_body_paragraph(
+        doc,
+        "Statistics Ph.D. candidate and quantitative researcher specializing in hypothesis-driven empirical research, "
+        "scalable likelihood-based modeling, econometrics, machine learning, simulation, and statistical diagnostics. "
+        "Builds reproducible Python/PyTorch pipelines for large, complex datasets and evaluates when apparent signals "
+        "reflect persistent structure versus noise or model misspecification. Brings financial-services experience and "
+        "a strong interest in systematic equity research.",
+        9.8,
+        after=1.0,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Education", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
+        "Expected May 2027  |  GPA: 3.8/4.0",
+        width,
+        9.65,
+        after=0.35,
+        keep_with_next=False,
+    )
+    add_tabbed_line(
+        doc,
+        "M.S. in Statistics, University of Minnesota, Minneapolis, MN",
+        "Sep 2021  |  GPA: 3.7/4.0",
+        width,
+        9.65,
+        after=0.35,
+        keep_with_next=False,
+    )
+
+    add_section_heading(doc, "Technical Skills", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Programming and Research Systems: ",
+        "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), SQL, C++/pybind11 integration, Linux, "
+        "Git, AWS EC2, HPC/SLURM; CPU/GPU computing and restartable analytical pipelines",
+        9.4,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Quantitative Research: ",
+        "Hypothesis testing, econometrics, regression, GLM/GBM, machine learning, stochastic processes, MLE/GLS, "
+        "Monte Carlo simulation, numerical optimization, spectral analysis, feature attribution, model selection, "
+        "validation, sensitivity analysis, and performance evaluation",
+        9.4,
+        after=0.35,
+    )
+
+    add_section_heading(doc, "Experience", compact=True)
+    add_tabbed_line(
+        doc,
+        "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review",
+        "Summer 2026",
+        width,
+        9.45,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed and validated a Sequential Probability Ratio Test for binary risk indicators, converting a "
+        "monitoring question into explicit hypotheses, likelihood-ratio boundaries, and controlled sequential decisions.",
+        num_id,
+        9.3,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Combined Brownian-motion approximation, dynamic-programming probability propagation, and simulation to "
+        "evaluate boundary-crossing probabilities, stopping behavior, Type I/II error, and early-decision tradeoffs.",
+        num_id,
+        9.3,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Travelers - Data Science Leadership Program, Business Insurance Pricing Team",
+        "Summer 2025",
+        width,
+        9.45,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed an end-to-end LightGBM pipeline across 2.46M+ records, including data preparation, feature "
+        "processing, GLM benchmarking, model selection, validation, and performance diagnostics on AWS EC2.",
+        num_id,
+        9.3,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Evaluated predictive performance and feature-attribution patterns and presented pricing and risk-segmentation "
+        "recommendations to business stakeholders.",
+        num_id,
+        9.3,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Quantitative Research and Markets", compact=True)
+    add_tabbed_line(
+        doc,
+        "IMC Prosperity Algorithmic Trading Competition - Top 2.39% of Participants",
+        "Apr 2025",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Built and evaluated a market-making strategy using market-based fair-value estimation, inventory-aware "
+        "quoting, rolling-window exposure controls, and benchmark-driven performance analysis.",
+        num_id,
+        9.25,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Ph.D. Dissertation Research - Scalable Statistical Research and Diagnostics",
+        "Sep 2024 - Present",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Scalable Statistical Modeling: Developed an advection-aware Vecchia likelihood approximation for "
+        "nonseparable Gaussian processes, replacing dense covariance operations with ordered local conditioning to "
+        "fit up to 145,008 observations per day.",
+        num_id,
+        9.15,
+        after=0.45,
+        line=1.0,
+        bold_lead="Scalable Statistical Modeling:",
+    )
+    add_bullet(
+        doc,
+        "Hypothesis Evaluation and Diagnostics: Designed simulation studies and scale- and frequency-resolved tools "
+        "to distinguish persistent dependence from low-frequency misspecification, high-frequency noise, and data artifacts.",
+        num_id,
+        9.15,
+        after=0.45,
+        line=1.0,
+        bold_lead="Hypothesis Evaluation and Diagnostics:",
+    )
+    add_bullet(
+        doc,
+        "Research Pipeline: Built reusable Python/PyTorch workflows for data-quality filtering, missingness tracking, "
+        "time-dependent alignment, estimation, simulation, cached outputs, and restartable CPU/GPU and HPC execution; "
+        "integrated compiled C++ routines through pybind11.",
+        num_id,
+        9.15,
+        after=0.55,
+        line=1.0,
+        bold_lead="Research Pipeline:",
+    )
+    add_tabbed_line(
+        doc,
+        "Econometrics Project - Earned Income Tax Credit and Household Labor Supply",
+        "Graduate Research",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Estimated the effect of the Earned Income Tax Credit on household labor supply using fixed-effects "
+        "regression and propensity-score matching with observed household covariates.",
+        num_id,
+        9.15,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Additional", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Coursework: ",
+        "Econometrics, Machine Learning, Probability Theory, Stochastic Processes, Statistical Computing, "
+        "Advanced Theory of Statistics I-II, Data Structures and Algorithms, Linear Algebra",
+        9.05,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Languages: ",
+        "Korean (Native); English (Fluent); Chinese (Basic)",
+        9.05,
+        after=0,
+    )
+
+    out = BLACKROCK_SAE / "Joonwon_Lee_BlackRock_SAE_Resume.docx"
+    doc.save(out)
+    return out
+
+
 def build_upstart_resume():
     doc = Document()
     width = set_cell_free_document_defaults(doc, margin_x=0.60, margin_top=0.50, margin_bottom=0.50)
@@ -2846,7 +3099,7 @@ def build_jpmorgan_spg_qtr_resume():
     add_tabbed_line(
         doc,
         "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
-        "Expected Jan 2027  |  GPA: 3.8/4.0",
+        "Expected May 2027  |  GPA: 3.8/4.0",
         width,
         9.5,
         after=0.35,
@@ -3058,7 +3311,7 @@ def build_goldman_core_planning_resume():
     add_tabbed_line(
         doc,
         "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
-        "Expected Jan 2027  |  GPA: 3.8/4.0",
+        "Expected May 2027  |  GPA: 3.8/4.0",
         width,
         9.5,
         after=0.35,
@@ -3268,7 +3521,7 @@ def build_walleye_single_stock_vol_resume():
     add_tabbed_line(
         doc,
         "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
-        "Expected Jan 2027  |  GPA: 3.8/4.0",
+        "Expected May 2027  |  GPA: 3.8/4.0",
         width,
         9.5,
         after=0.35,
@@ -3440,6 +3693,3129 @@ def build_walleye_single_stock_vol_resume():
     )
 
     out = WALLEYE_SINGLE_STOCK_VOL / "Joonwon_Lee_Walleye_Single_Stock_Volatility_Quantitative_Researcher_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_sentilink_resume():
+    doc = Document()
+    width = set_cell_free_document_defaults(doc, margin_x=0.70, margin_top=0.52, margin_bottom=0.52)
+    configure_styles(doc, body_size=9.8, body_line=1.01)
+    num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - SentiLink Quantitative Researcher Resume",
+        "Targeted resume for Quantitative Researcher, PhD New Grad at SentiLink",
+        "applied machine learning, financial risk, model development, data quality, root-cause analysis, "
+        "statistical testing, Python, scalable research engineering",
+    )
+
+    add_name_header(doc, compact=True)
+
+    add_section_heading(doc, "Summary", compact=True)
+    add_body_paragraph(
+        doc,
+        "Statistics Ph.D. candidate and applied quantitative researcher with experience developing and validating "
+        "machine-learning and statistical models for financial risk, insurance pricing, and large, noisy dependent "
+        "data. Builds reproducible Python/PyTorch workflows spanning data quality, feature processing, model training, "
+        "simulation, diagnostics, and monitoring, and translates ambiguous problems into testable model specifications "
+        "and clear recommendations.",
+        9.9,
+        after=1.0,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Education", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
+        "Expected May 2027  |  GPA: 3.8/4.0",
+        width,
+        9.7,
+        after=0.35,
+        keep_with_next=False,
+    )
+    add_tabbed_line(
+        doc,
+        "M.S. in Statistics, University of Minnesota, Minneapolis, MN",
+        "Sep 2021  |  GPA: 3.7/4.0",
+        width,
+        9.7,
+        after=0.35,
+        keep_with_next=False,
+    )
+
+    add_section_heading(doc, "Technical Skills", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Programming and Platforms: ",
+        "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), SQL, C++/pybind11 integration, "
+        "Linux, Git, AWS EC2, HPC/SLURM; CPU/GPU computing and restartable analytical pipelines",
+        9.5,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Machine Learning and Statistics: ",
+        "Supervised learning, GLM/GBM, regression, feature processing and attribution, model selection and validation, "
+        "hypothesis testing, Monte Carlo simulation, stochastic processes, data-quality diagnostics, and numerical optimization",
+        9.5,
+        after=0.35,
+    )
+
+    add_section_heading(doc, "Experience", compact=True)
+    add_tabbed_line(
+        doc,
+        "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review",
+        "Summer 2026",
+        width,
+        9.5,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed and validated a Sequential Probability Ratio Test for binary risk indicators, translating a "
+        "monitoring requirement into explicit hypotheses, likelihood-ratio boundaries, and controlled stopping decisions.",
+        num_id,
+        9.4,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Combined Brownian-motion approximation, dynamic-programming probability propagation, and simulation to "
+        "evaluate boundary-crossing probabilities, stopping behavior, Type I/II error, and model limitations.",
+        num_id,
+        9.4,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Travelers - Data Science Leadership Program, Business Insurance Pricing Team",
+        "Summer 2025",
+        width,
+        9.5,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed an end-to-end LightGBM pricing pipeline across 2.46M+ records, including data preparation, "
+        "feature processing, GLM benchmarking, model selection, validation, and performance diagnostics on AWS EC2.",
+        num_id,
+        9.4,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Analyzed model performance and feature-attribution patterns and presented pricing and risk-segmentation "
+        "recommendations to business stakeholders.",
+        num_id,
+        9.4,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Applied Research and Engineering", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. Dissertation Research - Scalable Model Development, Data Quality, and Diagnostics",
+        "Sep 2024 - Present",
+        width,
+        9.45,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Scalable Modeling: Developed an advection-aware Vecchia likelihood approximation for nonseparable Gaussian "
+        "processes, replacing dense covariance operations with ordered local conditioning to fit up to 145,008 observations per day.",
+        num_id,
+        9.3,
+        after=0.45,
+        line=1.0,
+        bold_lead="Scalable Modeling:",
+    )
+    add_bullet(
+        doc,
+        "Data Quality and Root-Cause Analysis: Built workflows for quality filtering, missingness tracking, "
+        "time-dependent coordinate offsets, nearest-neighbor center matching, and regular-grid construction to "
+        "separate systematic measurement artifacts from statistical model failures.",
+        num_id,
+        9.3,
+        after=0.45,
+        line=1.0,
+        bold_lead="Data Quality and Root-Cause Analysis:",
+    )
+    add_bullet(
+        doc,
+        "Model Evaluation and Monitoring: Designed scale- and frequency-resolved diagnostics to localize whether "
+        "misspecification arises from low-frequency structure, high-frequency behavior, noise, or dependence.",
+        num_id,
+        9.3,
+        after=0.45,
+        line=1.0,
+        bold_lead="Model Evaluation and Monitoring:",
+    )
+    add_bullet(
+        doc,
+        "Research Engineering: Implemented reusable Python/PyTorch pipelines with CPU/GPU execution, cached "
+        "artifacts, and restartable HPC jobs; integrated compiled C++ ordering routines through pybind11.",
+        num_id,
+        9.3,
+        after=0.6,
+        line=1.0,
+        bold_lead="Research Engineering:",
+    )
+
+    add_section_heading(doc, "Additional", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Coursework: ",
+        "Machine Learning, Probability Theory, Stochastic Processes, Statistical Computing, Advanced Theory of "
+        "Statistics I-II, Data Structures and Algorithms, Linear Algebra, Econometrics",
+        9.15,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Languages: ",
+        "Korean (Native); English (Fluent); Chinese (Basic)",
+        9.15,
+        after=0,
+    )
+
+    out = SENTILINK / "Joonwon_Lee_SentiLink_Quantitative_Researcher_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_teza_technologies_resume():
+    doc = Document()
+    width = set_cell_free_document_defaults(doc, margin_x=0.68, margin_top=0.50, margin_bottom=0.50)
+    configure_styles(doc, body_size=9.7, body_line=1.0)
+    num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Teza Technologies Quantitative Researcher PhD Resume",
+        "Targeted resume for Quantitative Researcher, PhD at Teza Technologies",
+        "quantitative research, systematic trading, market making, stochastic modeling, time-series analysis, "
+        "hypothesis testing, machine learning, research infrastructure, Python",
+    )
+
+    add_name_header(doc, compact=True)
+
+    add_section_heading(doc, "Summary", compact=True)
+    add_body_paragraph(
+        doc,
+        "Statistics Ph.D. candidate and quantitative researcher specializing in time-dependent stochastic modeling, "
+        "scalable likelihood-based inference, hypothesis testing, simulation, machine learning, and statistical "
+        "diagnostics. Builds reproducible Python/PyTorch research infrastructure for large, granular datasets and has "
+        "hands-on market-making strategy experience with fair-value estimation, inventory-aware quoting, and systematic risk controls.",
+        9.8,
+        after=1.0,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Education", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
+        "Expected May 2027  |  GPA: 3.8/4.0",
+        width,
+        9.65,
+        after=0.35,
+        keep_with_next=False,
+    )
+    add_tabbed_line(
+        doc,
+        "M.S. in Statistics, University of Minnesota, Minneapolis, MN",
+        "Sep 2021  |  GPA: 3.7/4.0",
+        width,
+        9.65,
+        after=0.35,
+        keep_with_next=False,
+    )
+
+    add_section_heading(doc, "Technical Skills", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Programming and Research Systems: ",
+        "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), C++/pybind11 integration, SQL, "
+        "Linux, Git, AWS EC2, HPC/SLURM; CPU/GPU computing and restartable analytical pipelines",
+        9.4,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Quantitative Research: ",
+        "Stochastic processes, time-series and spatiotemporal modeling, Gaussian processes, MLE/GLS, Monte Carlo "
+        "simulation, numerical optimization, regression and machine learning, spectral methods, hypothesis testing, "
+        "feature evaluation, model diagnostics and validation",
+        9.4,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Trading Research: ",
+        "Fair-value estimation, market making, inventory-aware quoting, rolling-window risk monitoring, and "
+        "soft/hard liquidation controls",
+        9.4,
+        after=0.35,
+    )
+
+    add_section_heading(doc, "Experience", compact=True)
+    add_tabbed_line(
+        doc,
+        "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review",
+        "Summer 2026",
+        width,
+        9.45,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed and validated a Sequential Probability Ratio Test for binary risk indicators, translating a "
+        "monitoring problem into explicit hypotheses, likelihood-ratio boundaries, and statistically controlled stopping rules.",
+        num_id,
+        9.3,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Applied Brownian-motion approximation, dynamic-programming probability propagation, and simulation to "
+        "evaluate boundary-crossing probabilities, stopping behavior, Type I/II error, and early-decision tradeoffs.",
+        num_id,
+        9.3,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Travelers - Data Science Leadership Program, Business Insurance Pricing Team",
+        "Summer 2025",
+        width,
+        9.45,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed an end-to-end LightGBM pipeline across 2.46M+ records, including data preparation, feature "
+        "processing, GLM benchmarking, model selection, validation, and performance diagnostics on AWS EC2.",
+        num_id,
+        9.3,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Evaluated model performance and feature-attribution patterns and presented pricing and risk-segmentation "
+        "recommendations to business stakeholders.",
+        num_id,
+        9.3,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Quantitative Research and Trading", compact=True)
+    add_tabbed_line(
+        doc,
+        "IMC Prosperity Algorithmic Trading Competition - Top 2.39% of Participants",
+        "Apr 2025",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Built and evaluated a market-making strategy combining market-based fair-value estimation with "
+        "inventory-aware quoting.",
+        num_id,
+        9.25,
+        after=0.45,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Implemented rolling-window exposure controls that penalized persistent inventory and triggered soft/hard "
+        "liquidation to limit position risk.",
+        num_id,
+        9.25,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Ph.D. Dissertation Research - Scalable Stochastic Modeling and Diagnostics",
+        "Sep 2024 - Present",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Scalable Modeling: Developed an advection-aware Vecchia likelihood approximation for nonseparable "
+        "Gaussian processes, replacing dense covariance operations with ordered local conditioning to fit up to "
+        "145,008 observations per day.",
+        num_id,
+        9.2,
+        after=0.45,
+        line=1.0,
+        bold_lead="Scalable Modeling:",
+    )
+    add_bullet(
+        doc,
+        "Frequency-Resolved Model Diagnostics: Designed scale- and frequency-resolved tools to identify whether observed "
+        "model failure arises from low-frequency structure, high-frequency behavior, noise, or dependence.",
+        num_id,
+        9.2,
+        after=0.45,
+        line=1.0,
+        bold_lead="Frequency-Resolved Model Diagnostics:",
+    )
+    add_bullet(
+        doc,
+        "Granular Data Pipeline: Built quality-filtering, missingness-tracking, time-dependent alignment, and "
+        "nearest-neighbor grid-matching workflows to correct systematic measurement and geometry shifts.",
+        num_id,
+        9.2,
+        after=0.45,
+        line=1.0,
+        bold_lead="Granular Data Pipeline:",
+    )
+    add_bullet(
+        doc,
+        "Research Infrastructure: Built reusable Python/PyTorch workflows for estimation, simulation, and restartable "
+        "CPU/GPU and HPC execution; integrated compiled C++ ordering routines "
+        "through pybind11.",
+        num_id,
+        9.2,
+        after=0.6,
+        line=1.0,
+        bold_lead="Research Infrastructure:",
+    )
+
+    add_section_heading(doc, "Additional", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Coursework: ",
+        "Probability Theory, Stochastic Processes, Machine Learning, Linear Algebra, Statistical Computing, "
+        "Advanced Theory of Statistics I-II, Data Structures and Algorithms, Econometrics",
+        9.05,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Languages: ",
+        "Korean (Native); English (Fluent); Chinese (Basic)",
+        9.05,
+        after=0,
+    )
+
+    out = TEZA_TECHNOLOGIES / "Joonwon_Lee_Teza_Quantitative_Researcher_PhD_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_freddie_mac_resume():
+    doc = Document()
+    width = set_cell_free_document_defaults(doc, margin_x=0.72, margin_top=0.52, margin_bottom=0.52)
+    configure_styles(doc, body_size=9.9, body_line=1.01)
+    num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Freddie Mac Quantitative Analytics Senior Resume",
+        "Targeted resume for Quantitative Analytics Senior, Single Family Modeling at Freddie Mac",
+        "predictive modeling, property risk, financial risk, econometrics, machine learning, Monte Carlo simulation, "
+        "optimization, model development, model validation, data processing, Python",
+    )
+
+    add_name_header(doc, compact=True)
+
+    add_section_heading(doc, "Summary", compact=True)
+    add_body_paragraph(
+        doc,
+        "Statistics Ph.D. candidate and quantitative modeler with experience developing and validating predictive and statistical "
+        "models for financial-risk monitoring, commercial property insurance pricing, and large dependent datasets. "
+        "Combines GLM/GBM, econometrics, Monte Carlo simulation, optimization, and statistical diagnostics with "
+        "reproducible Python/PyTorch workflows, translating business and risk questions into independently developed, testable models.",
+        10.0,
+        after=1.0,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Education", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
+        "Expected May 2027  |  GPA: 3.8/4.0",
+        width,
+        9.8,
+        after=0.35,
+        keep_with_next=False,
+    )
+    add_tabbed_line(
+        doc,
+        "M.S. in Statistics, University of Minnesota, Minneapolis, MN",
+        "Sep 2021  |  GPA: 3.7/4.0",
+        width,
+        9.8,
+        after=0.35,
+        keep_with_next=False,
+    )
+
+    add_section_heading(doc, "Technical Skills", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Programming and Data: ",
+        "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), SQL, C++/pybind11 integration, Linux, "
+        "Git, AWS EC2, HPC/SLURM; data cleaning, feature processing, missingness handling, and CPU/GPU computing",
+        9.55,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Modeling and Analytics: ",
+        "Predictive modeling, GLM/GBM, econometrics, machine learning, MLE/GLS, Monte Carlo simulation, numerical "
+        "optimization, hypothesis testing, stochastic processes, model selection, validation, and performance diagnostics",
+        9.55,
+        after=0.35,
+    )
+
+    add_section_heading(doc, "Experience", compact=True)
+    add_tabbed_line(
+        doc,
+        "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review",
+        "Summer 2026",
+        width,
+        9.55,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed and validated a Sequential Probability Ratio Test for binary risk indicators, translating a "
+        "business monitoring requirement into explicit hypotheses, likelihood-ratio boundaries, and controlled stopping decisions.",
+        num_id,
+        9.45,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Combined Brownian-motion approximation, dynamic-programming probability propagation, and Monte Carlo "
+        "simulation to evaluate boundary-crossing probabilities, stopping behavior, Type I/II error, and model limitations.",
+        num_id,
+        9.45,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Travelers - Data Science Leadership Program, Business Insurance Pricing Team",
+        "Summer 2025",
+        width,
+        9.55,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed an end-to-end LightGBM pricing pipeline across 2.46M+ commercial property-risk records, including "
+        "data preparation, feature processing, GLM benchmarking, model selection, validation, and diagnostics on AWS EC2.",
+        num_id,
+        9.45,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Evaluated predictive performance and feature-attribution patterns and presented pricing and risk-segmentation "
+        "recommendations to business stakeholders.",
+        num_id,
+        9.45,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Quantitative Modeling and Research", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. Dissertation Research - Scalable Model Development and Diagnostics",
+        "Sep 2024 - Present",
+        width,
+        9.5,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Independent Model Development: Developed an advection-aware Vecchia likelihood approximation for "
+        "nonseparable Gaussian processes, replacing dense covariance operations with ordered local conditioning to "
+        "fit up to 145,008 observations per day.",
+        num_id,
+        9.35,
+        after=0.45,
+        line=1.0,
+        bold_lead="Independent Model Development:",
+    )
+    add_bullet(
+        doc,
+        "Data Processing and Cleaning: Built workflows for quality filtering, missingness tracking, time-dependent "
+        "coordinate offsets, nearest-neighbor center matching, and regular-grid construction to correct systematic measurement shifts.",
+        num_id,
+        9.35,
+        after=0.45,
+        line=1.0,
+        bold_lead="Data Processing and Cleaning:",
+    )
+    add_bullet(
+        doc,
+        "Model Evaluation: Designed simulation studies and frequency-resolved diagnostics to identify whether "
+        "misspecification arises from low-frequency structure, high-frequency behavior, noise, or dependence.",
+        num_id,
+        9.35,
+        after=0.45,
+        line=1.0,
+        bold_lead="Model Evaluation:",
+    )
+    add_bullet(
+        doc,
+        "Scalable Research Engineering: Implemented reusable Python/PyTorch pipelines with GLS profiling, L-BFGS "
+        "optimization, CPU/GPU execution, cached artifacts, and restartable HPC jobs; integrated C++ routines through pybind11.",
+        num_id,
+        9.35,
+        after=0.6,
+        line=1.0,
+        bold_lead="Scalable Research Engineering:",
+    )
+    add_tabbed_line(
+        doc,
+        "Econometrics Project - Earned Income Tax Credit and Household Labor Supply",
+        "Graduate Research",
+        width,
+        9.5,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Estimated the effect of the Earned Income Tax Credit on household labor supply using fixed-effects "
+        "regression and propensity-score matching with observed household covariates.",
+        num_id,
+        9.35,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Additional", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Coursework: ",
+        "Econometrics, Machine Learning, Probability Theory, Stochastic Processes, Statistical Computing, "
+        "Advanced Theory of Statistics I-II, Data Structures and Algorithms, Linear Algebra",
+        9.2,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Languages: ",
+        "Korean (Native); English (Fluent); Chinese (Basic)",
+        9.2,
+        after=0,
+    )
+
+    out = FREDDIE_MAC / "Joonwon_Lee_Freddie_Mac_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_radix_trading_resume():
+    doc = Document()
+    width = set_cell_free_document_defaults(doc, margin_x=0.68, margin_top=0.50, margin_bottom=0.50)
+    configure_styles(doc, body_size=9.7, body_line=1.0)
+    num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Radix Trading Quantitative Researcher Resume",
+        "Targeted resume for Quantitative Researcher, Full-Time PhD+ at Radix Trading",
+        "quantitative research, probabilistic thinking, signal and noise, hypothesis testing, simulation, "
+        "market making, research framework, Python, C++ integration",
+    )
+
+    add_name_header(doc, compact=True)
+
+    add_section_heading(doc, "Summary", compact=True)
+    add_body_paragraph(
+        doc,
+        "Statistics Ph.D. candidate and quantitative researcher specializing in probabilistic modeling, scalable "
+        "likelihood-based inference, hypothesis testing, simulation, and signal-versus-noise diagnostics. Builds "
+        "reproducible Python/PyTorch research frameworks for large, complex datasets, rapidly tests empirical ideas, "
+        "and adapts models when evidence reveals noise, misspecification, or changing dependence. Brings hands-on "
+        "market-making strategy experience and a strong interest in research-driven trading.",
+        9.8,
+        after=1.0,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Education", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
+        "Expected May 2027  |  GPA: 3.8/4.0",
+        width,
+        9.65,
+        after=0.35,
+        keep_with_next=False,
+    )
+    add_tabbed_line(
+        doc,
+        "M.S. in Statistics, University of Minnesota, Minneapolis, MN",
+        "Sep 2021  |  GPA: 3.7/4.0",
+        width,
+        9.65,
+        after=0.35,
+        keep_with_next=False,
+    )
+
+    add_section_heading(doc, "Technical Skills", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Programming and Research Systems: ",
+        "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), C++/pybind11 integration, SQL, Linux, "
+        "Git, AWS EC2, HPC/SLURM; CPU/GPU computing, cached artifacts, and restartable analytical pipelines",
+        9.4,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Quantitative Research: ",
+        "Probability and stochastic processes, hypothesis testing, MLE/GLS, Monte Carlo simulation, numerical "
+        "optimization, Gaussian processes, time-series and spatiotemporal modeling, regression and machine learning, "
+        "spectral analysis, model selection, validation, and sensitivity analysis",
+        9.4,
+        after=0.35,
+    )
+
+    add_section_heading(doc, "Experience", compact=True)
+    add_tabbed_line(
+        doc,
+        "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review",
+        "Summer 2026",
+        width,
+        9.45,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed and validated a Sequential Probability Ratio Test for binary risk indicators, converting a "
+        "monitoring problem into explicit hypotheses, likelihood-ratio boundaries, and controlled sequential decisions.",
+        num_id,
+        9.3,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Combined Brownian-motion approximation, dynamic-programming probability propagation, and simulation to "
+        "evaluate boundary-crossing probabilities, stopping behavior, Type I/II error, and early-decision tradeoffs.",
+        num_id,
+        9.3,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Travelers - Data Science Leadership Program, Business Insurance Pricing Team",
+        "Summer 2025",
+        width,
+        9.45,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed an end-to-end LightGBM pipeline across 2.46M+ records, including data preparation, feature "
+        "processing, GLM benchmarking, model selection, validation, and performance diagnostics on AWS EC2.",
+        num_id,
+        9.3,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Evaluated model performance and feature-attribution patterns and translated findings into pricing and "
+        "risk-segmentation recommendations for business stakeholders.",
+        num_id,
+        9.3,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Quantitative Research and Trading", compact=True)
+    add_tabbed_line(
+        doc,
+        "IMC Prosperity Algorithmic Trading Competition - Top 2.39% of Participants",
+        "Apr 2025",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Built and evaluated a market-making strategy using market-based fair-value estimation and inventory-aware quoting.",
+        num_id,
+        9.25,
+        after=0.45,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Implemented rolling-window exposure controls that penalized persistent inventory and triggered soft/hard "
+        "liquidation to limit position risk.",
+        num_id,
+        9.25,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Ph.D. Dissertation Research - Scalable Probabilistic Modeling and Diagnostics",
+        "Sep 2024 - Present",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Probabilistic Modeling: Developed an advection-aware Vecchia likelihood approximation for nonseparable "
+        "Gaussian processes, using ordered conditional models to fit up to 145,008 observations per day.",
+        num_id,
+        9.15,
+        after=0.45,
+        line=1.0,
+        bold_lead="Probabilistic Modeling:",
+    )
+    add_bullet(
+        doc,
+        "Signal-versus-Noise Diagnostics: Designed simulation studies and scale- and frequency-resolved tools to "
+        "determine whether apparent structure reflects persistent dependence, noise, missingness, or model misspecification.",
+        num_id,
+        9.15,
+        after=0.45,
+        line=1.0,
+        bold_lead="Signal-versus-Noise Diagnostics:",
+    )
+    add_bullet(
+        doc,
+        "Research Framework: Built reusable Python/PyTorch workflows for data-quality filtering, missingness tracking, "
+        "time-dependent alignment, estimation, simulation, cached outputs, and restartable CPU/GPU and HPC execution.",
+        num_id,
+        9.15,
+        after=0.45,
+        line=1.0,
+        bold_lead="Research Framework:",
+    )
+    add_bullet(
+        doc,
+        "Performance Engineering: Integrated compiled C++ max-min ordering routines into the Python research pipeline "
+        "through pybind11 for performance-critical dependency ordering.",
+        num_id,
+        9.15,
+        after=0.6,
+        line=1.0,
+        bold_lead="Performance Engineering:",
+    )
+
+    add_section_heading(doc, "Additional", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Coursework: ",
+        "Probability Theory, Stochastic Processes, Machine Learning, Linear Algebra, Statistical Computing, "
+        "Advanced Theory of Statistics I-II, Data Structures and Algorithms, Econometrics",
+        9.05,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Languages: ",
+        "Korean (Native); English (Fluent); Chinese (Basic)",
+        9.05,
+        after=0,
+    )
+
+    out = RADIX_TRADING / "Joonwon_Lee_Radix_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_3red_partners_resume():
+    doc = Document()
+    width = set_cell_free_document_defaults(doc, margin_x=0.68, margin_top=0.50, margin_bottom=0.50)
+    configure_styles(doc, body_size=9.7, body_line=1.0)
+    num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - 3Red Partners Graduate Quantitative Researcher Resume",
+        "Targeted resume for Graduate Quantitative Researcher, 2027 Incoming Graduate at 3Red Partners",
+        "quantitative research, trading strategies, statistical modeling, machine learning, hypothesis testing, "
+        "Python, C++ integration, research pipelines, performance evaluation",
+    )
+
+    add_name_header(doc, compact=True)
+
+    add_section_heading(doc, "Summary", compact=True)
+    add_body_paragraph(
+        doc,
+        "Statistics Ph.D. candidate and quantitative researcher specializing in probabilistic modeling, hypothesis "
+        "testing, simulation, machine learning, and signal-versus-noise diagnostics. Builds reproducible Python/PyTorch "
+        "research pipelines for large datasets, integrates compiled C++ routines for performance-critical components, "
+        "and evaluates models through controlled experiments and performance diagnostics. Brings two financial-services "
+        "internships and hands-on market-making strategy experience.",
+        9.8,
+        after=1.0,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Education", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
+        "Expected May 2027  |  GPA: 3.8/4.0",
+        width,
+        9.65,
+        after=0.35,
+        keep_with_next=False,
+    )
+    add_tabbed_line(
+        doc,
+        "M.S. in Statistics, University of Minnesota, Minneapolis, MN",
+        "Sep 2021  |  GPA: 3.7/4.0",
+        width,
+        9.65,
+        after=0.35,
+        keep_with_next=False,
+    )
+
+    add_section_heading(doc, "Technical Skills", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Programming and Research Systems: ",
+        "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), C++/pybind11 integration, SQL, Linux, "
+        "Git, AWS EC2, HPC/SLURM; CPU/GPU computing, cached artifacts, and restartable analytical pipelines",
+        9.4,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Quantitative Methods: ",
+        "Probability and stochastic processes, hypothesis testing, MLE/GLS, Monte Carlo simulation, numerical "
+        "optimization, time-series and spatiotemporal modeling, regression, GLM/GBM, machine learning, spectral "
+        "analysis, model selection, validation, feature attribution, and performance evaluation",
+        9.4,
+        after=0.35,
+    )
+
+    add_section_heading(doc, "Quantitative Industry Experience", compact=True)
+    add_tabbed_line(
+        doc,
+        "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review",
+        "Summer 2026",
+        width,
+        9.45,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed and validated a Sequential Probability Ratio Test for binary risk indicators, converting a "
+        "monitoring problem into explicit hypotheses, likelihood-ratio boundaries, and controlled sequential decisions.",
+        num_id,
+        9.3,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Combined Brownian-motion approximation, dynamic-programming probability propagation, and simulation to "
+        "evaluate boundary-crossing probabilities, stopping behavior, Type I/II error, and early-decision tradeoffs.",
+        num_id,
+        9.3,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Travelers - Data Science Leadership Program, Business Insurance Pricing Team",
+        "Summer 2025",
+        width,
+        9.45,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed an end-to-end LightGBM pipeline across 2.46M+ records, including data preparation, feature "
+        "processing, GLM benchmarking, model selection, validation, and performance diagnostics on AWS EC2.",
+        num_id,
+        9.3,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Evaluated model performance and feature-attribution patterns and translated findings into pricing and "
+        "risk-segmentation recommendations for business stakeholders.",
+        num_id,
+        9.3,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Quantitative Research and Trading", compact=True)
+    add_tabbed_line(
+        doc,
+        "IMC Prosperity Algorithmic Trading Competition - Top 2.39% of Participants",
+        "Apr 2025",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Built and evaluated a market-making strategy using market-based fair-value estimation and inventory-aware quoting.",
+        num_id,
+        9.25,
+        after=0.45,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Implemented rolling-window exposure controls that penalized persistent inventory and triggered soft/hard "
+        "liquidation to limit position risk.",
+        num_id,
+        9.25,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Ph.D. Dissertation Research - Scalable Probabilistic Modeling and Research Systems",
+        "Sep 2024 - Present",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Scalable Modeling: Developed an advection-aware Vecchia likelihood approximation for nonseparable Gaussian "
+        "processes, using ordered conditional models to fit up to 145,008 observations per day.",
+        num_id,
+        9.15,
+        after=0.45,
+        line=1.0,
+        bold_lead="Scalable Modeling:",
+    )
+    add_bullet(
+        doc,
+        "Empirical Testing and Diagnostics: Designed simulation studies and scale- and frequency-resolved tools to "
+        "determine whether apparent structure reflects persistent dependence, noise, missingness, or misspecification.",
+        num_id,
+        9.15,
+        after=0.45,
+        line=1.0,
+        bold_lead="Empirical Testing and Diagnostics:",
+    )
+    add_bullet(
+        doc,
+        "Research Infrastructure: Built reusable Python/PyTorch workflows for data-quality filtering, time-dependent "
+        "alignment, estimation, simulation, cached outputs, and restartable CPU/GPU and HPC execution.",
+        num_id,
+        9.15,
+        after=0.45,
+        line=1.0,
+        bold_lead="Research Infrastructure:",
+    )
+    add_bullet(
+        doc,
+        "C++ Integration: Integrated compiled C++ max-min ordering routines into the Python pipeline through pybind11 "
+        "for performance-critical dependency ordering.",
+        num_id,
+        9.15,
+        after=0.6,
+        line=1.0,
+        bold_lead="C++ Integration:",
+    )
+
+    add_section_heading(doc, "Additional", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Coursework: ",
+        "Probability Theory, Stochastic Processes, Machine Learning, Linear Algebra, Statistical Computing, "
+        "Advanced Theory of Statistics I-II, Data Structures and Algorithms, Econometrics",
+        9.05,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Languages: ",
+        "Korean (Native); English (Fluent); Chinese (Basic)",
+        9.05,
+        after=0,
+    )
+
+    out = THREE_RED_PARTNERS / "Joonwon_Lee_3Red_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_openai_safety_resume():
+    doc = Document()
+    width = set_cell_free_document_defaults(doc, margin_x=0.68, margin_top=0.50, margin_bottom=0.50)
+    configure_styles(doc, body_size=9.55, body_line=1.0)
+    num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - OpenAI Data Scientist, Safety Resume",
+        "Targeted resume for Data Scientist, Safety at OpenAI",
+        "statistical testing, uncertainty quantification, causal inference, observational analysis, false positives, "
+        "false negatives, noisy data, root-cause diagnostics, Python, machine learning",
+    )
+
+    add_name_header(doc, compact=True)
+
+    add_section_heading(doc, "Summary", compact=True)
+    add_body_paragraph(
+        doc,
+        "Statistics Ph.D. candidate and data scientist specializing in rigorous statistical testing, causal and "
+        "observational analysis, uncertainty quantification, and diagnostics for noisy, incomplete data. Develops "
+        "Python/PyTorch analytical systems that translate ambiguous risk questions into measurable hypotheses, "
+        "quantify false-positive/false-negative tradeoffs, and distinguish systematic data artifacts from model "
+        "failures. Experience communicating model evidence and limitations in financial-risk and insurance settings. "
+        "Available to begin full-time employment in February 2027.",
+        9.65,
+        after=1.0,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Education", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
+        "Expected May 2027  |  GPA: 3.8/4.0",
+        width,
+        9.55,
+        after=0.35,
+        keep_with_next=False,
+    )
+    add_tabbed_line(
+        doc,
+        "M.S. in Statistics, University of Minnesota, Minneapolis, MN",
+        "Sep 2021  |  GPA: 3.7/4.0",
+        width,
+        9.55,
+        after=0.35,
+        keep_with_next=False,
+    )
+
+    add_section_heading(doc, "Technical Skills", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Programming and Data: ",
+        "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), SQL, C++/pybind11 integration, Linux, "
+        "Git, AWS EC2, HPC/SLURM; data cleaning, missing-data workflows, nearest-neighbor matching, and large-scale pipelines",
+        9.25,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Statistical and Causal Methods: ",
+        "Sequential hypothesis testing, Type I/II error analysis, uncertainty quantification, Monte Carlo simulation, "
+        "fixed-effects regression, propensity-score matching, GLM/GBM, machine learning, model validation, diagnostics, "
+        "and performance evaluation",
+        9.25,
+        after=0.35,
+    )
+
+    add_section_heading(doc, "Industry Experience", compact=True)
+    add_tabbed_line(
+        doc,
+        "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review",
+        "Summer 2026",
+        width,
+        9.35,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed and validated a Sequential Probability Ratio Test for binary risk indicators, translating an "
+        "ambiguous monitoring problem into explicit hypotheses, likelihood-ratio boundaries, and controlled decisions.",
+        num_id,
+        9.2,
+        after=0.45,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Combined Brownian-motion approximation, dynamic-programming probability propagation, and simulation to "
+        "quantify boundary-crossing and stopping-time uncertainty, Type I/II error, and early-decision tradeoffs.",
+        num_id,
+        9.2,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Travelers - Data Science Leadership Program, Business Insurance Pricing Team",
+        "Summer 2025",
+        width,
+        9.35,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed an end-to-end LightGBM pipeline across 2.46M+ records, including data preparation, feature "
+        "processing, GLM benchmarking, model selection, validation, and performance diagnostics on AWS EC2.",
+        num_id,
+        9.2,
+        after=0.45,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Translated performance diagnostics and feature-attribution findings into pricing and risk-segmentation "
+        "recommendations for business stakeholders, including clear communication of model limitations.",
+        num_id,
+        9.2,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Statistical Research and Applied Analysis", compact=True)
+    add_tabbed_line(
+        doc,
+        "Longitudinal Observational Study - EITC and Household Labor Supply",
+        "2021",
+        width,
+        9.3,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Estimated the relationship between Earned Income Tax Credit exposure and household labor supply using "
+        "fixed-effects regression and propensity-score matching with household income and demographic covariates; "
+        "defined treatment and comparison groups and interpreted results under observational-study assumptions.",
+        num_id,
+        9.1,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Ph.D. Dissertation Research - Data Quality, Root-Cause Diagnostics, and Scalable Modeling",
+        "Sep 2024 - Present",
+        width,
+        9.3,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Messy-Data Pipeline: Built observation masks, quality filters, spatial-distance thresholds, hour-specific "
+        "longitude offsets, and nearest-neighbor center matching to map incomplete satellite observations onto a regular grid.",
+        num_id,
+        9.05,
+        after=0.4,
+        line=1.0,
+        bold_lead="Messy-Data Pipeline:",
+    )
+    add_bullet(
+        doc,
+        "Root-Cause Diagnostics: Distinguished random measurement noise from systematic acquisition artifacts, including "
+        "scan-geometry trends with distance from instrument nadir and hour-specific coordinate shifts, before attributing "
+        "remaining discrepancies to statistical-model misspecification.",
+        num_id,
+        9.05,
+        after=0.4,
+        line=1.0,
+        bold_lead="Root-Cause Diagnostics:",
+    )
+    add_bullet(
+        doc,
+        "Scalable Modeling: Developed an advection-aware Vecchia likelihood approximation for nonseparable Gaussian "
+        "processes, using ordered conditional models to fit up to 145,008 observations per day in reusable "
+        "Python/PyTorch CPU/GPU and HPC workflows.",
+        num_id,
+        9.05,
+        after=0.6,
+        line=1.0,
+        bold_lead="Scalable Modeling:",
+    )
+
+    add_section_heading(doc, "Additional", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Coursework: ",
+        "Machine Learning, Probability Theory, Stochastic Processes, Statistical Computing, Advanced Theory of "
+        "Statistics I-II, Data Structures and Algorithms, Econometrics",
+        8.95,
+        after=0.25,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Languages: ",
+        "Korean (Native); English (Fluent); Chinese (Basic)",
+        8.95,
+        after=0,
+    )
+
+    out = OPENAI_SAFETY / "Joonwon_Lee_OpenAI_Safety_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_capital_one_model_risk_resume():
+    doc = Document()
+    width = set_cell_free_document_defaults(doc, margin_x=0.68, margin_top=0.50, margin_bottom=0.50)
+    configure_styles(doc, body_size=9.65, body_line=1.0)
+    num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Capital One Model Risk Audit Resume",
+        "Targeted resume for Senior Associate, Data Scientist - Model Risk Audit at Capital One",
+        "model development, model validation, model risk, machine learning, statistical testing, Python, AWS, "
+        "large-scale data, performance diagnostics, stakeholder communication",
+    )
+
+    add_name_header(doc, compact=True)
+
+    add_section_heading(doc, "Summary", compact=True)
+    add_body_paragraph(
+        doc,
+        "Statistics Ph.D. candidate and data scientist with experience in statistical model development, independent "
+        "validation, hypothesis testing, and machine learning across financial risk, insurance pricing, and large-scale "
+        "dependent data. Builds reproducible Python workflows on AWS and HPC, evaluates model assumptions and performance, "
+        "and translates technical findings into clear business and model-risk recommendations.",
+        9.75,
+        after=1.0,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Education", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
+        "Expected May 2027  |  GPA: 3.8/4.0",
+        width,
+        9.6,
+        after=0.35,
+        keep_with_next=False,
+    )
+    add_tabbed_line(
+        doc,
+        "M.S. in Statistics, University of Minnesota, Minneapolis, MN",
+        "Sep 2021  |  GPA: 3.7/4.0",
+        width,
+        9.6,
+        after=0.35,
+        keep_with_next=False,
+    )
+
+    add_section_heading(doc, "Technical Skills", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Programming and Platforms: ",
+        "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), SQL, R, Linux, Git, AWS EC2, HPC/SLURM; "
+        "CPU/GPU computing, cached artifacts, and restartable analytical pipelines",
+        9.35,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Data Science and Model Risk: ",
+        "Statistical model development and validation, hypothesis testing, MLE/GLS, Monte Carlo simulation, regression, "
+        "GLM/GBM, machine learning, time-series and spatiotemporal modeling, model selection, diagnostics, feature "
+        "attribution, and performance evaluation",
+        9.35,
+        after=0.35,
+    )
+
+    add_section_heading(doc, "Industry Experience", compact=True)
+    add_tabbed_line(
+        doc,
+        "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review",
+        "Summer 2026",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed and independently validated a Sequential Probability Ratio Test for binary risk indicators, "
+        "translating a monitoring problem into explicit hypotheses, likelihood-ratio boundaries, and controlled decisions.",
+        num_id,
+        9.25,
+        after=0.45,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Combined Brownian-motion approximation, dynamic-programming probability propagation, and simulation to "
+        "evaluate boundary-crossing probabilities, stopping behavior, Type I/II error, and early-decision tradeoffs; "
+        "documented model assumptions, performance, and limitations.",
+        num_id,
+        9.25,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Travelers - Data Science Leadership Program, Business Insurance Pricing Team",
+        "Summer 2025",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed an end-to-end LightGBM pricing pipeline across 2.46M+ records, including data preparation, feature "
+        "processing, GLM benchmarking, model selection, validation, and performance diagnostics on AWS EC2.",
+        num_id,
+        9.25,
+        after=0.45,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Evaluated model performance and feature-attribution patterns and presented findings as pricing and "
+        "risk-segmentation recommendations for business stakeholders.",
+        num_id,
+        9.25,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Research and Engineering", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. Dissertation Research - Scalable Gaussian Process Inference and Diagnostics",
+        "Sep 2024 - Present",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Large-Scale Model Development: Developed an advection-aware Vecchia likelihood approximation for "
+        "nonseparable Gaussian processes, replacing dense covariance operations with ordered conditional models to fit "
+        "up to 145,008 observations per day.",
+        num_id,
+        9.15,
+        after=0.45,
+        line=1.0,
+        bold_lead="Large-Scale Model Development:",
+    )
+    add_bullet(
+        doc,
+        "Data Quality and Processing: Built observation masks, quality filters, spatial-distance thresholds, "
+        "hour-specific coordinate offsets, and nearest-neighbor matching to convert incomplete, irregular satellite "
+        "observations into analysis-ready grids.",
+        num_id,
+        9.15,
+        after=0.45,
+        line=1.0,
+        bold_lead="Data Quality and Processing:",
+    )
+    add_bullet(
+        doc,
+        "Model Validation and Root-Cause Analysis: Designed scale- and frequency-resolved diagnostics to distinguish "
+        "systematic acquisition artifacts and measurement noise from covariance-model misspecification and to identify "
+        "where model assumptions fail.",
+        num_id,
+        9.15,
+        after=0.45,
+        line=1.0,
+        bold_lead="Model Validation and Root-Cause Analysis:",
+    )
+    add_bullet(
+        doc,
+        "Research Engineering: Implemented reusable Python/PyTorch workflows with GLS profiling, L-BFGS optimization, "
+        "CPU/GPU execution, cached artifacts, and restartable HPC jobs for estimation, simulation, and diagnostics.",
+        num_id,
+        9.15,
+        after=0.6,
+        line=1.0,
+        bold_lead="Research Engineering:",
+    )
+    add_tabbed_line(
+        doc,
+        "Longitudinal Observational Study - EITC and Household Labor Supply",
+        "2021",
+        width,
+        9.35,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Estimated the relationship between Earned Income Tax Credit exposure and household labor supply using "
+        "fixed-effects regression and propensity-score matching with household income and demographic covariates; "
+        "evaluated comparison-group construction, confounding assumptions, and interpretation of model results.",
+        num_id,
+        9.1,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Additional", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Coursework: ",
+        "Machine Learning, Probability Theory, Stochastic Processes, Statistical Computing, Advanced Theory of "
+        "Statistics I-II, Data Structures and Algorithms, Econometrics",
+        9.0,
+        after=0.25,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Languages: ",
+        "Korean (Native); English (Fluent); Chinese (Basic)",
+        9.0,
+        after=0,
+    )
+
+    out = CAPITAL_ONE_MODEL_RISK / "Joonwon_Lee_Capital_One_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_capital_one_principal_quant_modeler_resume():
+    doc = Document()
+    width = set_cell_free_document_defaults(doc, margin_x=0.68, margin_top=0.50, margin_bottom=0.50)
+    configure_styles(doc, body_size=9.65, body_line=1.0)
+    num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Capital One Principal Quantitative Modeler Resume",
+        "Targeted resume for Principal Quantitative Modeler, Credit Risk Management Modeling at Capital One",
+        "credit risk modeling, econometrics, machine learning, panel data, time series, large datasets, model "
+        "development, validation, monitoring, Python, R, SQL, AWS, stakeholder communication",
+    )
+
+    add_name_header(doc, compact=True)
+
+    add_section_heading(doc, "Summary", compact=True)
+    add_body_paragraph(
+        doc,
+        "Statistics Ph.D. candidate and quantitative modeler with experience developing and validating statistical "
+        "and machine-learning models for financial risk, insurance pricing, and large dependent datasets. Combines "
+        "econometrics, stochastic processes, likelihood-based inference, simulation, and model diagnostics with "
+        "reproducible Python/PyTorch workflows on AWS and HPC. Translates business and monitoring questions into "
+        "transparent model specifications, performance evidence, and actionable recommendations.",
+        9.75,
+        after=1.0,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Education", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
+        "Expected May 2027  |  GPA: 3.8/4.0",
+        width,
+        9.6,
+        after=0.35,
+        keep_with_next=False,
+    )
+    add_tabbed_line(
+        doc,
+        "M.S. in Statistics, University of Minnesota, Minneapolis, MN",
+        "Sep 2021  |  GPA: 3.7/4.0",
+        width,
+        9.6,
+        after=0.35,
+        keep_with_next=False,
+    )
+
+    add_section_heading(doc, "Technical Skills", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Programming and Platforms: ",
+        "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), R, SQL, C++/pybind11 integration, Linux, "
+        "Git, AWS EC2, HPC/SLURM; CPU/GPU computing, cached artifacts, and restartable analytical pipelines",
+        9.3,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Statistical and Econometric Modeling: ",
+        "Linear and logistic regression, GLM/GBM, time-series and spatiotemporal modeling, panel/longitudinal and "
+        "cross-sectional analysis, fixed effects, propensity-score matching, machine learning, MLE/GLS, Monte Carlo "
+        "simulation, hypothesis testing, model selection, validation, sensitivity analysis, and performance diagnostics",
+        9.3,
+        after=0.35,
+    )
+
+    add_section_heading(doc, "Quantitative Industry Experience", compact=True)
+    add_tabbed_line(
+        doc,
+        "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review",
+        "Summer 2026",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed and validated a Sequential Probability Ratio Test for binary risk indicators, translating a "
+        "monitoring problem into explicit hypotheses, likelihood-ratio boundaries, and controlled sequential decisions.",
+        num_id,
+        9.2,
+        after=0.45,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Combined Brownian-motion approximation, dynamic-programming probability propagation, and simulation to "
+        "quantify Type I/II error, boundary-crossing probabilities, stopping behavior, uncertainty, and early-decision "
+        "tradeoffs; documented assumptions, performance, and limitations.",
+        num_id,
+        9.2,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Travelers - Data Science Leadership Program, Business Insurance Pricing Team",
+        "Summer 2025",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed an end-to-end LightGBM pricing pipeline across 2.46M+ property-risk records, including data "
+        "preparation, feature processing, GLM benchmarking, model selection, validation, and performance diagnostics on AWS EC2.",
+        num_id,
+        9.2,
+        after=0.45,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Evaluated predictive performance and feature-attribution patterns and presented pricing and risk-segmentation "
+        "recommendations to business stakeholders.",
+        num_id,
+        9.2,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Research and Quantitative Modeling", compact=True)
+    add_tabbed_line(
+        doc,
+        "Longitudinal Observational Study - EITC and Household Labor Supply",
+        "2021",
+        width,
+        9.35,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Analyzed the relationship between Earned Income Tax Credit exposure and household labor supply using panel "
+        "data, fixed-effects regression, and propensity-score matching with household income and demographic covariates; "
+        "evaluated comparison-group construction, confounding assumptions, and interpretation of results.",
+        num_id,
+        9.1,
+        after=0.55,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Ph.D. Dissertation Research - Scalable Model Development and Diagnostics",
+        "Sep 2024 - Present",
+        width,
+        9.35,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Large-Scale Model Development: Developed an advection-aware Vecchia likelihood approximation for "
+        "nonseparable Gaussian processes, replacing dense covariance operations with ordered conditional models to fit "
+        "up to 145,008 observations per day.",
+        num_id,
+        9.05,
+        after=0.4,
+        line=1.0,
+        bold_lead="Large-Scale Model Development:",
+    )
+    add_bullet(
+        doc,
+        "Data Engineering: Built quality filters, missingness tracking, time-specific coordinate offsets, "
+        "nearest-neighbor center matching, and spatial-threshold regular-grid construction for incomplete, irregular data.",
+        num_id,
+        9.05,
+        after=0.4,
+        line=1.0,
+        bold_lead="Data Engineering:",
+    )
+    add_bullet(
+        doc,
+        "Model Diagnostics and Monitoring: Designed scale- and frequency-resolved tools to distinguish systematic "
+        "data artifacts and measurement noise from model misspecification and identify where assumptions fail.",
+        num_id,
+        9.05,
+        after=0.4,
+        line=1.0,
+        bold_lead="Model Diagnostics and Monitoring:",
+    )
+    add_bullet(
+        doc,
+        "Research Engineering: Implemented reusable Python/PyTorch workflows with numerical optimization, CPU/GPU "
+        "execution, cached artifacts, and restartable HPC jobs for estimation, simulation, and diagnostics; integrated "
+        "compiled C++ ordering routines through pybind11.",
+        num_id,
+        9.05,
+        after=0.6,
+        line=1.0,
+        bold_lead="Research Engineering:",
+    )
+
+    add_section_heading(doc, "Additional", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Coursework: ",
+        "Machine Learning, Probability Theory, Stochastic Processes, Statistical Computing, Advanced Theory of "
+        "Statistics I-II, Data Structures and Algorithms, Microeconomics, Econometrics",
+        8.95,
+        after=0.25,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Languages: ",
+        "Korean (Native); English (Fluent); Chinese (Basic)",
+        8.95,
+        after=0,
+    )
+
+    out = CAPITAL_ONE_QUANT_MODELER / "Joonwon_Lee_Capital_One_Principal_Quantitative_Modeler_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_wells_fargo_qa_2027_resume():
+    doc = Document()
+    width = set_cell_free_document_defaults(doc, margin_x=0.68, margin_top=0.50, margin_bottom=0.50)
+    configure_styles(doc, body_size=9.65, body_line=1.0)
+    num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Wells Fargo 2027 Quantitative Analytics Program Resume",
+        "Targeted resume for the 2027 Quantitative Analytics Program - Capital Markets (PhD) at Wells Fargo",
+        "capital markets, quantitative analytics, model development, model validation, Monte Carlo simulation, "
+        "pricing and risk models, Python, C++ integration, scalable computing, stochastic modeling",
+    )
+
+    add_name_header(doc, compact=True)
+
+    add_section_heading(doc, "Summary", compact=True)
+    add_body_paragraph(
+        doc,
+        "Statistics Ph.D. candidate and quantitative researcher specializing in stochastic modeling, likelihood-based "
+        "inference, Monte Carlo simulation, hypothesis testing, and independent model validation. Develops scalable "
+        "Python/PyTorch analytical systems for complex dependent data and communicates model assumptions, performance, "
+        "and risk tradeoffs clearly. Brings financial model-risk and insurance-pricing experience with a strong interest "
+        "in capital-markets pricing, portfolio risk, and quantitative research.",
+        9.7,
+        after=1.0,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Education", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
+        "Expected May 2027  |  GPA: 3.8/4.0",
+        width,
+        9.6,
+        after=0.35,
+        keep_with_next=False,
+    )
+    add_tabbed_line(
+        doc,
+        "M.S. in Statistics, University of Minnesota, Minneapolis, MN",
+        "Sep 2021  |  GPA: 3.7/4.0",
+        width,
+        9.6,
+        after=0.35,
+        keep_with_next=False,
+    )
+
+    add_section_heading(doc, "Technical Skills", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Programming and Platforms: ",
+        "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), C++/pybind11 integration, SQL, R, Linux, "
+        "Git, AWS EC2, HPC/SLURM; CPU/GPU computing, cached artifacts, and restartable analytical pipelines",
+        9.3,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Quantitative Methods: ",
+        "Probability and stochastic processes, Monte Carlo simulation, hypothesis testing, MLE/GLS, numerical "
+        "optimization, linear algebra, regression, GLM/GBM, machine learning, time-series and spatiotemporal modeling, "
+        "model selection, validation, and performance diagnostics",
+        9.3,
+        after=0.35,
+    )
+
+    add_section_heading(doc, "Quantitative Industry Experience", compact=True)
+    add_tabbed_line(
+        doc,
+        "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review",
+        "Summer 2026",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed and independently validated a Sequential Probability Ratio Test for binary risk indicators, "
+        "translating a monitoring problem into explicit hypotheses, likelihood-ratio boundaries, and controlled decisions.",
+        num_id,
+        9.2,
+        after=0.45,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Combined Brownian-motion approximation, dynamic-programming probability propagation, and simulation to "
+        "evaluate boundary-crossing probabilities, stopping behavior, Type I/II error, and early-decision tradeoffs; "
+        "documented model assumptions, performance, and limitations.",
+        num_id,
+        9.2,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Travelers - Data Science Leadership Program, Business Insurance Pricing Team",
+        "Summer 2025",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed an end-to-end LightGBM pricing pipeline across 2.46M+ records, including data preparation, feature "
+        "processing, GLM benchmarking, model selection, validation, and performance diagnostics on AWS EC2.",
+        num_id,
+        9.2,
+        after=0.45,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Translated model diagnostics and feature-attribution findings into pricing and risk-segmentation recommendations "
+        "for business stakeholders.",
+        num_id,
+        9.2,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Quantitative Research and Markets", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. Dissertation Research - Scalable Stochastic Modeling and Model Diagnostics",
+        "Sep 2024 - Present",
+        width,
+        9.35,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Scalable Inference: Developed an advection-aware Vecchia likelihood approximation for nonseparable Gaussian "
+        "processes, replacing dense covariance operations with ordered conditional models to fit up to 145,008 "
+        "observations per day.",
+        num_id,
+        9.1,
+        after=0.4,
+        line=1.0,
+        bold_lead="Scalable Inference:",
+    )
+    add_bullet(
+        doc,
+        "Model Diagnostics: Designed scale- and frequency-resolved tools to identify whether discrepancies arise from "
+        "low- or high-frequency behavior, missingness, measurement artifacts, or covariance-model misspecification.",
+        num_id,
+        9.1,
+        after=0.4,
+        line=1.0,
+        bold_lead="Model Diagnostics:",
+    )
+    add_bullet(
+        doc,
+        "Research Engineering: Built reusable Python/PyTorch workflows for data-quality filtering, optimization, "
+        "simulation, cached outputs, and restartable CPU/GPU and HPC execution; integrated performance-critical C++ "
+        "ordering routines through pybind11.",
+        num_id,
+        9.1,
+        after=0.6,
+        line=1.0,
+        bold_lead="Research Engineering:",
+    )
+    add_tabbed_line(
+        doc,
+        "IMC Prosperity Algorithmic Trading Competition - Top 2.39% of Participants",
+        "Apr 2025",
+        width,
+        9.35,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Built and evaluated a market-making strategy using market-based fair-value estimation, inventory-aware "
+        "quoting, rolling-window exposure controls, and dynamic liquidation rules to manage position risk.",
+        num_id,
+        9.1,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Additional", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Coursework: ",
+        "Machine Learning, Linear Algebra, Probability Theory, Stochastic Processes, Statistical Computing, Advanced "
+        "Theory of Statistics I-II, Data Structures and Algorithms, Microeconomics, Econometrics",
+        9.0,
+        after=0.25,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Languages: ",
+        "Korean (Native); English (Fluent); Chinese (Basic)",
+        9.0,
+        after=0,
+    )
+
+    out = WELLS_FARGO_QA_2027 / "Joonwon_Lee_Wells_Fargo_QA_2027_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_tower_research_resume():
+    doc = Document()
+    width = set_cell_free_document_defaults(doc, margin_x=0.68, margin_top=0.50, margin_bottom=0.50)
+    configure_styles(doc, body_size=9.65, body_line=1.0)
+    num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Tower Research Quantitative Trader Researcher Resume",
+        "Targeted resume for Quantitative Trader / Researcher at Tower Research Capital",
+        "quantitative research, systematic trading, stochastic modeling, simulation, signal diagnostics, Python, "
+        "C++ integration, large-scale data, spectral analysis, hypothesis testing",
+    )
+
+    add_name_header(doc, compact=True)
+
+    add_section_heading(doc, "Summary", compact=True)
+    add_body_paragraph(
+        doc,
+        "Statistics Ph.D. candidate and quantitative researcher specializing in stochastic processes, likelihood-based "
+        "inference, simulation, and scale- and frequency-resolved signal diagnostics. Builds reproducible Python/PyTorch "
+        "research systems for large dependent datasets and integrates C++ for performance-critical computation. Brings "
+        "rigorous hypothesis-testing and model-evaluation experience, with demonstrated interest in systematic trading, "
+        "market making, and empirical strategy research.",
+        9.7,
+        after=1.0,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Education", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
+        "Expected May 2027  |  GPA: 3.8/4.0",
+        width,
+        9.6,
+        after=0.35,
+        keep_with_next=False,
+    )
+    add_tabbed_line(
+        doc,
+        "M.S. in Statistics, University of Minnesota, Minneapolis, MN",
+        "Sep 2021  |  GPA: 3.7/4.0",
+        width,
+        9.6,
+        after=0.35,
+        keep_with_next=False,
+    )
+
+    add_section_heading(doc, "Technical Skills", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Programming and Research Systems: ",
+        "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), C++/pybind11 integration, SQL, Linux, Git, "
+        "AWS EC2, HPC/SLURM; CPU/GPU computing, cached artifacts, and restartable research pipelines",
+        9.3,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Quantitative Methods: ",
+        "Probability and stochastic processes, Monte Carlo simulation, hypothesis testing, MLE/GLS, numerical "
+        "optimization, time-series and spatiotemporal modeling, spectral and autocorrelation analysis, regression, "
+        "machine learning, model validation, and performance evaluation",
+        9.3,
+        after=0.35,
+    )
+
+    add_section_heading(doc, "Quantitative Industry Experience", compact=True)
+    add_tabbed_line(
+        doc,
+        "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review",
+        "Summer 2026",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed and validated a Sequential Probability Ratio Test for binary risk indicators, translating a "
+        "monitoring problem into explicit hypotheses, likelihood-ratio boundaries, and controlled sequential decisions.",
+        num_id,
+        9.2,
+        after=0.45,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Combined Brownian-motion approximation, dynamic-programming probability propagation, and simulation to "
+        "evaluate boundary-crossing probabilities, stopping behavior, Type I/II error, and early-decision tradeoffs.",
+        num_id,
+        9.2,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Travelers - Data Science Leadership Program, Business Insurance Pricing Team",
+        "Summer 2025",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed an end-to-end LightGBM pipeline across 2.46M+ records, including data preparation, feature "
+        "processing, GLM benchmarking, model selection, validation, and performance diagnostics on AWS EC2.",
+        num_id,
+        9.2,
+        after=0.45,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Evaluated model performance and feature-attribution patterns and translated findings into pricing and "
+        "risk-segmentation recommendations for business stakeholders.",
+        num_id,
+        9.2,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Quantitative Research and Trading", compact=True)
+    add_tabbed_line(
+        doc,
+        "IMC Prosperity Algorithmic Trading Competition - Top 2.39% of Participants",
+        "Apr 2025",
+        width,
+        9.35,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Built and evaluated a market-making strategy using market-based fair-value estimation, inventory-aware "
+        "quoting, rolling-window exposure controls, dynamic liquidation rules, and benchmark-driven performance analysis.",
+        num_id,
+        9.1,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Ph.D. Dissertation Research - Scalable Stochastic Modeling and Signal Diagnostics",
+        "Sep 2024 - Present",
+        width,
+        9.35,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Scalable Inference: Developed an advection-aware Vecchia likelihood approximation for nonseparable Gaussian "
+        "processes, using ordered conditional models to fit up to 145,008 observations per day.",
+        num_id,
+        9.05,
+        after=0.4,
+        line=1.0,
+        bold_lead="Scalable Inference:",
+    )
+    add_bullet(
+        doc,
+        "Signal Diagnostics: Designed scale- and frequency-resolved analyses to determine whether apparent patterns "
+        "reflect persistent dependence, high-frequency noise, missingness, acquisition artifacts, or model misspecification.",
+        num_id,
+        9.05,
+        after=0.4,
+        line=1.0,
+        bold_lead="Signal Diagnostics:",
+    )
+    add_bullet(
+        doc,
+        "Research Infrastructure: Built reusable Python/PyTorch workflows for data-quality filtering, time-dependent "
+        "alignment, optimization, simulation, cached outputs, and restartable CPU/GPU and HPC execution; integrated "
+        "performance-critical C++ ordering routines through pybind11.",
+        num_id,
+        9.05,
+        after=0.6,
+        line=1.0,
+        bold_lead="Research Infrastructure:",
+    )
+
+    add_section_heading(doc, "Additional", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Coursework: ",
+        "Machine Learning, Linear Algebra, Probability Theory, Stochastic Processes, Statistical Computing, Advanced "
+        "Theory of Statistics I-II, Data Structures and Algorithms, Microeconomics, Econometrics",
+        9.0,
+        after=0.25,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Languages: ",
+        "Korean (Native); English (Fluent); Chinese (Basic)",
+        9.0,
+        after=0,
+    )
+
+    out = TOWER_RESEARCH / "Joonwon_Lee_Tower_Research_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_imc_quantitative_researcher_2027_resume():
+    doc = Document()
+    width = set_cell_free_document_defaults(doc, margin_x=0.68, margin_top=0.50, margin_bottom=0.50)
+    configure_styles(doc, body_size=9.65, body_line=1.0)
+    num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - IMC Quantitative Researcher 2027 Resume",
+        "Targeted resume for Quantitative Researcher at IMC Trading",
+        "quantitative research, stochastic modeling, hypothesis testing, simulation, market making, Python, "
+        "C++ integration, scalable likelihood inference, statistical diagnostics",
+    )
+
+    add_name_header(doc, compact=True)
+
+    add_section_heading(doc, "Summary", compact=True)
+    add_body_paragraph(
+        doc,
+        "Statistics Ph.D. candidate and quantitative researcher specializing in probabilistic modeling, hypothesis "
+        "testing, simulation, scalable likelihood-based inference, and statistical diagnostics. Builds reproducible "
+        "Python/PyTorch research systems for large dependent datasets and integrates compiled C++ for "
+        "performance-critical computation. Demonstrated interest in market making through a top-2.39% finish in IMC "
+        "Prosperity. Available for full-time employment in August 2027.",
+        9.65,
+        after=1.0,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Education", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
+        "Expected May 2027  |  GPA: 3.8/4.0",
+        width,
+        9.6,
+        after=0.35,
+        keep_with_next=False,
+    )
+    add_tabbed_line(
+        doc,
+        "M.S. in Statistics, University of Minnesota, Minneapolis, MN",
+        "Sep 2021  |  GPA: 3.7/4.0",
+        width,
+        9.6,
+        after=0.35,
+        keep_with_next=False,
+    )
+
+    add_section_heading(doc, "Technical Skills", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Programming and Research Systems: ",
+        "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), C++/pybind11 integration, R, SQL, Linux, "
+        "Git, AWS EC2, HPC/SLURM; CPU/GPU computing and restartable research pipelines",
+        9.25,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Quantitative Methods: ",
+        "Probability and stochastic processes, Monte Carlo simulation, hypothesis testing, MLE/GLS, numerical "
+        "optimization, time-series and spatiotemporal modeling, spectral and autocorrelation analysis, regression, "
+        "machine learning, model validation, and performance evaluation",
+        9.25,
+        after=0.35,
+    )
+
+    add_section_heading(doc, "Quantitative Industry Experience", compact=True)
+    add_tabbed_line(
+        doc,
+        "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review",
+        "Summer 2026",
+        width,
+        9.35,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed and validated a Sequential Probability Ratio Test for binary risk indicators, translating a "
+        "monitoring problem into explicit hypotheses, likelihood-ratio boundaries, and controlled sequential decisions.",
+        num_id,
+        9.15,
+        after=0.4,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Combined Brownian-motion approximation, dynamic-programming probability propagation, and simulation to "
+        "evaluate boundary-crossing probabilities, stopping behavior, Type I/II error, and early-decision tradeoffs.",
+        num_id,
+        9.15,
+        after=0.55,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Travelers - Data Science Leadership Program, Business Insurance Pricing Team",
+        "Summer 2025",
+        width,
+        9.35,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed an end-to-end LightGBM pipeline across 2.46M+ records, including data preparation, feature "
+        "processing, GLM benchmarking, model selection, validation, and performance diagnostics on AWS EC2.",
+        num_id,
+        9.15,
+        after=0.55,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Quantitative Research and Trading", compact=True)
+    add_tabbed_line(
+        doc,
+        "IMC Prosperity Algorithmic Trading Competition - Top 2.39% of Participants",
+        "Apr 2025",
+        width,
+        9.35,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Built and evaluated a market-making strategy using market-based fair-value estimation and inventory-aware "
+        "quoting; implemented rolling-window exposure controls and dynamic liquidation rules to manage position risk.",
+        num_id,
+        9.1,
+        after=0.55,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Ph.D. Dissertation Research - Scalable Stochastic Modeling and Statistical Diagnostics",
+        "Sep 2024 - Present",
+        width,
+        9.35,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Scalable Inference: Developed an advection-aware Vecchia likelihood approximation for nonseparable Gaussian "
+        "processes, using ordered local conditional models to fit up to 145,008 observations per day.",
+        num_id,
+        9.05,
+        after=0.4,
+        line=1.0,
+        bold_lead="Scalable Inference:",
+    )
+    add_bullet(
+        doc,
+        "Empirical Testing: Designed scale- and frequency-resolved diagnostics to distinguish persistent dependence "
+        "from high-frequency noise, missingness, acquisition artifacts, and model misspecification.",
+        num_id,
+        9.05,
+        after=0.4,
+        line=1.0,
+        bold_lead="Empirical Testing:",
+    )
+    add_bullet(
+        doc,
+        "Research Tools: Built reusable Python/PyTorch workflows for data-quality filtering, time-dependent alignment, "
+        "optimization, simulation, and restartable CPU/GPU and HPC execution; integrated performance-critical C++ "
+        "ordering routines through pybind11.",
+        num_id,
+        9.05,
+        after=0.55,
+        line=1.0,
+        bold_lead="Research Tools:",
+    )
+
+    add_section_heading(doc, "Additional", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Coursework: ",
+        "Machine Learning, Linear Algebra, Probability Theory, Stochastic Processes, Statistical Computing, Advanced "
+        "Theory of Statistics I-II, Data Structures and Algorithms, Microeconomics, Econometrics",
+        9.0,
+        after=0.25,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Languages: ",
+        "Korean (Native); English (Fluent); Chinese (Basic)",
+        9.0,
+        after=0,
+    )
+
+    out = IMC_TRADING / "Joonwon_Lee_IMC_Quantitative_Researcher_2027_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_virtu_quantitative_strategist_resume():
+    """Create the Virtu-targeted version from the established one-page quant layout."""
+    source = IMC_TRADING / "Joonwon_Lee_IMC_Quantitative_Researcher_2027_Resume.docx"
+    if not source.exists():
+        raise FileNotFoundError(f"Run build_imc_quantitative_researcher_2027_resume() first: {source}")
+
+    doc = Document(source)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Virtu Quantitative Strategist Resume",
+        "Targeted resume for Quantitative Strategist (PhD) at Virtu Financial",
+        "quantitative research, predictive modeling, trading strategies, portfolio risk, stochastic modeling, "
+        "hypothesis testing, simulation, Python, C++ integration, market making, statistical diagnostics",
+    )
+
+    replacements = {
+        "Statistics Ph.D. candidate and quantitative researcher specializing": (
+            "Statistics Ph.D. candidate and quantitative researcher specializing in scalable likelihood inference and "
+            "statistical diagnostics. Builds reproducible Python/PyTorch research tools for large dependent datasets, "
+            "integrates compiled C++ for performance-critical computation, and evaluates models under uncertainty."
+        ),
+        "Built and evaluated a market-making strategy": (
+            "Built and backtested an inventory-aware market-making strategy around empirically calibrated reference "
+            "values; tracked position-limit saturation over a rolling 10-step window and triggered more aggressive "
+            "inventory-reducing quotes to manage persistent exposure."
+        ),
+    }
+
+    for paragraph in doc.paragraphs:
+        for prefix, new_text in replacements.items():
+            if paragraph.text.startswith(prefix):
+                first_run = paragraph.runs[0] if paragraph.runs else None
+                for run in list(paragraph.runs):
+                    paragraph._p.remove(run._r)
+                new_run = paragraph.add_run(new_text)
+                if first_run is not None:
+                    set_run_font(
+                        new_run,
+                        first_run.font.size.pt if first_run.font.size else 9.15,
+                        bold=bool(first_run.bold),
+                        italic=bool(first_run.italic),
+                        color=first_run.font.color.rgb or BLACK,
+                    )
+                break
+
+    out = VIRTU_FINANCIAL / "Joonwon_Lee_Virtu_Quantitative_Strategist_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_new_york_life_resume():
+    doc = Document()
+    width = set_cell_free_document_defaults(doc, margin_x=0.70, margin_top=0.52, margin_bottom=0.52)
+    configure_styles(doc, body_size=9.8, body_line=1.01)
+    num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - New York Life Senior Associate Data Scientist Resume",
+        "Targeted resume for Senior Associate - Data Scientist at New York Life",
+        "data science, machine learning, model lifecycle, model validation, data quality, model governance, Python, "
+        "PyTorch, AWS, stakeholder communication, statistical diagnostics",
+    )
+
+    add_name_header(doc, compact=True)
+
+    add_section_heading(doc, "Summary", compact=True)
+    add_body_paragraph(
+        doc,
+        "Statistics Ph.D. candidate and data scientist with experience developing and validating statistical and "
+        "machine-learning solutions for financial risk, insurance pricing, and large, noisy datasets. Builds "
+        "reproducible Python/PyTorch workflows spanning data preparation, feature processing, model training, "
+        "validation, simulation, and monitoring diagnostics, and translates technical results into clear decisions "
+        "for business stakeholders.",
+        9.9,
+        after=1.0,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Education", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
+        "Expected Feb 2027  |  GPA: 3.8/4.0",
+        width,
+        9.7,
+        after=0.35,
+        keep_with_next=False,
+    )
+    add_tabbed_line(
+        doc,
+        "M.S. in Statistics, University of Minnesota, Minneapolis, MN",
+        "Sep 2021  |  GPA: 3.7/4.0",
+        width,
+        9.7,
+        after=0.35,
+        keep_with_next=False,
+    )
+
+    add_section_heading(doc, "Technical Skills", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Programming and Platforms: ",
+        "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), SQL, C++/pybind11 integration, Linux, Git, "
+        "AWS EC2, HPC/SLURM; CPU/GPU computing, cached artifacts, and restartable analytical pipelines",
+        9.45,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Data Science and Model Lifecycle: ",
+        "Data preparation, feature processing, supervised learning, GLM/GBM, regression, model selection and "
+        "validation, performance evaluation, feature attribution, hypothesis testing, Monte Carlo simulation, "
+        "numerical optimization, model diagnostics, documentation, and stakeholder communication",
+        9.45,
+        after=0.35,
+    )
+
+    add_section_heading(doc, "Experience", compact=True)
+    add_tabbed_line(
+        doc,
+        "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review",
+        "Summer 2026",
+        width,
+        9.5,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed and validated a Sequential Probability Ratio Test for binary risk indicators, translating a "
+        "monitoring requirement into explicit hypotheses, likelihood-ratio boundaries, and controlled stopping decisions.",
+        num_id,
+        9.35,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Combined Brownian-motion approximation, dynamic-programming probability propagation, and simulation to "
+        "evaluate boundary-crossing probabilities, Type I/II error, stopping behavior, uncertainty, and model limitations.",
+        num_id,
+        9.35,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Travelers - Data Science Leadership Program, Business Insurance Pricing Team",
+        "Summer 2025",
+        width,
+        9.5,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed an end-to-end LightGBM pricing pipeline across 2.46M+ records, including data preparation, "
+        "feature processing, GLM benchmarking, model selection, validation, and performance diagnostics on AWS EC2.",
+        num_id,
+        9.35,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Evaluated model performance and feature-attribution patterns and presented pricing and risk-segmentation "
+        "recommendations to business stakeholders.",
+        num_id,
+        9.35,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Research and Engineering", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. Dissertation Research - Scalable Model Development and Statistical Diagnostics",
+        "Sep 2024 - Present",
+        width,
+        9.45,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Scalable Modeling: Developed an advection-aware Vecchia likelihood approximation for nonseparable Gaussian "
+        "processes, replacing dense covariance operations with ordered local conditioning to fit up to 145,008 observations per day.",
+        num_id,
+        9.25,
+        after=0.45,
+        line=1.0,
+        bold_lead="Scalable Modeling:",
+    )
+    add_bullet(
+        doc,
+        "Data Quality and Root-Cause Analysis: Built workflows for quality filtering, missingness tracking, "
+        "time-specific coordinate offsets, nearest-neighbor center matching, and irregular-to-regular grid mapping "
+        "to separate systematic acquisition artifacts from random noise and model misspecification.",
+        num_id,
+        9.25,
+        after=0.45,
+        line=1.0,
+        bold_lead="Data Quality and Root-Cause Analysis:",
+    )
+    add_bullet(
+        doc,
+        "Model Evaluation and Monitoring: Designed scale- and frequency-resolved diagnostics to localize whether "
+        "model discrepancies arise from low-frequency structure, high-frequency behavior, noise, missingness, or dependence.",
+        num_id,
+        9.25,
+        after=0.45,
+        line=1.0,
+        bold_lead="Model Evaluation and Monitoring:",
+    )
+    add_bullet(
+        doc,
+        "Research Engineering: Implemented reusable Python/PyTorch pipelines with CPU/GPU execution, cached artifacts, "
+        "and restartable HPC jobs; integrated compiled C++ ordering routines through pybind11.",
+        num_id,
+        9.25,
+        after=0.6,
+        line=1.0,
+        bold_lead="Research Engineering:",
+    )
+
+    add_section_heading(doc, "Additional", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Coursework: ",
+        "Machine Learning, Probability Theory, Stochastic Processes, Statistical Computing, Advanced Theory of "
+        "Statistics I-II, Data Structures and Algorithms, Linear Algebra, Microeconomics, Econometrics",
+        9.05,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Languages: ",
+        "Korean (Native); English (Fluent); Chinese (Basic)",
+        9.05,
+        after=0,
+    )
+
+    out = NEW_YORK_LIFE / "Joonwon_Lee_New_York_Life_Data_Scientist_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_voleon_data_scientist_resume():
+    doc = Document()
+    width = set_cell_free_document_defaults(doc, margin_x=0.70, margin_top=0.52, margin_bottom=0.52)
+    configure_styles(doc, body_size=9.8, body_line=1.01)
+    num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Voleon Data Scientist Resume",
+        "Targeted resume for Data Scientist at The Voleon Group",
+        "data quality, root-cause analysis, statistical diagnostics, anomaly monitoring, data curation, Python, "
+        "Pandas, R, SQL, Linux, Git, trading systems, research systems, automated analysis pipelines",
+    )
+
+    add_name_header(doc, compact=True)
+
+    add_section_heading(doc, "Summary", compact=True)
+    add_body_paragraph(
+        doc,
+        "Statistics Ph.D. candidate and data scientist specializing in data quality, statistical diagnostics, and "
+        "root-cause analysis for large, noisy, and dependent datasets. Builds reproducible Python/PyTorch workflows "
+        "for data curation, anomaly investigation, simulation, and ongoing analytical monitoring. Experienced in "
+        "translating ambiguous financial and scientific questions into mathematically defined analyses and clearly "
+        "communicating findings to technical and business stakeholders.",
+        9.9,
+        after=1.0,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Education", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
+        "Expected Feb 2027  |  GPA: 3.8/4.0",
+        width,
+        9.7,
+        after=0.35,
+        keep_with_next=False,
+    )
+    add_tabbed_line(
+        doc,
+        "M.S. in Statistics, University of Minnesota, Minneapolis, MN",
+        "Sep 2021  |  GPA: 3.7/4.0",
+        width,
+        9.7,
+        after=0.35,
+        keep_with_next=False,
+    )
+
+    add_section_heading(doc, "Technical Skills", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Programming and Systems: ",
+        "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), R, SQL, C++/pybind11 integration, Bash, "
+        "Linux/Unix, Git, AWS EC2, HPC/SLURM; CPU/GPU computing, cached artifacts, and restartable analysis pipelines",
+        9.4,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Data Analysis and Monitoring: ",
+        "Data curation, aggregation, exploratory analysis, visualization, data validation, anomaly detection, "
+        "root-cause analysis, statistical testing, regression, GLM/GBM, Monte Carlo simulation, model diagnostics, "
+        "feature attribution, performance evaluation, and stakeholder reporting",
+        9.4,
+        after=0.35,
+    )
+
+    add_section_heading(doc, "Experience", compact=True)
+    add_tabbed_line(
+        doc,
+        "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review",
+        "Summer 2026",
+        width,
+        9.5,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed and validated a Sequential Probability Ratio Test for binary risk indicators, converting a "
+        "monitoring problem into explicit hypotheses, likelihood-ratio boundaries, and controlled stopping decisions.",
+        num_id,
+        9.3,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Combined Brownian-motion approximation, dynamic-programming probability propagation, and simulation to "
+        "quantify Type I/II error, boundary-crossing probabilities, stopping behavior, uncertainty, "
+        "and early-decision tradeoffs.",
+        num_id,
+        9.3,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Travelers - Data Science Leadership Program, Business Insurance Pricing Team",
+        "Summer 2025",
+        width,
+        9.5,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed an end-to-end LightGBM analysis pipeline across 2.46M+ records, including data preparation, "
+        "feature processing, GLM benchmarking, model selection, validation, and performance diagnostics on AWS EC2.",
+        num_id,
+        9.3,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Analyzed performance and feature-attribution patterns and presented pricing and risk-segmentation "
+        "recommendations to business stakeholders.",
+        num_id,
+        9.3,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Research and Analytical Systems", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. Dissertation Research - Data Quality, Scalable Analysis, and Statistical Diagnostics",
+        "Sep 2024 - Present",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Data Curation and Quality: Built workflows for quality filtering, missingness tracking, time-specific "
+        "coordinate offsets, nearest-neighbor center matching, and spatial-threshold regular-grid construction for "
+        "large satellite datasets.",
+        num_id,
+        9.2,
+        after=0.45,
+        line=1.0,
+        bold_lead="Data Curation and Quality:",
+    )
+    add_bullet(
+        doc,
+        "Root-Cause Analysis: Investigated scan-geometry and time-dependent alignment effects and designed scale- and "
+        "frequency-resolved diagnostics to distinguish systematic acquisition artifacts from random noise, missingness, "
+        "and statistical-model misspecification.",
+        num_id,
+        9.2,
+        after=0.45,
+        line=1.0,
+        bold_lead="Root-Cause Analysis:",
+    )
+    add_bullet(
+        doc,
+        "Scalable Statistical Analysis: Developed an advection-aware Vecchia likelihood approximation for "
+        "nonseparable Gaussian processes, using ordered local conditioning to analyze up to 145,008 observations per day.",
+        num_id,
+        9.2,
+        after=0.45,
+        line=1.0,
+        bold_lead="Scalable Statistical Analysis:",
+    )
+    add_bullet(
+        doc,
+        "Analysis Automation: Implemented reusable Python/PyTorch pipelines for preprocessing, estimation, simulation, "
+        "cached outputs, and restartable CPU/GPU and HPC jobs; integrated compiled C++ ordering routines through pybind11.",
+        num_id,
+        9.2,
+        after=0.6,
+        line=1.0,
+        bold_lead="Analysis Automation:",
+    )
+
+    add_section_heading(doc, "Additional", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Coursework: ",
+        "Machine Learning, Probability Theory, Stochastic Processes, Statistical Computing, Advanced Theory of "
+        "Statistics I-II, Data Structures and Algorithms, Linear Algebra, Microeconomics, Econometrics",
+        9.05,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Languages: ",
+        "Korean (Native); English (Fluent); Chinese (Basic)",
+        9.05,
+        after=0,
+    )
+
+    out = VOLEON / "Joonwon_Lee_Voleon_Data_Scientist_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_state_street_credit_risk_resume():
+    doc = Document()
+    width = set_cell_free_document_defaults(doc, margin_x=0.70, margin_top=0.52, margin_bottom=0.52)
+    configure_styles(doc, body_size=9.8, body_line=1.01)
+    num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - State Street Quantitative Analyst AVP Resume",
+        "Targeted resume for Quantitative Analyst, Assistant Vice President - Credit Risk Modeler at State Street",
+        "credit risk modeling, model development, model validation, financial risk, econometrics, stochastic "
+        "processes, simulation, Python, R, SQL, C++ integration, model governance, statistical diagnostics",
+    )
+
+    add_name_header(doc, compact=True)
+
+    add_section_heading(doc, "Summary", compact=True)
+    add_body_paragraph(
+        doc,
+        "Statistics Ph.D. candidate and quantitative modeler with industry experience in financial-risk model "
+        "validation, insurance pricing, and scalable statistical model development. Combines stochastic processes, "
+        "likelihood-based inference, econometrics, simulation, and statistical diagnostics with reproducible "
+        "Python/PyTorch research systems. Translates model assumptions, performance, uncertainty, and limitations "
+        "into clear findings for technical and business stakeholders.",
+        9.9,
+        after=1.0,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Education", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
+        "Expected Feb 2027  |  GPA: 3.8/4.0",
+        width,
+        9.7,
+        after=0.35,
+        keep_with_next=False,
+    )
+    add_tabbed_line(
+        doc,
+        "M.S. in Statistics, University of Minnesota, Minneapolis, MN",
+        "Sep 2021  |  GPA: 3.7/4.0",
+        width,
+        9.7,
+        after=0.35,
+        keep_with_next=False,
+    )
+
+    add_section_heading(doc, "Technical Skills", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Programming and Research Systems: ",
+        "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), R, SQL, C++/pybind11 integration, Linux, "
+        "Git, AWS EC2, HPC/SLURM; CPU/GPU computing, cached artifacts, and restartable analytical pipelines",
+        9.4,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Quantitative Methods: ",
+        "Stochastic processes, probability, MLE/GLS, regression, GLM/GBM, econometrics, fixed effects, propensity-score "
+        "matching, Monte Carlo simulation, hypothesis testing, numerical optimization, model selection and validation, "
+        "sensitivity analysis, feature attribution, and statistical diagnostics",
+        9.4,
+        after=0.35,
+    )
+
+    add_section_heading(doc, "Quantitative Industry Experience", compact=True)
+    add_tabbed_line(
+        doc,
+        "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review",
+        "Summer 2026",
+        width,
+        9.5,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed and validated a Sequential Probability Ratio Test for binary risk indicators, translating a "
+        "monitoring requirement into explicit hypotheses, likelihood-ratio boundaries, and controlled stopping decisions.",
+        num_id,
+        9.3,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Combined Brownian-motion approximation, dynamic-programming probability propagation, and simulation to "
+        "evaluate Type I/II error, boundary-crossing probabilities, stopping behavior, uncertainty, and model limitations.",
+        num_id,
+        9.3,
+        after=0.6,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Travelers - Data Science Leadership Program, Business Insurance Pricing Team",
+        "Summer 2025",
+        width,
+        9.5,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed an end-to-end LightGBM pricing pipeline across 2.46M+ property-risk records, including data "
+        "preparation, feature processing, GLM benchmarking, model selection, validation, and performance diagnostics on AWS EC2.",
+        num_id,
+        9.3,
+        after=0.5,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Evaluated performance and feature-attribution patterns and presented pricing and risk-segmentation "
+        "recommendations to business stakeholders.",
+        num_id,
+        9.3,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Research and Quantitative Modeling", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. Dissertation Research - Scalable Statistical Model Development and Diagnostics",
+        "Sep 2024 - Present",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Scalable Model Development: Developed an advection-aware Vecchia likelihood approximation for nonseparable "
+        "Gaussian processes, replacing dense covariance operations with ordered local conditioning to fit up to "
+        "145,008 observations per day.",
+        num_id,
+        9.2,
+        after=0.45,
+        line=1.0,
+        bold_lead="Scalable Model Development:",
+    )
+    add_bullet(
+        doc,
+        "Assumption Review and Diagnostics: Compared alternative covariance specifications and designed scale- and "
+        "frequency-resolved tools to determine whether discrepancies arise from low-frequency structure, "
+        "high-frequency behavior, noise, missingness, or model misspecification.",
+        num_id,
+        9.2,
+        after=0.45,
+        line=1.0,
+        bold_lead="Assumption Review and Diagnostics:",
+    )
+    add_bullet(
+        doc,
+        "Research Engineering: Implemented reusable Python/PyTorch workflows for data-quality filtering, estimation, "
+        "simulation, numerical optimization, cached outputs, and restartable CPU/GPU and HPC execution; integrated "
+        "compiled C++ ordering routines through pybind11.",
+        num_id,
+        9.2,
+        after=0.55,
+        line=1.0,
+        bold_lead="Research Engineering:",
+    )
+    add_tabbed_line(
+        doc,
+        "Econometric Study - Earned Income Tax Credit and Household Labor Supply",
+        "2021",
+        width,
+        9.35,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Estimated the association between EITC exposure and household labor supply using longitudinal observational "
+        "data, fixed-effects regression, and propensity-score matching with household income and demographic covariates.",
+        num_id,
+        9.15,
+        after=0.6,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Additional", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Coursework: ",
+        "Probability Theory, Stochastic Processes, Machine Learning, Linear Algebra, Statistical Computing, Advanced "
+        "Theory of Statistics I-II, Data Structures and Algorithms, Microeconomics, Econometrics",
+        9.0,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Languages: ",
+        "Korean (Native); English (Fluent); Chinese (Basic)",
+        9.0,
+        after=0,
+    )
+
+    out = STATE_STREET / "Joonwon_Lee_State_Street_Quantitative_Analyst_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_liberty_mutual_data_scientist_resume():
+    doc = Document()
+    width = set_cell_free_document_defaults(doc, margin_x=0.70, margin_top=0.52, margin_bottom=0.52)
+    configure_styles(doc, body_size=9.8, body_line=1.01)
+    num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Liberty Mutual Data Scientist Resume",
+        "Targeted resume for Data Scientist - Property and Specialty Product Design and Modeling",
+        "property insurance pricing, predictive modeling, GLM, LightGBM, hypothesis testing, statistical diagnostics, "
+        "model validation, Python, AWS, stakeholder communication",
+    )
+
+    add_name_header(doc, compact=True)
+
+    add_section_heading(doc, "Summary", compact=True)
+    add_body_paragraph(
+        doc,
+        "Statistics Ph.D. candidate and data scientist with hands-on property-insurance pricing experience and a "
+        "rigorous background in predictive modeling, hypothesis testing, and statistical diagnostics. Built an "
+        "end-to-end GLM/LightGBM workflow across 2.46M+ property-risk records and reusable Python/PyTorch pipelines "
+        "for large, noisy datasets. Translates model evidence, uncertainty, and diagnostics into clear recommendations "
+        "for business stakeholders.",
+        9.9,
+        after=1.0,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Education", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. in Statistics, Rutgers University, Piscataway, NJ",
+        "Expected May 2027  |  GPA: 3.8/4.0",
+        width,
+        9.7,
+        after=0.35,
+        keep_with_next=False,
+    )
+    add_tabbed_line(
+        doc,
+        "M.S. in Statistics, University of Minnesota, Minneapolis, MN",
+        "Sep 2021  |  GPA: 3.7/4.0",
+        width,
+        9.7,
+        after=0.35,
+        keep_with_next=False,
+    )
+
+    add_section_heading(doc, "Technical Skills", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Programming and Platforms: ",
+        "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), SQL, R, Linux, Git, AWS EC2, HPC/SLURM; "
+        "reproducible and restartable analytical pipelines",
+        9.4,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Predictive Modeling and Validation: ",
+        "Data preparation, feature processing, regression, GLM/GBM, supervised learning, model selection, calibration "
+        "and validation, performance evaluation, feature attribution, hypothesis testing, Monte Carlo simulation, "
+        "statistical diagnostics, documentation, and stakeholder communication",
+        9.4,
+        after=0.35,
+    )
+
+    add_section_heading(doc, "Experience", compact=True)
+    add_tabbed_line(
+        doc,
+        "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review",
+        "Summer 2026",
+        width,
+        9.45,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed and validated a Sequential Probability Ratio Test for binary risk indicators, translating a "
+        "monitoring requirement into explicit hypotheses, likelihood-ratio boundaries, and controlled stopping decisions.",
+        num_id,
+        9.3,
+        after=0.45,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Combined Brownian-motion approximation, dynamic-programming probability propagation, and simulation to "
+        "evaluate Type I/II error, boundary-crossing probabilities, stopping behavior, uncertainty, and model limitations.",
+        num_id,
+        9.3,
+        after=0.55,
+        line=1.0,
+    )
+    add_tabbed_line(
+        doc,
+        "Travelers - Data Science Leadership Program, Business Insurance Pricing Team",
+        "Summer 2025",
+        width,
+        9.45,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Developed an end-to-end LightGBM property-pricing pipeline across 2.46M+ records, including data preparation, "
+        "feature processing, GLM benchmarking, model selection, validation, and performance diagnostics on AWS EC2.",
+        num_id,
+        9.3,
+        after=0.45,
+        line=1.0,
+    )
+    add_bullet(
+        doc,
+        "Evaluated predictive performance and feature-attribution patterns and presented pricing and risk-segmentation "
+        "recommendations to business stakeholders.",
+        num_id,
+        9.3,
+        after=0.55,
+        line=1.0,
+    )
+
+    add_section_heading(doc, "Research and Analytical Systems", compact=True)
+    add_tabbed_line(
+        doc,
+        "Ph.D. Dissertation Research - Scalable Model Development and Statistical Diagnostics",
+        "Sep 2024 - Present",
+        width,
+        9.4,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Scalable Modeling: Developed an advection-aware Vecchia likelihood approximation for nonseparable Gaussian "
+        "processes, replacing dense covariance operations with ordered local conditioning to fit up to 145,008 "
+        "observations per day.",
+        num_id,
+        9.2,
+        after=0.4,
+        line=1.0,
+        bold_lead="Scalable Modeling:",
+    )
+    add_bullet(
+        doc,
+        "Data Quality and Root-Cause Analysis: Built workflows for quality filtering, missingness tracking, "
+        "time-specific coordinate offsets, nearest-neighbor matching, and irregular-to-regular grid mapping to "
+        "separate systematic acquisition artifacts from random noise and model misspecification.",
+        num_id,
+        9.2,
+        after=0.4,
+        line=1.0,
+        bold_lead="Data Quality and Root-Cause Analysis:",
+    )
+    add_bullet(
+        doc,
+        "Model Diagnostics: Designed scale- and frequency-resolved tests to identify whether discrepancies arise from "
+        "low-frequency structure, high-frequency behavior, noise, missingness, or dependence; implemented reusable "
+        "Python/PyTorch workflows for estimation, simulation, validation, and HPC execution.",
+        num_id,
+        9.2,
+        after=0.55,
+        line=1.0,
+        bold_lead="Model Diagnostics:",
+    )
+
+    add_section_heading(doc, "Additional", compact=True)
+    add_labeled_paragraph(
+        doc,
+        "Coursework: ",
+        "Machine Learning, Probability Theory, Stochastic Processes, Statistical Computing, Advanced Theory of "
+        "Statistics I-II, Data Structures and Algorithms, Linear Algebra, Microeconomics, Econometrics",
+        9.05,
+        after=0.3,
+    )
+    add_labeled_paragraph(
+        doc,
+        "Languages: ",
+        "Korean (Native); English (Fluent); Chinese (Basic)",
+        9.05,
+        after=0,
+    )
+
+    out = LIBERTY_MUTUAL / "Joonwon_Lee_Liberty_Mutual_Data_Scientist_Resume.docx"
     doc.save(out)
     return out
 
@@ -3780,9 +7156,26 @@ if __name__ == "__main__":
     print(build_google_ads_metrics_resume())
     print(build_valley_bank_resume())
     print(build_blackrock_resume())
+    print(build_blackrock_sae_resume())
     print(build_upstart_resume())
     print(build_akuna_capital_resume())
     print(build_jpmorgan_spg_qtr_resume())
     print(build_goldman_core_planning_resume())
     print(build_walleye_single_stock_vol_resume())
+    print(build_sentilink_resume())
+    print(build_teza_technologies_resume())
+    print(build_freddie_mac_resume())
+    print(build_radix_trading_resume())
+    print(build_3red_partners_resume())
+    print(build_openai_safety_resume())
+    print(build_capital_one_model_risk_resume())
+    print(build_capital_one_principal_quant_modeler_resume())
+    print(build_wells_fargo_qa_2027_resume())
+    print(build_tower_research_resume())
+    print(build_imc_quantitative_researcher_2027_resume())
+    print(build_virtu_quantitative_strategist_resume())
+    print(build_new_york_life_resume())
+    print(build_voleon_data_scientist_resume())
+    print(build_state_street_credit_risk_resume())
+    print(build_liberty_mutual_data_scientist_resume())
     print(build_research_cv())

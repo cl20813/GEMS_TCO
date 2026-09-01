@@ -1,0 +1,167 @@
+{
+  "arguments": {
+    "angles_deg": "22.5,112.5,202.5,292.5",
+    "bootstrap_replicates": 2000,
+    "convergence_grad_threshold": 0.001,
+    "daily_stride": 2,
+    "data_root": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5",
+    "device": "cpu",
+    "empirical_max_lat_offset": 20,
+    "empirical_max_lon_offset": 20,
+    "empirical_min_pair_count": 1000,
+    "empirical_smooth_bandwidth_deg": 0.063,
+    "final_max_eval": 20,
+    "grad_tol": 1e-05,
+    "jkq_threshold_cells": 0.5,
+    "large_parameter_error_threshold": 0.5,
+    "large_regret_threshold": 0.002,
+    "lat_range": "-3,-1",
+    "lbfgs_history": 10,
+    "lbfgs_lr": 1.0,
+    "lon_range": "121,125",
+    "n_lat": 32,
+    "n_lon": 48,
+    "nuisance_scenarios": "oracle_start,short_time_high_nugget,long_time_low_nugget",
+    "output_root": "outputs/summer_26/synthetic_m3_q_jkq_fullfit_confirmatory_090126",
+    "reference_max_eval": 25,
+    "replicates": 2,
+    "resume": false,
+    "seed": 901261,
+    "signal_regimes": "strong,reference,weak",
+    "smooth": 0.5,
+    "speeds_cells": "0.75,2.0,4.0",
+    "subgrid_max_condition_number": 100.0,
+    "target_chunk_size": 128,
+    "year": 2023
+  },
+  "base_truth": {
+    "advec_lat": 0.08,
+    "advec_lon": -0.2,
+    "nugget": 1.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "sigmasq": 10.0
+  },
+  "common_objective": "oracle-direction fixed corridor",
+  "conditions": [
+    {
+      "advec_lat": 0.030488024572872488,
+      "advec_lon": 0.018081792179251176,
+      "direction_deg_grid": 22.5,
+      "speed_cells": 0.75,
+      "truth_id": "a022_s0p75"
+    },
+    {
+      "advec_lat": 0.0813013988609933,
+      "advec_lon": 0.04821811247800314,
+      "direction_deg_grid": 22.5,
+      "speed_cells": 2.0,
+      "truth_id": "a022_s2p0"
+    },
+    {
+      "advec_lat": 0.1626027977219866,
+      "advec_lon": 0.09643622495600628,
+      "direction_deg_grid": 22.5,
+      "speed_cells": 4.0,
+      "truth_id": "a022_s4p0"
+    },
+    {
+      "advec_lat": -0.012628553268047972,
+      "advec_lon": 0.043653307911159955,
+      "direction_deg_grid": 112.5,
+      "speed_cells": 0.75,
+      "truth_id": "a112_s0p75"
+    },
+    {
+      "advec_lat": -0.033676142048127924,
+      "advec_lon": 0.11640882109642654,
+      "direction_deg_grid": 112.5,
+      "speed_cells": 2.0,
+      "truth_id": "a112_s2p0"
+    },
+    {
+      "advec_lat": -0.06735228409625585,
+      "advec_lon": 0.23281764219285309,
+      "direction_deg_grid": 112.5,
+      "speed_cells": 4.0,
+      "truth_id": "a112_s4p0"
+    },
+    {
+      "advec_lat": -0.03048802457287249,
+      "advec_lon": -0.018081792179251172,
+      "direction_deg_grid": 202.5,
+      "speed_cells": 0.75,
+      "truth_id": "a202_s0p75"
+    },
+    {
+      "advec_lat": -0.08130139886099332,
+      "advec_lon": -0.048218112478003124,
+      "direction_deg_grid": 202.5,
+      "speed_cells": 2.0,
+      "truth_id": "a202_s2p0"
+    },
+    {
+      "advec_lat": -0.16260279772198663,
+      "advec_lon": -0.09643622495600625,
+      "direction_deg_grid": 202.5,
+      "speed_cells": 4.0,
+      "truth_id": "a202_s4p0"
+    },
+    {
+      "advec_lat": 0.012628553268047982,
+      "advec_lon": -0.04365330791115995,
+      "direction_deg_grid": 292.5,
+      "speed_cells": 0.75,
+      "truth_id": "a292_s0p75"
+    },
+    {
+      "advec_lat": 0.03367614204812795,
+      "advec_lon": -0.11640882109642653,
+      "direction_deg_grid": 292.5,
+      "speed_cells": 2.0,
+      "truth_id": "a292_s2p0"
+    },
+    {
+      "advec_lat": 0.0673522840962559,
+      "advec_lon": -0.23281764219285306,
+      "direction_deg_grid": 292.5,
+      "speed_cells": 4.0,
+      "truth_id": "a292_s4p0"
+    }
+  ],
+  "created": "2026-09-01T15:38:44",
+  "device": "cpu",
+  "flag_definitions": {
+    "gradient_nonconvergence": "finite fit with final raw-gradient infinity norm > 0.001",
+    "large_common_regret_flag": "common objective regret > 0.002; operational threshold, not an optimizer failure or statistical test",
+    "large_parameter_error_flag": "standardized seven-parameter RMSE > 0.5; operational threshold",
+    "numerical_failure": "exception, nonfinite objective/gradient/parameters"
+  },
+  "input_template": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5/2023_july_st_circulant/sim_july2023_st_circulant_gridded.pkl",
+  "methods": [
+    "M3_fft",
+    "M3_fft_Q",
+    "M3_fft_JKQ"
+  ],
+  "nuisance_scenarios": [
+    "oracle_start",
+    "short_time_high_nugget",
+    "long_time_low_nugget"
+  ],
+  "script": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/real_data/advection_direction/synthetic_m3_q_jkq_fullfit_confirmatory_090126.py",
+  "signal_regimes": {
+    "reference": {
+      "nugget_factor": 1.0,
+      "range_time_factor": 1.0
+    },
+    "strong": {
+      "nugget_factor": 0.5,
+      "range_time_factor": 1.5
+    },
+    "weak": {
+      "nugget_factor": 3.0,
+      "range_time_factor": 0.5
+    }
+  }
+}

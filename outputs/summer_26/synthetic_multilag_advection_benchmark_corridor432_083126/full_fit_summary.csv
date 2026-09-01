@@ -1,0 +1,4 @@
+method,n_days,mean_final_nll,mean_final_advection_error,mean_final_rmsre_7param,mean_final_fit_s,mean_end_to_end_s
+M0_zero,3,1.13487631,0.00878226,0.03081405,7.74758736,7.74758736
+M3_empirical_tau1,3,1.12868923,0.00681114,0.03237299,7.88534471,8.01213329
+M6_robust_multilag,3,1.12870333,0.00664221,0.03264248,7.94484243,8.13073117

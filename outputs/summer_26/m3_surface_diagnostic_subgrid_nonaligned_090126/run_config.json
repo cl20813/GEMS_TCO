@@ -1,0 +1,230 @@
+{
+  "arguments": {
+    "angle_offset_deg": 22.5,
+    "days": "0,1,2,3,4",
+    "empirical_max_lat_offset": 20,
+    "empirical_max_lon_offset": 20,
+    "empirical_min_pair_count": 1000,
+    "empirical_smooth_bandwidth_deg": 0.063,
+    "jkq_threshold_cells": 0.5,
+    "lat_range": "-3,-1",
+    "lon_range": "121,125",
+    "mode": "synthetic",
+    "month": 7,
+    "n_lat": 32,
+    "n_lon": 48,
+    "output_root": "outputs/summer_26/m3_surface_diagnostic_subgrid_nonaligned_090126",
+    "real_data_root": "/Users/joonwonlee/Documents/GEMS_DATA",
+    "replicates": 5,
+    "seed": 901260,
+    "signal_regimes": "strong,reference,weak",
+    "smooth": 0.5,
+    "speeds_cells": "0.75,2.0,4.0",
+    "subgrid_max_condition_number": 100.0,
+    "synthetic_data_root": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5",
+    "year": 2023
+  },
+  "base_truth": {
+    "advec_lat": 0.08,
+    "advec_lon": -0.2,
+    "nugget": 1.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "sigmasq": 10.0
+  },
+  "conditions": [
+    {
+      "advec_lat": 0.030488024572872488,
+      "advec_lon": 0.018081792179251176,
+      "direction_deg_grid": 22.5,
+      "speed_cells": 0.75,
+      "truth_id": "a022_s0p75"
+    },
+    {
+      "advec_lat": 0.0813013988609933,
+      "advec_lon": 0.04821811247800314,
+      "direction_deg_grid": 22.5,
+      "speed_cells": 2.0,
+      "truth_id": "a022_s2p0"
+    },
+    {
+      "advec_lat": 0.1626027977219866,
+      "advec_lon": 0.09643622495600628,
+      "direction_deg_grid": 22.5,
+      "speed_cells": 4.0,
+      "truth_id": "a022_s4p0"
+    },
+    {
+      "advec_lat": 0.012628553268047975,
+      "advec_lon": 0.043653307911159955,
+      "direction_deg_grid": 67.5,
+      "speed_cells": 0.75,
+      "truth_id": "a067_s0p75"
+    },
+    {
+      "advec_lat": 0.03367614204812794,
+      "advec_lon": 0.11640882109642654,
+      "direction_deg_grid": 67.5,
+      "speed_cells": 2.0,
+      "truth_id": "a067_s2p0"
+    },
+    {
+      "advec_lat": 0.06735228409625588,
+      "advec_lon": 0.23281764219285309,
+      "direction_deg_grid": 67.5,
+      "speed_cells": 4.0,
+      "truth_id": "a067_s4p0"
+    },
+    {
+      "advec_lat": -0.012628553268047972,
+      "advec_lon": 0.043653307911159955,
+      "direction_deg_grid": 112.5,
+      "speed_cells": 0.75,
+      "truth_id": "a112_s0p75"
+    },
+    {
+      "advec_lat": -0.033676142048127924,
+      "advec_lon": 0.11640882109642654,
+      "direction_deg_grid": 112.5,
+      "speed_cells": 2.0,
+      "truth_id": "a112_s2p0"
+    },
+    {
+      "advec_lat": -0.06735228409625585,
+      "advec_lon": 0.23281764219285309,
+      "direction_deg_grid": 112.5,
+      "speed_cells": 4.0,
+      "truth_id": "a112_s4p0"
+    },
+    {
+      "advec_lat": -0.030488024572872488,
+      "advec_lon": 0.018081792179251183,
+      "direction_deg_grid": 157.5,
+      "speed_cells": 0.75,
+      "truth_id": "a157_s0p75"
+    },
+    {
+      "advec_lat": -0.0813013988609933,
+      "advec_lon": 0.04821811247800315,
+      "direction_deg_grid": 157.5,
+      "speed_cells": 2.0,
+      "truth_id": "a157_s2p0"
+    },
+    {
+      "advec_lat": -0.1626027977219866,
+      "advec_lon": 0.0964362249560063,
+      "direction_deg_grid": 157.5,
+      "speed_cells": 4.0,
+      "truth_id": "a157_s4p0"
+    },
+    {
+      "advec_lat": -0.03048802457287249,
+      "advec_lon": -0.018081792179251172,
+      "direction_deg_grid": 202.5,
+      "speed_cells": 0.75,
+      "truth_id": "a202_s0p75"
+    },
+    {
+      "advec_lat": -0.08130139886099332,
+      "advec_lon": -0.048218112478003124,
+      "direction_deg_grid": 202.5,
+      "speed_cells": 2.0,
+      "truth_id": "a202_s2p0"
+    },
+    {
+      "advec_lat": -0.16260279772198663,
+      "advec_lon": -0.09643622495600625,
+      "direction_deg_grid": 202.5,
+      "speed_cells": 4.0,
+      "truth_id": "a202_s4p0"
+    },
+    {
+      "advec_lat": -0.012628553268047965,
+      "advec_lon": -0.043653307911159955,
+      "direction_deg_grid": 247.5,
+      "speed_cells": 0.75,
+      "truth_id": "a247_s0p75"
+    },
+    {
+      "advec_lat": -0.033676142048127904,
+      "advec_lon": -0.11640882109642656,
+      "direction_deg_grid": 247.5,
+      "speed_cells": 2.0,
+      "truth_id": "a247_s2p0"
+    },
+    {
+      "advec_lat": -0.06735228409625581,
+      "advec_lon": -0.2328176421928531,
+      "direction_deg_grid": 247.5,
+      "speed_cells": 4.0,
+      "truth_id": "a247_s4p0"
+    },
+    {
+      "advec_lat": 0.012628553268047982,
+      "advec_lon": -0.04365330791115995,
+      "direction_deg_grid": 292.5,
+      "speed_cells": 0.75,
+      "truth_id": "a292_s0p75"
+    },
+    {
+      "advec_lat": 0.03367614204812795,
+      "advec_lon": -0.11640882109642653,
+      "direction_deg_grid": 292.5,
+      "speed_cells": 2.0,
+      "truth_id": "a292_s2p0"
+    },
+    {
+      "advec_lat": 0.0673522840962559,
+      "advec_lon": -0.23281764219285306,
+      "direction_deg_grid": 292.5,
+      "speed_cells": 4.0,
+      "truth_id": "a292_s4p0"
+    },
+    {
+      "advec_lat": 0.03048802457287249,
+      "advec_lon": -0.018081792179251165,
+      "direction_deg_grid": 337.5,
+      "speed_cells": 0.75,
+      "truth_id": "a337_s0p75"
+    },
+    {
+      "advec_lat": 0.08130139886099332,
+      "advec_lon": -0.04821811247800311,
+      "direction_deg_grid": 337.5,
+      "speed_cells": 2.0,
+      "truth_id": "a337_s2p0"
+    },
+    {
+      "advec_lat": 0.16260279772198663,
+      "advec_lon": -0.09643622495600622,
+      "direction_deg_grid": 337.5,
+      "speed_cells": 4.0,
+      "truth_id": "a337_s4p0"
+    }
+  ],
+  "created": "2026-09-01T15:30:30",
+  "diagnostic_definition": "JQ90 of LOTO safeguarded-quadratic seed Chebyshev displacement in grid cells",
+  "input_template": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5/2023_july_st_circulant/sim_july2023_st_circulant_gridded.pkl",
+  "methods": [
+    "M3_fft",
+    "M3_fft_Q",
+    "M3_fft_JKQ"
+  ],
+  "mode": "synthetic",
+  "script": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/real_data/advection_direction/m3_surface_diagnostic_subgrid_benchmark_090126.py",
+  "signal_regimes": {
+    "reference": {
+      "nugget_factor": 1.0,
+      "range_time_factor": 1.0
+    },
+    "strong": {
+      "nugget_factor": 0.5,
+      "range_time_factor": 1.5
+    },
+    "weak": {
+      "nugget_factor": 3.0,
+      "range_time_factor": 0.5
+    }
+  }
+}

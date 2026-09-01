@@ -1,0 +1,37 @@
+{
+  "year": 2024,
+  "month": 7,
+  "days": [
+    0
+  ],
+  "device": "cpu",
+  "torch_num_threads": 10,
+  "monthly_load_s": 0.13072833296610042,
+  "grid": {
+    "n_lat": 114,
+    "n_lon": 159,
+    "points_per_hour": 18126,
+    "lat_step": 0.04400000000000004,
+    "lon_step": 0.06300000000000239
+  },
+  "fft_repeats": 5,
+  "reverse_l_max_eval": 5,
+  "reverse_l_spatial_stride": 2,
+  "run_full_fit": true,
+  "full_fit": {
+    "daily_stride": 2,
+    "target_chunk_size": 128,
+    "outer_steps": 1,
+    "max_eval_per_step": 20,
+    "history": 10
+  },
+  "fixed_nuisance": {
+    "sigmasq": 13.059,
+    "range_lat": 0.2,
+    "range_lon": 0.25,
+    "range_time": 1.5,
+    "advec_lat": 0.0,
+    "advec_lon": 0.0,
+    "nugget": 0.247
+  }
+}

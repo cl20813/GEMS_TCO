@@ -1,0 +1,9 @@
+truth_id,replicate,dataset_id,simulation_seed,n_lat,n_lon,n_valid,n_total,embedding_px,embedding_py,embedding_pt,spectrum_min_real_before_clamp,spectrum_negative_count_before_clamp
+slow_NE,0,slow_NE_rep00,831261,32,48,12140,12288,64,96,16,-19.4526062012,9
+slow_NW,0,slow_NW_rep00,841261,32,48,12140,12288,64,96,16,-19.3810729980,9
+slow_SW,0,slow_SW_rep00,851261,32,48,12140,12288,64,96,16,-19.5457458496,9
+slow_SE,0,slow_SE_rep00,861261,32,48,12140,12288,64,96,16,-19.6172790527,9
+fast_NE,0,fast_NE_rep00,871261,32,48,12140,12288,64,96,16,-16.4279785156,57
+fast_NW,0,fast_NW_rep00,881261,32,48,12140,12288,64,96,16,-16.9849548340,57
+fast_SW,0,fast_SW_rep00,891261,32,48,12140,12288,64,96,16,-17.0218200684,53
+fast_SE,0,fast_SE_rep00,901261,32,48,12140,12288,64,96,16,-16.4668579102,53
