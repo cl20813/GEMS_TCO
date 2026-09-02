@@ -1,0 +1,70 @@
+{
+  "arguments": {
+    "convergence_grad_threshold": 0.001,
+    "daily_stride": 2,
+    "days": "0,1,2",
+    "device": "cpu",
+    "empirical_max_lat_offset": 20,
+    "empirical_max_lon_offset": 20,
+    "empirical_min_pair_count": 1000,
+    "empirical_smooth_bandwidth_deg": 0.063,
+    "final_max_eval": 12,
+    "grad_tol": 1e-05,
+    "lat_range": "-3,-1",
+    "lbfgs_history": 10,
+    "lbfgs_lr": 1.0,
+    "lon_range": "121,125",
+    "month": 7,
+    "n_lat": 32,
+    "n_lon": 48,
+    "output_root": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/m3_q3_q5_quick_benchmark_090126",
+    "q5_gaussian_sigma_cells": 1.25,
+    "real_data_root": "/Users/joonwonlee/Documents/GEMS_DATA",
+    "real_full_fit_day_position": 1,
+    "real_max_eval": 8,
+    "seed": 901263,
+    "skip_real": false,
+    "skip_synthetic": true,
+    "smooth": 0.5,
+    "subgrid_max_condition_number": 100.0,
+    "summarize_only": false,
+    "synthetic_data_root": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5",
+    "synthetic_nuisance_scenario": "long_time_low_nugget",
+    "target_chunk_size": 128,
+    "wall_limit_minutes": 12.0,
+    "year": 2024
+  },
+  "created": "2026-09-01T22:04:40",
+  "methods": [
+    "M3_fft",
+    "M3_fft_Q3",
+    "M3_fft_Q5"
+  ],
+  "quick_cases": [
+    {
+      "angle_deg": 22.5,
+      "signal": "weak",
+      "speed_cells": 0.75
+    },
+    {
+      "angle_deg": 112.5,
+      "signal": "reference",
+      "speed_cells": 2.0
+    },
+    {
+      "angle_deg": 202.5,
+      "signal": "strong",
+      "speed_cells": 4.0
+    },
+    {
+      "angle_deg": 292.5,
+      "signal": "weak",
+      "speed_cells": 2.0
+    }
+  ],
+  "real_common_corridor_seed": {
+    "advec_lat": 0.0218,
+    "advec_lon": -0.1689
+  },
+  "script": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/real_data/advection_direction/m3_q3_q5_quick_benchmark_090126.py"
+}

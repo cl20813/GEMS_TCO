@@ -1,0 +1,333 @@
+% Standalone manuscript-ready draft.  Copy the material between
+% \begin{document} and \end{document} into the main Overleaf manuscript.
+% Required packages in the main manuscript:
+%   \usepackage{amsmath,amssymb,booktabs,threeparttable,graphicx,array}
+
+\documentclass[10pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,booktabs,threeparttable,graphicx,array}
+\usepackage{microtype}
+
+\newcommand{\Mthree}{\ensuremath{\mathrm{M3}}}
+\newcommand{\Qthree}{\ensuremath{\mathrm{Q3}}}
+\newcommand{\Qfive}{\ensuremath{\mathrm{Q5}}}
+
+\begin{document}
+
+\section{Design and stress testing of the advection initializer}
+\label{sec:advection-initializer}
+
+\subsection{Motivation and estimand}
+
+The directional Vecchia approximation places lagged conditioning blocks in a
+corridor oriented by an advection vector
+$\boldsymbol v=(v_{\mathrm{lat}},v_{\mathrm{lon}})^{\mathsf T}$.
+Although both components of $\boldsymbol v$ are estimated continuously in the
+subsequent seven-parameter likelihood optimization, the conditioning graph
+must first be constructed from an initial direction.  Rebuilding that graph
+inside every optimizer iteration would be expensive and would also change the
+approximate likelihood being optimized.  We therefore estimate a fast
+advection anchor, construct the directional corridor once, and keep the graph
+fixed throughout the final fit.  All competing initializers share the same
+starting values for the five nuisance parameters and the same optimizer
+budget; only the initial advection anchor differs.
+
+Our baseline, denoted \Mthree, is a \emph{masked-FFT empirical argmin}.  The
+label ``M3'' is an experiment identifier rather than a third-order model.  The
+two refinements, \Qthree\ and \Qfive, use the same empirical surface as \Mthree
+and only interpolate its local minimum below the grid resolution.
+
+\subsection{Masked-FFT cross-semivariogram}
+
+Let $Z_t(\boldsymbol x)$ be the field at hour $t$ on a regular
+$n_1\times n_2$ grid, and let $M_t(\boldsymbol x)$ equal one when that grid cell
+is observed and zero otherwise.  No spatial binning is required because every
+candidate displacement is an integer grid offset.  To attenuate time-varying
+additive level shifts, we center each hourly image using only its observed
+cells,
+\begin{equation}
+  \bar Z_t
+  =\frac{\sum_{\boldsymbol x}M_t(\boldsymbol x)Z_t(\boldsymbol x)}
+  {\sum_{\boldsymbol x}M_t(\boldsymbol x)},
+  \qquad
+  Y_t(\boldsymbol x)
+  =M_t(\boldsymbol x)\{Z_t(\boldsymbol x)-\bar Z_t\}.
+  \label{eq:hourly-demean}
+\end{equation}
+This removes first-order temporal nonstationarity in the mean, but it does not
+assume away temporal changes in the covariance or missingness pattern.
+
+For a one-hour lag $\tau=1$ and spatial offset $\boldsymbol h$, the pooled
+pairwise cross-semivariogram is
+\begin{equation}
+  \widehat\gamma_1(\boldsymbol h)
+  =\frac{1}{2N(\boldsymbol h)}
+  \sum_{t=1}^{T-1}\sum_{\boldsymbol x}
+  M_t(\boldsymbol x)M_{t+1}(\boldsymbol x+\boldsymbol h)
+  \left[\widetilde Z_t(\boldsymbol x)
+  -\widetilde Z_{t+1}(\boldsymbol x+\boldsymbol h)\right]^2,
+  \label{eq:cross-semivariogram}
+\end{equation}
+where $\widetilde Z_t=Z_t-\bar Z_t$ on observed cells and
+\begin{equation}
+  N(\boldsymbol h)=\sum_{t=1}^{T-1}\sum_{\boldsymbol x}
+  M_t(\boldsymbol x)M_{t+1}(\boldsymbol x+\boldsymbol h).
+\end{equation}
+In the eight-hour application, pooling uses all seven adjacent hourly
+transitions.  The lag $\tau=1$ therefore means one hour, not one spatial grid
+cell.  We use the one-hour lag as the primary initializer because it provides
+the largest number of overlapping pairs, avoids compounding displacement over
+multiple hours, and generally retains the strongest temporal dependence;
+longer lags can be treated as a sensitivity analysis when one-hour dependence
+is weak.
+
+Expanding the square in Equation~\eqref{eq:cross-semivariogram} gives four
+linear cross-correlations for each adjacent pair:
+\begin{align}
+ N_t(\boldsymbol h)
+   &=\sum_{\boldsymbol x}M_t(\boldsymbol x)
+      M_{t+1}(\boldsymbol x+\boldsymbol h), \\
+ A_t(\boldsymbol h)
+   &=\sum_{\boldsymbol x}Y_t(\boldsymbol x)^2
+      M_{t+1}(\boldsymbol x+\boldsymbol h), \\
+ B_t(\boldsymbol h)
+   &=\sum_{\boldsymbol x}M_t(\boldsymbol x)
+      Y_{t+1}(\boldsymbol x+\boldsymbol h)^2, \\
+ C_t(\boldsymbol h)
+   &=\sum_{\boldsymbol x}Y_t(\boldsymbol x)
+      Y_{t+1}(\boldsymbol x+\boldsymbol h),
+ \label{eq:four-correlations}
+\end{align}
+so that
+\begin{equation}
+ \widehat\gamma_1(\boldsymbol h)
+ =\frac{\sum_{t=1}^{T-1}
+ \{A_t(\boldsymbol h)+B_t(\boldsymbol h)-2C_t(\boldsymbol h)\}}
+ {2\sum_{t=1}^{T-1}N_t(\boldsymbol h)}.
+ \label{eq:masked-gamma}
+\end{equation}
+For arrays $U$ and $V$, all displacements are obtained simultaneously using
+the correlation theorem,
+\begin{equation}
+ \operatorname{Corr}(U,V)(\boldsymbol h)
+ =\mathcal F^{-1}
+ \left\{\overline{\mathcal F(U)}\,\mathcal F(V)\right\}
+ (\boldsymbol h).
+ \label{eq:fft-correlation}
+\end{equation}
+Thus, the four quantities in Equation~\eqref{eq:four-correlations} are computed
+by applying Equation~\eqref{eq:fft-correlation} to the data, squared data, and
+observation masks.  Missing observations are set to zero only inside the FFT;
+the mask correlation $N_t(\boldsymbol h)$ restores the exact number of valid
+pairs at every displacement.  This is analogous in spirit to the observation-
+window correction used by a debiased Whittle likelihood because both the data
+and their observation window are transformed.  Here, however, the mask is used
+for exact pairwise normalization of a cross-semivariogram, rather than for
+correcting the expected periodogram.
+
+Zero-padding is essential.  An unpadded discrete Fourier transform returns a
+\emph{circular} correlation and would spuriously match the eastern and western
+boundaries, or the northern and southern boundaries.  We instead compute the
+full linear correlation by padding each dimension to at least
+$(2n_1-1)\times(2n_2-1)$ (an FFT implementation may pad further to an efficient
+transform length), and then extract the entries centered at
+$(n_1-1,n_2-1)+\boldsymbol h$.  We searched integer offsets
+$h_j\in\{-20,\ldots,20\}$, retained cells with at least 1,000 pooled valid
+pairs, and applied a missing-aware Gaussian smoother with bandwidth
+$0.063^\circ$.  For the GEMS grid spacings
+$(\Delta_{\mathrm{lat}},\Delta_{\mathrm{lon}})=(0.044^\circ,0.063^\circ)$,
+the search region is approximately
+$[-0.88^\circ,0.88^\circ]\times[-1.26^\circ,1.26^\circ]$.
+
+The \Mthree\ anchor is the discrete minimum
+\begin{equation}
+ \widehat{\boldsymbol v}_{\Mthree}
+ =\underset{\boldsymbol h\in\mathcal H}{\arg\min}\;
+ \widehat\gamma_1(\boldsymbol h).
+ \label{eq:m3}
+\end{equation}
+The direct calculation costs
+$O\{(T-1)|\mathcal H|n_1n_2\}$ operations, whereas the masked-FFT calculation
+costs $O\{(T-1)n_1n_2\log(n_1n_2)\}$ and returns the entire displacement
+surface at once.
+
+\subsection{Safeguarded local quadratic refinements}
+
+Because Equation~\eqref{eq:m3} is restricted to integer offsets, its error has
+a grid-quantization component.  Let $(i_0,j_0)$ denote the \Mthree\ cell and
+write local coordinates in \emph{grid-cell units},
+$\boldsymbol d=(u,v)^{\mathsf T}$, rather than degrees.  Both refinements fit
+\begin{equation}
+ q(\boldsymbol d)
+ =\beta_0+\boldsymbol g^{\mathsf T}\boldsymbol d
+ +\frac{1}{2}\boldsymbol d^{\mathsf T}H\boldsymbol d,
+ \qquad
+ \widehat{\boldsymbol d}=-\widehat H^{-1}\widehat{\boldsymbol g},
+ \label{eq:quadratic}
+\end{equation}
+where $H$ is a symmetric $2\times2$ Hessian.  There are six distinct
+coefficients: an intercept, two slopes, and the three unique elements of $H$.
+The eigenvalues of $H$ are the curvatures along the two principal directions
+of the local surface.
+
+The \Qthree\ method uses ordinary least squares on the $3\times3$ patch
+$u,v\in\{-1,0,1\}$, giving nine surface values and three residual degrees of
+freedom.  This is a deterministic local interpolation, not a regression model
+for nine independent observations: neighboring semivariogram cells are
+correlated and each cell already averages many data pairs.  The \Qfive\ method
+uses the $5\times5$ patch $u,v\in\{-2,-1,0,1,2\}$ and weighted least squares
+with prespecified Gaussian weights
+\begin{equation}
+ w(u,v)=\exp\left\{-\frac{u^2+v^2}{2s^2}\right\},
+ \qquad s=1.25\ \text{grid cells},
+ \label{eq:q5-weight}
+\end{equation}
+leaving 19 nominal residual degrees of freedom.  The weighting stabilizes the
+fit while limiting contamination from nonquadratic behavior or a neighboring
+basin farther from the discrete minimum.
+
+The same numerical safeguards are imposed on \Qthree\ and \Qfive:
+\begin{enumerate}
+ \item the complete local patch must lie inside the searched surface and all
+       patch values must be finite;
+ \item $\widehat H$ must be positive definite, i.e., both eigenvalues must be
+       strictly positive;
+ \item the Hessian condition number, calculated in grid-cell coordinates,
+       must satisfy $\kappa(\widehat H)\leq100$; and
+ \item the interpolated correction must remain inside the central half cell,
+       $|\widehat d_{\mathrm{lat}}|\leq0.5$ and
+       $|\widehat d_{\mathrm{lon}}|\leq0.5$.
+\end{enumerate}
+If any condition fails, the method returns the unmodified \Mthree\ anchor.
+The physical correction is
+$(\Delta_{\mathrm{lat}}\widehat d_{\mathrm{lat}},
+\Delta_{\mathrm{lon}}\widehat d_{\mathrm{lon}})$.
+Scaling before the fit is important: otherwise the unequal latitude and
+longitude spacings can distort the numerical condition number without changing
+the underlying surface geometry.
+
+We also examined a leave-one-transition-out stability diagnostic as a possible
+hard gate between \Mthree\ and \Qthree.  The gate was not retained as a primary
+method: among the 12 downstream comparisons on which it changed the selected
+anchor, \Qthree\ and \Mthree\ each achieved the lower common NLL six times, and
+the gate rejected \Qthree\ in the most consequential case in which it avoided
+a poor local solution.  The diagnostic may still be reported as a continuous
+measure of surface stability, but it is not used to override the numerical
+safeguards above.
+
+\subsection{Stress-test design}
+
+The initializer-only factorial experiment crossed eight non-grid-aligned
+directions $(22.5^\circ+45^\circ k)$, three speeds
+$(0.75,2,4)$ grid cells per hour, three signal regimes, and five independent
+replicates, producing $8\times3\times3\times5=360$ data sets.  Relative to the
+reference covariance, the strong, reference, and weak regimes multiplied
+$(\text{range}_{t},\text{nugget})$ by $(1.5,0.5)$, $(1,1)$, and $(0.5,3)$,
+respectively.  This factorial stresses slow motion, large motion, weak temporal
+dependence, high nugget, and all four quadrants.
+
+A downstream experiment then used a partially completed set of 30 synthetic
+data sets.  For each data set we used three common nuisance starts: the truth;
+a short-time/high-nugget start with multipliers
+$(0.75,1.25,1.25,0.50,1.50)$; and a long-time/low-nugget start with multipliers
+$(1.25,0.75,0.75,1.50,0.50)$ for
+$(\sigma^2,\rho_{\mathrm{lat}},\rho_{\mathrm{lon}},\rho_t,\tau^2)$.
+This produced 90 seven-parameter fits per initializer.  The partial run covered
+all selected $22.5^\circ$ cases and the 0.75- and 2-cell cases at
+$112.5^\circ$, but not the opposite quadrants, and is therefore reported as
+descriptive interim evidence.  Final estimates were evaluated on a common
+oracle-direction corridor because raw likelihoods from different Vecchia
+factorizations are not directly comparable.
+
+We reran the complete 360-data-set initializer factorial using the final
+cell-scaled safeguards for both \Qthree\ and \Qfive.  The more expensive
+downstream full-fit stress test predated \Qfive; hence its 30-data-set results
+compare \Mthree\ and \Qthree, followed by a deliberately small downstream
+\Qfive\ screen.  This distinction prevents preliminary full-fit evidence for
+\Qfive\ from being interpreted as confirmatory.
+
+\begin{table}[t]
+\centering
+\caption{Stress tests of the empirical and sub-grid advection initializers.}
+\label{tab:advection-stress}
+\begin{threeparttable}
+\small
+\textbf{A. Initializer-only factorial stress test (360 synthetic data sets)}\\[2pt]
+\begin{tabular}{lrrrrrr}
+\toprule
+Method & Mean error & Median error & Angle error & Correct & Q accepted & Time \\
+       & (cells)    & (cells)      & (degrees)   & quadrant &            & (ms) \\
+\midrule
+\Mthree        & 0.587 & 0.559 & 13.88 & 0.656 & ---   & 2.828 \\
+\Mthree+\Qthree & 0.381 & 0.266 &  8.83 & 0.944 & 0.953 & 2.913 \\
+\Mthree+\Qfive  & 0.391 & 0.285 &  9.11 & 0.944 & 0.958 & 2.914 \\
+\bottomrule
+\end{tabular}
+
+\vspace{6pt}
+\textbf{B. Partial fixed-corridor full-fit stress test
+(30 data sets, three nuisance starts, 90 fits per method)}\\[2pt]
+\begin{tabular}{lrrrrrr}
+\toprule
+Method & Common & Seven-parameter & Final advection & Gradient & Fit time & Start-var. \\
+       & regret & error & error & convergence & (s) & trace \\
+\midrule
+\Mthree         & 0.000739 & 0.1790 & 0.02184 & 0.444 & 7.135 & 0.3208 \\
+\Mthree+\Qthree & 0.000500 & 0.1697 & 0.01366 & 0.467 & 7.152 & 0.1634 \\
+\bottomrule
+\end{tabular}
+
+\vspace{6pt}
+\textbf{C. Preliminary \Qfive\ screen (four synthetic data sets)}\\[2pt]
+\begin{tabular}{lrrrrr}
+\toprule
+Method & Seed error & Common NLL & Seven-parameter & Final advection & Fit time \\
+       & (cells)    &            & error           & error           & (s) \\
+\midrule
+\Mthree          & 0.680 & 1.258142 & 0.591 & 0.1812 & 4.086 \\
+\Mthree+\Qthree  & 0.604 & 1.257321 & 0.366 & 0.0307 & 4.050 \\
+\Mthree+\Qfive   & 0.530 & 1.256986 & 0.396 & 0.0214 & 4.042 \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}[flushleft]\footnotesize
+\item Errors in panel A are measured in grid-cell units.  ``Start-var. trace''
+is the trace of the standardized final-parameter covariance across the three
+nuisance starts.  Panel B is an unbalanced partial run; 87--90\% of fits reached
+the 20-evaluation limit.  In paired dataset-cluster bootstraps, the
+\Mthree+\Qthree\ minus \Mthree\ differences were $-0.000240$
+($95\%$ CI $[-0.000880,0.000146]$) for common NLL, $-0.00929$
+($[-0.03928,0.01018]$) for seven-parameter error, and $-0.00818$
+($[-0.02502,0.00079]$) for final advection error.  All intervals include zero.
+All panel C fits reached the 12-evaluation limit, so panel C compares equal
+budgets rather than converged estimators.
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+\subsection{Real-data timing and interpretation}
+
+On three full GEMS days ($114\times159=18{,}126$ grid cells per hour and eight
+hours per day), the mean initializer times were 0.0199, 0.0201, and 0.0200
+seconds for \Mthree, \Mthree+\Qthree, and \Mthree+\Qfive, respectively.
+Both quadratic refinements fell back to \Mthree\ on one of the three days; when
+accepted, the largest correction was 0.312 grid cells.  On the selected
+non-fallback day, a short seven-parameter fit required 40.41, 40.49, and 40.72
+seconds, respectively.  The common-corridor NLLs were 1.403918, 1.403625, and
+1.403915, with \Mthree+\Qthree\ smallest.  All three real-data fits reached the
+eight-evaluation limit, so these values are timing and stability checks rather
+than evidence of optimizer convergence.
+
+The 360-data-set initializer stress test shows that both safeguarded local
+quadratic corrections remove substantial grid quantization error at negligible
+computational cost.  In this larger screen, \Qthree\ had slightly smaller mean
+and median errors than \Qfive; \Qfive\ was nevertheless competitive and had a
+slightly higher safeguard acceptance rate.  The partial downstream experiment
+also favors \Qthree\ in its point estimates and suggests reduced sensitivity to
+nuisance starts, but its confidence intervals include zero and its directional
+coverage is incomplete.  In the smaller downstream screen, \Qfive\ had the
+smallest final advection error but not the smallest seven-parameter error.
+Accordingly, we treat \Mthree\ as the primary baseline, safeguarded \Qthree\ as
+the primary refinement, and weighted \Qfive\ as a prespecified competing
+refinement for the final confirmatory experiment.
+
+\end{document}

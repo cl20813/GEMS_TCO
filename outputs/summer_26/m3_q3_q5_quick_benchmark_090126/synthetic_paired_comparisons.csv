@@ -1,0 +1,9 @@
+baseline,competitor,metric,n_pairs,mean_difference_competitor_minus_baseline,paired_win_rate_lower_is_better
+M3_fft,M3_fft_Q3,common_eval_nll,4,-0.0008203141,0.7500000000
+M3_fft,M3_fft_Q3,final_standardized_rmse_7param,4,-0.2253086369,0.7500000000
+M3_fft,M3_fft_Q3,final_seed_error_euclid,4,-0.1504409326,0.5000000000
+M3_fft,M3_fft_Q3,end_to_end_s,4,-0.0347756355,1.0000000000
+M3_fft,M3_fft_Q5,common_eval_nll,4,-0.0011553819,0.5000000000
+M3_fft,M3_fft_Q5,final_standardized_rmse_7param,4,-0.1952959710,0.5000000000
+M3_fft,M3_fft_Q5,final_seed_error_euclid,4,-0.1597637158,0.5000000000
+M3_fft,M3_fft_Q5,end_to_end_s,4,-0.0434820938,1.0000000000

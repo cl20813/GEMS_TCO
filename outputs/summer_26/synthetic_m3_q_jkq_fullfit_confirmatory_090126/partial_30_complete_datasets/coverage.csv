@@ -1,0 +1,16 @@
+direction_deg_grid,speed_cells,signal_regime,size
+22.5,0.75,reference,2
+22.5,0.75,strong,2
+22.5,0.75,weak,2
+22.5,2.0,reference,2
+22.5,2.0,strong,2
+22.5,2.0,weak,2
+22.5,4.0,reference,2
+22.5,4.0,strong,2
+22.5,4.0,weak,2
+112.5,0.75,reference,2
+112.5,0.75,strong,2
+112.5,0.75,weak,2
+112.5,2.0,reference,2
+112.5,2.0,strong,2
+112.5,2.0,weak,2
