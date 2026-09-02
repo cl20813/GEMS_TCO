@@ -1,0 +1,40 @@
+{
+  "source_root": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5",
+  "output_root": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/sim_data/july_st_circulant_realpattern_smooth0p5_nugget0_matched5_090226",
+  "selected_dates": [
+    "2023-07-04",
+    "2023-07-29",
+    "2024-07-13",
+    "2024-07-19",
+    "2025-07-06"
+  ],
+  "truth_nugget": 0.0,
+  "years": [
+    {
+      "year": 2023,
+      "dates": [
+        "2023-07-04",
+        "2023-07-29"
+      ],
+      "n_hours": 16,
+      "max_reconstruction_error": 0.0
+    },
+    {
+      "year": 2024,
+      "dates": [
+        "2024-07-13",
+        "2024-07-19"
+      ],
+      "n_hours": 16,
+      "max_reconstruction_error": 0.0
+    },
+    {
+      "year": 2025,
+      "dates": [
+        "2025-07-06"
+      ],
+      "n_hours": 8,
+      "max_reconstruction_error": 0.0
+    }
+  ]
+}

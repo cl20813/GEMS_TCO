@@ -1,0 +1,33 @@
+{
+  "center_value": 260.37636116279606,
+  "data_kind": "synthetic",
+  "data_source": "synthetic_dgp_smooth0p5_nugget1_fit_nugget0",
+  "dataset_id": "synthetic_20240719",
+  "date": "2024-07-19",
+  "day": 19,
+  "keys": [
+    "y24m07day19_hm00:53",
+    "y24m07day19_hm01:53",
+    "y24m07day19_hm02:53",
+    "y24m07day19_hm03:53",
+    "y24m07day19_hm04:48",
+    "y24m07day19_hm05:48",
+    "y24m07day19_hm06:48",
+    "y24m07day19_hm07:48"
+  ],
+  "month": 7,
+  "n_total": 145008,
+  "n_valid": 142077,
+  "source_path": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5/2024_july_st_circulant/sim_july2024_st_circulant_gridded.pkl",
+  "truth": {
+    "advec_lat": 0.08,
+    "advec_lon": -0.2,
+    "nugget": 1.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "sigmasq": 10.0
+  },
+  "valid_rate": 0.9797873220787818,
+  "year": 2024
+}

@@ -1,0 +1,9 @@
+data_kind,method,n_dates,mean_squared_score,max_abs_bridge_scaled,native_nll_per_target,diagnostic_seconds
+real,adapted,5,1.0607,7.4800,1.2877,2.7238
+real,fixed,5,1.0388,7.0804,1.2913,2.8463
+real,shifted,5,1.0577,7.3299,1.2878,2.7148
+real,union,5,1.0620,7.5312,1.2875,2.6976
+synthetic,adapted,5,1.0565,5.0803,1.1340,2.9116
+synthetic,fixed,5,1.0216,4.2391,1.1412,2.7401
+synthetic,shifted,5,1.0554,5.0409,1.1339,2.7852
+synthetic,union,5,1.0585,5.1379,1.1332,2.7793

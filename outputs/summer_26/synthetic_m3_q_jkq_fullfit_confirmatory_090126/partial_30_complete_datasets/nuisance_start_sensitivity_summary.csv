@@ -1,4 +1,0 @@
-method,n_datasets,mean_trace_start_variance,median_trace_start_variance,p90_trace_start_variance
-M3_fft,30,0.3207690369,0.1208709489,0.3862906551
-M3_fft_JKQ,30,0.3318875639,0.1340580737,0.3688991349
-M3_fft_Q,30,0.1633962493,0.1340580737,0.3534266751

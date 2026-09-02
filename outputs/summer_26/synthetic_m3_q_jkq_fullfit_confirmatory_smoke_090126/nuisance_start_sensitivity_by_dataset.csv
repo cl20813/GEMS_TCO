@@ -1,4 +1,0 @@
-dataset_id,method,n_nuisance_starts,trace_standardized_start_variance,mean_standardized_start_variance,start_variance_sigmasq,start_variance_range_lat,start_variance_range_lon,start_variance_range_time,start_variance_advec_lat,start_variance_advec_lon,start_variance_nugget
-a022_s2p0_reference_r00,M3_fft,1,,,,,,,,,
-a022_s2p0_reference_r00,M3_fft_Q,1,,,,,,,,,
-a022_s2p0_reference_r00,M3_fft_JKQ,1,,,,,,,,,

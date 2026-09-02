@@ -1,5 +1,11 @@
 # Four-geometry lag643 Vecchia comparison
 
+> **Historical four-method workflow:** the current driver has been updated for
+> the requested three-method `adapted`, `fixed`, `union` experiment. Do not use
+> the commands below with the current driver. Use
+> `README_vecchia_real30_synth30_three_geometry_lag643_run07.md` instead. This
+> file is retained only to document the earlier run configuration.
+
 This experiment compares four fixed conditioning graphs on five real July
 days and five smooth=0.5 synthetic July days. Every graph uses the same M3
 masked-FFT plus safeguarded Q3 advection initializer and the same optimizer
@@ -47,12 +53,9 @@ ssh -o HostKeyAlias=amarel-new.hpc.rutgers.edu \
   jl2815@amarel.rutgers.edu \
   "mkdir -p ${REMOTE_DIR} ${REMOTE_SRC} /home/jl2815/tco/exercise_output/summer/logs"
 
-scp -o HostKeyAlias=amarel-new.hpc.rutgers.edu \
-  "${LOCAL_ROOT}/src/GEMS_TCO/vecchia_cluster.py" \
-  "${LOCAL_ROOT}/src/GEMS_TCO/vecchia_realdata_corridor_width_4x4_lag643.py" \
-  "${LOCAL_ROOT}/src/GEMS_TCO/vecchia_realdata_adapted_corridor_width_4x4_lag643.py" \
-  "${LOCAL_ROOT}/src/GEMS_TCO/vecchia_realdata_calibrated_shifted_center_4x4_lag643.py" \
-  "jl2815@amarel.rutgers.edu:${REMOTE_SRC}/"
+scp -r -o HostKeyAlias=amarel-new.hpc.rutgers.edu \
+  "${LOCAL_ROOT}/src/GEMS_TCO" \
+  "jl2815@amarel.rutgers.edu:/home/jl2815/tco/"
 
 scp -o HostKeyAlias=amarel-new.hpc.rutgers.edu \
   "${LOCAL_DIR}/vecchia_adapted_vs_fixed_lag643_090126.py" \
@@ -114,16 +117,44 @@ ssh -o HostKeyAlias=amarel-new.hpc.rutgers.edu \
 - `all_cross_likelihoods.csv`
 - `union_reference_likelihood_gaps.csv` and `.png`
 - `all_eigen_summaries.csv`
-- `conditional_eigen_mean_four_geometries.png`, with all four colors and mean
-  native/union-evaluated likelihoods in the legend
 - `synthetic_parameter_errors.png`
-- per-dataset task folders with exact source keys and a four-curve eigen plot;
-  each legend records that fit's native and union-evaluated likelihoods
+- `comparison_report/vecchia_comparison_summary.csv`: one compact row per
+  selected dataset and method, beginning with data kind/date/dataset ID; all
+  numeric fields are written to four decimal places
+- `comparison_report/vecchia_parameter_details.csv`: tidy truth/estimate/error
+  table, also at four decimal places
+- `comparison_report/vecchia_comparison_report.md`: compact human-readable
+  report, including completion status, daily fit results, method means, and
+  synthetic truth errors
+- `comparison_report/run_completeness.csv`: makes missing fits, eigen results,
+  union evaluations, or task `COMPLETE` markers explicit
+- `comparison_report/plots/daily/*_conditional_eigen.png`: one daily plot per
+  dataset with adapted, shifted, fixed, and union curves in four colors; each
+  legend shows likelihood and eigen D to four decimals
+- `comparison_report/plots/mean/real_mean_conditional_eigen.png` and
+  `synthetic_mean_conditional_eigen.png`: separate selected-day means with all
+  four methods. A deliberately labelled `partial_mean` plot is produced only
+  when `--allow-partial-aggregate` is requested and results are incomplete.
+- per-dataset task folders with exact source keys and four-curve eigen plots
 
 Native NLL values from different graphs are retained, but the primary
 likelihood comparison uses the common union graph: evaluate the adapted,
 shifted, and fixed fitted parameter vectors under the union conditioning set
 and compare all three with the union fit.
+
+Aggregation normally refuses an incomplete run. After copying a still-running
+or failed result directory for diagnosis, use this explicitly:
+
+```bash
+python vecchia_adapted_vs_fixed_lag643_090126.py \
+  --mode aggregate \
+  --selection-file vecchia_adapted_vs_fixed_selection_090126.json \
+  --output-root /path/to/vecchia_four_geometry_lag643_090126 \
+  --allow-partial-aggregate
+```
+
+Partial plots and tables are marked `PARTIAL`; they must not be presented as
+the final four-method comparison.
 
 ## Pull results
 

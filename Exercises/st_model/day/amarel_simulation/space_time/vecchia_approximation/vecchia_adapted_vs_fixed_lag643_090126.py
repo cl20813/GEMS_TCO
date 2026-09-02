@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare three lag-643 conditioning geometries and their exact union.
+"""Compare adapted/fixed lag-643 conditioning geometries and their exact union.
 
 The experiment uses the same M3 masked-FFT + safeguarded Q3 advection seed for
 every fit.  Only the fixed conditioning graph changes:
@@ -11,21 +11,17 @@ every fit.  Only the fixed conditioning graph changes:
     sign is required by the covariance convention d(h - v*tau): for a current
     target, correlated past locations are in the -v direction.
 
-``shifted``
-    The same 6/4/3 budgets, with four nearest blocks centered at target-v_hat
-    for t-1 and three nearest blocks centered at target-2*v_hat for t-2.
-
 ``fixed``
     The same target blocks and 6/4/3 budgets, but both past neighborhoods stay
     centered at the target block (zero displacement).
 
 ``union``
-    The exact set union of adapted, shifted, and fixed conditioning blocks: six
-    same-time blocks, up to 12 t-1 blocks, and up to nine t-2 blocks after
+    The exact set union of adapted and fixed conditioning blocks: six
+    same-time blocks, up to eight t-1 blocks, and up to six t-2 blocks after
     deduplication.
 
-Each data set produces four native fits, a 4x4 cross-objective matrix (every
-fitted parameter vector evaluated on every graph), and a four-curve
+Each data set produces three native fits, a 3x3 cross-objective matrix (every
+fitted parameter vector evaluated on every graph), and a three-curve
 conditional-eigen diagnostic.  Synthetic fits also retain every truth,
 estimate, absolute/log error, advection error, and a combined parameter error.
 
@@ -82,23 +78,29 @@ from GEMS_TCO.vecchia_cluster import StrategyClusterVecchiaFit  # noqa: E402
 from GEMS_TCO.vecchia_realdata_adapted_corridor_width_4x4_lag643 import (  # noqa: E402
     AdaptedRealDataCorridorWidth4x4Lag643VecchiaFit,
 )
-from GEMS_TCO.vecchia_realdata_calibrated_shifted_center_4x4_lag643 import (  # noqa: E402
-    CalibratedShiftedCenter4x4Lag643VecchiaFit,
-)
-
-
 DTYPE = torch.double
 BLOCK_SHAPE = (4, 4)
 LAG_COUNTS = (6, 4, 3)
-BASE_GEOMETRIES = ("adapted", "shifted", "fixed")
+LAG_TAG = "lag643"
+BASE_GEOMETRIES = ("adapted", "fixed")
 GEOMETRIES = (*BASE_GEOMETRIES, "union")
 EIGEN_GEOMETRIES = GEOMETRIES
 GEOMETRY_COLORS = {
     "adapted": "#1f77b4",
-    "shifted": "#ff7f0e",
     "fixed": "#d62728",
     "union": "#2ca02c",
 }
+GEOMETRY_LINESTYLES = {
+    "adapted": "-",
+    "fixed": "-.",
+    "union": ":",
+}
+GEOMETRY_LABELS = {
+    "adapted": "adapted corridor",
+    "fixed": "fixed center",
+    "union": "adapted + fixed union",
+}
+REPORT_DIR_NAME = "comparison_report"
 PARAMETERS = (
     "sigmasq",
     "range_lat",
@@ -193,10 +195,22 @@ def assert_grid_order(frames: dict[str, pd.DataFrame], keys: Sequence[str], base
 
 def load_selection(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     selection = json.loads(path.read_text(encoding="utf-8"))
-    rows = [dict(row, data_kind="real") for row in selection["real"]]
-    rows.extend(dict(row, data_kind="synthetic") for row in selection["synthetic"])
-    if len(rows) != 10:
-        raise RuntimeError(f"Expected 10 selected data sets, found {len(rows)}")
+    real_source = str(selection.get("real_data_source", "real"))
+    synthetic_source = str(selection.get("synthetic_data_source", "synthetic"))
+    rows = [
+        dict(row, data_kind="real", data_source=row.get("data_source", real_source))
+        for row in selection.get("real", [])
+    ]
+    rows.extend(
+        dict(
+            row,
+            data_kind="synthetic",
+            data_source=row.get("data_source", synthetic_source),
+        )
+        for row in selection.get("synthetic", [])
+    )
+    if not rows:
+        raise RuntimeError("Selection must contain at least one real or synthetic data set")
     if len({row["dataset_id"] for row in rows}) != len(rows):
         raise RuntimeError("Selection contains duplicate dataset_id values")
     return selection, rows
@@ -276,12 +290,65 @@ def build_synthetic_tensor(
     return torch.cat([base, dummies.to(dtype=DTYPE)], dim=1).contiguous()
 
 
+def resolve_synthetic_asset_paths(
+    spec: dict[str, Any], args: argparse.Namespace
+) -> tuple[Path, Path]:
+    """Resolve synthetic assets without silently selecting another DGP."""
+    requested = Path(args.synthetic_data_root)
+    fallback_names = (
+        "july_st_circulant_realpattern_smooth0p5_nugget0_oneday_070926",
+        "july_st_circulant_realpattern_smooth0p5_nugget0",
+        "july_st_circulant_realpattern",
+    )
+    candidate_values = [requested]
+    if requested.name == "july_st_circulant_realpattern_smooth0p5":
+        candidate_values.extend(requested.with_name(name) for name in fallback_names)
+    candidates = list(dict.fromkeys(candidate_values))
+    checked: list[str] = []
+    for root in candidates:
+        year_dir = root / f"{spec['year']}_july_st_circulant"
+        data_path = year_dir / f"sim_july{spec['year']}_st_circulant_gridded.pkl"
+        truth_path = year_dir / f"sim_july{spec['year']}_st_circulant_truth.json"
+        checked.extend([str(data_path), str(truth_path)])
+        if not data_path.is_file() or not truth_path.is_file():
+            continue
+        truth = json.loads(truth_path.read_text(encoding="utf-8"))
+        if not math.isclose(
+            float(truth.get("smooth", np.nan)),
+            float(args.smooth),
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            checked.append(
+                f"rejected {truth_path}: smooth={truth.get('smooth')!r}"
+            )
+            continue
+        expected_nugget = getattr(args, "truth_nugget", None)
+        if expected_nugget is not None and not math.isclose(
+            float(truth.get("nugget", np.nan)),
+            float(expected_nugget),
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        ):
+            checked.append(
+                f"rejected {truth_path}: nugget={truth.get('nugget')!r}"
+            )
+            continue
+        return data_path, truth_path
+    raise FileNotFoundError(
+        f"No matching synthetic smooth={float(args.smooth):g}"
+        + (
+            " asset"
+            if getattr(args, "truth_nugget", None) is None
+            else f", nugget={float(args.truth_nugget):g} asset"
+        )
+        + " was found. Checked:\n- "
+        + "\n- ".join(checked)
+    )
+
+
 def load_synthetic_asset(spec: dict[str, Any], args: argparse.Namespace) -> DayAsset:
-    year_dir = Path(args.synthetic_data_root) / f"{spec['year']}_july_st_circulant"
-    data_path = year_dir / f"sim_july{spec['year']}_st_circulant_gridded.pkl"
-    truth_path = year_dir / f"sim_july{spec['year']}_st_circulant_truth.json"
-    if not data_path.exists() or not truth_path.exists():
-        raise FileNotFoundError(f"Synthetic inputs missing: {data_path} or {truth_path}")
+    data_path, truth_path = resolve_synthetic_asset_paths(spec, args)
     obj = pd.read_pickle(data_path)
     if not isinstance(obj, dict):
         raise TypeError(f"Expected dict pickle at {data_path}, got {type(obj)}")
@@ -306,8 +373,24 @@ def load_synthetic_asset(spec: dict[str, Any], args: argparse.Namespace) -> DayA
     }
     truth_raw = json.loads(truth_path.read_text(encoding="utf-8"))
     truth = {name: float(truth_raw[name]) for name in PARAMETERS}
-    if not math.isclose(float(truth_raw.get("smooth", np.nan)), 0.5, rel_tol=0.0, abs_tol=1e-12):
-        raise RuntimeError(f"Synthetic truth is not smooth=0.5: {truth_path}")
+    if not math.isclose(
+        float(truth_raw.get("smooth", np.nan)),
+        float(args.smooth),
+        rel_tol=0.0,
+        abs_tol=1e-12,
+    ):
+        raise RuntimeError(
+            f"Synthetic truth smooth does not equal {float(args.smooth):g}: {truth_path}"
+        )
+    if args.truth_nugget is not None and not math.isclose(
+        float(truth_raw.get("nugget", np.nan)),
+        float(args.truth_nugget),
+        rel_tol=0.0,
+        abs_tol=1e-12,
+    ):
+        raise RuntimeError(
+            f"Synthetic truth nugget does not equal {float(args.truth_nugget):g}: {truth_path}"
+        )
     valid, total = count_valid(source_map)
     del obj
     gc.collect()
@@ -376,7 +459,7 @@ class FixedCenterLag643VecchiaFit(StrategyClusterVecchiaFit):
 
 
 class UnionLag643VecchiaFit(AdaptedRealDataCorridorWidth4x4Lag643VecchiaFit):
-    """Exact block-set union of corridor, shifted, and fixed neighbors."""
+    """Exact block-set union of adapted-corridor and fixed-center neighbors."""
 
     def __init__(
         self,
@@ -401,11 +484,11 @@ class UnionLag643VecchiaFit(AdaptedRealDataCorridorWidth4x4Lag643VecchiaFit):
             min_target_points=min_target_points,
         )
         # The parent is the 6/4/3 corridor component.  The union also includes
-        # a shifted-center and a fixed-center 4/3 component.  These fields all
+        # a fixed-center 4/3 component.  These fields all
         # participate in precomputation/dummy allocation and therefore must be
         # changed together before precompute_conditioning_sets() is called.
-        self.lag1_block_count = 3 * LAG_COUNTS[1]
-        self.lag2_block_count = 3 * LAG_COUNTS[2]
+        self.lag1_block_count = 2 * LAG_COUNTS[1]
+        self.lag2_block_count = 2 * LAG_COUNTS[2]
         self.lag1_max_blocks = self.lag1_block_count
         self.lag2_max_blocks = self.lag2_block_count
         self.lag1_local_blocks = self.lag1_max_blocks
@@ -415,7 +498,7 @@ class UnionLag643VecchiaFit(AdaptedRealDataCorridorWidth4x4Lag643VecchiaFit):
             self.lag1_max_blocks,
             self.lag2_max_blocks,
         ) + 8
-        self.temporal_basis = "union_corridor_shifted_and_fixed"
+        self.temporal_basis = "union_corridor_and_fixed"
 
     def _lag_candidates(self, block_idx: int, lag: int) -> list[int]:
         component_count = self.component_lag_counts[int(lag)]
@@ -429,52 +512,114 @@ class UnionLag643VecchiaFit(AdaptedRealDataCorridorWidth4x4Lag643VecchiaFit):
             multipliers,
             component_count,
         )
-        shifted = (
-            CalibratedShiftedCenter4x4Lag643VecchiaFit
-            ._cluster_candidates_from_shifted_center(
-                self,
-                int(block_idx),
-                1.0 if int(lag) == 1 else 2.0,
-                component_count,
-            )
-        )
         fixed = self._cluster_candidates_from_center(int(block_idx), component_count)
         out: list[int] = []
         self._append_unique_int(out, adapted)
-        self._append_unique_int(out, shifted)
         self._append_unique_int(out, fixed)
         return out
 
     def _precompute_message(self) -> str:
         return (
-            "Pre-computing union corridor+shifted+fixed lag643 "
+            "Pre-computing union corridor+fixed lag643 "
             f"(seed=({self.reference_advec_lat:.6f},{self.reference_advec_lon:.6f}), "
             f"corridor_multipliers={self.lag1_corridor_multipliers}/"
             f"{self.lag2_corridor_multipliers}, "
-            "shifted_centers=1v/2v, budgets=6/up-to-12/up-to-9)..."
+            "fixed_centers=target, budgets=6/up-to-8/up-to-6)..."
         )
 
     def cluster_summary(self) -> dict[str, Any]:
         out = super().cluster_summary()
         out.update(
             {
-                "spec_name": "union_corridor_shifted_fixed_4x4_lag643",
+                "spec_name": "union_corridor_fixed_4x4_lag643",
                 "geometry": "union",
                 "geometry_definition": (
-                    "exact deduplicated union of calibrated corridor, calibrated "
-                    "shifted-center, and fixed-center block sets"
+                    "exact deduplicated union of calibrated corridor and "
+                    "fixed-center block sets"
                 ),
-                "conditioning_mode": "union_corridor_shifted_and_fixed",
+                "conditioning_mode": "union_corridor_and_fixed",
                 "reference_advec_lat": self.reference_advec_lat,
                 "reference_advec_lon": self.reference_advec_lon,
                 "past_step_lat": float(self.past_offset_vector[0]),
                 "past_step_lon": float(self.past_offset_vector[1]),
                 "component_lag1_block_count": LAG_COUNTS[1],
                 "component_lag2_block_count": LAG_COUNTS[2],
-                "union_component_count": 3,
+                "union_component_count": 2,
             }
         )
         return out
+
+
+class FixedZeroNuggetMixin:
+    """Use nugget=0 in every covariance while retaining numerical jitter."""
+
+    fixed_nugget = 0.0
+
+    def matern_cov_batched(self, params, x_batch):
+        phi1, phi2, phi3, phi4 = torch.exp(params[0:4])
+        dist_params = torch.stack([phi3, phi4, params[4], params[5]])
+        scaled_d = self.batched_manual_dist(dist_params, x_batch) * phi2
+        if math.isclose(float(self.smooth), 0.5, rel_tol=0.0, abs_tol=1e-12):
+            correlation = torch.exp(-scaled_d)
+        elif math.isclose(float(self.smooth), 1.5, rel_tol=0.0, abs_tol=1e-12):
+            correlation = (1.0 + scaled_d) * torch.exp(-scaled_d)
+        else:
+            raise ValueError(f"Unsupported smooth={self.smooth} for fixed-zero nugget model")
+        covariance = (phi1 / phi2) * correlation
+        batch_size, matrix_size, _ = x_batch.shape
+        eye = torch.eye(
+            matrix_size,
+            device=self.device,
+            dtype=torch.float64,
+        ).unsqueeze(0).expand(batch_size, matrix_size, matrix_size)
+        return covariance + eye * 1e-6
+
+    def matern_cov_aniso_STABLE_log_reparam(self, params, x, y):
+        phi1, phi2, phi3, phi4 = torch.exp(params[0:4])
+        sigmasq = phi1 / phi2
+        dist_params = torch.stack([phi3, phi4, params[4], params[5]])
+        scaled_d = self.precompute_coords_aniso_STABLE(dist_params, x, y) * phi2
+        if math.isclose(float(self.smooth), 0.5, rel_tol=0.0, abs_tol=1e-12):
+            correlation = torch.exp(-scaled_d)
+        elif math.isclose(float(self.smooth), 1.5, rel_tol=0.0, abs_tol=1e-12):
+            correlation = (1.0 + scaled_d) * torch.exp(-scaled_d)
+        else:
+            raise ValueError(f"Unsupported smooth={self.smooth} for fixed-zero nugget model")
+        covariance = sigmasq * correlation
+        if x.shape[0] == y.shape[0]:
+            covariance.diagonal().add_(1e-8)
+        return covariance
+
+    def _convert_params(self, raw):
+        out = super()._convert_params(raw)
+        out["nugget"] = 0.0
+        return out
+
+    def cluster_summary(self) -> dict[str, Any]:
+        out = super().cluster_summary()
+        out.update({"nugget_mode": "fixed", "fixed_nugget": 0.0})
+        return out
+
+
+class AdaptedFixedZeroNuggetVecchiaFit(
+    FixedZeroNuggetMixin,
+    AdaptedRealDataCorridorWidth4x4Lag643VecchiaFit,
+):
+    pass
+
+
+class FixedCenterFixedZeroNuggetVecchiaFit(
+    FixedZeroNuggetMixin,
+    FixedCenterLag643VecchiaFit,
+):
+    pass
+
+
+class UnionFixedZeroNuggetVecchiaFit(
+    FixedZeroNuggetMixin,
+    UnionLag643VecchiaFit,
+):
+    pass
 
 
 def build_geometry_model(
@@ -488,30 +633,51 @@ def build_geometry_model(
         key: tensor.to(device=device, dtype=DTYPE, non_blocking=True).contiguous()
         for key, tensor in asset.source_map.items()
     }
+    union_chunk_size = int(getattr(args, "union_target_chunk_size", 0))
+    target_chunk_size = (
+        union_chunk_size
+        if geometry == "union" and union_chunk_size > 0
+        else int(args.target_chunk_size)
+    )
     common = dict(
         smooth=float(args.smooth),
         input_map=mapped,
         grid_coords=asset.grid_coords,
         daily_stride=int(args.daily_stride),
-        target_chunk_size=int(args.target_chunk_size),
+        target_chunk_size=target_chunk_size,
         min_target_points=int(args.min_target_points),
     )
+    fixed_nugget = getattr(args, "fixed_nugget", None)
+    if fixed_nugget is not None and not math.isclose(
+        float(fixed_nugget), 0.0, rel_tol=0.0, abs_tol=1e-15
+    ):
+        raise ValueError("This comparison driver currently supports only --fixed-nugget 0")
+    use_fixed_zero = fixed_nugget is not None
     if geometry == "adapted":
-        return AdaptedRealDataCorridorWidth4x4Lag643VecchiaFit(
-            reference_advec_lat=float(seed["seed_lat"]),
-            reference_advec_lon=float(seed["seed_lon"]),
-            **common,
+        model_class = (
+            AdaptedFixedZeroNuggetVecchiaFit
+            if use_fixed_zero
+            else AdaptedRealDataCorridorWidth4x4Lag643VecchiaFit
         )
-    if geometry == "shifted":
-        return CalibratedShiftedCenter4x4Lag643VecchiaFit(
+        return model_class(
             reference_advec_lat=float(seed["seed_lat"]),
             reference_advec_lon=float(seed["seed_lon"]),
             **common,
         )
     if geometry == "fixed":
-        return FixedCenterLag643VecchiaFit(**common)
+        model_class = (
+            FixedCenterFixedZeroNuggetVecchiaFit
+            if use_fixed_zero
+            else FixedCenterLag643VecchiaFit
+        )
+        return model_class(**common)
     if geometry == "union":
-        return UnionLag643VecchiaFit(
+        model_class = (
+            UnionFixedZeroNuggetVecchiaFit
+            if use_fixed_zero
+            else UnionLag643VecchiaFit
+        )
+        return model_class(
             reference_advec_lat=float(seed["seed_lat"]),
             reference_advec_lon=float(seed["seed_lon"]),
             **common,
@@ -760,16 +926,20 @@ def m3_q3_seed(asset: DayAsset, args: argparse.Namespace) -> dict[str, Any]:
 
 
 def physical_to_raw(params: dict[str, float]) -> list[float]:
-    range_lon = float(params["range_lon"])
+    sigmasq = max(float(params["sigmasq"]), EPS)
+    range_lat = max(float(params["range_lat"]), EPS)
+    range_lon = max(float(params["range_lon"]), EPS)
+    range_time = max(float(params["range_time"]), EPS)
+    nugget = max(float(params["nugget"]), EPS)
     phi2 = 1.0 / range_lon
     return [
-        float(np.log(float(params["sigmasq"]) * phi2)),
+        float(np.log(sigmasq * phi2)),
         float(np.log(phi2)),
-        float(np.log((range_lon / float(params["range_lat"])) ** 2)),
-        float(np.log((range_lon / float(params["range_time"])) ** 2)),
+        float(np.log((range_lon / range_lat) ** 2)),
+        float(np.log((range_lon / range_time) ** 2)),
         float(params["advec_lat"]),
         float(params["advec_lon"]),
-        float(np.log(float(params["nugget"]))),
+        float(np.log(nugget)),
     ]
 
 
@@ -796,10 +966,16 @@ def parameter_error_columns(
     for name in PARAMETERS:
         out[f"truth_{name}"] = float(truth[name])
         out[f"error_abs_{name}"] = abs(float(estimate[name]) - float(truth[name]))
-        if name in POSITIVE_PARAMETERS:
+        if (
+            name in POSITIVE_PARAMETERS
+            and float(truth[name]) > 0.0
+            and float(estimate[name]) > 0.0
+        ):
             log_error = float(np.log(float(estimate[name]) / float(truth[name])))
             out[f"error_logratio_{name}"] = log_error
             log_parts.append(log_error)
+        elif name in POSITIVE_PARAMETERS:
+            out[f"error_logratio_{name}"] = np.nan
     dlat_cells = (float(estimate["advec_lat"]) - float(truth["advec_lat"])) / abs(lat_step)
     dlon_cells = (float(estimate["advec_lon"]) - float(truth["advec_lon"])) / abs(lon_step)
     out["advection_error"] = float(
@@ -824,7 +1000,13 @@ def conditional_eigen_curve(
     x_chunks: list[torch.Tensor] = []
     log_det_half = params.new_tensor(0.0)
     n_blocks = 0
-    chunk_size = max(1, int(args.diag_chunk_size))
+    union_diag_chunk = int(getattr(args, "union_diag_chunk_size", 0))
+    requested_chunk = (
+        union_diag_chunk
+        if isinstance(model, UnionLag643VecchiaFit) and union_diag_chunk > 0
+        else int(args.diag_chunk_size)
+    )
+    chunk_size = max(1, requested_chunk)
     with torch.no_grad():
         for batch in model._cluster_batches:
             target_slice = slice(batch.max_cond_points, batch.max_cond_points + batch.target_size)
@@ -926,19 +1108,20 @@ def plot_eigen_comparison(
         curve = curves[geometry]
         union_nll = summaries[geometry].get("union_graph_nll", np.nan)
         nll_label = (
-            f"NLL native/union={summaries[geometry]['final_native_nll']:.5f}/"
-            f"{union_nll:.5f}"
+            f"NLL native/union={summaries[geometry]['final_native_nll']:.4f}/"
+            f"{union_nll:.4f}"
             if np.isfinite(union_nll)
-            else f"NLL={summaries[geometry]['final_native_nll']:.5f}"
+            else f"NLL={summaries[geometry]['final_native_nll']:.4f}"
         )
         label = (
             f"{geometry}: {nll_label}, "
-            f"D={summaries[geometry]['max_abs_bridge_scaled']:.3f}"
+            f"D={summaries[geometry]['max_abs_bridge_scaled']:.4f}"
         )
         ax.plot(
             curve["frac_index"],
             curve["scaled_cumsum"],
             color=GEOMETRY_COLORS[geometry],
+            linestyle=GEOMETRY_LINESTYLES[geometry],
             lw=1.8,
             label=label,
         )
@@ -975,7 +1158,14 @@ def fit_one_geometry(
     precompute_s = time.perf_counter() - t0
     condition_summary = conditioning_block_summary(model, len(asset.keys))
     raw_init = physical_to_raw({**init, "advec_lat": seed["seed_lat"], "advec_lon": seed["seed_lon"]})
-    params = [Parameter(torch.tensor(value, dtype=DTYPE, device=device)) for value in raw_init]
+    nugget_is_fixed = getattr(args, "fixed_nugget", None) is not None
+    params = [
+        Parameter(
+            torch.tensor(value, dtype=DTYPE, device=device),
+            requires_grad=not (nugget_is_fixed and index == 6),
+        )
+        for index, value in enumerate(raw_init)
+    ]
     optimizer = model.set_optimizer(
         params,
         lr=float(args.lbfgs_lr),
@@ -1000,6 +1190,8 @@ def fit_one_geometry(
         final_nll = float(model.vecchia_batched_likelihood(params_tensor).detach().cpu().item())
         beta = model.get_gls_beta(params_tensor).detach()
     estimate = raw_to_physical(raw_final)
+    if nugget_is_fixed:
+        estimate["nugget"] = float(args.fixed_nugget)
     gradients = [abs(float(param.grad.detach().item())) for param in params if param.grad is not None]
     row: dict[str, Any] = {
         "dataset_id": asset.dataset_id,
@@ -1013,10 +1205,21 @@ def fit_one_geometry(
         "error": "",
         "smooth": float(args.smooth),
         "block_shape": "4x4",
-        "lag_pattern": "6/4/3" if geometry != "union" else "6/(4U4U4)/(3U3U3)",
+        "lag_pattern": (
+            "/".join(str(value) for value in LAG_COUNTS)
+            if geometry != "union"
+            else (
+                f"{LAG_COUNTS[0]}/"
+                f"({LAG_COUNTS[1]}U{LAG_COUNTS[1]})/"
+                f"({LAG_COUNTS[2]}U{LAG_COUNTS[2]})"
+            )
+        ),
         "initializer": seed["method"],
         "init_advec_lat": float(seed["seed_lat"]),
         "init_advec_lon": float(seed["seed_lon"]),
+        "init_nugget": float(init["nugget"]),
+        "nugget_mode": "fixed" if nugget_is_fixed else "estimated",
+        "fixed_nugget": float(args.fixed_nugget) if nugget_is_fixed else np.nan,
         "final_native_nll": final_nll,
         "fit_returned_nll": float(returned[-1]),
         "outer_steps": int(step_index) + 1,
@@ -1036,9 +1239,11 @@ def fit_one_geometry(
         )
     eigen_curve = None
     eigen_summary = None
+    diagnostic_s = 0.0
     if geometry in EIGEN_GEOMETRIES:
         t_diag = time.perf_counter()
         eigen_curve, eigen_summary = conditional_eigen_curve(model, params_tensor, beta, args)
+        diagnostic_s = time.perf_counter() - t_diag
         eigen_summary = {
             **eigen_summary,
             "dataset_id": asset.dataset_id,
@@ -1046,8 +1251,10 @@ def fit_one_geometry(
             "date": asset.date,
             "geometry": geometry,
             "final_native_nll": final_nll,
-            "diag_s": time.perf_counter() - t_diag,
+            "diag_s": diagnostic_s,
         }
+    row["diagnostic_s"] = diagnostic_s
+    row["method_total_s"] = precompute_s + fit_s + diagnostic_s
     del model, params, optimizer, params_tensor, beta
     gc.collect()
     if device.type == "cuda":
@@ -1061,12 +1268,16 @@ def cross_evaluate(
     fitted_raw: dict[str, list[float]],
     device: torch.device,
     args: argparse.Namespace,
+    checkpoint_path: Path | None = None,
 ) -> list[dict[str, Any]]:
     source_vectors = dict(fitted_raw)
     if asset.truth is not None:
         source_vectors["truth"] = physical_to_raw(asset.truth)
     rows: list[dict[str, Any]] = []
-    for eval_geometry in GEOMETRIES:
+    # Evaluate the common union graph first and checkpoint every graph.  This
+    # preserves the primary comparison even if a later secondary evaluation
+    # fails or a scheduler interrupts the process.
+    for eval_geometry in ("union", *BASE_GEOMETRIES):
         model = build_geometry_model(eval_geometry, asset, seed, device, args)
         t0 = time.perf_counter()
         model.precompute_conditioning_sets()
@@ -1086,6 +1297,8 @@ def cross_evaluate(
                     "evaluation_precompute_s": precompute_s,
                 }
             )
+        if checkpoint_path is not None:
+            pd.DataFrame(rows).to_csv(checkpoint_path, index=False)
         del model
         gc.collect()
         if device.type == "cuda":
@@ -1102,6 +1315,27 @@ def resolve_device(args: argparse.Namespace) -> torch.device:
     return device
 
 
+def requested_fit_order(text: str) -> tuple[str, ...]:
+    order = tuple(part.strip() for part in str(text).split(",") if part.strip())
+    if len(order) != len(GEOMETRIES) or set(order) != set(GEOMETRIES):
+        raise ValueError(
+            "--fit-order must contain each geometry exactly once: "
+            + ",".join(GEOMETRIES)
+        )
+    return order
+
+
+def write_progress(task_dir: Path, stage: str, **details: Any) -> None:
+    write_json(
+        task_dir / "PROGRESS.json",
+        {
+            "updated": datetime.now().isoformat(timespec="seconds"),
+            "stage": stage,
+            **details,
+        },
+    )
+
+
 def run_task(args: argparse.Namespace) -> None:
     selection, selected = load_selection(args.selection_file)
     task_index = int(args.task_index)
@@ -1109,9 +1343,15 @@ def run_task(args: argparse.Namespace) -> None:
         raise IndexError(f"task-index {task_index} outside 0..{len(selected)-1}")
     spec = selected[task_index]
     task_dir = Path(args.output_root) / f"task_{task_index:02d}_{spec['dataset_id']}"
+    if task_dir.exists() and any(task_dir.iterdir()):
+        raise FileExistsError(
+            f"Refusing to overlap an existing task directory: {task_dir}. "
+            "Choose a new numbered --output-root."
+        )
     task_dir.mkdir(parents=True, exist_ok=True)
     write_json(task_dir / "selection_manifest.json", selection)
     write_json(task_dir / "dataset_spec.json", spec)
+    write_progress(task_dir, "staged")
     device = resolve_device(args)
     print(f"Loading {spec['dataset_id']} ({spec['data_kind']}, {spec['date']})", flush=True)
     asset = load_real_asset(spec, args) if spec["data_kind"] == "real" else load_synthetic_asset(spec, args)
@@ -1128,15 +1368,32 @@ def run_task(args: argparse.Namespace) -> None:
             "truth": asset.truth,
         },
     )
+    write_progress(task_dir, "asset_loaded", source_path=asset.source_path)
     seed = m3_q3_seed(asset, args)
     pd.DataFrame([{**spec, **seed}]).to_csv(task_dir / "initializer.csv", index=False)
+    write_progress(
+        task_dir,
+        "initializer_complete",
+        init_advec_lat=seed["seed_lat"],
+        init_advec_lon=seed["seed_lon"],
+    )
     init = dict(asset.truth) if asset.truth is not None else dict(DEFAULT_REAL_INIT)
+    if args.fixed_nugget is not None:
+        if not math.isclose(float(args.fixed_nugget), 0.0, rel_tol=0.0, abs_tol=1e-15):
+            raise ValueError("This comparison driver currently supports only --fixed-nugget 0")
+        init["nugget"] = 0.0
+    elif float(init["nugget"]) <= 0.0:
+        if float(args.zero_nugget_fit_init) <= 0.0:
+            raise ValueError("--zero-nugget-fit-init must be strictly positive")
+        init["nugget"] = float(args.zero_nugget_fit_init)
     fit_rows: list[dict[str, Any]] = []
     fitted_raw: dict[str, list[float]] = {}
     curves: dict[str, pd.DataFrame] = {}
     eigen_summaries: dict[str, dict[str, Any]] = {}
-    for geometry in GEOMETRIES:
+    fit_order = requested_fit_order(args.fit_order)
+    for geometry in fit_order:
         print(f"Fitting {geometry} on {asset.dataset_id}", flush=True)
+        write_progress(task_dir, f"fitting_{geometry}", completed_fits=list(fitted_raw))
         row, raw, curve, eigen_summary = fit_one_geometry(
             geometry, asset, seed, init, device, args
         )
@@ -1155,7 +1412,20 @@ def run_task(args: argparse.Namespace) -> None:
             eigen_summaries[geometry] = eigen_summary
             sampled.to_csv(task_dir / f"conditional_eigen_curve_{geometry}.csv", index=False)
             pd.DataFrame(eigen_summaries.values()).to_csv(task_dir / "eigen_summary.csv", index=False)
-    cross_rows = cross_evaluate(asset, seed, fitted_raw, device, args)
+        write_progress(
+            task_dir,
+            f"fit_complete_{geometry}",
+            completed_fits=list(fitted_raw),
+        )
+    write_progress(task_dir, "cross_evaluation", completed_fits=list(fitted_raw))
+    cross_rows = cross_evaluate(
+        asset,
+        seed,
+        fitted_raw,
+        device,
+        args,
+        checkpoint_path=task_dir / "cross_likelihoods.csv",
+    )
     pd.DataFrame(cross_rows).to_csv(task_dir / "cross_likelihoods.csv", index=False)
     union_graph_nll = {
         str(row["source_fit"]): float(row["nll_per_target"])
@@ -1179,9 +1449,10 @@ def run_task(args: argparse.Namespace) -> None:
     plot_eigen_comparison(
         curves,
         {geometry: {**eigen_summaries[geometry], **next(row for row in fit_rows if row["geometry"] == geometry)} for geometry in EIGEN_GEOMETRIES},
-        f"{asset.dataset_id} ({asset.date}): four lag643 geometries",
-        task_dir / "conditional_eigen_four_geometries.png",
+        f"{asset.dataset_id} ({asset.date}): three {LAG_TAG} geometries",
+        task_dir / "conditional_eigen_three_geometries.png",
     )
+    write_progress(task_dir, "reporting_complete", completed_fits=list(fitted_raw))
     write_json(
         task_dir / "run_config.json",
         {
@@ -1194,13 +1465,14 @@ def run_task(args: argparse.Namespace) -> None:
             "dataset": spec,
             "geometry_note": (
                 "adapted uses calibrated signed 2-D corridors: t-1 [0.5v,1.5v], "
-                "t-2 [0,2v]; shifted uses calibrated v/2v centers; fixed uses the "
-                "target center; all past offsets follow the -v covariance convention; "
-                "union is the exact deduplicated set union of all three"
+                "t-2 [0,2v]; fixed uses the target center; all past offsets "
+                "follow the -v covariance convention; union is the exact "
+                "deduplicated set union of adapted and fixed"
             ),
         },
     )
     (task_dir / "COMPLETE").write_text(datetime.now().isoformat(timespec="seconds") + "\n", encoding="utf-8")
+    write_progress(task_dir, "complete", completed_fits=list(fitted_raw))
     print(f"Completed {asset.dataset_id}: {task_dir}", flush=True)
 
 
@@ -1211,91 +1483,927 @@ def read_task_tables(output_root: Path, filename: str) -> pd.DataFrame:
     return pd.concat([pd.read_csv(path) for path in paths], ignore_index=True)
 
 
-def aggregate_eigen_curves(
+def _read_csv_or_empty(path: Path) -> pd.DataFrame:
+    if not path.is_file():
+        return pd.DataFrame()
+    try:
+        return pd.read_csv(path)
+    except Exception:
+        return pd.DataFrame()
+
+
+def task_completeness_table(
     output_root: Path,
+    selected: Sequence[dict[str, Any]],
+) -> pd.DataFrame:
+    """Describe exactly how far every selected data set progressed."""
+    rows: list[dict[str, Any]] = []
+    required_methods = set(GEOMETRIES)
+    for task_index, spec in enumerate(selected):
+        task_dir = output_root / f"task_{task_index:02d}_{spec['dataset_id']}"
+        fits = _read_csv_or_empty(task_dir / "fits.csv")
+        eigen = _read_csv_or_empty(task_dir / "eigen_summary.csv")
+        cross = _read_csv_or_empty(task_dir / "cross_likelihoods.csv")
+        progress_path = task_dir / "PROGRESS.json"
+        failure_path = output_root / f"FAILED_task_{task_index:02d}.json"
+        progress = (
+            json.loads(progress_path.read_text(encoding="utf-8"))
+            if progress_path.is_file()
+            else {}
+        )
+        failure = (
+            json.loads(failure_path.read_text(encoding="utf-8"))
+            if failure_path.is_file()
+            else {}
+        )
+        fit_methods = set(fits.get("geometry", pd.Series(dtype=str)).dropna().astype(str))
+        eigen_methods = set(eigen.get("geometry", pd.Series(dtype=str)).dropna().astype(str))
+        curve_methods = {
+            path.stem.removeprefix("conditional_eigen_curve_")
+            for path in task_dir.glob("conditional_eigen_curve_*.csv")
+        }
+        expected_cross_rows = len(GEOMETRIES) * (
+            len(GEOMETRIES) + int(spec["data_kind"] == "synthetic")
+        )
+        has_complete_marker = (task_dir / "COMPLETE").is_file()
+        fully_complete = (
+            has_complete_marker
+            and fit_methods == required_methods
+            and eigen_methods == required_methods
+            and curve_methods == required_methods
+            and len(cross) == expected_cross_rows
+        )
+        if fully_complete:
+            status = "complete"
+        elif fit_methods:
+            status = "partial_fit"
+        elif (task_dir / "initializer.csv").is_file():
+            status = "initialized_only"
+        elif (task_dir / "dataset_spec.json").is_file():
+            status = "staged_only"
+        else:
+            status = "missing"
+        rows.append(
+            {
+                "data_source": spec.get("data_source", spec["data_kind"]),
+                "date": spec["date"],
+                "data_kind": spec["data_kind"],
+                "dataset_id": spec["dataset_id"],
+                "task_index": task_index,
+                "task_status": status,
+                "last_stage": progress.get("stage", "unknown"),
+                "failure_type": failure.get("error_type", ""),
+                "failure_message": failure.get("error", ""),
+                "complete_marker": has_complete_marker,
+                "fit_methods": ",".join(g for g in GEOMETRIES if g in fit_methods),
+                "missing_fit_methods": ",".join(g for g in GEOMETRIES if g not in fit_methods),
+                "eigen_methods": ",".join(g for g in GEOMETRIES if g in eigen_methods),
+                "missing_eigen_methods": ",".join(
+                    g for g in GEOMETRIES if g not in eigen_methods
+                ),
+                "cross_rows": len(cross),
+                "expected_cross_rows": expected_cross_rows,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _first_record(frame: pd.DataFrame, mask: pd.Series | None = None) -> dict[str, Any]:
+    if frame.empty:
+        return {}
+    selected = frame if mask is None else frame[mask]
+    return {} if selected.empty else selected.iloc[0].to_dict()
+
+
+def build_clean_comparison_tables(
+    selected: Sequence[dict[str, Any]],
+    completeness: pd.DataFrame,
+    fits: pd.DataFrame,
+    initializers: pd.DataFrame,
+    cross: pd.DataFrame,
+    eigen: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Create a compact performance table and a tidy parameter table."""
+    summary_rows: list[dict[str, Any]] = []
+    parameter_rows: list[dict[str, Any]] = []
+    status_lookup = completeness.set_index("dataset_id")["task_status"].to_dict()
+    for spec in selected:
+        dataset_id = str(spec["dataset_id"])
+        init = _first_record(
+            initializers,
+            initializers.get("dataset_id", pd.Series(index=initializers.index, dtype=str))
+            == dataset_id,
+        )
+        for geometry in GEOMETRIES:
+            fit = _first_record(
+                fits,
+                (fits.get("dataset_id", pd.Series(index=fits.index, dtype=str)) == dataset_id)
+                & (fits.get("geometry", pd.Series(index=fits.index, dtype=str)) == geometry),
+            )
+            eig = _first_record(
+                eigen,
+                (eigen.get("dataset_id", pd.Series(index=eigen.index, dtype=str)) == dataset_id)
+                & (eigen.get("geometry", pd.Series(index=eigen.index, dtype=str)) == geometry),
+            )
+            union_eval = _first_record(
+                cross,
+                (cross.get("dataset_id", pd.Series(index=cross.index, dtype=str)) == dataset_id)
+                & (
+                    cross.get("evaluation_geometry", pd.Series(index=cross.index, dtype=str))
+                    == "union"
+                )
+                & (cross.get("source_fit", pd.Series(index=cross.index, dtype=str)) == geometry),
+            )
+            union_nll = union_eval.get("nll_per_target", fit.get("union_graph_nll_at_fit", np.nan))
+            union_fit_eval = _first_record(
+                cross,
+                (cross.get("dataset_id", pd.Series(index=cross.index, dtype=str)) == dataset_id)
+                & (
+                    cross.get("evaluation_geometry", pd.Series(index=cross.index, dtype=str))
+                    == "union"
+                )
+                & (cross.get("source_fit", pd.Series(index=cross.index, dtype=str)) == "union"),
+            )
+            union_fit_nll = union_fit_eval.get("nll_per_target", np.nan)
+            union_gap = (
+                float(union_nll) - float(union_fit_nll)
+                if pd.notna(union_nll) and pd.notna(union_fit_nll)
+                else fit.get("union_graph_nll_gap_from_union_fit", np.nan)
+            )
+            summary_rows.append(
+                {
+                    "data_source": spec.get("data_source", spec["data_kind"]),
+                    "date": spec["date"],
+                    "data_kind": spec["data_kind"],
+                    "dataset_id": dataset_id,
+                    "method": geometry,
+                    "method_label": GEOMETRY_LABELS[geometry],
+                    "task_status": status_lookup.get(dataset_id, "missing"),
+                    "fit_status": fit.get("status", "missing"),
+                    "init_advec_lat": init.get("seed_lat", np.nan),
+                    "init_advec_lon": init.get("seed_lon", np.nan),
+                    "init_subgrid": init.get("subgrid_used", np.nan),
+                    "init_reason": init.get("selection_reason", ""),
+                    "native_nll": fit.get("final_native_nll", np.nan),
+                    "union_nll": union_nll,
+                    "union_gap": union_gap,
+                    "sigmasq_hat": fit.get("est_sigmasq", np.nan),
+                    "range_lat_hat": fit.get("est_range_lat", np.nan),
+                    "range_lon_hat": fit.get("est_range_lon", np.nan),
+                    "range_time_hat": fit.get("est_range_time", np.nan),
+                    "v_lat_hat": fit.get("est_advec_lat", np.nan),
+                    "v_lon_hat": fit.get("est_advec_lon", np.nan),
+                    "nugget_hat": fit.get("est_nugget", np.nan),
+                    "precompute_seconds": fit.get("precompute_s", np.nan),
+                    "fit_seconds": fit.get("fit_s", np.nan),
+                    "diagnostic_seconds": eig.get(
+                        "diag_s", fit.get("diagnostic_s", np.nan)
+                    ),
+                    "method_total_seconds": fit.get(
+                        "method_total_s", fit.get("total_fit_s", np.nan)
+                    ),
+                    "max_abs_gradient": fit.get("max_abs_gradient", np.nan),
+                    "outer_steps": fit.get("outer_steps", np.nan),
+                    "eigen_D": eig.get("max_abs_bridge_scaled", np.nan),
+                    "eigen_mean_y2": eig.get("mean_y2", np.nan),
+                    "eigen_loss_per_score": eig.get("conditional_loss_per_score", np.nan),
+                    "advection_error_cells": fit.get("advection_error_grid_cells", np.nan),
+                    "combined_parameter_error": fit.get("combined_parameter_error", np.nan),
+                }
+            )
+            if fit:
+                for parameter in PARAMETERS:
+                    parameter_rows.append(
+                        {
+                            "data_source": spec.get("data_source", spec["data_kind"]),
+                            "date": spec["date"],
+                            "data_kind": spec["data_kind"],
+                            "dataset_id": dataset_id,
+                            "method": geometry,
+                            "parameter": parameter,
+                            "truth": fit.get(f"truth_{parameter}", np.nan),
+                            "estimate": fit.get(f"est_{parameter}", np.nan),
+                            "absolute_error": fit.get(f"error_abs_{parameter}", np.nan),
+                            "logratio_error": fit.get(
+                                f"error_logratio_{parameter}", np.nan
+                            ),
+                        }
+                    )
+    summary = pd.DataFrame(summary_rows)
+    parameters = pd.DataFrame(parameter_rows)
+    return summary, parameters
+
+
+def build_native_nll_parameter_table(
+    selected: Sequence[dict[str, Any]],
+    fits: pd.DataFrame,
+    initializers: pd.DataFrame,
+    eigen: pd.DataFrame,
+    hours_per_day: int,
+) -> pd.DataFrame:
+    """Build the direct native-NLL table requested for interpretation.
+
+    ``final_native_nll`` is an average over every valid target in all hourly
+    slots.  Multiplying it by ``n_target_points`` therefore recovers the daily
+    objective total (up to the likelihood constant omitted by every method).
+    The comparison column uses the native NLL of the independently fitted union
+    model as its within-day reference; it is not the older cross-evaluated
+    ``union_nll`` quantity.
+
+    Daily rows are followed by arithmetic group-average rows for real and
+    synthetic data.  On an average row, every numeric field is the mean of the
+    five corresponding daily rows for that method.
+    """
+    hours = int(hours_per_day)
+    if hours <= 0:
+        raise ValueError("hours_per_day must be positive")
+
+    rows: list[dict[str, Any]] = []
+    for spec in selected:
+        dataset_id = str(spec["dataset_id"])
+        dataset_fits = fits[
+            fits.get("dataset_id", pd.Series(index=fits.index, dtype=str))
+            == dataset_id
+        ]
+        if dataset_fits.empty:
+            continue
+        union_fit = _first_record(
+            dataset_fits,
+            dataset_fits.get(
+                "geometry", pd.Series(index=dataset_fits.index, dtype=str)
+            )
+            == "union",
+        )
+        union_native_nll = union_fit.get("final_native_nll", np.nan)
+        init = _first_record(
+            initializers,
+            initializers.get(
+                "dataset_id", pd.Series(index=initializers.index, dtype=str)
+            )
+            == dataset_id,
+        )
+        for geometry in GEOMETRIES:
+            fit = _first_record(
+                dataset_fits,
+                dataset_fits.get(
+                    "geometry", pd.Series(index=dataset_fits.index, dtype=str)
+                )
+                == geometry,
+            )
+            if not fit:
+                continue
+            eig = _first_record(
+                eigen,
+                (
+                    eigen.get(
+                        "dataset_id", pd.Series(index=eigen.index, dtype=str)
+                    )
+                    == dataset_id
+                )
+                & (
+                    eigen.get("geometry", pd.Series(index=eigen.index, dtype=str))
+                    == geometry
+                ),
+            )
+            target_points = float(fit.get("n_target_points", np.nan))
+            native_nll = float(fit.get("final_native_nll", np.nan))
+            delta_per_target = (
+                native_nll - float(union_native_nll)
+                if np.isfinite(native_nll) and pd.notna(union_native_nll)
+                else np.nan
+            )
+            row: dict[str, Any] = {
+                "row_type": "daily",
+                "data_source": spec.get("data_source", spec["data_kind"]),
+                "date": spec["date"],
+                "data_kind": spec["data_kind"],
+                "dataset_id": dataset_id,
+                "n_datasets": 1,
+                "method": geometry,
+                "method_label": GEOMETRY_LABELS[geometry],
+                "smooth_fixed": fit.get("smooth", np.nan),
+                "hourly_slots": hours,
+                "n_target_points": target_points,
+                "mean_target_points_per_hour": target_points / hours,
+                "initializer": fit.get("initializer", init.get("method", "")),
+                "init_advec_lat": init.get(
+                    "seed_lat", fit.get("init_advec_lat", np.nan)
+                ),
+                "init_advec_lon": init.get(
+                    "seed_lon", fit.get("init_advec_lon", np.nan)
+                ),
+                "init_advection_error_grid_cells": init.get(
+                    "advection_error_grid_cells", np.nan
+                ),
+                "native_nll_per_target": native_nll,
+                "native_total_nll": native_nll * target_points,
+                "delta_native_nll_per_target_vs_union": delta_per_target,
+                "delta_native_total_nll_vs_union": delta_per_target
+                * target_points,
+                "fit_seconds": fit.get("fit_s", np.nan),
+                "eigen_D": eig.get("max_abs_bridge_scaled", np.nan),
+                "fit_advection_error_grid_cells": fit.get(
+                    "advection_error_grid_cells", np.nan
+                ),
+                "combined_parameter_error": fit.get(
+                    "combined_parameter_error", np.nan
+                ),
+            }
+            for parameter in PARAMETERS:
+                row[f"fit_{parameter}"] = fit.get(f"est_{parameter}", np.nan)
+                row[f"true_{parameter}"] = fit.get(f"truth_{parameter}", np.nan)
+            rows.append(row)
+
+    daily = pd.DataFrame(rows)
+    if daily.empty:
+        return daily
+
+    numeric_columns = [
+        column
+        for column in daily.columns
+        if column
+        not in {
+            "row_type",
+            "data_source",
+            "date",
+            "data_kind",
+            "dataset_id",
+            "method",
+            "method_label",
+            "initializer",
+        }
+    ]
+    average_rows: list[dict[str, Any]] = []
+    for (data_kind, method), group in daily.groupby(
+        ["data_kind", "method"], sort=False
+    ):
+        average: dict[str, Any] = {
+            "row_type": "group_average",
+            "data_source": group["data_source"].iloc[0],
+            "date": "GROUP_AVERAGE",
+            "data_kind": data_kind,
+            "dataset_id": f"{data_kind}_group_average_n{group['dataset_id'].nunique()}",
+            "method": method,
+            "method_label": group["method_label"].iloc[0],
+            "initializer": group["initializer"].iloc[0],
+        }
+        for column in numeric_columns:
+            average[column] = pd.to_numeric(group[column], errors="coerce").mean()
+        average["n_datasets"] = int(group["dataset_id"].nunique())
+        average_rows.append(average)
+
+    combined = pd.concat([daily, pd.DataFrame(average_rows)], ignore_index=True)
+    leading_columns = [
+        "date",
+        "data_kind",
+        "data_source",
+        "dataset_id",
+        "row_type",
+        "n_datasets",
+        "method",
+        "method_label",
+        "smooth_fixed",
+        "hourly_slots",
+        "n_target_points",
+        "mean_target_points_per_hour",
+        "initializer",
+        "init_advec_lat",
+        "init_advec_lon",
+        "init_advection_error_grid_cells",
+        "native_nll_per_target",
+        "native_total_nll",
+        "delta_native_nll_per_target_vs_union",
+        "delta_native_total_nll_vs_union",
+        "fit_seconds",
+        "eigen_D",
+    ]
+    trailing_columns = [
+        "fit_advection_error_grid_cells",
+        "combined_parameter_error",
+    ]
+    return combined[
+        leading_columns
+        + [f"fit_{parameter}" for parameter in PARAMETERS]
+        + [f"true_{parameter}" for parameter in PARAMETERS]
+        + trailing_columns
+    ]
+
+
+def _format_markdown_value(value: Any) -> str:
+    if value is None or (not isinstance(value, str) and pd.isna(value)):
+        return "—"
+    if isinstance(value, (float, np.floating)):
+        return f"{float(value):.4f}"
+    if isinstance(value, (bool, np.bool_)):
+        return "yes" if bool(value) else "no"
+    return str(value)
+
+
+def dataframe_to_markdown(frame: pd.DataFrame) -> list[str]:
+    if frame.empty:
+        return ["No available rows."]
+    headers = [str(column) for column in frame.columns]
+    lines = [
+        "| " + " | ".join(headers) + " |",
+        "| " + " | ".join("---" for _ in headers) + " |",
+    ]
+    for values in frame.itertuples(index=False, name=None):
+        lines.append("| " + " | ".join(_format_markdown_value(value) for value in values) + " |")
+    return lines
+
+
+def write_native_nll_parameter_report(
+    report_dir: Path,
+    table: pd.DataFrame,
+) -> None:
+    """Write a readable companion document for the direct native-NLL CSV."""
+    if table.empty:
+        return
+    daily = table[table["row_type"] == "daily"].copy()
+    averages = table[table["row_type"] == "group_average"].copy()
+    daily_performance_columns = [
+        "data_source",
+        "date",
+        "method",
+        "n_target_points",
+        "mean_target_points_per_hour",
+        "init_advec_lat",
+        "init_advec_lon",
+        "native_nll_per_target",
+        "native_total_nll",
+        "delta_native_total_nll_vs_union",
+        "fit_seconds",
+        "eigen_D",
+        "fit_advec_lat",
+        "fit_advec_lon",
+        "fit_advection_error_grid_cells",
+    ]
+    daily_parameter_columns = [
+        "data_source",
+        "date",
+        "method",
+        *[f"fit_{parameter}" for parameter in PARAMETERS],
+        *[f"true_{parameter}" for parameter in PARAMETERS],
+    ]
+    average_performance_columns = [
+        "data_kind",
+        "method",
+        "n_datasets",
+        "n_target_points",
+        "native_nll_per_target",
+        "native_total_nll",
+        "delta_native_total_nll_vs_union",
+        "fit_seconds",
+        "eigen_D",
+        "fit_advection_error_grid_cells",
+    ]
+    average_parameter_columns = [
+        "data_kind",
+        "method",
+        "init_advec_lat",
+        "init_advec_lon",
+        *[f"fit_{parameter}" for parameter in PARAMETERS],
+        *[f"true_{parameter}" for parameter in PARAMETERS],
+    ]
+    report = [
+        f"# Direct native-NLL and parameter comparison ({LAG_TAG})",
+        "",
+        "This table deliberately omits the old cross-evaluated `union_nll` field.",
+        "`native_nll_per_target` is each method's own fitted Vecchia objective.",
+        "The daily comparison is",
+        "",
+        "`delta_native_total_nll_vs_union = "
+        "(method native NLL - fitted-union native NLL) * n_target_points`.",
+        "",
+        "`n_target_points` already counts valid targets across all eight hourly",
+        "slots, so it must not be multiplied by eight again. A value near 18,000",
+        "per hour produces a daily count near 144,000.",
+        "",
+        "`init_advec_lat/lon` is the once-per-day M3 masked-FFT plus safeguarded-Q3",
+        "calibration. It initializes the fitted advection parameters and fixes the",
+        "conditioning geometry. `fit_advec_lat/lon` is the final continuously",
+        "optimized covariance advection. Spatial advection units are coordinate",
+        "degrees per one-hour time step.",
+        "",
+        "Group-average rows are arithmetic means of the five daily rows for each",
+        "data kind and method. All displayed numeric values are rounded to four",
+        "decimal places.",
+        "",
+        "## Daily NLL, timing, initialization, and advection",
+        "",
+        *dataframe_to_markdown(daily[daily_performance_columns]),
+        "",
+        "## Daily fitted and synthetic truth parameters",
+        "",
+        *dataframe_to_markdown(daily[daily_parameter_columns]),
+        "",
+        "## Group-average performance",
+        "",
+        *dataframe_to_markdown(averages[average_performance_columns]),
+        "",
+        "## Group-average initialization and parameters",
+        "",
+        *dataframe_to_markdown(averages[average_parameter_columns]),
+        "",
+    ]
+    (report_dir / "vecchia_native_nll_parameter_report.md").write_text(
+        "\n".join(report),
+        encoding="utf-8",
+    )
+
+
+def collect_conditional_eigen_curves(output_root: Path) -> pd.DataFrame:
+    frames: list[pd.DataFrame] = []
+    for task_dir in sorted(output_root.glob("task_*")):
+        spec_path = task_dir / "dataset_spec.json"
+        if not spec_path.is_file():
+            continue
+        spec = json.loads(spec_path.read_text(encoding="utf-8"))
+        for path in sorted(task_dir.glob("conditional_eigen_curve_*.csv")):
+            geometry = path.stem.removeprefix("conditional_eigen_curve_")
+            curve = _read_csv_or_empty(path)
+            if curve.empty:
+                continue
+            curve = curve.copy()
+            curve["dataset_id"] = spec["dataset_id"]
+            curve["data_kind"] = spec["data_kind"]
+            curve["date"] = spec["date"]
+            curve["geometry"] = geometry
+            frames.append(curve)
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def _lookup_metric(
+    frame: pd.DataFrame,
+    dataset_id: str,
+    geometry: str,
+    column: str,
+    geometry_column: str = "geometry",
+) -> float:
+    if frame.empty or column not in frame:
+        return float("nan")
+    rows = frame[
+        (frame["dataset_id"].astype(str) == str(dataset_id))
+        & (frame[geometry_column].astype(str) == str(geometry))
+    ]
+    return float(rows.iloc[0][column]) if not rows.empty and pd.notna(rows.iloc[0][column]) else float("nan")
+
+
+def create_daily_eigen_plots(
+    curves: pd.DataFrame,
     fits: pd.DataFrame,
     cross: pd.DataFrame,
+    eigen: pd.DataFrame,
+    report_dir: Path,
 ) -> pd.DataFrame:
-    paths = sorted(output_root.glob("task_*/conditional_eigen_curve_*.csv"))
-    if not paths:
+    """Create one plot per available date, always distinguishing missing methods."""
+    if curves.empty:
         return pd.DataFrame()
-    curves = pd.concat([pd.read_csv(path) for path in paths], ignore_index=True)
-    curves.to_csv(output_root / "all_conditional_eigen_curves.csv", index=False)
-    summary = (
-        curves.groupby(["data_kind", "geometry", "frac_index"], as_index=False)
-        .agg(
-            scaled_cumsum_mean=("scaled_cumsum", "mean"),
-            scaled_cumsum_sd=("scaled_cumsum", "std"),
-            conditional_eigenvalue_mean=("conditional_eigenvalue", "mean"),
-            n_datasets=("dataset_id", "nunique"),
-        )
-    )
-    summary.to_csv(output_root / "mean_conditional_eigen_curves.csv", index=False)
-    nll_means: dict[tuple[str, str], float] = {}
-    if not fits.empty and "final_native_nll" in fits:
-        nll_means = (
-            fits[fits["status"] == "ok"]
-            .groupby(["data_kind", "geometry"])["final_native_nll"]
-            .mean()
-            .to_dict()
-        )
-    union_nll_means: dict[tuple[str, str], float] = {}
-    if not cross.empty:
-        union_nll_means = (
-            cross[
-                (cross["evaluation_geometry"] == "union")
-                & (cross["source_fit"].isin(GEOMETRIES))
-            ]
-            .groupby(["data_kind", "source_fit"])["nll_per_target"]
-            .mean()
-            .to_dict()
-        )
-    fig, axes = plt.subplots(1, 2, figsize=(12.2, 5.0), sharex=True)
-    for ax, data_kind in zip(axes, ("real", "synthetic")):
-        for geometry in EIGEN_GEOMETRIES:
-            group = summary[(summary["data_kind"] == data_kind) & (summary["geometry"] == geometry)]
-            if group.empty:
-                continue
-            x = group["frac_index"].to_numpy()
-            mean = group["scaled_cumsum_mean"].to_numpy()
-            sd = group["scaled_cumsum_sd"].fillna(0.0).to_numpy()
-            mean_nll = nll_means.get((data_kind, geometry), np.nan)
-            mean_union_nll = union_nll_means.get((data_kind, geometry), np.nan)
-            label = (
-                f"{geometry} (mean NLL native/union="
-                f"{mean_nll:.5f}/{mean_union_nll:.5f})"
-                if np.isfinite(mean_nll) and np.isfinite(mean_union_nll)
-                else geometry
+    plot_dir = report_dir / "plots" / "daily"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    manifests: list[dict[str, Any]] = []
+    for (dataset_id, data_kind, date), day in curves.groupby(
+        ["dataset_id", "data_kind", "date"], sort=True
+    ):
+        available = [g for g in GEOMETRIES if g in set(day["geometry"])]
+        missing = [g for g in GEOMETRIES if g not in available]
+        fig, ax = plt.subplots(figsize=(9.2, 6.6))
+        y_max = 1.02
+        residual_dfs: list[float] = []
+        for geometry in available:
+            curve = day[day["geometry"] == geometry].sort_values("frac_index")
+            native_nll = _lookup_metric(fits, dataset_id, geometry, "final_native_nll")
+            union_rows = cross[
+                (cross.get("dataset_id", pd.Series(index=cross.index, dtype=str)).astype(str) == str(dataset_id))
+                & (cross.get("evaluation_geometry", pd.Series(index=cross.index, dtype=str)) == "union")
+                & (cross.get("source_fit", pd.Series(index=cross.index, dtype=str)) == geometry)
+            ] if not cross.empty else pd.DataFrame()
+            union_nll = (
+                float(union_rows.iloc[0]["nll_per_target"])
+                if not union_rows.empty
+                else float("nan")
             )
+            diagnostic = _lookup_metric(eigen, dataset_id, geometry, "max_abs_bridge_scaled")
+            residual_df = _lookup_metric(eigen, dataset_id, geometry, "residual_df")
+            if np.isfinite(residual_df):
+                residual_dfs.append(residual_df)
+            nll_text = f"native={native_nll:.4f}"
+            if np.isfinite(union_nll):
+                nll_text += f", union={union_nll:.4f}"
+            label = f"{GEOMETRY_LABELS[geometry]} | {nll_text} | D={diagnostic:.4f}"
             ax.plot(
-                x,
+                curve["frac_index"],
+                curve["scaled_cumsum"],
+                color=GEOMETRY_COLORS[geometry],
+                linestyle=GEOMETRY_LINESTYLES[geometry],
+                lw=2.1,
+                label=label,
+            )
+            y_max = max(y_max, float(curve["scaled_cumsum"].max()) * 1.03)
+        grid = np.linspace(0.0, 1.0, 300)
+        ax.plot(grid, grid, color="#4B5563", lw=1.2, label="expected")
+        if residual_dfs:
+            band = BROWN_BRIDGE_Q95 * math.sqrt(2.0 / max(float(np.mean(residual_dfs)), 1.0))
+            ax.plot(grid, grid - band, color="#9CA3AF", ls="--", lw=0.9)
+            ax.plot(grid, grid + band, color="#9CA3AF", ls="--", lw=0.9)
+        title = f"{str(data_kind).title()} {date}: Vecchia conditional eigen diagnostic"
+        if missing:
+            title += f"\nPARTIAL — missing {', '.join(missing)}"
+        ax.set(xlim=(0.0, 1.0), ylim=(0.0, y_max))
+        ax.set_xlabel("projected expected-df fraction, decreasing conditional eigenvalue")
+        ax.set_ylabel("cumulative squared conditional score / residual df")
+        ax.set_title(title)
+        ax.grid(alpha=0.20)
+        ax.legend(fontsize=8.2, loc="best")
+        fig.tight_layout()
+        output_path = plot_dir / f"{data_kind}_{date}_conditional_eigen.png"
+        fig.savefig(output_path, dpi=200, bbox_inches="tight")
+        plt.close(fig)
+        manifests.append(
+            {
+                "data_kind": data_kind,
+                "date": date,
+                "dataset_id": dataset_id,
+                "available_methods": ",".join(available),
+                "missing_methods": ",".join(missing),
+                "plot_path": str(output_path.relative_to(report_dir)),
+            }
+        )
+    return pd.DataFrame(manifests)
+
+
+def create_mean_eigen_plots(
+    curves: pd.DataFrame,
+    fits: pd.DataFrame,
+    cross: pd.DataFrame,
+    selected: Sequence[dict[str, Any]],
+    report_dir: Path,
+) -> pd.DataFrame:
+    """Create separate real/synthetic mean plots; label partial fallbacks."""
+    if curves.empty:
+        return pd.DataFrame()
+    plot_dir = report_dir / "plots" / "mean"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    grid = np.linspace(0.0, 1.0, 500)
+    summary_rows: list[dict[str, Any]] = []
+    for data_kind in ("real", "synthetic"):
+        subset = curves[curves["data_kind"] == data_kind]
+        if subset.empty:
+            continue
+        expected_count = sum(str(spec["data_kind"]) == data_kind for spec in selected)
+        method_sets = {
+            dataset_id: set(group["geometry"])
+            for dataset_id, group in subset.groupby("dataset_id")
+        }
+        complete_method_ids = [
+            dataset_id
+            for dataset_id, methods in method_sets.items()
+            if set(GEOMETRIES).issubset(methods)
+        ]
+        if complete_method_ids:
+            dataset_ids = complete_method_ids
+            methods = list(GEOMETRIES)
+        else:
+            dataset_ids = sorted(method_sets)
+            common_methods = set.intersection(*(method_sets[dataset_id] for dataset_id in dataset_ids))
+            methods = [geometry for geometry in GEOMETRIES if geometry in common_methods]
+        if not methods:
+            continue
+        full = len(dataset_ids) == expected_count and methods == list(GEOMETRIES)
+        fig, ax = plt.subplots(figsize=(9.2, 6.6))
+        for geometry in methods:
+            interpolated: list[np.ndarray] = []
+            for dataset_id in dataset_ids:
+                curve = subset[
+                    (subset["dataset_id"] == dataset_id)
+                    & (subset["geometry"] == geometry)
+                ].sort_values("frac_index")
+                if curve.empty:
+                    continue
+                interpolated.append(
+                    np.interp(grid, curve["frac_index"], curve["scaled_cumsum"])
+                )
+            if not interpolated:
+                continue
+            values = np.vstack(interpolated)
+            mean = values.mean(axis=0)
+            sd = values.std(axis=0, ddof=1) if len(values) > 1 else np.zeros_like(mean)
+            fit_rows = fits[
+                (fits.get("data_kind", pd.Series(index=fits.index, dtype=str)) == data_kind)
+                & (fits.get("geometry", pd.Series(index=fits.index, dtype=str)) == geometry)
+                & (fits.get("dataset_id", pd.Series(index=fits.index, dtype=str)).isin(dataset_ids))
+            ] if not fits.empty else pd.DataFrame()
+            native_nll = (
+                float(fit_rows["final_native_nll"].mean())
+                if not fit_rows.empty
+                else float("nan")
+            )
+            union_rows = cross[
+                (cross.get("data_kind", pd.Series(index=cross.index, dtype=str)) == data_kind)
+                & (cross.get("evaluation_geometry", pd.Series(index=cross.index, dtype=str)) == "union")
+                & (cross.get("source_fit", pd.Series(index=cross.index, dtype=str)) == geometry)
+                & (cross.get("dataset_id", pd.Series(index=cross.index, dtype=str)).isin(dataset_ids))
+            ] if not cross.empty else pd.DataFrame()
+            union_nll = (
+                float(union_rows["nll_per_target"].mean())
+                if not union_rows.empty
+                else float("nan")
+            )
+            label = f"{GEOMETRY_LABELS[geometry]} | mean native={native_nll:.4f}"
+            if np.isfinite(union_nll):
+                label += f", union={union_nll:.4f}"
+            ax.plot(
+                grid,
                 mean,
                 color=GEOMETRY_COLORS[geometry],
-                lw=2.0,
+                linestyle=GEOMETRY_LINESTYLES[geometry],
+                lw=2.2,
                 label=label,
             )
             ax.fill_between(
-                x,
+                grid,
                 mean - sd,
                 mean + sd,
                 color=GEOMETRY_COLORS[geometry],
-                alpha=0.12,
+                alpha=0.10,
             )
-        grid = np.linspace(0.0, 1.0, 200)
-        ax.plot(grid, grid, color="0.4", lw=1.0)
-        ax.set_title(f"{data_kind}: mean of selected days")
-        ax.set_xlabel("projected expected-df fraction")
-        ax.grid(alpha=0.22)
-    axes[0].set_ylabel("mean cumulative squared score / residual df")
-    axes[1].legend()
-    fig.tight_layout()
-    fig.savefig(
-        output_root / "conditional_eigen_mean_four_geometries.png",
-        dpi=180,
-        bbox_inches="tight",
+            for x_value, mean_value, sd_value in zip(grid, mean, sd):
+                summary_rows.append(
+                    {
+                        "data_kind": data_kind,
+                        "geometry": geometry,
+                        "n_dates": len(interpolated),
+                        "frac_index": x_value,
+                        "scaled_cumsum_mean": mean_value,
+                        "scaled_cumsum_sd": sd_value,
+                        "complete_all_method_mean": full,
+                    }
+                )
+        ax.plot(grid, grid, color="#4B5563", lw=1.2, label="expected")
+        state = "" if full else "PARTIAL — "
+        ax.set_title(
+            f"{str(data_kind).title()}: {state}mean conditional eigen diagnostic "
+            f"({len(dataset_ids)}/{expected_count} dates)"
+        )
+        ax.set(xlim=(0.0, 1.0))
+        ax.set_xlabel("projected expected-df fraction, decreasing conditional eigenvalue")
+        ax.set_ylabel("mean cumulative squared conditional score / residual df")
+        ax.grid(alpha=0.20)
+        ax.legend(fontsize=8.2, loc="best")
+        fig.tight_layout()
+        suffix = "mean" if full else "partial_mean"
+        fig.savefig(
+            plot_dir / f"{data_kind}_{suffix}_conditional_eigen.png",
+            dpi=200,
+            bbox_inches="tight",
+        )
+        plt.close(fig)
+    return pd.DataFrame(summary_rows)
+
+
+def write_clean_comparison_report(
+    report_dir: Path,
+    completeness: pd.DataFrame,
+    summary: pd.DataFrame,
+    parameter_details: pd.DataFrame,
+) -> pd.DataFrame:
+    """Write one concise Markdown report and return method-level means."""
+    fitted = summary[summary["fit_status"] == "ok"].copy()
+    mean_columns = [
+        "native_nll",
+        "union_nll",
+        "union_gap",
+        "precompute_seconds",
+        "fit_seconds",
+        "diagnostic_seconds",
+        "method_total_seconds",
+        "eigen_D",
+        "eigen_mean_y2",
+        "advection_error_cells",
+        "combined_parameter_error",
+    ]
+    method_means = (
+        fitted.groupby(["data_kind", "method"], as_index=False)[mean_columns].mean()
+        if not fitted.empty
+        else pd.DataFrame(columns=["data_kind", "method", *mean_columns])
     )
-    plt.close(fig)
-    return curves
+    complete_count = int((completeness["task_status"] == "complete").sum())
+    selected_count = len(completeness)
+    state = "COMPLETE" if complete_count == selected_count else "PARTIAL"
+    compact_status = completeness[
+        [
+            "data_source",
+            "date",
+            "data_kind",
+            "dataset_id",
+            "task_status",
+            "last_stage",
+            "failure_type",
+            "failure_message",
+            "fit_methods",
+            "missing_fit_methods",
+            "cross_rows",
+            "expected_cross_rows",
+        ]
+    ]
+    performance_results = fitted[
+        [
+            "data_source",
+            "date",
+            "data_kind",
+            "dataset_id",
+            "method",
+            "init_advec_lat",
+            "init_advec_lon",
+            "native_nll",
+            "union_nll",
+            "union_gap",
+            "eigen_D",
+            "precompute_seconds",
+            "fit_seconds",
+            "diagnostic_seconds",
+            "method_total_seconds",
+        ]
+    ]
+    fitted_parameters = fitted[
+        [
+            "data_source",
+            "date",
+            "data_kind",
+            "dataset_id",
+            "method",
+            "sigmasq_hat",
+            "range_lat_hat",
+            "range_lon_hat",
+            "range_time_hat",
+            "v_lat_hat",
+            "v_lon_hat",
+            "nugget_hat",
+        ]
+    ]
+    synthetic = fitted[fitted["data_kind"] == "synthetic"]
+    synthetic_results = synthetic[
+        [
+            "date",
+            "method",
+            "v_lat_hat",
+            "v_lon_hat",
+            "advection_error_cells",
+            "combined_parameter_error",
+        ]
+    ]
+    report = [
+        f"# Three-geometry {LAG_TAG} Vecchia comparison",
+        "",
+        f"Report state: **{state}** ({complete_count}/{selected_count} data sets complete).",
+        "",
+    ]
+    if state != "COMPLETE":
+        report.extend(
+            [
+                "> The downloaded directory is incomplete. Missing union/cross-likelihood or",
+                "> synthetic results must not be interpreted as final model comparisons.",
+                "",
+            ]
+        )
+    report.extend(
+        [
+            "## Conditioning methods",
+            "",
+            "- adapted: calibrated t-1 [0.5v,1.5v], t-2 [0,2v] corridors",
+            "- fixed: target-centered nearest blocks",
+            "- union: exact deduplicated union of adapted and fixed sets",
+            "",
+            "## Run completeness",
+            "",
+            *dataframe_to_markdown(compact_status),
+            "",
+            "## Daily fitted performance",
+            "",
+            *dataframe_to_markdown(performance_results),
+            "",
+            "## Final fitted seven-parameter vectors",
+            "",
+            *dataframe_to_markdown(fitted_parameters),
+            "",
+            "## Mean performance by data type and method",
+            "",
+            *dataframe_to_markdown(method_means),
+            "",
+            "## Synthetic truth performance",
+            "",
+            *dataframe_to_markdown(synthetic_results),
+            "",
+            "All displayed numeric values are rounded to four decimal places. The flat",
+            "comparison table is `vecchia_comparison_summary.csv`; parameter-level truth and",
+            "fit values are in `vecchia_parameter_details.csv`.",
+        ]
+    )
+    (report_dir / "vecchia_comparison_report.md").write_text(
+        "\n".join(report) + "\n",
+        encoding="utf-8",
+    )
+    return method_means
 
 
 def plot_union_reference(cross: pd.DataFrame, output_root: Path) -> None:
@@ -1311,7 +2419,8 @@ def plot_union_reference(cross: pd.DataFrame, output_root: Path) -> None:
     for ax, data_kind in zip(axes, ("real", "synthetic")):
         group = pivot[pivot["data_kind"] == data_kind].sort_values("date")
         x = np.arange(len(group))
-        for offset, geometry in zip((-0.18, 0.0, 0.18), BASE_GEOMETRIES):
+        offsets = np.linspace(-0.14, 0.14, len(BASE_GEOMETRIES))
+        for offset, geometry in zip(offsets, BASE_GEOMETRIES):
             col = f"{geometry}_minus_union_fit_nll"
             ax.scatter(
                 x + offset,
@@ -1342,7 +2451,8 @@ def plot_synthetic_errors(fits: pd.DataFrame, output_root: Path) -> None:
     ):
         dates = sorted(synthetic["date"].unique())
         x = np.arange(len(dates))
-        for offset, geometry in zip((-0.27, -0.09, 0.09, 0.27), GEOMETRIES):
+        offsets = np.linspace(-0.20, 0.20, len(GEOMETRIES))
+        for offset, geometry in zip(offsets, GEOMETRIES):
             group = synthetic[synthetic["geometry"] == geometry].set_index("date").reindex(dates)
             ax.scatter(
                 x + offset,
@@ -1363,6 +2473,8 @@ def plot_synthetic_errors(fits: pd.DataFrame, output_root: Path) -> None:
 def aggregate(args: argparse.Namespace) -> None:
     output_root = Path(args.output_root)
     selection, selected = load_selection(args.selection_file)
+    report_dir = output_root / REPORT_DIR_NAME
+    report_dir.mkdir(parents=True, exist_ok=True)
     completed = sorted(output_root.glob("task_*/COMPLETE"))
     if len(completed) != len(selected) and not args.allow_partial_aggregate:
         raise RuntimeError(f"Expected {len(selected)} COMPLETE markers, found {len(completed)}")
@@ -1378,6 +2490,46 @@ def aggregate(args: argparse.Namespace) -> None:
         ("all_eigen_summaries.csv", eigen),
     ):
         frame.to_csv(output_root / name, index=False)
+    completeness = task_completeness_table(output_root, selected)
+    clean_summary, parameter_details = build_clean_comparison_tables(
+        selected,
+        completeness,
+        fits,
+        initializers,
+        cross,
+        eigen,
+    )
+    native_nll_parameter_table = build_native_nll_parameter_table(
+        selected,
+        fits,
+        initializers,
+        eigen,
+        hours_per_day=int(args.hours_per_day),
+    )
+    completeness.to_csv(
+        report_dir / "run_completeness.csv",
+        index=False,
+        float_format="%.4f",
+    )
+    clean_summary.to_csv(
+        report_dir / "vecchia_comparison_summary.csv",
+        index=False,
+        float_format="%.4f",
+    )
+    parameter_details.to_csv(
+        report_dir / "vecchia_parameter_details.csv",
+        index=False,
+        float_format="%.4f",
+    )
+    native_nll_parameter_table.to_csv(
+        report_dir / "vecchia_native_nll_parameter_comparison.csv",
+        index=False,
+        float_format="%.4f",
+    )
+    write_native_nll_parameter_report(
+        report_dir,
+        native_nll_parameter_table,
+    )
     if not fits.empty:
         summary_metrics = [
             "final_native_nll",
@@ -1393,8 +2545,45 @@ def aggregate(args: argparse.Namespace) -> None:
         plot_synthetic_errors(fits, output_root)
     if not cross.empty:
         plot_union_reference(cross, output_root)
-    aggregate_eigen_curves(output_root, fits, cross)
-    dates = pd.DataFrame(selected)[["dataset_id", "data_kind", "date", "year", "month", "day"]]
+    curves = collect_conditional_eigen_curves(output_root)
+    if not curves.empty:
+        curves.to_csv(report_dir / "conditional_eigen_curves.csv", index=False)
+    daily_plot_manifest = create_daily_eigen_plots(
+        curves,
+        fits,
+        cross,
+        eigen,
+        report_dir,
+    )
+    daily_plot_manifest.to_csv(
+        report_dir / "daily_plot_manifest.csv",
+        index=False,
+    )
+    mean_curves = create_mean_eigen_plots(
+        curves,
+        fits,
+        cross,
+        selected,
+        report_dir,
+    )
+    mean_curves.to_csv(
+        report_dir / "mean_conditional_eigen_curves.csv",
+        index=False,
+    )
+    method_means = write_clean_comparison_report(
+        report_dir,
+        completeness,
+        clean_summary,
+        parameter_details,
+    )
+    method_means.to_csv(
+        report_dir / "method_mean_summary.csv",
+        index=False,
+        float_format="%.4f",
+    )
+    dates = pd.DataFrame(selected)[
+        ["data_source", "date", "dataset_id", "data_kind", "year", "month", "day"]
+    ]
     dates.to_csv(output_root / "selected_dates.csv", index=False)
     date_headers = list(dates.columns)
     date_table = [
@@ -1403,27 +2592,22 @@ def aggregate(args: argparse.Namespace) -> None:
     ]
     for values in dates.itertuples(index=False, name=None):
         date_table.append("| " + " | ".join(str(value) for value in values) + " |")
-    report = [
-        "# Four-geometry lag643 Vecchia comparison",
+    root_report = [
+        f"# Three-geometry {LAG_TAG} Vecchia comparison",
         "",
         f"Aggregated: {datetime.now().isoformat(timespec='seconds')}",
+        "",
+        "The clean report, rounded summary tables, and daily/mean conditional-eigen",
+        f"plots are in `{REPORT_DIR_NAME}/`.",
         "",
         "## Selected data sets",
         "",
         *date_table,
-        "",
-        "## Geometry",
-        "",
-        "- adapted: M3+Q3-calibrated signed 2-D corridors; t-1 [0.5v,1.5v], t-2 [0,2v] in the past -v direction.",
-        "- shifted: identical 6/4/3 budget; nearest blocks around calibrated v/2v centers in the past -v direction.",
-        "- fixed: identical 6/4/3 budget; past neighborhoods centered at the target.",
-        "- union: exact deduplicated union of the three candidates, up to 6/12/9 blocks.",
-        "- all four optimizers start from the identical M3+Q3 advection and identical nuisance values.",
-        "",
-        "Native NLLs from different graphs are recorded, but the primary likelihood comparison is",
-        "the cross-evaluation on the common union graph in union_reference_likelihood_gaps.csv.",
     ]
-    (output_root / "REPORT.md").write_text("\n".join(report) + "\n", encoding="utf-8")
+    (output_root / "REPORT.md").write_text(
+        "\n".join(root_report) + "\n",
+        encoding="utf-8",
+    )
     print(f"Aggregated results: {output_root}")
 
 
@@ -1445,17 +2629,52 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output-root",
         type=Path,
-        default=Path("/home/jl2815/tco/exercise_output/summer/vecchia_four_geometry_lag643_090126"),
+        default=Path("/home/jl2815/tco/exercise_output/summer/vecchia_three_geometry_lag643_090126"),
     )
     parser.add_argument("--hours-per-day", type=int, default=8)
     parser.add_argument("--lat-range", default="-3,2")
     parser.add_argument("--lon-range", default="121,131")
     parser.add_argument("--smooth", type=float, default=0.5, choices=[0.5])
+    parser.add_argument(
+        "--truth-nugget",
+        type=float,
+        default=None,
+        help="When set, reject synthetic assets whose truth JSON has another nugget.",
+    )
+    parser.add_argument(
+        "--zero-nugget-fit-init",
+        type=float,
+        default=DEFAULT_REAL_INIT["nugget"],
+        help="Strictly positive optimizer start used when the synthetic truth nugget is zero.",
+    )
+    parser.add_argument(
+        "--fixed-nugget",
+        type=float,
+        default=None,
+        help="Fix the statistical nugget at zero and exclude it from optimization.",
+    )
     parser.add_argument("--keep-exact-loc", dest="keep_exact_loc", action="store_true", default=True)
     parser.add_argument("--no-keep-exact-loc", dest="keep_exact_loc", action="store_false")
     parser.add_argument("--daily-stride", type=int, default=2)
     parser.add_argument("--target-chunk-size", type=int, default=32)
+    parser.add_argument(
+        "--union-target-chunk-size",
+        type=int,
+        default=8,
+        help="Smaller covariance/autograd batch for the larger union graph; <=0 uses target-chunk-size.",
+    )
     parser.add_argument("--diag-chunk-size", type=int, default=64)
+    parser.add_argument(
+        "--union-diag-chunk-size",
+        type=int,
+        default=16,
+        help="Smaller conditional-eigen batch for the union graph; <=0 uses diag-chunk-size.",
+    )
+    parser.add_argument(
+        "--fit-order",
+        default="union,adapted,fixed",
+        help="Permutation of union,adapted,fixed. Union first distinguishes union failures early.",
+    )
     parser.add_argument("--min-target-points", type=int, default=1)
     parser.add_argument("--lbfgs-lr", type=float, default=1.0)
     parser.add_argument("--lbfgs-steps", type=int, default=5)
@@ -1483,7 +2702,25 @@ def main() -> None:
     else:
         try:
             run_task(args)
-        except Exception:
+        except Exception as exc:
+            failure = {
+                "failed": datetime.now().isoformat(timespec="seconds"),
+                "task_index": int(args.task_index),
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+                "traceback": traceback.format_exc(),
+                "device_requested": args.device,
+                "cuda_available": torch.cuda.is_available(),
+            }
+            if torch.cuda.is_available():
+                failure["cuda_device_name"] = torch.cuda.get_device_name(0)
+                failure["cuda_memory_allocated_bytes"] = int(torch.cuda.memory_allocated())
+                failure["cuda_memory_reserved_bytes"] = int(torch.cuda.memory_reserved())
+            failure_path = (
+                Path(args.output_root)
+                / f"FAILED_task_{int(args.task_index):02d}.json"
+            )
+            write_json(failure_path, failure)
             traceback.print_exc()
             raise
 

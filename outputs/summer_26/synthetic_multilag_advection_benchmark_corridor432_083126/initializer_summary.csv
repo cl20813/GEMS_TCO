@@ -1,4 +1,0 @@
-method,n_days,mean_seed_s,median_seed_s,mean_seed_error,median_seed_error,max_seed_error,mean_angle_error_deg,correct_quadrant_rate
-M0_zero,3,0.00000000,0.00000000,0.21540659,0.21540659,0.21540659,,0.00000000
-M3_empirical_tau1,3,0.12678858,0.13384292,0.01360147,0.01360147,0.01360147,3.16567602,1.00000000
-M6_robust_multilag,3,0.18588874,0.19103004,0.01640349,0.01780449,0.01780449,2.75648108,1.00000000

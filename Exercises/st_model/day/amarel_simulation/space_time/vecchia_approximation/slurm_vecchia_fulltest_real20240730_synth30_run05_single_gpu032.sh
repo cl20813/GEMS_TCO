@@ -1,0 +1,127 @@
+#!/bin/bash
+#SBATCH --job-name=vecc_s30_r05
+#SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/vecc_s30_r05_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/summer/logs/vecc_s30_r05_%j.err
+#SBATCH --time=3-00:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=128G
+#SBATCH --partition=gpu
+#SBATCH --nodelist=gpu032
+#SBATCH --gres=gpu:1
+
+set -uo pipefail
+
+module purge || true
+module use /projects/community/modulefiles || true
+module load cuda/12.1.0 || true
+
+if ! command -v conda >/dev/null 2>&1; then
+  source "${HOME}/.bashrc" || true
+fi
+if ! command -v conda >/dev/null 2>&1; then
+  echo "ERROR: conda command not found." >&2
+  exit 2
+fi
+
+eval "$(conda shell.bash hook)"
+conda activate faiss_env
+
+REMOTE_DIR="/home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/vecchia_approximation"
+SCRIPT="${REMOTE_DIR}/vecchia_adapted_vs_fixed_lag643_090126.py"
+SELECTION="${REMOTE_DIR}/vecchia_fulltest_real20240730_synth30_run03_selection.json"
+REAL_DATA_ROOT="/home/jl2815/tco/data"
+SYNTHETIC_DATA_ROOT="/home/jl2815/tco/exercise_output/sim_data/july_st_circulant_realpattern_smooth0p5_nugget0_oneday_070926"
+OUTPUT_ROOT="/home/jl2815/tco/exercise_output/summer/vecchia_four_geometry_lag643_real20240730_synth30_run05_single_gpu032"
+
+export PYTHONPATH="/home/jl2815/tco:${REMOTE_DIR}:${PYTHONPATH:-}"
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:128
+export MPLCONFIGDIR="${OUTPUT_ROOT}/.mplconfig_${SLURM_JOB_ID:-manual}"
+
+mkdir -p "${OUTPUT_ROOT}" "${MPLCONFIGDIR}" /home/jl2815/tco/exercise_output/summer/logs
+
+echo "Host: $(hostname)"
+echo "Started: $(date)"
+echo "Execution: one Slurm job, one gpu032 allocation, task indices 0 through 30 serially"
+echo "Output root: ${OUTPUT_ROOT}"
+which python
+nvidia-smi || true
+
+python - <<'PY'
+import numpy, pandas, scipy, torch
+print("numpy", numpy.__version__)
+print("pandas", pandas.__version__)
+print("scipy", scipy.__version__)
+print("torch", torch.__version__)
+print("cuda available", torch.cuda.is_available())
+print("cuda devices visible to this job", torch.cuda.device_count())
+PY
+
+FAILED_TASKS=()
+for TASK_INDEX in $(seq 0 30); do
+  echo "Starting task ${TASK_INDEX}/30 at $(date)"
+  if python "${SCRIPT}" \
+    --mode run-task \
+    --task-index "${TASK_INDEX}" \
+    --selection-file "${SELECTION}" \
+    --real-data-root "${REAL_DATA_ROOT}" \
+    --synthetic-data-root "${SYNTHETIC_DATA_ROOT}" \
+    --output-root "${OUTPUT_ROOT}" \
+    --lat-range=-3,2 \
+    --lon-range=121,131 \
+    --smooth 0.5 \
+    --truth-nugget 0.0 \
+    --fixed-nugget 0.0 \
+    --keep-exact-loc \
+    --daily-stride 2 \
+    --target-chunk-size 32 \
+    --union-target-chunk-size 8 \
+    --diag-chunk-size 64 \
+    --union-diag-chunk-size 16 \
+    --fit-order union,adapted,shifted,fixed \
+    --lbfgs-lr 1.0 \
+    --lbfgs-steps 5 \
+    --lbfgs-eval 20 \
+    --lbfgs-history 10 \
+    --grad-tol 1e-5 \
+    --empirical-max-lat-offset 20 \
+    --empirical-max-lon-offset 20 \
+    --empirical-min-pair-count 1000 \
+    --empirical-smooth-bandwidth-deg 0.063 \
+    --subgrid-max-condition-number 100 \
+    --resample-grid 500 \
+    --device cuda \
+    --require-cuda \
+    --suppress-fit-prints
+  then
+    echo "Completed task ${TASK_INDEX}/30 at $(date)"
+  else
+    TASK_EXIT=$?
+    FAILED_TASKS+=("${TASK_INDEX}:${TASK_EXIT}")
+    echo "FAILED task ${TASK_INDEX}/30 with exit ${TASK_EXIT}; continuing." >&2
+  fi
+done
+
+echo "Starting aggregate at $(date)"
+AGGREGATE_EXIT=0
+python "${SCRIPT}" \
+  --mode aggregate \
+  --selection-file "${SELECTION}" \
+  --output-root "${OUTPUT_ROOT}" \
+  --allow-partial-aggregate || AGGREGATE_EXIT=$?
+
+echo "Finished: $(date)"
+if (( AGGREGATE_EXIT != 0 )); then
+  echo "ERROR: aggregate failed with exit ${AGGREGATE_EXIT}." >&2
+  exit "${AGGREGATE_EXIT}"
+fi
+if (( ${#FAILED_TASKS[@]} > 0 )); then
+  echo "ERROR: failed task indices and exits: ${FAILED_TASKS[*]}" >&2
+  exit 1
+fi
+echo "All 31 tasks and aggregate completed successfully."

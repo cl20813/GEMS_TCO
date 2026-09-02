@@ -1,9 +1,0 @@
-{
-  "initial_screening_run_approx_s": 211.0,
-  "initial_screening_run_note": "Four synthetic paired cases, three real initializer days, and the fallback real-day full fits; elapsed reconstructed from run/file timestamps after a report-only dependency error.",
-  "nonfallback_real_followup_s": 145.34462750004604,
-  "nonfallback_real_followup_note": "Recorded wall time for the three 2024-07-02 short full fits and report rebuild.",
-  "cumulative_approx_s": 356.34462750004604,
-  "cumulative_approx_minutes": 5.939077125000767,
-  "requested_limit_minutes": 20.0
-}

@@ -1,4 +1,0 @@
-dataset_id,truth_id,direction_deg_grid,speed_cells,signal_regime,replicate,method,seed_lat,seed_lon,seed_total_s,seed_error_euclid,subgrid_used,selection_reason,jkq_j90_cells,jkq_valid_fraction,subgrid_stable,subgrid_numerically_accepted,subgrid_numerical_reason
-a022_s2p0_reference_r00,a022_s2p0,22.5000000000,2.0000000000,reference,0,M3_fft,0.0880000000,0.0630000000,0.0022769580,0.0162288464,False,discrete_fft_argmin,0.4593180446,0.7142857143,False,True,accepted
-a022_s2p0_reference_r00,a022_s2p0,22.5000000000,2.0000000000,reference,0,M3_fft_Q,0.0677900060,0.0418890820,0.0024177920,0.0149202669,True,accepted,0.4593180446,0.7142857143,False,True,accepted
-a022_s2p0_reference_r00,a022_s2p0,22.5000000000,2.0000000000,reference,0,M3_fft_JKQ,0.0880000000,0.0630000000,0.0035894170,0.0162288464,False,jackknife_subgrid_unstable,0.4593180446,0.7142857143,False,True,accepted

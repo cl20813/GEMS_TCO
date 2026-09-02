@@ -1,0 +1,11 @@
+data_source,date,data_kind,dataset_id,task_index,task_status,last_stage,failure_type,failure_message,complete_marker,fit_methods,missing_fit_methods,eigen_methods,missing_eigen_methods,cross_rows,expected_cross_rows
+real_gems_tco,2024-07-03,real,real_20240703,0,complete,complete,,,True,"adapted,shifted,fixed,union",,"adapted,shifted,fixed,union",,16,16
+real_gems_tco,2024-07-05,real,real_20240705,1,complete,complete,,,True,"adapted,shifted,fixed,union",,"adapted,shifted,fixed,union",,16,16
+real_gems_tco,2024-07-07,real,real_20240707,2,complete,complete,,,True,"adapted,shifted,fixed,union",,"adapted,shifted,fixed,union",,16,16
+real_gems_tco,2024-07-15,real,real_20240715,3,complete,complete,,,True,"adapted,shifted,fixed,union",,"adapted,shifted,fixed,union",,16,16
+real_gems_tco,2024-07-22,real,real_20240722,4,complete,complete,,,True,"adapted,shifted,fixed,union",,"adapted,shifted,fixed,union",,16,16
+synthetic_dgp_smooth0p5_nugget1_fit_nugget0,2023-07-04,synthetic,synthetic_20230704,5,complete,complete,,,True,"adapted,shifted,fixed,union",,"adapted,shifted,fixed,union",,20,20
+synthetic_dgp_smooth0p5_nugget1_fit_nugget0,2023-07-29,synthetic,synthetic_20230729,6,complete,complete,,,True,"adapted,shifted,fixed,union",,"adapted,shifted,fixed,union",,20,20
+synthetic_dgp_smooth0p5_nugget1_fit_nugget0,2024-07-13,synthetic,synthetic_20240713,7,complete,complete,,,True,"adapted,shifted,fixed,union",,"adapted,shifted,fixed,union",,20,20
+synthetic_dgp_smooth0p5_nugget1_fit_nugget0,2024-07-19,synthetic,synthetic_20240719,8,complete,complete,,,True,"adapted,shifted,fixed,union",,"adapted,shifted,fixed,union",,20,20
+synthetic_dgp_smooth0p5_nugget1_fit_nugget0,2025-07-06,synthetic,synthetic_20250706,9,complete,complete,,,True,"adapted,shifted,fixed,union",,"adapted,shifted,fixed,union",,20,20

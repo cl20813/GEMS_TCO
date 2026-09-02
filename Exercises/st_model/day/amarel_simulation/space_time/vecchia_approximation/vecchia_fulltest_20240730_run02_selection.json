@@ -1,0 +1,32 @@
+{
+  "selection_method": "Targeted full-pipeline validation on the same 2024-07-30 date for real and smooth=0.5 synthetic data.",
+  "run_id": "20240730_run02",
+  "month": 7,
+  "hours_per_day": 8,
+  "real": [
+    {
+      "dataset_id": "real_20240730",
+      "year": 2024,
+      "month": 7,
+      "day": 30,
+      "date": "2024-07-30"
+    }
+  ],
+  "synthetic": [
+    {
+      "dataset_id": "synthetic_20240730",
+      "year": 2024,
+      "month": 7,
+      "day": 30,
+      "date": "2024-07-30"
+    }
+  ],
+  "smooth": 0.5,
+  "fit_order": [
+    "union",
+    "adapted",
+    "shifted",
+    "fixed"
+  ],
+  "comparison_note": "Each data type fits all four geometries, records the 4x4 cross-likelihood matrix (plus synthetic truth evaluations), and writes four-method conditional-eigen PNG diagnostics."
+}

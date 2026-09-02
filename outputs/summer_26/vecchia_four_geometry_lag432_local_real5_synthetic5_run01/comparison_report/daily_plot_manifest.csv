@@ -1,0 +1,11 @@
+data_kind,date,dataset_id,available_methods,missing_methods,plot_path
+real,2024-07-03,real_20240703,"adapted,shifted,fixed,union",,plots/daily/real_2024-07-03_conditional_eigen.png
+real,2024-07-05,real_20240705,"adapted,shifted,fixed,union",,plots/daily/real_2024-07-05_conditional_eigen.png
+real,2024-07-07,real_20240707,"adapted,shifted,fixed,union",,plots/daily/real_2024-07-07_conditional_eigen.png
+real,2024-07-15,real_20240715,"adapted,shifted,fixed,union",,plots/daily/real_2024-07-15_conditional_eigen.png
+real,2024-07-22,real_20240722,"adapted,shifted,fixed,union",,plots/daily/real_2024-07-22_conditional_eigen.png
+synthetic,2023-07-04,synthetic_20230704,"adapted,shifted,fixed,union",,plots/daily/synthetic_2023-07-04_conditional_eigen.png
+synthetic,2023-07-29,synthetic_20230729,"adapted,shifted,fixed,union",,plots/daily/synthetic_2023-07-29_conditional_eigen.png
+synthetic,2024-07-13,synthetic_20240713,"adapted,shifted,fixed,union",,plots/daily/synthetic_2024-07-13_conditional_eigen.png
+synthetic,2024-07-19,synthetic_20240719,"adapted,shifted,fixed,union",,plots/daily/synthetic_2024-07-19_conditional_eigen.png
+synthetic,2025-07-06,synthetic_20250706,"adapted,shifted,fixed,union",,plots/daily/synthetic_2025-07-06_conditional_eigen.png

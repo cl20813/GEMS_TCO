@@ -1,4 +1,0 @@
-nuisance_scenario,method,n_cases,numerical_success_rate,gradient_convergence_rate,large_common_regret_rate,mean_common_regret,mean_parameter_error,mean_final_advection_error,mean_optimizer_iterations,mean_fit_s
-oracle_start,M3_fft,1,1.0000000000,0.0000000000,0.0000000000,0.0000000000,0.0628058346,0.0156558130,2.0000000000,0.5251545830
-oracle_start,M3_fft_JKQ,1,1.0000000000,0.0000000000,0.0000000000,0.0000000000,0.0628058346,0.0156558130,2.0000000000,0.5626690000
-oracle_start,M3_fft_Q,1,1.0000000000,0.0000000000,0.0000000000,0.0000228504,0.0674133306,0.0168544308,1.0000000000,0.5605642920

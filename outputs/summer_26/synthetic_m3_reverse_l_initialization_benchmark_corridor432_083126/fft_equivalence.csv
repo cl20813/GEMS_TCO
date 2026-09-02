@@ -1,4 +1,0 @@
-year,day_idx,day,max_abs_gamma_diff,max_abs_smoothed_diff,max_abs_count_diff,same_seed
-2023,0,2023-07-01,5.3290705182e-15,5.3290705182e-15,0,True
-2023,1,2023-07-02,7.1054273576e-15,5.3290705182e-15,0,True
-2023,2,2023-07-03,5.3290705182e-15,5.3290705182e-15,0,True

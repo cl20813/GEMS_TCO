@@ -1,0 +1,127 @@
+{
+  "brown_bridge_q": 1.3581015157406195,
+  "cov_jitter": 1e-08,
+  "dataset_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "eigenvalue_atol": 1e-12,
+  "eigenvalue_rtol": 1e-10,
+  "fit_root": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/vecchia_four_geometry_lag432_local_real5_synthetic5_run01",
+  "hours_per_day": 8,
+  "methods": [
+    "adapted",
+    "shifted",
+    "fixed",
+    "union"
+  ],
+  "output_root": "outputs/summer_26/vecchia_four_geometry_lag432_local_real5_synthetic5_run01/comparison_report/full_pointmaxmin_whitening_400_run01",
+  "points_per_hour": 400,
+  "selection": {
+    "fit_order": [
+      "union",
+      "adapted",
+      "shifted",
+      "fixed"
+    ],
+    "fitted_nugget": 0.0,
+    "hours_per_day": 8,
+    "lag_counts": [
+      4,
+      3,
+      2
+    ],
+    "month": 7,
+    "random_seed": 20260902,
+    "real": [
+      {
+        "dataset_id": "real_20240703",
+        "date": "2024-07-03",
+        "day": 3,
+        "month": 7,
+        "year": 2024
+      },
+      {
+        "dataset_id": "real_20240705",
+        "date": "2024-07-05",
+        "day": 5,
+        "month": 7,
+        "year": 2024
+      },
+      {
+        "dataset_id": "real_20240707",
+        "date": "2024-07-07",
+        "day": 7,
+        "month": 7,
+        "year": 2024
+      },
+      {
+        "dataset_id": "real_20240715",
+        "date": "2024-07-15",
+        "day": 15,
+        "month": 7,
+        "year": 2024
+      },
+      {
+        "dataset_id": "real_20240722",
+        "date": "2024-07-22",
+        "day": 22,
+        "month": 7,
+        "year": 2024
+      }
+    ],
+    "real_data_source": "real_gems_tco",
+    "run_id": "local_lag432_real5_synthetic5_090226",
+    "selection_method": "Five requested July 2024 real days plus five reproducibly sampled complete synthetic days (2/2/1 across 2023/2024/2025, seed 20260902).",
+    "smooth": 0.5,
+    "synthetic": [
+      {
+        "dataset_id": "synthetic_20230704",
+        "date": "2023-07-04",
+        "day": 4,
+        "month": 7,
+        "year": 2023
+      },
+      {
+        "dataset_id": "synthetic_20230729",
+        "date": "2023-07-29",
+        "day": 29,
+        "month": 7,
+        "year": 2023
+      },
+      {
+        "dataset_id": "synthetic_20240713",
+        "date": "2024-07-13",
+        "day": 13,
+        "month": 7,
+        "year": 2024
+      },
+      {
+        "dataset_id": "synthetic_20240719",
+        "date": "2024-07-19",
+        "day": 19,
+        "month": 7,
+        "year": 2024
+      },
+      {
+        "dataset_id": "synthetic_20250706",
+        "date": "2025-07-06",
+        "day": 6,
+        "month": 7,
+        "year": 2025
+      }
+    ],
+    "synthetic_data_source": "synthetic_dgp_smooth0p5_nugget1_fit_nugget0",
+    "synthetic_truth_nugget": 1.0
+  },
+  "selection_file": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/vecchia_approximation/vecchia_local_lag432_selection_090226.json",
+  "smooth": 0.5
+}

@@ -1,0 +1,9 @@
+dataset_id,data_kind,date,hour_index,hour_key,n_valid_before_ordering,full_maxmin_order_size,n_selected,maxmin_order_seconds
+synthetic_20240713,synthetic,2024-07-13,0,y24m07day13_hm00:53,18069,18069,400,0.0118
+synthetic_20240713,synthetic,2024-07-13,1,y24m07day13_hm01:53,17736,17736,400,0.0114
+synthetic_20240713,synthetic,2024-07-13,2,y24m07day13_hm02:53,17148,17148,400,0.0111
+synthetic_20240713,synthetic,2024-07-13,3,y24m07day13_hm03:53,17018,17018,400,0.0110
+synthetic_20240713,synthetic,2024-07-13,4,y24m07day13_hm04:48,17100,17100,400,0.0111
+synthetic_20240713,synthetic,2024-07-13,5,y24m07day13_hm05:48,16913,16913,400,0.0112
+synthetic_20240713,synthetic,2024-07-13,6,y24m07day13_hm06:48,17880,17880,400,0.0113
+synthetic_20240713,synthetic,2024-07-13,7,y24m07day13_hm07:48,17874,17874,400,0.0120

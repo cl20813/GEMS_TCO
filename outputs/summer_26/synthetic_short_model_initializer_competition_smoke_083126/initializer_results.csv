@@ -1,7 +1,0 @@
-dataset_id,truth_id,speed_label,direction,replicate,nuisance_scenario,method,seed_lat,seed_lon,seed_total_s,closure_calls,profile_evals,selected_candidate,fft_strong,fft_near_count,fft_basin_gap,est_range_time_seed_stage,seed_error_euclid,seed_angle_error_deg,seed_norm,true_advec_norm,seed_norm_abs_error,correct_quadrant
-slow_NE_rep00,slow_NE,slow,NE,0,oracle_start,M0_zero,0.0000000000,0.0000000000,0.0000000000,0,0,zero,,,,,0.1077032961,,0.0000000000,0.1077032961,0.1077032961,False
-slow_NE_rep00,slow_NE,slow,NE,0,oracle_start,M3_fft,0.0440000000,0.1260000000,0.0032192090,0,1681,tau1_fft_exact,,,,,0.0263058929,2.5518836137,0.1334616050,0.1077032961,0.0257583088,True
-slow_NE_rep00,slow_NE,slow,NE,0,oracle_start,S1_fixed_stencil,0.1194718137,0.0391276086,0.0904025830,5,0,zero_then_fixed_stencil,,,,2.0000000000,0.1001060298,50.0647136916,0.1257158861,0.1077032961,0.0180125900,True
-slow_NE_rep00,slow_NE,slow,NE,0,oracle_start,S2_pairwise_polar,0.0191043724,0.0839538367,0.0141322500,5,108,pairwise_polar_global,,,,3.0000000000,0.0263459031,8.9815988789,0.0861000798,0.1077032961,0.0216032163,True
-slow_NE_rep00,slow_NE,slow,NE,0,oracle_start,S3_fft_gated,0.0191145378,0.0839618300,0.0177387510,5,27,fft_local,True,4.0000000000,0.1984292685,3.0000000000,0.0263329723,8.9761837251,0.0861101298,0.1077032961,0.0215931664,True
-slow_NE_rep00,slow_NE,slow,NE,0,oracle_start,S4_iterative_corridor,0.0390861101,0.1068435688,2.5291918340,6,0,m3_iterative_corridor,,,,,0.0069043196,1.7075973925,0.1137685027,0.1077032961,0.0060652065,True

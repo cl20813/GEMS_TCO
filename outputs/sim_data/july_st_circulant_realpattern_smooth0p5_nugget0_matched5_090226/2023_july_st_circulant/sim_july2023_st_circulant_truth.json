@@ -1,0 +1,45 @@
+{
+  "year": 2023,
+  "input_template": "/home/jl2815/tco/data/pickle_2023/tco_grid_23_07.pkl",
+  "n_hours": 16,
+  "hours_per_day": 8,
+  "block_generation": "independent daily 8-hour 3D circulant embeddings",
+  "smooth": 0.5,
+  "sigmasq": 10.0,
+  "sigma": 3.1622776601683795,
+  "range_lat": 0.2,
+  "range_lon": 0.3,
+  "range_time": 2.0,
+  "advec_lat": 0.08,
+  "advec_lon": -0.2,
+  "nugget": 0.0,
+  "mean_intercept": 260.0,
+  "mean_lat_slope": 1.0,
+  "mean_lat_center": -0.5,
+  "lat_range": [
+    -3.0,
+    2.0
+  ],
+  "lon_range": [
+    121.0,
+    131.0
+  ],
+  "delta_lat_base": 0.044,
+  "delta_lon_base": 0.063,
+  "lat_factor_hr": 100,
+  "lon_factor_hr": 10,
+  "delta_lat_hr": 0.00043999999999999996,
+  "delta_lon_hr": 0.0063,
+  "hr_pad": 0.1,
+  "griddification_rule": "nearest regular grid cell, 1-to-1, then axis-wise half-cell threshold",
+  "griddification_threshold_lat": 0.022,
+  "griddification_threshold_lon": 0.0315,
+  "selected_dates": [
+    "2023-07-04",
+    "2023-07-29"
+  ],
+  "matched_latent_field_source": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5/2023_july_st_circulant/sim_july2023_st_circulant_real_locations.pkl",
+  "derivation": "Exact removal of the stored N(0,1) nugget using each hour's recorded seed_nugget, followed by the original one-to-one griddification.",
+  "source_truth_nugget": 1.0,
+  "maximum_reconstruction_error": 0.0
+}

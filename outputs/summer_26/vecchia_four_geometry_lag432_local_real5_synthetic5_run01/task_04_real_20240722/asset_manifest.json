@@ -1,0 +1,25 @@
+{
+  "center_value": 257.9726104252314,
+  "data_kind": "real",
+  "data_source": "real_gems_tco",
+  "dataset_id": "real_20240722",
+  "date": "2024-07-22",
+  "day": 22,
+  "keys": [
+    "2024_07_y24m07day22_hm00:53",
+    "2024_07_y24m07day22_hm01:53",
+    "2024_07_y24m07day22_hm02:53",
+    "2024_07_y24m07day22_hm03:53",
+    "2024_07_y24m07day22_hm04:48",
+    "2024_07_y24m07day22_hm05:48",
+    "2024_07_y24m07day22_hm06:48",
+    "2024_07_y24m07day22_hm07:48"
+  ],
+  "month": 7,
+  "n_total": 145008,
+  "n_valid": 143621,
+  "source_path": "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/tco_grid_24_07.pkl",
+  "truth": null,
+  "valid_rate": 0.9904350104821803,
+  "year": 2024
+}

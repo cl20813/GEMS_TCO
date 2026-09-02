@@ -1,2 +1,0 @@
-truth_id,replicate,dataset_id,simulation_seed,n_lat,n_lon,n_valid,n_total,embedding_px,embedding_py,embedding_pt,spectrum_min_real_before_clamp,spectrum_negative_count_before_clamp,signal_regime,speed_cells,direction_deg_grid
-a022_s2p0_reference_r00,0,a022_s2p0_reference_r00,901261,24,32,6038,6144,48,64,16,-19.9836692810,209,reference,2.0000000000,22.5000000000

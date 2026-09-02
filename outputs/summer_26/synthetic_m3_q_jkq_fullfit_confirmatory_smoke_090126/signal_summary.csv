@@ -1,4 +1,0 @@
-signal_regime,method,n_cases,large_common_regret_rate,mean_common_regret,mean_parameter_error,mean_final_advection_error
-reference,M3_fft,1,0.0000000000,0.0000000000,0.0628058346,0.0156558130
-reference,M3_fft_JKQ,1,0.0000000000,0.0000000000,0.0628058346,0.0156558130
-reference,M3_fft_Q,1,0.0000000000,0.0000228504,0.0674133306,0.0168544308

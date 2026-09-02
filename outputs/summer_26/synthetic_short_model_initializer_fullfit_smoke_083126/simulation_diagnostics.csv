@@ -1,2 +1,0 @@
-truth_id,replicate,dataset_id,simulation_seed,n_lat,n_lon,n_valid,n_total,embedding_px,embedding_py,embedding_pt,spectrum_min_real_before_clamp,spectrum_negative_count_before_clamp
-slow_NE,0,slow_NE_rep00,831261,32,48,12140,12288,64,96,16,-19.4526062012,9
