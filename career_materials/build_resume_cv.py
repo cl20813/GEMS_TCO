@@ -74,6 +74,8 @@ LIBERTY_MUTUAL = ROOT / "liberty_mutual"
 LIBERTY_MUTUAL.mkdir(parents=True, exist_ok=True)
 VIRTU_FINANCIAL = ROOT / "virtu_financial"
 VIRTU_FINANCIAL.mkdir(parents=True, exist_ok=True)
+BARCLAYS_ELECTRONIC_TRADING = ROOT / "barclays_electronic_trading"
+BARCLAYS_ELECTRONIC_TRADING.mkdir(parents=True, exist_ok=True)
 
 FONT = "Arial"
 BLACK = RGBColor(0x11, 0x11, 0x11)
@@ -6025,18 +6027,139 @@ def build_virtu_quantitative_strategist_resume():
                 first_run = paragraph.runs[0] if paragraph.runs else None
                 for run in list(paragraph.runs):
                     paragraph._p.remove(run._r)
-                new_run = paragraph.add_run(new_text)
-                if first_run is not None:
+                if first_run is not None and first_run.bold and ": " in new_text:
+                    lead, detail = new_text.split(": ", 1)
+                    lead_run = paragraph.add_run(f"{lead}: ")
                     set_run_font(
-                        new_run,
+                        lead_run,
                         first_run.font.size.pt if first_run.font.size else 9.15,
-                        bold=bool(first_run.bold),
+                        bold=True,
                         italic=bool(first_run.italic),
                         color=first_run.font.color.rgb or BLACK,
                     )
+                    detail_run = paragraph.add_run(detail)
+                    set_run_font(
+                        detail_run,
+                        first_run.font.size.pt if first_run.font.size else 9.15,
+                        bold=False,
+                        italic=bool(first_run.italic),
+                        color=first_run.font.color.rgb or BLACK,
+                    )
+                else:
+                    new_run = paragraph.add_run(new_text)
+                    if first_run is not None:
+                        set_run_font(
+                            new_run,
+                            first_run.font.size.pt if first_run.font.size else 9.15,
+                            bold=bool(first_run.bold),
+                            italic=bool(first_run.italic),
+                            color=first_run.font.color.rgb or BLACK,
+                        )
                 break
 
     out = VIRTU_FINANCIAL / "Joonwon_Lee_Virtu_Quantitative_Strategist_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_barclays_electronic_trading_resume():
+    """Create a targeted one-page resume for Barclays' 2027 Electronic Trading program."""
+    source = VIRTU_FINANCIAL / "Joonwon_Lee_Virtu_Quantitative_Strategist_Resume.docx"
+    if not source.exists():
+        raise FileNotFoundError(f"Run build_virtu_quantitative_strategist_resume() first: {source}")
+
+    doc = Document(source)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Barclays Electronic Trading Graduate Associate Resume",
+        "Targeted resume for the Barclays Electronic Trading Associate Graduate Program 2027",
+        "electronic trading, quantitative research, statistical modeling, machine learning, Python, C++ integration, "
+        "model implementation, simulation, market making, scalable research tools",
+    )
+
+    replacements = {
+        "Statistics Ph.D. candidate and quantitative researcher specializing": (
+            "Statistics Ph.D. candidate specializing in scalable likelihood inference and statistical diagnostics "
+            "for stochastically dependent data. Develops mathematical models and reproducible Python/PyTorch research "
+            "tools, with C++/pybind11 integration for performance-critical computation."
+        ),
+        "Developed an end-to-end LightGBM pipeline across 2.46M+ records": (
+            "Developed an end-to-end LightGBM pipeline across 2.46M+ records, including data preparation, feature "
+            "processing, GLM benchmarking, model selection, validation, and performance diagnostics on AWS EC2; "
+            "presented findings as pricing and risk-segmentation recommendations to business stakeholders."
+        ),
+        "Developed and validated a Sequential Probability Ratio Test": (
+            "Developed a sequential risk-monitoring framework for binary indicators, using Brownian-motion "
+            "approximation, dynamic-programming probability propagation, and simulation to quantify stopping-time "
+            "uncertainty and early-decision tradeoffs."
+        ),
+        "Combined Brownian-motion approximation": (
+            "Specified and validated a Sequential Probability Ratio Test with explicit hypotheses and "
+            "likelihood-ratio boundaries; evaluated boundary-crossing probabilities, stopping behavior, and Type I/II "
+            "error."
+        ),
+        "Scalable Inference: Developed an advection-aware Vecchia likelihood approximation": (
+            "Scalable Inference: Developed an advection-aware Vecchia likelihood approximation for nonseparable "
+            "space-time covariance structures, using ordered local conditional models to support likelihood-based "
+            "parameter estimation and uncertainty quantification for up to 145,008 observations per day."
+        ),
+        "Empirical Testing: Designed scale- and frequency-resolved diagnostics": (
+            "Stochastic Diagnostics: Developed statistical diagnostic tools for dependent stochastic processes that "
+            "localize where a fitted model fails across scale and frequency, distinguishing persistent dependence from "
+            "high-frequency noise, missingness, acquisition artifacts, and covariance misspecification."
+        ),
+    }
+
+    for paragraph in doc.paragraphs:
+        for prefix, new_text in replacements.items():
+            if paragraph.text.startswith(prefix):
+                first_run = paragraph.runs[0] if paragraph.runs else None
+                for run in list(paragraph.runs):
+                    paragraph._p.remove(run._r)
+                if first_run is not None and first_run.bold and ": " in new_text:
+                    lead, detail = new_text.split(": ", 1)
+                    lead_run = paragraph.add_run(f"{lead}: ")
+                    set_run_font(
+                        lead_run,
+                        first_run.font.size.pt if first_run.font.size else 9.15,
+                        bold=True,
+                        italic=bool(first_run.italic),
+                        color=first_run.font.color.rgb or BLACK,
+                    )
+                    detail_run = paragraph.add_run(detail)
+                    set_run_font(
+                        detail_run,
+                        first_run.font.size.pt if first_run.font.size else 9.15,
+                        bold=False,
+                        italic=bool(first_run.italic),
+                        color=first_run.font.color.rgb or BLACK,
+                    )
+                else:
+                    new_run = paragraph.add_run(new_text)
+                    if first_run is not None:
+                        set_run_font(
+                            new_run,
+                            first_run.font.size.pt if first_run.font.size else 9.15,
+                            bold=bool(first_run.bold),
+                            italic=bool(first_run.italic),
+                            color=first_run.font.color.rgb or BLACK,
+                        )
+                break
+
+    paragraphs = list(doc.paragraphs)
+    imc_index = next(
+        i for i, paragraph in enumerate(paragraphs)
+        if paragraph.text.startswith("IMC Prosperity Algorithmic Trading Competition")
+    )
+    dissertation_index = next(
+        i for i, paragraph in enumerate(paragraphs)
+        if paragraph.text.startswith("Ph.D. Dissertation Research")
+    )
+    additional = next(paragraph for paragraph in paragraphs if paragraph.text == "ADDITIONAL")
+    for paragraph in paragraphs[imc_index:dissertation_index]:
+        additional._p.addprevious(paragraph._p)
+
+    out = BARCLAYS_ELECTRONIC_TRADING / "Joonwon_Lee_Barclays_Electronic_Trading_Resume.docx"
     doc.save(out)
     return out
 
@@ -7174,6 +7297,7 @@ if __name__ == "__main__":
     print(build_tower_research_resume())
     print(build_imc_quantitative_researcher_2027_resume())
     print(build_virtu_quantitative_strategist_resume())
+    print(build_barclays_electronic_trading_resume())
     print(build_new_york_life_resume())
     print(build_voleon_data_scientist_resume())
     print(build_state_street_credit_risk_resume())

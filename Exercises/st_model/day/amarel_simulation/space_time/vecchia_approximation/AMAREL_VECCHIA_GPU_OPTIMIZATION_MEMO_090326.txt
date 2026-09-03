@@ -1,0 +1,125 @@
+AMAREL VECCHIA GPU / OPTIMIZATION 설정 메모
+갱신: 2026-09-03
+
+[현재 권장 구성]
+
+- 비교 방법: adapted vs fixed (union 제외)
+- 공간 block: 4x4, block당 최대 16 points
+- lag 구조: 6/4/3
+- fitting batch: target_chunk_size=256
+- torch.float64, Matern smooth=0.5
+- Amarel 한 node / 한 task / GPU 1개 / 날짜별 순차 실행
+- float64 Cholesky/solve가 중심이므로 L40S보다 A100 우선
+
+[GPU batch size의 두 단위]
+
+- 과거 개별(point-target) Vecchia 최적 batch: 약 4,800 target rows
+- 4x4 block Vecchia의 target_chunk_size는 point 수가 아니라 block 수
+- 64 blocks = 최대 1,024 target points
+- 128 blocks = 최대 2,048 target points
+- 256 blocks = 최대 4,096 target points
+- 512 blocks = 최대 8,192 target points
+- 따라서 256이 과거 pointwise 4,800과 가장 가까운 실질 작업량
+- pointwise 값 4,800을 block chunk에 직접 넣으면 안 됨
+
+[2024-07-03 adapted 1회 benchmark: gpu016 A100-PCIE-40GB]
+
+chunk  시간       직전 대비 감소       peak GPU       native NLL
+64     31.278초   -                    21.069 GiB     1.3771583724
+128    24.471초   6.807초, 21.8%       21.091 GiB     1.3771583724
+256    21.569초   2.902초, 11.9%       21.273 GiB     1.3771583724
+512    20.747초   0.822초,  3.8%       21.448 GiB     1.3771583724
+
+- 64 -> 256: 9.709초(31.0%) 단축
+- 64 -> 512: 10.531초(33.7%) 단축
+- NLL은 모든 chunk에서 동일: batch는 계산 분할만 바꾸고 목적함수는 안 바꿈
+- 512가 가장 빠르지만 256 대비 이득이 3.8%뿐
+- 장기간 여러 날짜의 변동성과 메모리 여유를 고려한 최적점: 256
+
+[A / AB / ABC 구조]
+
+- block은 centroid max-min ordering으로 정렬
+- 같은 시간대에서는 현재 block보다 ordering상 앞선 block만 conditioning 가능
+- A: 현재 t에서 이전 spatial block 최대 6개
+- B: t-1 corridor에서 4개
+- C: t-2 corridor에서 3개
+- A batch: A6 = conditioning 최대 96 points; target 포함 행렬 최대 112x112
+- AB batch: A6+B4 = 최대 160 points; target 포함 최대 176x176
+- ABC batch: A6+B4+C3 = 최대 208 points; target 포함 최대 224x224
+- adapted: 보정된 signed 2-D advection corridor로 graph 생성
+- fixed: 고정 reference/target-centered corridor로 graph 생성
+- conditioning graph는 fitting 전에 한 번 만들고 LBFGS 중에는 재생성하지 않음
+
+[다음 production용 LBFGS 권장값]
+
+lr=1.0
+line_search_fn="strong_wolfe"
+max_iter=20
+max_eval=20
+history_size=40
+tolerance_grad=1e-5
+tolerance_change=1e-9
+outer max_steps=5
+outer grad_tol=1e-5
+
+- 실제 outer loop은 2024-07-03 benchmark에서 2회 수렴
+- 그래도 outer max_steps는 2로 자르지 말고 안전 상한 5 유지
+- strong_wolfe 때문에 outer step 1회 안에서도 closure/NLL 평가가 여러 번 발생
+- positive covariance parameter는 log scale에서 최적화
+- GLS beta는 likelihood 안에서 계산
+
+중요: 위 batch benchmark는 history_size=10으로 측정됨.
+history_size=40은 다음 production 실행용 제안이며 아직 10과 직접 비교하지 않음.
+parameter가 7개라 history 자체의 GPU 부담은 작을 것으로 예상되지만,
+재현성을 위해 run_config.json에 실제 값을 반드시 기록할 것.
+
+[Nugget 정책]
+
+- 위 real-data benchmark: nugget 추정, initial nugget=0.247
+- simulation: 실제 truth nugget으로 초기화하고 실험 설계대로 고정/최적화 제외
+- nugget=0 고정 시 statistical nugget과 Cholesky numerical jitter를 구분
+- 결과 비교 때 estimated/fixed 여부와 초기값을 반드시 저장
+
+[Amarel 권장 node]
+
+A100/Ampere 우선 후보:
+- gpu015-016: A100-PCIE-40GB 확인, system RAM 약 1.5TB, GPU 4개/node
+- gpu017: Ampere/A100 계열, RAM 약 190GB, GPU 4개 (gpu018은 invalid라 제외)
+- gpu019, gpu022-026: Ampere/A100 계열, RAM 약 250GB, GPU 2개/node
+- gpu020-021: Ampere/A100 계열, RAM 약 250GB, GPU 4개/node
+- gpu027-028: Ampere/A100 계열, RAM 약 250GB, GPU 4개/node
+- nodelist: gpu[015-017,019-028]
+
+L40S/Ada fallback 후보:
+- gpu029-030: Ada feature, RAM 약 250GB
+- gpu031-048: Ada feature, RAM 약 516GB
+- nodelist: gpu[029-048]
+- 실제 GPU 모델은 할당 후 nvidia-smi로 확인
+- L40S는 float32/tensor core에는 강하지만 native float64는 A100보다 불리
+
+[60일 순차 실행 Slurm 기준]
+
+--partition=gpu
+--nodes=1
+--ntasks=1
+--cpus-per-task=12
+--mem=128G
+--gres=gpu:1
+--time=32:00:00
+--nodelist=gpu[015-017,019-028]
+
+- 현재 코드는 single-process/single-GPU이므로 GPU 3개를 요청하지 말 것
+- 날짜별/방법별 결과를 즉시 저장하고 skip-existing/resume 지원
+- 날짜/방법 종료 후 model과 tensor 참조 삭제, gc.collect(), torch.cuda.empty_cache()
+- PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True로 fragmentation 완화
+- fitting chunk와 eigen diagnostic chunk는 별도 설정
+
+[진단/저장]
+
+- 유지: native Vecchia NLL, full-eigen 누적곡선, mean Y^2, D
+- 제외: full NLL/obs
+- full eigen: 시간대별 max-min 400개 x 8 = 3,200 points, 순차 계산
+- 저장: run_config.json, 날짜별 CSV/JSON, optimizer 종료 gradient/outer steps,
+  fit time, peak GPU memory, parameter estimates, seed, node/GPU 이름, logs,
+  daily plots, 연도별 July 평균 지표/plot
+

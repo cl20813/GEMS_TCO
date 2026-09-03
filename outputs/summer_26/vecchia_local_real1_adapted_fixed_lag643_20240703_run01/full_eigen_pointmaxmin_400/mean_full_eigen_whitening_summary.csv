@@ -1,0 +1,3 @@
+data_kind,method,n_dates,mean_squared_score,max_abs_bridge_scaled,native_nll_per_target,full_gaussian_nll_per_obs,diagnostic_seconds
+real,adapted,1,0.9253,3.2450,1.3772,2.6477,1.1032
+real,fixed,1,0.8959,4.1565,1.3817,2.6444,1.0796

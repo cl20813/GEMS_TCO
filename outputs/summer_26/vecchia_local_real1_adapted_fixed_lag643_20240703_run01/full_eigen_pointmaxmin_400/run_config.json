@@ -1,0 +1,43 @@
+{
+  "brown_bridge_q": 1.3581015157406195,
+  "cov_jitter": 1e-08,
+  "dataset_indices": [
+    0
+  ],
+  "eigenvalue_atol": 1e-12,
+  "eigenvalue_rtol": 1e-10,
+  "fit_root": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/vecchia_local_real1_adapted_fixed_lag643_20240703_run01",
+  "hours_per_day": 8,
+  "methods": [
+    "adapted",
+    "fixed"
+  ],
+  "output_root": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/vecchia_local_real1_adapted_fixed_lag643_20240703_run01/full_eigen_pointmaxmin_400",
+  "points_per_hour": 400,
+  "selection": {
+    "description": "Local one-day real-data adapted versus fixed lag-643 test",
+    "fit_order": [
+      "adapted",
+      "fixed"
+    ],
+    "lag_counts": [
+      6,
+      4,
+      3
+    ],
+    "real": [
+      {
+        "data_kind": "real",
+        "data_source": "real_july_2024",
+        "dataset_id": "real_20240703",
+        "date": "2024-07-03",
+        "day": 3,
+        "month": 7,
+        "year": 2024
+      }
+    ],
+    "synthetic": []
+  },
+  "selection_file": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/vecchia_approximation/vecchia_local_real1_adapted_fixed_lag643_20240703_090326_selection.json",
+  "smooth": 0.5
+}
