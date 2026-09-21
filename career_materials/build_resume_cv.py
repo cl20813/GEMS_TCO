@@ -26,6 +26,10 @@ GOOGLE_YOUTUBE = ROOT / "google_youtube"
 GOOGLE_YOUTUBE.mkdir(parents=True, exist_ok=True)
 GOOGLE_ADS_METRICS = ROOT / "google_ads_metrics"
 GOOGLE_ADS_METRICS.mkdir(parents=True, exist_ok=True)
+GOOGLE_STUDENT_RESEARCHER = ROOT / "google_student_researcher"
+GOOGLE_STUDENT_RESEARCHER.mkdir(parents=True, exist_ok=True)
+GOOGLE_DATA_SCIENTIST = ROOT / "google_data_scientist"
+GOOGLE_DATA_SCIENTIST.mkdir(parents=True, exist_ok=True)
 VALLEY_BANK = ROOT / "valley_bank"
 VALLEY_BANK.mkdir(parents=True, exist_ok=True)
 BLACKROCK = ROOT / "blackrock"
@@ -76,6 +80,12 @@ VIRTU_FINANCIAL = ROOT / "virtu_financial"
 VIRTU_FINANCIAL.mkdir(parents=True, exist_ok=True)
 BARCLAYS_ELECTRONIC_TRADING = ROOT / "barclays_electronic_trading"
 BARCLAYS_ELECTRONIC_TRADING.mkdir(parents=True, exist_ok=True)
+CUBIST = ROOT / "cubist_point72"
+CUBIST.mkdir(parents=True, exist_ok=True)
+CITADEL = ROOT / "citadel"
+CITADEL.mkdir(parents=True, exist_ok=True)
+TWO_SIGMA = ROOT / "two_sigma"
+TWO_SIGMA.mkdir(parents=True, exist_ok=True)
 
 FONT = "Arial"
 BLACK = RGBColor(0x11, 0x11, 0x11)
@@ -2043,6 +2053,131 @@ def build_google_ads_metrics_resume():
     )
 
     out = GOOGLE_ADS_METRICS / "Joonwon_Lee_Google_Ads_Metrics_Research_Data_Scientist_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_google_data_scientist_resume():
+    """Create a computational-statistics-focused resume for Google's Data Scientist role."""
+    source = GOOGLE_ADS_METRICS / "Joonwon_Lee_Google_Ads_Metrics_Research_Data_Scientist_Resume.docx"
+    if not source.exists():
+        build_google_ads_metrics_resume()
+
+    doc = Document(source)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Google Data Scientist Resume",
+        "Targeted resume for Data Scientist at Google YouTube",
+        "computational statistics, scalable inference, predictive modeling, statistical machine learning, "
+        "data integration, data integrity, experimentation, Python, PyTorch, SQL, stakeholder communication",
+    )
+
+    replacements = {
+        "Statistics Ph.D. candidate and research data scientist": (
+            "Computational statistician and Statistics Ph.D. candidate specializing in scalable likelihood inference, "
+            "probabilistic and predictive modeling, and statistical diagnostics for large, dependent datasets. Builds "
+            "reproducible Python/PyTorch workflows for data integration, model estimation, simulation, and validation; "
+            "translates business questions into measurable statistical problems, evaluation metrics, and defensible results."
+        ),
+        "Programming and Data Workflows:": (
+            "Programming and Statistical Computing: Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), "
+            "C++/pybind11 integration, Linux, Git, AWS EC2, HPC/SLURM; SQL/MySQL (working knowledge); CPU/GPU computing, "
+            "data restructuring, and reproducible pipelines"
+        ),
+        "Statistical Measurement and Modeling:": (
+            "Computational Statistics and Modeling: Scalable likelihood approximation, Gaussian processes, MLE/GLS, "
+            "numerical optimization, Monte Carlo simulation, statistical diagnostics, hypothesis testing, regression "
+            "(GLM/GBM), machine learning, model selection and validation, uncertainty quantification, and missing-data analysis"
+        ),
+        "JPMorgan Chase - Summer Quantitative Analytics Associate": (
+            "JPMorgan Chase - Summer Quantitative Analytics Associate, Model Risk Governance and Review\tSummer 2026"
+        ),
+        "RESEARCH AND ANALYTICAL PROJECTS": "COMPUTATIONAL STATISTICS RESEARCH",
+        "Ph.D. Dissertation Research -": (
+            "Ph.D. Dissertation Research - Scalable Statistical Computing and Model Diagnostics\tSep 2024 - Present"
+        ),
+        "Measurement Methodology:": (
+            "Scalable Inference: Developed an advection-aware Vecchia likelihood approximation for nonseparable "
+            "space-time Gaussian processes, using ordered local conditioning for likelihood-based parameter estimation "
+            "and uncertainty quantification with up to 145,008 observations per day."
+        ),
+        "Data Preparation and Quality:": (
+            "Data Integration and Integrity: Built workflows for quality filtering, missingness tracking, time-dependent "
+            "coordinate offsets, nearest-center matching, spatial-threshold regular-grid construction, and "
+            "dependency-aware ordering for noisy satellite data."
+        ),
+        "Scalable Model Development:": (
+            "Statistical Diagnostics and Computing: Developed scale- and frequency-resolved diagnostics that localize "
+            "covariance misspecification and distinguish persistent dependence from high-frequency noise and acquisition "
+            "artifacts; implemented Python/PyTorch pipelines with L-BFGS optimization, CPU/GPU and HPC execution, and "
+            "C++/pybind11 integration."
+        ),
+    }
+
+    for paragraph in doc.paragraphs:
+        for prefix, new_text in replacements.items():
+            if not paragraph.text.startswith(prefix):
+                continue
+            first_run = paragraph.runs[0] if paragraph.runs else None
+            for run in list(paragraph.runs):
+                paragraph._p.remove(run._r)
+
+            if "\t" in new_text:
+                left, right = new_text.split("\t", 1)
+                left_run = paragraph.add_run(left)
+                if first_run is not None:
+                    set_run_font(
+                        left_run,
+                        first_run.font.size.pt if first_run.font.size else 9.2,
+                        bold=True,
+                        italic=bool(first_run.italic),
+                        color=first_run.font.color.rgb or BLACK,
+                    )
+                paragraph.add_run("\t")
+                right_run = paragraph.add_run(right)
+                set_run_font(
+                    right_run,
+                    first_run.font.size.pt if first_run and first_run.font.size else 9.2,
+                    bold=False,
+                    italic=False,
+                    color=first_run.font.color.rgb if first_run and first_run.font.color.rgb else BLACK,
+                )
+            elif first_run is not None and first_run.bold and ": " in new_text:
+                lead, detail = new_text.split(": ", 1)
+                lead_run = paragraph.add_run(f"{lead}: ")
+                set_run_font(
+                    lead_run,
+                    first_run.font.size.pt if first_run.font.size else 9.2,
+                    bold=True,
+                    italic=bool(first_run.italic),
+                    color=first_run.font.color.rgb or BLACK,
+                )
+                detail_run = paragraph.add_run(detail)
+                set_run_font(
+                    detail_run,
+                    first_run.font.size.pt if first_run.font.size else 9.2,
+                    bold=False,
+                    italic=bool(first_run.italic),
+                    color=first_run.font.color.rgb or BLACK,
+                )
+            else:
+                replacement = paragraph.add_run(new_text)
+                if first_run is not None:
+                    set_run_font(
+                        replacement,
+                        first_run.font.size.pt if first_run.font.size else 9.2,
+                        bold=bool(first_run.bold),
+                        italic=bool(first_run.italic),
+                        color=first_run.font.color.rgb or BLACK,
+                    )
+            break
+
+    for paragraph in doc.paragraphs:
+        for run in paragraph.runs:
+            if "Expected Dec 2026" in run.text:
+                run.text = run.text.replace("Expected Dec 2026", "Expected May 2027")
+
+    out = GOOGLE_DATA_SCIENTIST / "Joonwon_Lee_Google_Data_Scientist_Resume.docx"
     doc.save(out)
     return out
 
@@ -5607,10 +5742,10 @@ def build_tower_research_resume():
     num_id = add_bullet_numbering(doc, left_twips=320, hanging_twips=180)
     set_core_properties(
         doc,
-        "Joonwon Lee - Tower Research Quantitative Trader Researcher Resume",
-        "Targeted resume for Quantitative Trader / Researcher at Tower Research Capital",
-        "quantitative research, systematic trading, stochastic modeling, simulation, signal diagnostics, Python, "
-        "C++ integration, large-scale data, spectral analysis, hypothesis testing",
+        "Joonwon Lee - Tower Research Quantitative Trader Researcher 2027 Resume",
+        "Targeted resume for 2027 Quantitative Trader / Researcher at Tower Research Capital",
+        "quantitative research, stochastic modeling, simulation, statistical diagnostics, Python, C++ integration, "
+        "large-scale data, spectral analysis, hypothesis testing, market making",
     )
 
     add_name_header(doc, compact=True)
@@ -5618,11 +5753,10 @@ def build_tower_research_resume():
     add_section_heading(doc, "Summary", compact=True)
     add_body_paragraph(
         doc,
-        "Statistics Ph.D. candidate and quantitative researcher specializing in stochastic processes, likelihood-based "
-        "inference, simulation, and scale- and frequency-resolved signal diagnostics. Builds reproducible Python/PyTorch "
-        "research systems for large dependent datasets and integrates C++ for performance-critical computation. Brings "
-        "rigorous hypothesis-testing and model-evaluation experience, with demonstrated interest in systematic trading, "
-        "market making, and empirical strategy research.",
+        "Statistics Ph.D. candidate specializing in scalable likelihood inference, stochastic modeling, and statistical "
+        "diagnostics for dependent data. Builds reproducible Python/PyTorch research tools for large datasets, integrates "
+        "compiled C++ through pybind11 for performance-critical computation, and evaluates models through hypothesis "
+        "testing and simulation.",
         9.7,
         after=1.0,
         line=1.0,
@@ -5653,7 +5787,7 @@ def build_tower_research_resume():
         doc,
         "Programming and Research Systems: ",
         "Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), C++/pybind11 integration, SQL, Linux, Git, "
-        "AWS EC2, HPC/SLURM; CPU/GPU computing, cached artifacts, and restartable research pipelines",
+        "AWS EC2, HPC/SLURM; CPU/GPU computing and restartable research pipelines",
         9.3,
         after=0.3,
     )
@@ -5724,24 +5858,7 @@ def build_tower_research_resume():
     add_section_heading(doc, "Quantitative Research and Trading", compact=True)
     add_tabbed_line(
         doc,
-        "IMC Prosperity Algorithmic Trading Competition - Top 2.39% of Participants",
-        "Apr 2025",
-        width,
-        9.35,
-        after=0.35,
-    )
-    add_bullet(
-        doc,
-        "Built and evaluated a market-making strategy using market-based fair-value estimation, inventory-aware "
-        "quoting, rolling-window exposure controls, dynamic liquidation rules, and benchmark-driven performance analysis.",
-        num_id,
-        9.1,
-        after=0.6,
-        line=1.0,
-    )
-    add_tabbed_line(
-        doc,
-        "Ph.D. Dissertation Research - Scalable Stochastic Modeling and Signal Diagnostics",
+        "Ph.D. Dissertation Research - Scalable Stochastic Modeling and Statistical Diagnostics",
         "Sep 2024 - Present",
         width,
         9.35,
@@ -5749,8 +5866,9 @@ def build_tower_research_resume():
     )
     add_bullet(
         doc,
-        "Scalable Inference: Developed an advection-aware Vecchia likelihood approximation for nonseparable Gaussian "
-        "processes, using ordered conditional models to fit up to 145,008 observations per day.",
+        "Scalable Inference: Developed an advection-aware Vecchia likelihood approximation for nonseparable space-time "
+        "covariance structures, using ordered local conditional models for likelihood-based parameter estimation and "
+        "uncertainty quantification with up to 145,008 observations per day.",
         num_id,
         9.05,
         after=0.4,
@@ -5759,24 +5877,43 @@ def build_tower_research_resume():
     )
     add_bullet(
         doc,
-        "Signal Diagnostics: Designed scale- and frequency-resolved analyses to determine whether apparent patterns "
-        "reflect persistent dependence, high-frequency noise, missingness, acquisition artifacts, or model misspecification.",
+        "Stochastic Diagnostics: Developed statistical diagnostic tools for dependent stochastic processes that localize "
+        "where fitted models fail across scale and frequency, distinguishing persistent dependence from high-frequency "
+        "noise, missingness, acquisition artifacts, and covariance misspecification.",
         num_id,
         9.05,
         after=0.4,
         line=1.0,
-        bold_lead="Signal Diagnostics:",
+        bold_lead="Stochastic Diagnostics:",
     )
     add_bullet(
         doc,
         "Research Infrastructure: Built reusable Python/PyTorch workflows for data-quality filtering, time-dependent "
-        "alignment, optimization, simulation, cached outputs, and restartable CPU/GPU and HPC execution; integrated "
+        "alignment, optimization, simulation, and restartable CPU/GPU and HPC execution; integrated "
         "performance-critical C++ ordering routines through pybind11.",
         num_id,
         9.05,
         after=0.6,
         line=1.0,
         bold_lead="Research Infrastructure:",
+    )
+    add_tabbed_line(
+        doc,
+        "IMC Prosperity Algorithmic Trading Competition - Top 2.39% of Participants",
+        "Apr 2025",
+        width,
+        9.35,
+        after=0.35,
+    )
+    add_bullet(
+        doc,
+        "Built and backtested an inventory-aware market-making strategy around empirically calibrated reference values; "
+        "tracked position-limit saturation over a rolling 10-step window and triggered more aggressive inventory-reducing "
+        "quotes to manage persistent exposure.",
+        num_id,
+        9.1,
+        after=0.6,
+        line=1.0,
     )
 
     add_section_heading(doc, "Additional", compact=True)
@@ -5796,7 +5933,7 @@ def build_tower_research_resume():
         after=0,
     )
 
-    out = TOWER_RESEARCH / "Joonwon_Lee_Tower_Research_Resume.docx"
+    out = TOWER_RESEARCH / "Joonwon_Lee_Tower_QTQR_2027_Resume.docx"
     doc.save(out)
     return out
 
@@ -6160,6 +6297,315 @@ def build_barclays_electronic_trading_resume():
         additional._p.addprevious(paragraph._p)
 
     out = BARCLAYS_ELECTRONIC_TRADING / "Joonwon_Lee_Barclays_Electronic_Trading_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_cubist_entry_level_quantitative_researcher_resume():
+    """Create a targeted one-page resume for Cubist's Entry-Level Quantitative Researcher role."""
+    source = BARCLAYS_ELECTRONIC_TRADING / "Joonwon_Lee_Barclays_Electronic_Trading_Resume.docx"
+    if not source.exists():
+        raise FileNotFoundError(f"Run build_barclays_electronic_trading_resume() first: {source}")
+
+    doc = Document(source)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Cubist Entry-Level Quantitative Researcher Resume",
+        "Targeted resume for Entry-Level Quantitative Researcher at Cubist Systematic Strategies",
+        "quantitative research, predictive modeling, hypothesis testing, backtesting, statistical diagnostics, "
+        "Python, SQL, C++ integration, systematic investing, reproducible research tools",
+    )
+
+    replacements = {
+        "Statistics Ph.D. candidate specializing": (
+            "Statistics Ph.D. candidate specializing in scalable likelihood inference, predictive modeling, and "
+            "statistical diagnostics for stochastically dependent data. Develops rigorous hypothesis-driven research "
+            "workflows and reproducible Python/PyTorch tools for large datasets, with C++/pybind11 integration for "
+            "performance-critical computation."
+        ),
+        "Quantitative Methods: Probability and stochastic processes": (
+            "Quantitative Methods: Hypothesis testing, predictive modeling, regression and machine learning, "
+            "backtesting, probability and stochastic processes, Monte Carlo simulation, MLE/GLS, numerical "
+            "optimization, time-series and spatiotemporal modeling, spectral and autocorrelation analysis, model "
+            "validation, and performance evaluation"
+        ),
+        "QUANTITATIVE RESEARCH AND TRADING": "QUANTITATIVE RESEARCH PROJECTS",
+    }
+
+    for paragraph in doc.paragraphs:
+        for prefix, new_text in replacements.items():
+            if paragraph.text.startswith(prefix):
+                first_run = paragraph.runs[0] if paragraph.runs else None
+                for run in list(paragraph.runs):
+                    paragraph._p.remove(run._r)
+                if first_run is not None and first_run.bold and ": " in new_text:
+                    lead, detail = new_text.split(": ", 1)
+                    lead_run = paragraph.add_run(f"{lead}: ")
+                    set_run_font(
+                        lead_run,
+                        first_run.font.size.pt if first_run.font.size else 9.15,
+                        bold=True,
+                        italic=bool(first_run.italic),
+                        color=first_run.font.color.rgb or BLACK,
+                    )
+                    detail_run = paragraph.add_run(detail)
+                    set_run_font(
+                        detail_run,
+                        first_run.font.size.pt if first_run.font.size else 9.15,
+                        bold=False,
+                        italic=bool(first_run.italic),
+                        color=first_run.font.color.rgb or BLACK,
+                    )
+                else:
+                    new_run = paragraph.add_run(new_text)
+                    if first_run is not None:
+                        set_run_font(
+                            new_run,
+                            first_run.font.size.pt if first_run.font.size else 9.15,
+                            bold=bool(first_run.bold),
+                            italic=bool(first_run.italic),
+                            color=first_run.font.color.rgb or BLACK,
+                        )
+                break
+
+    out = CUBIST / "Joonwon_Lee_Cubist_Quantitative_Researcher_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_citadel_quantitative_researcher_resume():
+    """Create a targeted one-page resume for Citadel's PhD Graduate QR role."""
+    source = CUBIST / "Joonwon_Lee_Cubist_Quantitative_Researcher_Resume.docx"
+    if not source.exists():
+        raise FileNotFoundError(
+            f"Run build_cubist_entry_level_quantitative_researcher_resume() first: {source}"
+        )
+
+    doc = Document(source)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Citadel Quantitative Researcher Resume",
+        "Targeted resume for Quantitative Researcher - PhD Graduate at Citadel",
+        "quantitative research, probability, statistics, predictive modeling, hypothesis testing, backtesting, "
+        "stochastic processes, scalable likelihood inference, Python, PyTorch, C++, independent research",
+    )
+
+    old_summary = "Statistics Ph.D. candidate specializing"
+    new_summary = (
+        "Statistics Ph.D. candidate specializing in scalable likelihood inference, predictive modeling, and "
+        "statistical diagnostics for stochastically dependent data. Develops hypothesis-driven research and "
+        "translates mathematical models into reproducible Python/PyTorch workflows for large datasets, with "
+        "C++/pybind11 integration for performance-critical computation."
+    )
+    for paragraph in doc.paragraphs:
+        if not paragraph.text.startswith(old_summary):
+            continue
+        first_run = paragraph.runs[0] if paragraph.runs else None
+        for run in list(paragraph.runs):
+            paragraph._p.remove(run._r)
+        replacement = paragraph.add_run(new_summary)
+        if first_run is not None:
+            set_run_font(
+                replacement,
+                first_run.font.size.pt if first_run.font.size else 9.15,
+                bold=bool(first_run.bold),
+                italic=bool(first_run.italic),
+                color=first_run.font.color.rgb or BLACK,
+            )
+        break
+
+    out = CITADEL / "Joonwon_Lee_Citadel_Quantitative_Researcher_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_two_sigma_quantitative_researcher_resume():
+    """Create a targeted one-page resume for Two Sigma's Quantitative Researcher role."""
+    source = CITADEL / "Joonwon_Lee_Citadel_Quantitative_Researcher_Resume.docx"
+    if not source.exists():
+        raise FileNotFoundError(f"Run build_citadel_quantitative_researcher_resume() first: {source}")
+
+    doc = Document(source)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Two Sigma Quantitative Researcher Resume",
+        "Targeted resume for Quantitative Researcher at Two Sigma",
+        "quantitative research, scientific method, hypothesis testing, probabilistic modeling, predictive modeling, "
+        "statistical diagnostics, stochastic processes, scalable likelihood inference, Python, PyTorch, C++",
+    )
+
+    old_summary = "Statistics Ph.D. candidate specializing"
+    new_summary = (
+        "Statistics Ph.D. candidate specializing in scalable likelihood inference, predictive modeling, and "
+        "statistical diagnostics for stochastically dependent data. Uses rigorous hypothesis testing and probabilistic "
+        "modeling to study large real-world datasets and builds reproducible Python/PyTorch research workflows, with "
+        "C++/pybind11 integration for performance-critical computation."
+    )
+    for paragraph in doc.paragraphs:
+        if not paragraph.text.startswith(old_summary):
+            continue
+        first_run = paragraph.runs[0] if paragraph.runs else None
+        for run in list(paragraph.runs):
+            paragraph._p.remove(run._r)
+        replacement = paragraph.add_run(new_summary)
+        if first_run is not None:
+            set_run_font(
+                replacement,
+                first_run.font.size.pt if first_run.font.size else 9.15,
+                bold=bool(first_run.bold),
+                italic=bool(first_run.italic),
+                color=first_run.font.color.rgb or BLACK,
+            )
+        break
+
+    out = TWO_SIGMA / "Joonwon_Lee_Two_Sigma_Quantitative_Researcher_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_tower_2027_from_two_sigma_resume():
+    """Create Tower's 2027 resume directly from the verified Two Sigma version."""
+    source = TWO_SIGMA / "Joonwon_Lee_Two_Sigma_Quantitative_Researcher_Resume.docx"
+    if not source.exists():
+        build_two_sigma_quantitative_researcher_resume()
+
+    doc = Document(source)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Tower Research Quantitative Trader Researcher 2027 Resume",
+        "Targeted resume for Quantitative Trader Researcher 2027 at Tower Research Capital",
+        "quantitative research, predictive modeling, hypothesis testing, probabilistic modeling, statistical "
+        "diagnostics, stochastic processes, scalable likelihood inference, simulation, Python, PyTorch, C++",
+    )
+
+    out = TOWER_RESEARCH / "Joonwon_Lee_Tower_QTQR_2027_Resume.docx"
+    doc.save(out)
+    return out
+
+
+def build_google_student_researcher_phd_resume():
+    """Create a research-first resume for Google's 2027 PhD Student Researcher program."""
+    source = TWO_SIGMA / "Joonwon_Lee_Two_Sigma_Quantitative_Researcher_Resume.docx"
+    if not source.exists():
+        build_two_sigma_quantitative_researcher_resume()
+
+    doc = Document(source)
+    set_core_properties(
+        doc,
+        "Joonwon Lee - Google Student Researcher PhD 2027 Resume",
+        "Targeted resume for Student Researcher PhD Winter Summer 2027 at Google",
+        "student researcher, statistics, scalable inference, probabilistic modeling, Gaussian processes, "
+        "statistical diagnostics, machine learning, scientific computing, Python, PyTorch, C++",
+    )
+
+    replacements = {
+        "Statistics Ph.D. candidate specializing": (
+            "Statistics Ph.D. candidate specializing in scalable statistical inference, probabilistic modeling, "
+            "and statistical diagnostics for stochastically dependent data. Develops new methods for large, noisy, "
+            "partially observed datasets and builds reproducible Python/PyTorch research systems, with C++/pybind11 "
+            "integration for performance-critical computation."
+        ),
+        "Programming and Research Systems:": (
+            "Programming and Research Systems: Python (NumPy, Pandas, SciPy, PyTorch, LightGBM, scikit-learn), "
+            "C++/pybind11 integration, Linux, Git, AWS EC2, HPC/SLURM; CPU/GPU computing and restartable research pipelines"
+        ),
+        "Quantitative Methods:": (
+            "Quantitative Methods: Gaussian processes, probability and stochastic processes, scalable likelihood "
+            "approximation, hypothesis testing, Monte Carlo simulation, MLE/GLS, numerical optimization, spatiotemporal "
+            "modeling, spectral and eigenvalue diagnostics, regression and machine learning, model validation, and "
+            "uncertainty quantification"
+        ),
+        "QUANTITATIVE RESEARCH PROJECTS": "RESEARCH EXPERIENCE",
+        "Ph.D. Dissertation Research -": (
+            "Ph.D. Dissertation Research - Scalable Statistical Inference and Diagnostics\tSep 2024 - Present"
+        ),
+        "Research Tools:": (
+            "Research Systems: Built end-to-end Python/PyTorch workflows for quality filtering, missingness tracking, "
+            "time-dependent coordinate alignment, regular-grid matching, optimization, simulation, and restartable "
+            "CPU/GPU and HPC execution; integrated performance-critical C++ ordering routines through pybind11."
+        ),
+    }
+
+    for paragraph in doc.paragraphs:
+        for prefix, new_text in replacements.items():
+            if not paragraph.text.startswith(prefix):
+                continue
+            first_run = paragraph.runs[0] if paragraph.runs else None
+            for run in list(paragraph.runs):
+                paragraph._p.remove(run._r)
+
+            if "\t" in new_text:
+                left, right = new_text.split("\t", 1)
+                left_run = paragraph.add_run(left)
+                if first_run is not None:
+                    set_run_font(
+                        left_run,
+                        first_run.font.size.pt if first_run.font.size else 9.15,
+                        bold=True,
+                        italic=bool(first_run.italic),
+                        color=first_run.font.color.rgb or BLACK,
+                    )
+                paragraph.add_run("\t")
+                right_run = paragraph.add_run(right)
+                set_run_font(
+                    right_run,
+                    first_run.font.size.pt if first_run and first_run.font.size else 9.15,
+                    bold=False,
+                    italic=False,
+                    color=first_run.font.color.rgb if first_run and first_run.font.color.rgb else BLACK,
+                )
+            elif first_run is not None and first_run.bold and ": " in new_text:
+                lead, detail = new_text.split(": ", 1)
+                lead_run = paragraph.add_run(f"{lead}: ")
+                set_run_font(
+                    lead_run,
+                    first_run.font.size.pt if first_run.font.size else 9.15,
+                    bold=True,
+                    italic=bool(first_run.italic),
+                    color=first_run.font.color.rgb or BLACK,
+                )
+                detail_run = paragraph.add_run(detail)
+                set_run_font(
+                    detail_run,
+                    first_run.font.size.pt if first_run.font.size else 9.15,
+                    bold=False,
+                    italic=bool(first_run.italic),
+                    color=first_run.font.color.rgb or BLACK,
+                )
+            else:
+                replacement = paragraph.add_run(new_text)
+                if first_run is not None:
+                    set_run_font(
+                        replacement,
+                        first_run.font.size.pt if first_run.font.size else 9.15,
+                        bold=bool(first_run.bold),
+                        italic=bool(first_run.italic),
+                        color=first_run.font.color.rgb or BLACK,
+                    )
+            break
+
+    for paragraph in doc.paragraphs:
+        for run in paragraph.runs:
+            if "Expected May 2027" in run.text:
+                run.text = run.text.replace("Expected May 2027", "Expected 05/2027")
+
+    paragraphs = list(doc.paragraphs)
+    imc_index = next(
+        i for i, paragraph in enumerate(paragraphs)
+        if paragraph.text.startswith("IMC Prosperity Algorithmic Trading Competition")
+    )
+    additional_index = next(i for i, paragraph in enumerate(paragraphs) if paragraph.text == "ADDITIONAL")
+    for paragraph in paragraphs[imc_index:additional_index]:
+        paragraph._element.getparent().remove(paragraph._element)
+
+    paragraphs = list(doc.paragraphs)
+    research_heading_index = next(i for i, paragraph in enumerate(paragraphs) if paragraph.text == "RESEARCH EXPERIENCE")
+    industry_heading = next(paragraph for paragraph in paragraphs if paragraph.text == "QUANTITATIVE INDUSTRY EXPERIENCE")
+    additional_index = next(i for i, paragraph in enumerate(paragraphs) if paragraph.text == "ADDITIONAL")
+    for paragraph in paragraphs[research_heading_index:additional_index]:
+        industry_heading._p.addprevious(paragraph._p)
+
+    out = GOOGLE_STUDENT_RESEARCHER / "Joonwon_Lee_Google_Student_Researcher_PhD_Resume.docx"
     doc.save(out)
     return out
 
@@ -7277,6 +7723,7 @@ if __name__ == "__main__":
     print(build_microsoft_resume())
     print(build_google_youtube_resume())
     print(build_google_ads_metrics_resume())
+    print(build_google_data_scientist_resume())
     print(build_valley_bank_resume())
     print(build_blackrock_resume())
     print(build_blackrock_sae_resume())
@@ -7294,10 +7741,14 @@ if __name__ == "__main__":
     print(build_capital_one_model_risk_resume())
     print(build_capital_one_principal_quant_modeler_resume())
     print(build_wells_fargo_qa_2027_resume())
-    print(build_tower_research_resume())
     print(build_imc_quantitative_researcher_2027_resume())
     print(build_virtu_quantitative_strategist_resume())
     print(build_barclays_electronic_trading_resume())
+    print(build_cubist_entry_level_quantitative_researcher_resume())
+    print(build_citadel_quantitative_researcher_resume())
+    print(build_two_sigma_quantitative_researcher_resume())
+    print(build_tower_2027_from_two_sigma_resume())
+    print(build_google_student_researcher_phd_resume())
     print(build_new_york_life_resume())
     print(build_voleon_data_scientist_resume())
     print(build_state_street_credit_risk_resume())

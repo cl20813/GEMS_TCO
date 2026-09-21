@@ -1189,6 +1189,7 @@ def fit_one_geometry(
     with torch.no_grad():
         final_nll = float(model.vecchia_batched_likelihood(params_tensor).detach().cpu().item())
         beta = model.get_gls_beta(params_tensor).detach()
+    gls_beta = [float(value) for value in beta.reshape(-1).cpu().tolist()]
     estimate = raw_to_physical(raw_final)
     if nugget_is_fixed:
         estimate["nugget"] = float(args.fixed_nugget)
@@ -1224,6 +1225,7 @@ def fit_one_geometry(
         "fit_returned_nll": float(returned[-1]),
         "outer_steps": int(step_index) + 1,
         "max_abs_gradient": max(gradients) if gradients else np.nan,
+        "gls_beta": gls_beta,
         "precompute_s": precompute_s,
         "fit_s": fit_s,
         "total_fit_s": precompute_s + fit_s,

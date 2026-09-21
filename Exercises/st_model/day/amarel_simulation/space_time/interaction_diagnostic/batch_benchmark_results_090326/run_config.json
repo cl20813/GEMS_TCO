@@ -1,0 +1,72 @@
+{
+  "created": "2026-09-03T20:04:27",
+  "script": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/benchmark_adapted_vecchia_batch_sizes_090326.py",
+  "date": "2024-07-03",
+  "real_data_root": "/Users/joonwonlee/Documents/GEMS_DATA",
+  "lag_patterns": [
+    "432",
+    "643"
+  ],
+  "batch_sizes": [
+    64,
+    128,
+    256
+  ],
+  "number_of_requested_fits": 6,
+  "geometry": "adapted_only",
+  "block_shape": [
+    4,
+    4
+  ],
+  "smooth": 0.5,
+  "dtype": "torch.float64",
+  "device": "cpu",
+  "nugget_mode": "estimated",
+  "base_initial_parameters_before_advection_seed": {
+    "sigmasq": 13.059,
+    "range_lat": 0.2,
+    "range_lon": 0.25,
+    "range_time": 1.5,
+    "advec_lat": 0.0218,
+    "advec_lon": -0.1689,
+    "nugget": 0.247
+  },
+  "optimizer": {
+    "name": "LBFGS",
+    "lr": 1.0,
+    "line_search_fn": "strong_wolfe",
+    "max_iter": 20,
+    "max_eval": 20,
+    "history_size": 10,
+    "tolerance_grad": 1e-05,
+    "tolerance_change": 1e-09,
+    "outer_max_steps": 5,
+    "outer_grad_tol": 1e-05
+  },
+  "host": {
+    "platform": "macOS-15.7.9-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 14,
+    "torch_version": "2.5.1",
+    "torch_num_threads": 10,
+    "torch_num_interop_threads": 14,
+    "mps_available": false,
+    "cuda_available": false,
+    "model_name": "MacBook Pro",
+    "model_identifier": "Mac16,7",
+    "chip": "Apple M4 Pro",
+    "total_number_of_cores": "14 (10 performance and 4 efficiency)",
+    "memory": "48 GB"
+  },
+  "fit_initial_parameters": {
+    "sigmasq": 13.059,
+    "range_lat": 0.2,
+    "range_lon": 0.25,
+    "range_time": 1.5,
+    "advec_lat": -0.08622982710154078,
+    "advec_lon": -0.25402393577127386,
+    "nugget": 0.247
+  },
+  "data_load_s": 0.17319683299865574,
+  "initializer_s": 0.02546187499683583
+}

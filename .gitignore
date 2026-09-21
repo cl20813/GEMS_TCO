@@ -30,3 +30,7 @@ output.png
 outputs/day/simulation/
 outputs/day/real/
 outputs/day/real_data/
+
+# Generated Vecchia whitening matrices can exceed GitHub's 100 MB blob limit.
+**/whitener_B.npz
+**/vecchia_whitener_B.npz

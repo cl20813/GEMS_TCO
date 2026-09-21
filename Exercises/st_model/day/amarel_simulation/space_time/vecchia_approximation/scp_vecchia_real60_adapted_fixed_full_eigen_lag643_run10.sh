@@ -14,13 +14,12 @@ scp -r \
   "${REMOTE_HOST}:/home/jl2815/tco/"
 
 scp \
-  "${LOCAL_DIR}/vecchia_adapted_vs_fixed_lag643_090126.py" \
+  "${LOCAL_DIR}/vecchia_adapted_fixed_lag643_core.py" \
   "${LOCAL_DIR}/vecchia_real60_adapted_fixed_full_eigen_lag643_run10.py" \
   "${LOCAL_DIR}/slurm_vecchia_real60_adapted_fixed_full_eigen_lag643_run10.sh" \
-  "${LOCAL_DIR}/AMAREL_VECCHIA_GPU_OPTIMIZATION_MEMO_090326.txt" \
   "${REMOTE_HOST}:${REMOTE_DIR}/"
 
 echo "Upload complete. Submit on Amarel with:"
+echo "ssh ${REMOTE_HOST}"
 echo "cd ${REMOTE_DIR}"
 echo "sbatch slurm_vecchia_real60_adapted_fixed_full_eigen_lag643_run10.sh"
-

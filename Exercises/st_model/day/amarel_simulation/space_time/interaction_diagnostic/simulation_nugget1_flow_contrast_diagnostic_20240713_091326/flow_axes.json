@@ -1,0 +1,33 @@
+{
+  "parallel": {
+    "dr": 2,
+    "dc": -3,
+    "physical_lat": 0.08800000000000008,
+    "physical_lon": -0.18899999999996453,
+    "physical_length": 0.20848261318389744,
+    "target_length": 0.21938033989836775,
+    "direction_error_degrees": 3.246337590302769,
+    "relative_length_error": -0.049675037970671854
+  },
+  "perpendicular": {
+    "dr": 4,
+    "dc": 1,
+    "physical_lat": 0.17600000000000016,
+    "physical_lon": 0.06299999999998818,
+    "physical_length": 0.1869358178627054,
+    "target_length": 0.21938033989836775,
+    "direction_error_degrees": 2.0256890516156694,
+    "relative_length_error": -0.14789165725011133
+  },
+  "metric_perpendicular": {
+    "dr": 3,
+    "dc": 2,
+    "physical_lat": 0.13200000000000012,
+    "physical_lon": 0.12599999999997635,
+    "physical_length": 0.18248287590893034,
+    "target_length": 0.21938033989836772,
+    "direction_error_degrees": 1.7869285436858953,
+    "relative_length_error": -0.16818947407288576
+  },
+  "axis_angle_deviation_from_90_degrees": 5.272026641918288
+}

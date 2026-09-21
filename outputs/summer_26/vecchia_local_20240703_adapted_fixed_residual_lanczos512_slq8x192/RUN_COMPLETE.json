@@ -1,0 +1,18 @@
+{
+  "completed": "2026-09-08T21:06:44",
+  "date": "2024-07-03",
+  "device": "local CPU",
+  "methods": [
+    "adapted",
+    "fixed"
+  ],
+  "total_wall_seconds": 102.14260412499425,
+  "residual_lanczos_steps": 512,
+  "slq_probes": 8,
+  "slq_steps": 192,
+  "frequency_bins": 12,
+  "main_plot": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/vecchia_local_20240703_adapted_fixed_residual_lanczos512_slq8x192/2024-07-03_residual_lanczos_slq_frequency_failure.png",
+  "convergence_plot": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/summer_26/vecchia_local_20240703_adapted_fixed_residual_lanczos512_slq8x192/2024-07-03_residual_lanczos_step_convergence.png",
+  "individual_eigenvectors_computed": false,
+  "slq_probe_pairing": "identical Rademacher probes for adapted and fixed"
+}

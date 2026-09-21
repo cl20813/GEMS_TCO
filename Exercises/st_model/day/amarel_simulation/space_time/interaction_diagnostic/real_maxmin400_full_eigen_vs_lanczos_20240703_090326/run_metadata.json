@@ -1,0 +1,153 @@
+{
+  "created": "2026-09-03T22:12:21",
+  "script": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/real_maxmin400_full_eigen_vs_lanczos_090326.py",
+  "date": "2024-07-03",
+  "data_source": "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/tco_grid_24_07.pkl",
+  "fit_results": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/batch_benchmark_results_090326/batch_benchmark_results.json",
+  "fit_initializer": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/batch_benchmark_results_090326/initializer.json",
+  "fit_reused_without_refit": true,
+  "fit": {
+    "geometry": "adapted",
+    "lag_pattern": "4/3/2",
+    "target_chunk_size": 64,
+    "fitted_parameters": {
+      "sigmasq": 13.07290059615328,
+      "range_lat": 0.16540293300820902,
+      "range_lon": 0.19386939774091874,
+      "range_time": 1.3683254600746475,
+      "advec_lat": -0.07305519133399865,
+      "advec_lon": -0.2829997280915573,
+      "nugget": 1.4821971710732058
+    },
+    "fitted_native_nll": 1.3778025988666298,
+    "gls_beta": [
+      0.15004645256296076,
+      1.1187279788192848,
+      -0.21761917407469694,
+      -0.6056813133443295,
+      -0.7403013476896194,
+      -0.5700430404351062,
+      -1.0036955943240669,
+      -0.5235601925255003,
+      1.2333522083336017
+    ],
+    "gls_lat_mean": -0.5041003227233887
+  },
+  "subset": {
+    "n_grid": 18126,
+    "n_common_valid": 14791,
+    "n_spatial_selected": 400,
+    "maxmin_s": 0.010270457991282456,
+    "coordinate_order": "longitude,latitude",
+    "hours": 8,
+    "n_observations": 3200,
+    "ordering": "time-major, then max-min spatial rank",
+    "common_valid_required": true
+  },
+  "full_covariance": {
+    "shape": [
+      3200,
+      3200
+    ],
+    "storage_bytes": 81920000,
+    "symmetry_max_abs_error": 0.0,
+    "min_eigenvalue": 6.764638129891797,
+    "max_eigenvalue": 101.3856618153376,
+    "condition_number": 14.98759576914121,
+    "exact_endpoint_energy": 2978.8232111367324,
+    "solve_endpoint_energy": 2978.823211136727,
+    "endpoint_identity_relative_error": 1.8319208035696672e-15
+  },
+  "lanczos": {
+    "operator": "fitted exact covariance K",
+    "algorithm_interface": "matvec-only",
+    "benchmark_backend": "dense BLAS reference",
+    "streamed_kernel_matvec_validated": true,
+    "streamed_matvec_relative_error": 2.318622403603666e-16,
+    "steps_reported": [
+      32,
+      64,
+      128,
+      256,
+      512
+    ],
+    "max_steps_computed": 512,
+    "slq_probes": 32,
+    "probe_distribution": "Rademacher",
+    "random_seed": 20260903,
+    "reorthogonalization": "full",
+    "hard_projector": true
+  },
+  "streamed_matvec_relative_error": 2.318622403603666e-16,
+  "timings_s": {
+    "data_load": 0.16333587501139846,
+    "vecchia_precompute": 1.412589333995129,
+    "gls_beta": 1.2052237919997424,
+    "maxmin": 0.010270457991282456,
+    "dense_covariance_build": 0.167933709002682,
+    "dense_matmat_three_vectors": 0.0024051670043263584,
+    "streamed_matmat_three_vectors": 0.14555133300018497,
+    "full_eigendecomposition": 3.0717786670138594,
+    "residual_lanczos": 1.7528264160064282,
+    "residual_lanczos_matvec_only": 0.7190965820918791,
+    "slq_all_probes": 40.02509279099468,
+    "slq_all_probe_matvec_only": 17.914956813125173,
+    "workflow_total": 49.624039292000816
+  },
+  "software": {
+    "python": "3.12.3",
+    "numpy": "1.26.4",
+    "scipy": "1.15.2",
+    "torch": "2.5.1",
+    "platform": "macOS-15.7.9-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 14
+  },
+  "figures": [
+    "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/real_maxmin400_full_eigen_vs_lanczos_20240703_090326/full_eigen_vs_lanczos_slq.png",
+    "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/real_maxmin400_full_eigen_vs_lanczos_20240703_090326/exact_spectrum_and_shape_bridge.png"
+  ],
+  "gls_recomputation": {
+    "vecchia_precompute_s": 1.412589333995129,
+    "gls_beta_s": 1.2052237919997424,
+    "vecchia_summary": {
+      "n_clusters": 1160,
+      "block_shape_lat": 4,
+      "block_shape_lon": 4,
+      "max_points_per_cluster": 16,
+      "n_target_blocks": 9229,
+      "n_target_points": 140352,
+      "n_batches": 38,
+      "target_chunk_size": 64,
+      "strategy": "offset_corridor_tapered",
+      "temporal_basis": "corridor",
+      "force_target_center": 0,
+      "lag0_block_count": 4,
+      "lag1_block_count": 3,
+      "lag2_block_count": 2,
+      "lag1_max_blocks": 3,
+      "lag2_max_blocks": 2,
+      "lag1_lon_offset": 0.2682605879116235,
+      "lag2_lon_offset": 0.536521175823247,
+      "lag1_lon_interval_lo": 0.13413029395581175,
+      "lag1_lon_interval_hi": 0.4023908818674352,
+      "lag2_lon_interval_lo": 0.0,
+      "lag2_lon_interval_hi": 0.536521175823247,
+      "corridor_anchor_mode": "width",
+      "grid_lon_step": 0.06300000000000239,
+      "corridor_block_lon_width": 0.25200000000000955,
+      "block_row_offset": 0,
+      "block_col_offset": 0,
+      "spec_name": "directional_corridor_width_4x4_lag432",
+      "reference_advec_lat": -0.08622982710154078,
+      "reference_advec_lon": -0.25402393577127386,
+      "reference_advec_norm": 0.2682605879116235,
+      "past_offset_lat": 0.08622982710154078,
+      "past_offset_lon": 0.25402393577127386,
+      "lag1_corridor_multiplier_lo": 0.5,
+      "lag1_corridor_multiplier_hi": 1.5,
+      "lag2_corridor_multiplier_lo": 0.0,
+      "lag2_corridor_multiplier_hi": 2.0
+    }
+  }
+}

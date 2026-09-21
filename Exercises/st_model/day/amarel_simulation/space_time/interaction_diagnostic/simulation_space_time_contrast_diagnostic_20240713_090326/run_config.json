@@ -1,0 +1,85 @@
+{
+  "created": "2026-09-03T21:03:12",
+  "script": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/sim_space_time_contrast_diagnostic_090326.py",
+  "source_path": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/sim_data/july_st_circulant_realpattern_smooth0p5_nugget0_matched5_090226/2024_july_st_circulant/sim_july2024_st_circulant_gridded.pkl",
+  "truth_path": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/sim_data/july_st_circulant_realpattern_smooth0p5_nugget0_matched5_090226/2024_july_st_circulant/sim_july2024_st_circulant_truth.json",
+  "date": "2024-07-13",
+  "n_valid": 139738,
+  "n_total": 145008,
+  "grid_shape": [
+    8,
+    114,
+    159
+  ],
+  "lat_step": 0.04400000000000004,
+  "lon_step": 0.06300000000000239,
+  "fit": {
+    "geometry": "adapted",
+    "lag_pattern": "4/3/2",
+    "block_shape": [
+      4,
+      4
+    ],
+    "target_chunk_size": 64,
+    "smooth": 0.5,
+    "dtype": "torch.float64",
+    "nugget_mode": "fixed_zero",
+    "lbfgs_lr": 1.0,
+    "lbfgs_steps": 5,
+    "lbfgs_eval": 20,
+    "lbfgs_history": 10,
+    "grad_tol": 1e-05
+  },
+  "diagnostics": {
+    "surface_max_lag_cells": 6,
+    "surface_time_lags": [
+      0,
+      1,
+      2
+    ],
+    "stencil_space_scales": [
+      1,
+      2,
+      4
+    ],
+    "stencil_time_scales": [
+      1,
+      2
+    ],
+    "jackknife_block_cells": 8,
+    "residual_modes": [
+      "fitted_gls",
+      "truth_mean"
+    ],
+    "model_candidates": [
+      "truth",
+      "fitted",
+      "no_advection",
+      "reversed_advection",
+      "separable_same_margins"
+    ]
+  },
+  "host": {
+    "platform": "macOS-15.7.9-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 14,
+    "torch_version": "2.5.1"
+  },
+  "timings_s": {
+    "load_and_initialize": 0.06822824999835575,
+    "fit_precompute": 1.317704999994021,
+    "fit_optimize": 112.52991333400132,
+    "fit_precompute_plus_optimize": 113.84761833399534,
+    "residual_build": 0.00880729200434871,
+    "surface_diagnostic": 5.320251750003081,
+    "six_direction_diagnostic": 7.466513208004471,
+    "rectangle_diagnostic": 16.582533624998177,
+    "figures_and_method_note": 1.6508405409986153,
+    "current_process_total": 31.128311250002298
+  },
+  "figures": [
+    "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/simulation_space_time_contrast_diagnostic_20240713_090326/cross_variogram_and_interaction_surfaces.png",
+    "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/simulation_space_time_contrast_diagnostic_20240713_090326/six_direction_contrast_diagnostic.png",
+    "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/simulation_space_time_contrast_diagnostic_20240713_090326/contrast_sector_sensitivity.png"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "maxmin_dir": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/real_maxmin400_exact_vs_subset_vecchia_4way_20240703_090326",
+  "contiguous_dir": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/real_contiguous20x20_exact_vs_subset_vecchia_4way_20240703_090326",
+  "figure": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/maxmin_vs_contiguous_4way_robustness_20240703_090326/maxmin_vs_contiguous_robustness.png",
+  "curve_error_ratio_maxmin_over_contiguous": 7.451502246509115,
+  "expected_band_bias_ratio_maxmin_over_contiguous": 3.613952344981731
+}

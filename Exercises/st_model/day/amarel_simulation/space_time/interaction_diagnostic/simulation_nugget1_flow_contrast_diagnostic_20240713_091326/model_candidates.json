@@ -1,0 +1,74 @@
+{
+  "truth": {
+    "sigmasq": 10.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "advec_lat": 0.08,
+    "advec_lon": -0.2,
+    "nugget": 1.0
+  },
+  "fitted_432": {
+    "sigmasq": 9.842012228503613,
+    "range_lat": 0.1970780722896628,
+    "range_lon": 0.2956695317698703,
+    "range_time": 1.9473475199919057,
+    "advec_lat": 0.08118897602814612,
+    "advec_lon": -0.2038040326034411,
+    "nugget": 0.987956334606747
+  },
+  "zero": {
+    "sigmasq": 10.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "advec_lat": 0.0,
+    "advec_lon": 0.0,
+    "nugget": 1.0
+  },
+  "half_speed": {
+    "sigmasq": 10.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "advec_lat": 0.04,
+    "advec_lon": -0.1,
+    "nugget": 1.0
+  },
+  "double_speed": {
+    "sigmasq": 10.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "advec_lat": 0.16,
+    "advec_lon": -0.4,
+    "nugget": 1.0
+  },
+  "reversed": {
+    "sigmasq": 10.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "advec_lat": -0.08,
+    "advec_lon": 0.2,
+    "nugget": 1.0
+  },
+  "rotated_45": {
+    "sigmasq": 10.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "advec_lat": 0.19798989873223333,
+    "advec_lon": -0.08485281374238574,
+    "nugget": 1.0
+  },
+  "rotated_90": {
+    "sigmasq": 10.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "advec_lat": 0.2,
+    "advec_lon": 0.07999999999999999,
+    "nugget": 1.0
+  }
+}

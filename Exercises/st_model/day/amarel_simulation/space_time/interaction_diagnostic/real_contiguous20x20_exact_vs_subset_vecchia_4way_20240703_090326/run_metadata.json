@@ -1,0 +1,209 @@
+{
+  "created": "2026-09-03T23:15:41",
+  "script": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/real_maxmin400_exact_vs_subset_vecchia_4way_090326.py",
+  "date": "2024-07-03",
+  "data_source": "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/tco_grid_24_07.pkl",
+  "fit_reused_without_refit": true,
+  "fit": {
+    "geometry": "adapted",
+    "lag_pattern": "4/3/2",
+    "target_chunk_size": 64,
+    "fitted_parameters": {
+      "sigmasq": 13.07290059615328,
+      "range_lat": 0.16540293300820902,
+      "range_lon": 0.19386939774091874,
+      "range_time": 1.3683254600746475,
+      "advec_lat": -0.07305519133399865,
+      "advec_lon": -0.2829997280915573,
+      "nugget": 1.4821971710732058
+    },
+    "full_data_gls_beta": [
+      0.15004645256296076,
+      1.1187279788192848,
+      -0.21761917407469694,
+      -0.6056813133443295,
+      -0.7403013476896194,
+      -0.5700430404351062,
+      -1.0036955943240669,
+      -0.5235601925255003,
+      1.2333522083336017
+    ],
+    "full_data_gls_lat_mean": -0.5041003227233887,
+    "stored_native_nll": 1.3778025988666298
+  },
+  "subset": {
+    "selection": "central fully common-valid native-grid rectangle",
+    "n_grid": 18126,
+    "n_common_valid": 14791,
+    "n_spatial_selected": 400,
+    "native_grid_rows": 114,
+    "native_grid_cols": 159,
+    "window_rows": 20,
+    "window_cols": 20,
+    "window_row_start": 43,
+    "window_col_start": 70,
+    "window_lat_min": -1.08,
+    "window_lat_max": -0.244,
+    "window_lon_min": 125.456,
+    "window_lon_max": 126.653,
+    "fully_valid_window_count": 1437,
+    "selection_s": 0.05460870900424197,
+    "coordinate_order": "native grid row-major",
+    "hours": 8,
+    "n_observations": 3200,
+    "ordering_for_comparison": "time-major, then native-grid row-major within rectangle",
+    "same_raw_residual_all_four_methods": true,
+    "residual_max_abs_difference": 4.731622773590516e-07
+  },
+  "exact_covariance": {
+    "diagonal_jitter_matching_vecchia_batched_covariance": 1e-06,
+    "min_eigenvalue": 2.803516001277436,
+    "max_eigenvalue": 1929.4927519609023,
+    "condition_number": 688.2403207549803,
+    "precision_eigenvalue_max_relative_error": 3.9433450400929194e-13
+  },
+  "subset_vecchia": {
+    "construction": "selected observations only; nonempty subset blocks reordered by max-min; block IDs, centroids, footprints, and width inherited from native grid",
+    "uses_full_precision_submatrix": false,
+    "uses_observations_outside_subset": false,
+    "n_nonempty_subset_blocks": 36,
+    "native_grid_lat_levels": 114,
+    "native_grid_lon_levels": 159,
+    "precompute_s": 0.09134554200863931,
+    "subset_lat_mean": -0.6619254946708679,
+    "global_lat_mean": -0.5041003227233887,
+    "beta_intercept_adjustment": -0.17656343561960955,
+    "model_summary": {
+      "n_clusters": 36,
+      "block_shape_lat": 4,
+      "block_shape_lon": 4,
+      "max_points_per_cluster": 16,
+      "n_target_blocks": 288,
+      "n_target_points": 3200,
+      "n_batches": 18,
+      "target_chunk_size": 64,
+      "strategy": "offset_corridor_tapered",
+      "temporal_basis": "corridor",
+      "force_target_center": 0,
+      "lag0_block_count": 4,
+      "lag1_block_count": 3,
+      "lag2_block_count": 2,
+      "lag1_max_blocks": 3,
+      "lag2_max_blocks": 2,
+      "lag1_lon_offset": 0.2682605879116235,
+      "lag2_lon_offset": 0.536521175823247,
+      "lag1_lon_interval_lo": 0.13413029395581175,
+      "lag1_lon_interval_hi": 0.4023908818674352,
+      "lag2_lon_interval_lo": 0.0,
+      "lag2_lon_interval_hi": 0.536521175823247,
+      "corridor_anchor_mode": "width",
+      "grid_lon_step": 0.06300000000000239,
+      "corridor_block_lon_width": 0.25200000000000955,
+      "block_row_offset": 0,
+      "block_col_offset": 0,
+      "spec_name": "directional_corridor_width_4x4_lag432",
+      "reference_advec_lat": -0.08622982710154078,
+      "reference_advec_lon": -0.25402393577127386,
+      "reference_advec_norm": 0.2682605879116235,
+      "past_offset_lat": 0.08622982710154078,
+      "past_offset_lon": 0.25402393577127386,
+      "lag1_corridor_multiplier_lo": 0.5,
+      "lag1_corridor_multiplier_hi": 1.5,
+      "lag2_corridor_multiplier_lo": 0.0,
+      "lag2_corridor_multiplier_hi": 2.0
+    },
+    "operator": {
+      "n_valid": 3200,
+      "n_real_with_missing": 3200,
+      "n_block_targets": 288,
+      "n_build_chunks": 19,
+      "shape": [
+        3200,
+        3200
+      ],
+      "nnz": 327016,
+      "density": 0.03193515625,
+      "nnz_per_row_mean": 102.1925,
+      "nnz_per_row_median": 106.0,
+      "nnz_per_row_max": 160,
+      "csr_storage_bytes": 3936996,
+      "coefficient_drop_tolerance": 0.0,
+      "conditional_logdet_half": 2862.6802605561443,
+      "build_s": 0.30389670899603516
+    },
+    "reordered_whitener_nnz": 327016,
+    "reordered_whitener_storage_bytes": 3936996
+  },
+  "approximation_metrics": {
+    "real_residual_curve_rmse_per_n": 0.0015635159743870696,
+    "real_residual_curve_max_abs_per_n": 0.005938167370700409,
+    "real_residual_endpoint_difference_per_n": 0.00022374778960554398,
+    "real_residual_band_energy_per_mode_rmse": 0.042980787447645614,
+    "real_residual_band_energy_per_mode_max_abs": 0.08215541491129064,
+    "covariance_eigenvalue_log_ratio_rmse": 0.013078389504123801,
+    "covariance_eigenvalue_log_ratio_max_abs": 0.15873341718581013,
+    "covariance_relative_frobenius_error": 0.0897100327661558,
+    "kl_exact_to_vecchia_per_observation": 0.0013886707830985756,
+    "kl_vecchia_to_exact_per_observation": 0.0015904453055087231,
+    "mean_expected_vecchia_energy_under_exact_K": 1.0014039118837679,
+    "max_abs_expected_vecchia_band_energy_minus_one": 0.031346199132177954
+  },
+  "settings": {
+    "lanczos_steps": [
+      64,
+      128,
+      256,
+      512
+    ],
+    "slq_probes": 32,
+    "shared_probes_between_operators": true,
+    "reorthogonalization_modes": [
+      "full",
+      "none"
+    ],
+    "bands": 20,
+    "simulation_replicates": 128,
+    "random_seed": 20260903
+  },
+  "timings_s": {
+    "full_data_vecchia_precompute_for_beta": 1.3999993329925928,
+    "full_data_gls_beta": 1.247108166993712,
+    "exact_covariance_build": 0.16153083300741855,
+    "exact_covariance_full_eigen": 2.4937055000045802,
+    "subset_vecchia_full_precision_and_eigen": 2.421994125004858,
+    "exact_precision_materialization": 0.37735258300381247,
+    "lanczos": {
+      "exact_precision_full": {
+        "residual_s": 1.1380875419999938,
+        "probe_s": 37.594750666001346,
+        "matvec_s": 17.35422149830265
+      },
+      "subset_vecchia_precision_full": {
+        "residual_s": 1.5633580830035498,
+        "probe_s": 53.84446145800757,
+        "matvec_s": 33.925785505824024
+      },
+      "exact_precision_none": {
+        "residual_s": 0.6820424159959657,
+        "probe_s": 19.22864191699773,
+        "matvec_s": 19.14518066200253
+      },
+      "subset_vecchia_precision_none": {
+        "residual_s": 1.3792536660039332,
+        "probe_s": 49.082005000003846,
+        "matvec_s": 48.93312122426869
+      }
+    },
+    "workflow_total": 178.3086291669897
+  },
+  "software": {
+    "python": "3.12.3",
+    "numpy": "1.26.4",
+    "scipy": "1.15.2",
+    "torch": "2.5.1",
+    "platform": "macOS-15.7.9-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 14
+  },
+  "figure": "Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/real_contiguous20x20_exact_vs_subset_vecchia_4way_20240703_090326/exact_vecchia_four_way_diagnostic.png"
+}

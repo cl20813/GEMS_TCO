@@ -1,0 +1,250 @@
+{
+  "created": "2026-09-13T23:11:09",
+  "script": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/sim_nugget1_flow_contrast_diagnostic_091326.py",
+  "truth_path": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5/2024_july_st_circulant/sim_july2024_st_circulant_truth.json",
+  "data_path": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5/2024_july_st_circulant/sim_july2024_st_circulant_gridded.pkl",
+  "truth": {
+    "sigmasq": 10.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "advec_lat": 0.08,
+    "advec_lon": -0.2,
+    "nugget": 1.0
+  },
+  "fit": {
+    "status": "ok",
+    "date": "2024-07-13",
+    "geometry": "adapted",
+    "lag_pattern": "4/3/2",
+    "target_chunk_size": 64,
+    "smooth": 0.5,
+    "nugget_mode": "estimated",
+    "truth": {
+      "sigmasq": 10.0,
+      "range_lat": 0.2,
+      "range_lon": 0.3,
+      "range_time": 2.0,
+      "advec_lat": 0.08,
+      "advec_lon": -0.2,
+      "nugget": 1.0
+    },
+    "seed": {
+      "seed_lat": 0.08249762699319166,
+      "seed_lon": -0.2041975451513152,
+      "grid_seed_lat": 0.08800000000000008,
+      "grid_seed_lon": -0.18900000000000716,
+      "subgrid_used": true,
+      "selection_reason": "accepted",
+      "delta_lat_cells": -0.12505393197291867,
+      "delta_lon_cells": -0.24123087541757873,
+      "hessian_condition_cells": 1.097121655853704,
+      "hessian_min_eigenvalue_cells": 0.2869951662759603,
+      "quadratic_residual_rmse": 0.003195138668733424,
+      "method": "M3_masked_fft_plus_safeguarded_Q3",
+      "lat_step": 0.04400000000000004,
+      "lon_step": 0.06300000000000239,
+      "min_pair_count": 1000,
+      "max_pair_count": 118417,
+      "surface_min": 5.613765652313744,
+      "initializer_s": 0.024483749992214143,
+      "advection_error": 0.0048844166380898725,
+      "advection_error_grid_cells": 0.08752959828723877
+    },
+    "initial": {
+      "sigmasq": 10.0,
+      "range_lat": 0.2,
+      "range_lon": 0.3,
+      "range_time": 2.0,
+      "advec_lat": 0.08249762699319166,
+      "advec_lon": -0.2041975451513152,
+      "nugget": 1.0
+    },
+    "fitted": {
+      "sigmasq": 9.842012228503613,
+      "range_lat": 0.1970780722896628,
+      "range_lon": 0.2956695317698703,
+      "range_time": 1.9473475199919057,
+      "advec_lat": 0.08118897602814612,
+      "advec_lon": -0.2038040326034411,
+      "nugget": 0.987956334606747
+    },
+    "errors": {
+      "error_sigmasq": -0.1579877714963871,
+      "error_range_lat": -0.0029219277103372243,
+      "error_range_lon": -0.004330468230129669,
+      "error_range_time": -0.052652480008094305,
+      "error_advec_lat": 0.0011889760281461187,
+      "error_advec_lon": -0.0038040326034410876,
+      "error_nugget": -0.012043665393252967
+    },
+    "raw_final": [
+      3.5051730799969705,
+      1.2185128950723858,
+      0.811284855282724,
+      -3.769962191030883,
+      0.08118897602814612,
+      -0.2038040326034411,
+      -0.012116777953088714
+    ],
+    "gls_beta": [
+      [
+        0.03504091091968516
+      ],
+      [
+        1.1151707269405313
+      ],
+      [
+        0.01871862077507531
+      ],
+      [
+        0.02512904876430093
+      ],
+      [
+        0.15393203592584534
+      ],
+      [
+        0.06936474129438983
+      ],
+      [
+        -0.14089201256753514
+      ],
+      [
+        -0.2457606171327142
+      ],
+      [
+        -0.20821383263016502
+      ]
+    ],
+    "lat_mean_val": -0.4706883430480957,
+    "precompute_s": 1.2737879579653963,
+    "fit_s": 150.44434516702313,
+    "precompute_plus_fit_s": 151.71813312498853,
+    "optimizer_likelihood_calls": 31,
+    "outer_steps": 5,
+    "fit_returned_nll": 1.1242948105764021,
+    "final_native_nll": 1.1242948105764021,
+    "model_summary": {
+      "n_clusters": 1160,
+      "block_shape_lat": 4,
+      "block_shape_lon": 4,
+      "max_points_per_cluster": 16,
+      "n_target_blocks": 9230,
+      "n_target_points": 139738,
+      "n_batches": 37,
+      "target_chunk_size": 64,
+      "strategy": "offset_corridor_tapered",
+      "temporal_basis": "corridor",
+      "force_target_center": 0,
+      "lag0_block_count": 4,
+      "lag1_block_count": 3,
+      "lag2_block_count": 2,
+      "lag1_max_blocks": 3,
+      "lag2_max_blocks": 2,
+      "lag1_lon_offset": 0.2202328220436981,
+      "lag2_lon_offset": 0.4404656440873962,
+      "lag1_lon_interval_lo": 0.11011641102184905,
+      "lag1_lon_interval_hi": 0.33034923306554714,
+      "lag2_lon_interval_lo": 0.0,
+      "lag2_lon_interval_hi": 0.4404656440873962,
+      "corridor_anchor_mode": "width",
+      "grid_lon_step": 0.06300000000000239,
+      "corridor_block_lon_width": 0.25200000000000955,
+      "block_row_offset": 0,
+      "block_col_offset": 0,
+      "spec_name": "directional_corridor_width_4x4_lag432",
+      "reference_advec_lat": 0.08249762699319166,
+      "reference_advec_lon": -0.2041975451513152,
+      "reference_advec_norm": 0.2202328220436981,
+      "past_offset_lat": -0.08249762699319166,
+      "past_offset_lon": 0.2041975451513152,
+      "lag1_corridor_multiplier_lo": 0.5,
+      "lag1_corridor_multiplier_hi": 1.5,
+      "lag2_corridor_multiplier_lo": 0.0,
+      "lag2_corridor_multiplier_hi": 2.0
+    }
+  },
+  "month": {
+    "n_independent_days": 3,
+    "days": [
+      13,
+      19,
+      25
+    ],
+    "grid_shape": [
+      3,
+      8,
+      114,
+      159
+    ],
+    "lat_step": 0.04400000000000004,
+    "lon_step": 0.06299999999998818,
+    "valid_per_hour_min": 16913,
+    "valid_per_hour_max": 18069,
+    "valid_per_hour_mean": 17700.041666666668
+  },
+  "flow_axes": {
+    "parallel": {
+      "dr": 2,
+      "dc": -3,
+      "physical_lat": 0.08800000000000008,
+      "physical_lon": -0.18899999999996453,
+      "physical_length": 0.20848261318389744,
+      "target_length": 0.21938033989836775,
+      "direction_error_degrees": 3.246337590302769,
+      "relative_length_error": -0.049675037970671854
+    },
+    "perpendicular": {
+      "dr": 4,
+      "dc": 1,
+      "physical_lat": 0.17600000000000016,
+      "physical_lon": 0.06299999999998818,
+      "physical_length": 0.1869358178627054,
+      "target_length": 0.21938033989836775,
+      "direction_error_degrees": 2.0256890516156694,
+      "relative_length_error": -0.14789165725011133
+    },
+    "metric_perpendicular": {
+      "dr": 3,
+      "dc": 2,
+      "physical_lat": 0.13200000000000012,
+      "physical_lon": 0.12599999999997635,
+      "physical_length": 0.18248287590893034,
+      "target_length": 0.21938033989836772,
+      "direction_error_degrees": 1.7869285436858953,
+      "relative_length_error": -0.16818947407288576
+    },
+    "axis_angle_deviation_from_90_degrees": 5.272026641918288
+  },
+  "settings": {
+    "space_scales": [
+      1,
+      2
+    ],
+    "time_scales": [
+      1,
+      2
+    ],
+    "selected_days": [
+      13,
+      19,
+      25
+    ],
+    "surface_max_lag_cells": 6,
+    "independent_day_standard_errors": true,
+    "mean_mode": "known_simulation_mean"
+  },
+  "host": {
+    "platform": "macOS-15.7.9-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 14,
+    "torch_version": "2.5.1"
+  },
+  "total_s": 3.3127852079924196,
+  "figures": [
+    "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/simulation_nugget1_flow_contrast_diagnostic_20240713_091326/flow_coordinate_geometry.png",
+    "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/simulation_nugget1_flow_contrast_diagnostic_20240713_091326/latlon_vs_flow_contrast_mismatch.png",
+    "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/simulation_nugget1_flow_contrast_diagnostic_20240713_091326/advection_mismatch_diagnostic_panel.png",
+    "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/simulation_nugget1_flow_contrast_diagnostic_20240713_091326/oriented_cross_variogram_advection_mismatch.png"
+  ]
+}

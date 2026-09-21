@@ -1,0 +1,157 @@
+{
+  "status": "ok",
+  "date": "2024-07-13",
+  "geometry": "adapted",
+  "lag_pattern": "4/3/2",
+  "target_chunk_size": 64,
+  "smooth": 0.5,
+  "dtype": "torch.float64",
+  "device": "cpu",
+  "nugget_mode": "fixed_zero",
+  "seed": {
+    "seed_lat": 0.08262924878234496,
+    "seed_lon": -0.20443730953614478,
+    "grid_seed_lat": 0.08800000000000008,
+    "grid_seed_lon": -0.18900000000000716,
+    "subgrid_used": true,
+    "selection_reason": "accepted",
+    "delta_lat_cells": -0.1220625276739801,
+    "delta_lon_cells": -0.24503665930376223,
+    "hessian_condition_cells": 1.0955562496621607,
+    "hessian_min_eigenvalue_cells": 0.2883195511554381,
+    "quadratic_residual_rmse": 0.0032537493251622754,
+    "method": "M3_masked_fft_plus_safeguarded_Q3",
+    "lat_step": 0.04400000000000004,
+    "lon_step": 0.06300000000000239,
+    "min_pair_count": 1000,
+    "max_pair_count": 118417,
+    "surface_min": 4.604356625889234,
+    "initializer_s": 0.023977834003744647,
+    "advection_error": 0.005157777145149227,
+    "advection_error_grid_cells": 0.09236673627062134
+  },
+  "truth": {
+    "sigmasq": 10.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "advec_lat": 0.08,
+    "advec_lon": -0.2,
+    "nugget": 0.0
+  },
+  "initial": {
+    "sigmasq": 10.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "advec_lat": 0.08262924878234496,
+    "advec_lon": -0.20443730953614478,
+    "nugget": 0.0
+  },
+  "fitted": {
+    "sigmasq": 9.753779462595933,
+    "range_lat": 0.19499694578431637,
+    "range_lon": 0.29332438689649876,
+    "range_time": 1.9496144824305668,
+    "advec_lat": 0.08069226462320443,
+    "advec_lon": -0.20479189134162812,
+    "nugget": 0.0
+  },
+  "errors": {
+    "error_sigmasq": -0.24622053740406713,
+    "error_range_lat": -0.005003054215683644,
+    "error_range_lon": -0.006675613103501232,
+    "error_range_time": -0.050385517569433214,
+    "error_advec_lat": 0.0006922646232044305,
+    "error_advec_lon": -0.004791891341628107,
+    "error_nugget": 0.0
+  },
+  "raw_final": [
+    3.5041310069467837,
+    1.2264761598595866,
+    0.816590446651991,
+    -3.788215623144205,
+    0.08069226462320443,
+    -0.20479189134162812,
+    -27.631021115928547
+  ],
+  "gls_beta": [
+    [
+      -0.02599959972248458
+    ],
+    [
+      1.1244275487076394
+    ],
+    [
+      0.011408846845336825
+    ],
+    [
+      0.013316857239343283
+    ],
+    [
+      0.14131538550801337
+    ],
+    [
+      0.0797268419944018
+    ],
+    [
+      -0.13534311246188074
+    ],
+    [
+      -0.22367629054664728
+    ],
+    [
+      -0.16417789455426948
+    ]
+  ],
+  "lat_mean_val": -0.4706883430480957,
+  "precompute_s": 1.317704999994021,
+  "fit_s": 112.52991333400132,
+  "precompute_plus_fit_s": 113.84761833399534,
+  "optimizer_likelihood_calls": 23,
+  "outer_steps": 5,
+  "max_abs_gradient": 3.025396582884989e-05,
+  "fit_returned_nll": 0.8976528831983207,
+  "final_native_nll": 0.8976528831983207,
+  "model_summary": {
+    "n_clusters": 1160,
+    "block_shape_lat": 4,
+    "block_shape_lon": 4,
+    "max_points_per_cluster": 16,
+    "n_target_blocks": 9230,
+    "n_target_points": 139738,
+    "n_batches": 37,
+    "target_chunk_size": 64,
+    "strategy": "offset_corridor_tapered",
+    "temporal_basis": "corridor",
+    "force_target_center": 0,
+    "lag0_block_count": 4,
+    "lag1_block_count": 3,
+    "lag2_block_count": 2,
+    "lag1_max_blocks": 3,
+    "lag2_max_blocks": 2,
+    "lag1_lon_offset": 0.22050443597513436,
+    "lag2_lon_offset": 0.4410088719502687,
+    "lag1_lon_interval_lo": 0.11025221798756718,
+    "lag1_lon_interval_hi": 0.33075665396270154,
+    "lag2_lon_interval_lo": 0.0,
+    "lag2_lon_interval_hi": 0.4410088719502687,
+    "corridor_anchor_mode": "width",
+    "grid_lon_step": 0.06300000000000239,
+    "corridor_block_lon_width": 0.25200000000000955,
+    "block_row_offset": 0,
+    "block_col_offset": 0,
+    "spec_name": "directional_corridor_width_4x4_lag432",
+    "reference_advec_lat": 0.08262924878234496,
+    "reference_advec_lon": -0.20443730953614478,
+    "reference_advec_norm": 0.22050443597513436,
+    "past_offset_lat": -0.08262924878234496,
+    "past_offset_lon": 0.20443730953614478,
+    "lag1_corridor_multiplier_lo": 0.5,
+    "lag1_corridor_multiplier_hi": 1.5,
+    "lag2_corridor_multiplier_lo": 0.0,
+    "lag2_corridor_multiplier_hi": 2.0,
+    "nugget_mode": "fixed",
+    "fixed_nugget": 0.0
+  }
+}

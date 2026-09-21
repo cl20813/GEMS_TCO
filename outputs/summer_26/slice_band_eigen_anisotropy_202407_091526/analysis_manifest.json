@@ -1,0 +1,253 @@
+{
+  "analysis": "matched-length latitude/longitude band eigenanalysis",
+  "days": [
+    13,
+    19,
+    25
+  ],
+  "positions": 80,
+  "latitude_bands": [
+    [
+      -3.0,
+      -2.0
+    ],
+    [
+      -2.0,
+      -1.0
+    ],
+    [
+      -1.0,
+      0.0
+    ],
+    [
+      0.0,
+      1.0
+    ],
+    [
+      1.0,
+      2.0
+    ]
+  ],
+  "longitude_bands_primary": [
+    [
+      122.0,
+      123.0
+    ],
+    [
+      124.0,
+      125.0
+    ],
+    [
+      126.0,
+      127.0
+    ],
+    [
+      128.0,
+      129.0
+    ],
+    [
+      130.0,
+      131.0
+    ]
+  ],
+  "longitude_bands_alternate": [
+    [
+      121.0,
+      122.0
+    ],
+    [
+      123.0,
+      124.0
+    ],
+    [
+      125.0,
+      126.0
+    ],
+    [
+      127.0,
+      128.0
+    ],
+    [
+      129.0,
+      130.0
+    ]
+  ],
+  "east_west_windows": [
+    [
+      121.0,
+      126.0
+    ],
+    [
+      126.0,
+      131.0
+    ]
+  ],
+  "correlation_not_covariance": true,
+  "correlation_estimator": "biased lag-pooled stationary Toeplitz correlation",
+  "sources": {
+    "simulation": {
+      "source": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5/2024_july_st_circulant/sim_july2024_st_circulant_gridded.pkl",
+      "kind": "simulation",
+      "days": [
+        13,
+        19,
+        25
+      ],
+      "grid_shape": [
+        114,
+        159
+      ],
+      "grid_latitude_range": [
+        -2.9720000000000044,
+        2.0
+      ],
+      "grid_longitude_range": [
+        121.04600000000188,
+        131.0
+      ],
+      "mean_model_columns": [
+        "known_intercept",
+        "known_latitude_slope"
+      ],
+      "mean_latitude_center": -0.5,
+      "mean_coefficients": null,
+      "valid_counts": {
+        "day13_hour0": 18069,
+        "day13_hour1": 17736,
+        "day13_hour2": 17148,
+        "day13_hour3": 17018,
+        "day13_hour4": 17100,
+        "day13_hour5": 16913,
+        "day13_hour6": 17880,
+        "day13_hour7": 17874,
+        "day19_hour0": 18067,
+        "day19_hour1": 17849,
+        "day19_hour2": 17640,
+        "day19_hour3": 17548,
+        "day19_hour4": 17609,
+        "day19_hour5": 17586,
+        "day19_hour6": 17889,
+        "day19_hour7": 17889,
+        "day25_hour0": 18067,
+        "day25_hour1": 17868,
+        "day25_hour2": 17809,
+        "day25_hour3": 17839,
+        "day25_hour4": 17839,
+        "day25_hour5": 17830,
+        "day25_hour6": 17861,
+        "day25_hour7": 17873
+      }
+    },
+    "real": {
+      "source": "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/tco_grid_24_07.pkl",
+      "kind": "real",
+      "days": [
+        13,
+        19,
+        25
+      ],
+      "grid_shape": [
+        114,
+        159
+      ],
+      "grid_latitude_range": [
+        -2.9720000000000044,
+        2.0
+      ],
+      "grid_longitude_range": [
+        121.04600000000188,
+        131.0
+      ],
+      "mean_model_columns": [
+        "intercept",
+        "source_lat_centered",
+        "day_19",
+        "day_25",
+        "hour_1",
+        "hour_2",
+        "hour_3",
+        "hour_4",
+        "hour_5",
+        "hour_6",
+        "hour_7"
+      ],
+      "mean_latitude_center": -0.4782902526903524,
+      "mean_coefficients": [
+        258.368646971093,
+        1.271914488271371,
+        -2.912117020673814,
+        4.4228486707651955,
+        -0.1967241709533318,
+        -1.236360335075252,
+        -1.563896770461022,
+        -1.4051899004626074,
+        -0.35166224877298374,
+        0.08837175173043374,
+        2.2974917862114053
+      ],
+      "valid_counts": {
+        "day13_hour0": 18069,
+        "day13_hour1": 17932,
+        "day13_hour2": 17360,
+        "day13_hour3": 17231,
+        "day13_hour4": 17312,
+        "day13_hour5": 17139,
+        "day13_hour6": 18102,
+        "day13_hour7": 18097,
+        "day19_hour0": 18067,
+        "day19_hour1": 18043,
+        "day19_hour2": 17838,
+        "day19_hour3": 17752,
+        "day19_hour4": 17813,
+        "day19_hour5": 17795,
+        "day19_hour6": 18109,
+        "day19_hour7": 18103,
+        "day25_hour0": 18067,
+        "day25_hour1": 18074,
+        "day25_hour2": 18032,
+        "day25_hour3": 18063,
+        "day25_hour4": 18061,
+        "day25_hour5": 18056,
+        "day25_hour6": 18093,
+        "day25_hour7": 18090
+      }
+    }
+  },
+  "simulation_truth": {
+    "year": 2024,
+    "input_template": "/home/jl2815/tco/data/pickle_2024/tco_grid_24_07.pkl",
+    "n_hours": 248,
+    "hours_per_day": 8,
+    "block_generation": "independent daily 8-hour 3D circulant embeddings",
+    "smooth": 0.5,
+    "sigmasq": 10.0,
+    "sigma": 3.1622776601683795,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "advec_lat": 0.08,
+    "advec_lon": -0.2,
+    "nugget": 1.0,
+    "mean_intercept": 260.0,
+    "mean_lat_slope": 1.0,
+    "mean_lat_center": -0.5,
+    "lat_range": [
+      -3.0,
+      2.0
+    ],
+    "lon_range": [
+      121.0,
+      131.0
+    ],
+    "delta_lat_base": 0.044,
+    "delta_lon_base": 0.063,
+    "lat_factor_hr": 100,
+    "lon_factor_hr": 10,
+    "delta_lat_hr": 0.00043999999999999996,
+    "delta_lon_hr": 0.0063,
+    "hr_pad": 0.1,
+    "griddification_rule": "nearest regular grid cell, 1-to-1, then axis-wise half-cell threshold",
+    "griddification_threshold_lat": 0.022,
+    "griddification_threshold_lon": 0.0315
+  }
+}

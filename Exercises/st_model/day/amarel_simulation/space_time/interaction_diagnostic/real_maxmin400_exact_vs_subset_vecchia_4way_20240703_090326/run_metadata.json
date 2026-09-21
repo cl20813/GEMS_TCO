@@ -1,0 +1,197 @@
+{
+  "created": "2026-09-03T23:00:24",
+  "script": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/real_maxmin400_exact_vs_subset_vecchia_4way_090326.py",
+  "date": "2024-07-03",
+  "data_source": "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/tco_grid_24_07.pkl",
+  "fit_reused_without_refit": true,
+  "fit": {
+    "geometry": "adapted",
+    "lag_pattern": "4/3/2",
+    "target_chunk_size": 64,
+    "fitted_parameters": {
+      "sigmasq": 13.07290059615328,
+      "range_lat": 0.16540293300820902,
+      "range_lon": 0.19386939774091874,
+      "range_time": 1.3683254600746475,
+      "advec_lat": -0.07305519133399865,
+      "advec_lon": -0.2829997280915573,
+      "nugget": 1.4821971710732058
+    },
+    "full_data_gls_beta": [
+      0.15004645256296076,
+      1.1187279788192848,
+      -0.21761917407469694,
+      -0.6056813133443295,
+      -0.7403013476896194,
+      -0.5700430404351062,
+      -1.0036955943240669,
+      -0.5235601925255003,
+      1.2333522083336017
+    ],
+    "full_data_gls_lat_mean": -0.5041003227233887,
+    "stored_native_nll": 1.3778025988666298
+  },
+  "subset": {
+    "n_grid": 18126,
+    "n_common_valid": 14791,
+    "n_spatial_selected": 400,
+    "maxmin_s": 0.00968375000229571,
+    "coordinate_order": "longitude,latitude",
+    "hours": 8,
+    "n_observations": 3200,
+    "ordering_for_comparison": "time-major, then max-min spatial rank",
+    "same_raw_residual_all_four_methods": true,
+    "residual_max_abs_difference": 5.557094482355751e-07
+  },
+  "exact_covariance": {
+    "diagonal_jitter_matching_vecchia_batched_covariance": 1e-06,
+    "min_eigenvalue": 6.7646391298918065,
+    "max_eigenvalue": 101.38566281533761,
+    "condition_number": 14.987593701389237,
+    "precision_eigenvalue_max_relative_error": 3.2009448273208765e-14
+  },
+  "subset_vecchia": {
+    "construction": "selected observations only; nonempty subset blocks reordered by max-min; block IDs, centroids, footprints, and width inherited from native grid",
+    "uses_full_precision_submatrix": false,
+    "uses_observations_outside_subset": false,
+    "n_nonempty_subset_blocks": 400,
+    "native_grid_lat_levels": 114,
+    "native_grid_lon_levels": 159,
+    "precompute_s": 0.41467195899167564,
+    "subset_lat_mean": -0.5528193116188049,
+    "global_lat_mean": -0.5041003227233887,
+    "beta_intercept_adjustment": -0.05450329597708821,
+    "model_summary": {
+      "n_clusters": 400,
+      "block_shape_lat": 4,
+      "block_shape_lon": 4,
+      "max_points_per_cluster": 1,
+      "n_target_blocks": 3200,
+      "n_target_points": 3200,
+      "n_batches": 3,
+      "target_chunk_size": 64,
+      "strategy": "offset_corridor_tapered",
+      "temporal_basis": "corridor",
+      "force_target_center": 0,
+      "lag0_block_count": 4,
+      "lag1_block_count": 3,
+      "lag2_block_count": 2,
+      "lag1_max_blocks": 3,
+      "lag2_max_blocks": 2,
+      "lag1_lon_offset": 0.2682605879116235,
+      "lag2_lon_offset": 0.536521175823247,
+      "lag1_lon_interval_lo": 0.13413029395581175,
+      "lag1_lon_interval_hi": 0.4023908818674352,
+      "lag2_lon_interval_lo": 0.0,
+      "lag2_lon_interval_hi": 0.536521175823247,
+      "corridor_anchor_mode": "width",
+      "grid_lon_step": 0.06300000000000239,
+      "corridor_block_lon_width": 0.25200000000000955,
+      "block_row_offset": 0,
+      "block_col_offset": 0,
+      "spec_name": "directional_corridor_width_4x4_lag432",
+      "reference_advec_lat": -0.08622982710154078,
+      "reference_advec_lon": -0.25402393577127386,
+      "reference_advec_norm": 0.2682605879116235,
+      "past_offset_lat": 0.08622982710154078,
+      "past_offset_lon": 0.25402393577127386,
+      "lag1_corridor_multiplier_lo": 0.5,
+      "lag1_corridor_multiplier_hi": 1.5,
+      "lag2_corridor_multiplier_lo": 0.0,
+      "lag2_corridor_multiplier_hi": 2.0
+    },
+    "operator": {
+      "n_valid": 3200,
+      "n_real_with_missing": 3200,
+      "n_block_targets": 3200,
+      "n_build_chunks": 52,
+      "shape": [
+        3200,
+        3200
+      ],
+      "nnz": 29120,
+      "density": 0.00284375,
+      "nnz_per_row_mean": 9.1,
+      "nnz_per_row_median": 10.0,
+      "nnz_per_row_max": 10,
+      "csr_storage_bytes": 362244,
+      "coefficient_drop_tolerance": 0.0,
+      "conditional_logdet_half": 4074.9982482993946,
+      "build_s": 0.19860633299686015
+    },
+    "reordered_whitener_nnz": 29120,
+    "reordered_whitener_storage_bytes": 362244
+  },
+  "approximation_metrics": {
+    "real_residual_curve_rmse_per_n": 0.011650542795598138,
+    "real_residual_curve_max_abs_per_n": 0.02351159637465837,
+    "real_residual_endpoint_difference_per_n": 0.016551356868258593,
+    "real_residual_band_energy_per_mode_rmse": 0.12895507335954362,
+    "real_residual_band_energy_per_mode_max_abs": 0.37889006893910615,
+    "covariance_eigenvalue_log_ratio_rmse": 0.045502127413453955,
+    "covariance_eigenvalue_log_ratio_max_abs": 0.29234532598417956,
+    "covariance_relative_frobenius_error": 0.16400169261692102,
+    "kl_exact_to_vecchia_per_observation": 0.004943038906750559,
+    "kl_vecchia_to_exact_per_observation": 0.0051742864735039975,
+    "mean_expected_vecchia_energy_under_exact_K": 1.0005791188953683,
+    "max_abs_expected_vecchia_band_energy_minus_one": 0.11328366985999883
+  },
+  "settings": {
+    "lanczos_steps": [
+      64,
+      128,
+      256,
+      512
+    ],
+    "slq_probes": 32,
+    "shared_probes_between_operators": true,
+    "reorthogonalization_modes": [
+      "full",
+      "none"
+    ],
+    "bands": 20,
+    "simulation_replicates": 128,
+    "random_seed": 20260903
+  },
+  "timings_s": {
+    "full_data_vecchia_precompute_for_beta": 1.4119844999950146,
+    "full_data_gls_beta": 1.237712249989272,
+    "exact_covariance_build": 0.17110216699074954,
+    "exact_covariance_full_eigen": 3.4825344999990193,
+    "subset_vecchia_full_precision_and_eigen": 3.487025958005688,
+    "exact_precision_materialization": 0.3609707910072757,
+    "lanczos": {
+      "exact_precision_full": {
+        "residual_s": 1.5079837090015644,
+        "probe_s": 56.116732583002886,
+        "matvec_s": 21.08911188483762
+      },
+      "subset_vecchia_precision_full": {
+        "residual_s": 2.5821101250039646,
+        "probe_s": 72.81363154199789,
+        "matvec_s": 35.872846986254444
+      },
+      "exact_precision_none": {
+        "residual_s": 0.7371944579936098,
+        "probe_s": 36.74535741699219,
+        "matvec_s": 36.60163450418622
+      },
+      "subset_vecchia_precision_none": {
+        "residual_s": 2.4647364580014255,
+        "probe_s": 43.316290083006606,
+        "matvec_s": 44.6017383520084
+      }
+    },
+    "workflow_total": 233.6986701249989
+  },
+  "software": {
+    "python": "3.12.3",
+    "numpy": "1.26.4",
+    "scipy": "1.15.2",
+    "torch": "2.5.1",
+    "platform": "macOS-15.7.9-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 14
+  },
+  "figure": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/real_maxmin400_exact_vs_subset_vecchia_4way_20240703_090326/exact_vecchia_four_way_diagnostic.png"
+}
