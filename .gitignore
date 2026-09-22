@@ -23,7 +23,8 @@ dist/
 *.lprof
 output.png
 
-.claude/worktrees/
+.claude/
+.matplotlib_cache/
 
 # Large generated simulation assets live outside the repo:
 # /Users/joonwonlee/Documents/GEMS_DATA/simulation

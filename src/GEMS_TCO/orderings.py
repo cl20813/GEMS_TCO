@@ -1,416 +1,145 @@
-import warnings
-from collections.abc import Callable
-from dataclasses import dataclass
+"""Spatial ordering and predecessor-neighbor construction.
 
-import faiss
+The public names describe the mathematical operation rather than the backend.
+Max-min ordering uses the bundled pybind11 implementation. Predecessor
+neighbors use a SciPy k-d tree and explicitly enforce that every returned
+neighbor precedes its target. Equal-distance neighbors are ordered by index so
+regular-grid results are reproducible across platforms.
+"""
+
+from __future__ import annotations
+
+from numbers import Integral
+
 import numpy as np
-import scipy
-import scipy.spatial.distance
-import sklearn.neighbors
+from scipy.spatial import cKDTree
 
-import sys
-import os
-for _p in [
-    "/Users/joonwonlee/Documents/GEMS_TCO-1/src/",
-    "/home/jl2815/tco",
-    "/home/ec2-user/gems_tco/src",
-]:
-    if os.path.exists(_p) and _p not in sys.path:
-        sys.path.append(_p)
+from ._maxmin import maxmin_order as _native_maxmin_order
 
-# original code from .maxmin_ancestor_cpp import maxmin_ancestor_cpp as _maxmin_ancestor_cpp
-from .maxmin_ancestor_cpp import maxmin_ancestor_cpp as _maxmin_ancestor_cpp
-from .maxmin_cpp import maxmin_cpp as _maxmin_cpp
+__all__ = ["maxmin_order", "predecessor_neighbors"]
 
 
-def find_closest_to_mean(locs: np.ndarray) -> np.intp:
+def _locations_array(locations, *, allow_empty: bool) -> np.ndarray:
+    """Return a finite, contiguous two-dimensional float64 location array."""
+
+    try:
+        array = np.asarray(locations, dtype=np.float64)
+    except (TypeError, ValueError) as exc:
+        raise TypeError("locations must be convertible to a numeric NumPy array") from exc
+
+    if array.ndim != 2:
+        raise ValueError(f"locations must be two-dimensional, got shape {array.shape}")
+    if array.shape[1] == 0:
+        raise ValueError("locations must have at least one coordinate column")
+    if not allow_empty and array.shape[0] == 0:
+        raise ValueError("locations must contain at least one row")
+    if not np.isfinite(array).all():
+        raise ValueError("locations must contain only finite values")
+    return np.ascontiguousarray(array)
+
+
+def maxmin_order(locations) -> np.ndarray:
+    """Return a zero-based max-min permutation of ``locations``.
+
+    The first location is the observation closest to the coordinate-wise mean;
+    each subsequent location maximizes its distance to the selected set.
     """
-    Finds in a location array the index of the location that is closest to the
-    mean of the locations.
 
-    The location array is a m by n array of m observations in an n-dimensional
-    space.
+    array = _locations_array(locations, allow_empty=False)
+    normalized = _normalize_euclidean_coordinates(array)
+    order = np.asarray(_native_maxmin_order(normalized), dtype=np.int64)
+    expected = np.arange(array.shape[0], dtype=np.int64)
+    if order.shape != expected.shape or not np.array_equal(np.sort(order), expected):
+        raise RuntimeError("the native max-min backend returned an invalid permutation")
+    return order
+
+
+def predecessor_neighbors(locations, max_neighbors: int = 10) -> np.ndarray:
+    """Return nearest neighbors that precede each ordered location.
 
     Parameters
     ----------
-    locs
-        2-d location array
+    locations:
+        Ordered location matrix with shape ``(n_locations, n_dimensions)``.
+    max_neighbors:
+        Maximum number of predecessor neighbors per row. Missing entries are
+        padded with ``-1``.
 
     Returns
     -------
-    np.intp
-        index of the location closest to the mean.
-
-    """
-    avg = np.expand_dims(np.mean(locs, axis=0), 0)
-    idx_min = np.argmin(scipy.spatial.distance.cdist(avg, locs))
-    return idx_min
-
-
-def maxmin_naive(dist: np.ndarray, first: np.intp) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Performs min-max ordering
-
-    The implementation is naive and will not perform well for large inputs.
-
-    Parameters
-    ----------
-    dist
-        distance matrix
-    first
-        Index of the observation that should be sorted first
-
-    Returns
-    -------
-    np.ndarray
-        The minmax ordering
-    np.ndarray
-        Array with the distances to the location preceding in ordering
+    numpy.ndarray
+        Integer array of shape ``(n_locations, max_neighbors)``. Every
+        nonnegative entry in row ``i`` is strictly less than ``i``.
     """
 
-    n = dist.shape[0]
-    ord = np.zeros(n, dtype=np.int64)
-    ord[0] = first
-    dists = np.zeros(n)
-    dists[0] = np.nan
-    idx = np.arange(n)
+    if not isinstance(max_neighbors, Integral) or isinstance(max_neighbors, (bool, np.bool_)):
+        raise TypeError("max_neighbors must be an integer")
+    if max_neighbors < 0:
+        raise ValueError("max_neighbors must be nonnegative")
 
-    for i in range(1, n):
-        # find min dist for each not selected loccation
-        mask = ~np.isin(idx, ord[:i])
-        min_d = np.min(dist[mask, :][:, ord[:i]], axis=1)
+    array = _locations_array(locations, allow_empty=True)
+    n_locations = array.shape[0]
+    neighbors = np.full((n_locations, int(max_neighbors)), -1, dtype=np.int64)
+    if n_locations == 0 or max_neighbors == 0:
+        return neighbors
 
-        # find max idx among those
-        idx_max = np.argmax(min_d)
+    # Translation and one global positive scale preserve Euclidean rankings
+    # while improving numerical resolution for coordinates with a large
+    # common offset.
+    normalized = _normalize_euclidean_coordinates(array)
+    tree = cKDTree(normalized)
 
-        # record dist
-        dists[i] = min_d[idx_max]
+    requested = np.minimum(np.arange(n_locations), int(max_neighbors))
+    unresolved = np.flatnonzero(requested > 0)
+    search_width = min(n_locations, max(2 * int(max_neighbors) + 1, 2))
+    while unresolved.size:
+        distances, candidates = tree.query(normalized[unresolved], k=search_width, workers=1)
+        distances = np.asarray(distances, dtype=np.float64)
+        candidates = np.asarray(candidates, dtype=np.int64)
+        if candidates.ndim == 1:
+            candidates = candidates[:, None]
+            distances = distances[:, None]
+        still_unresolved: list[int] = []
+        for result_row, target in enumerate(unresolved):
+            count = int(requested[target])
+            candidate_row = candidates[result_row]
+            distance_row = distances[result_row]
+            predecessor_mask = (candidate_row >= 0) & (candidate_row < target)
+            preceding = candidate_row[predecessor_mask]
+            if preceding.size >= count:
+                # The k-d tree does not specify an index tie-break and a
+                # truncated query can split a distance tie. Query the entire
+                # boundary ball, then sort exact float64 distances followed by
+                # index for a deterministic result.
+                cutoff = np.partition(distance_row[predecessor_mask], count - 1)[count - 1]
+                radius = np.nextafter(float(cutoff), np.inf)
+                tied_candidates = np.asarray(
+                    tree.query_ball_point(normalized[target], r=radius, workers=1),
+                    dtype=np.int64,
+                )
+                tied_candidates = tied_candidates[
+                    (tied_candidates >= 0) & (tied_candidates < target)
+                ]
+                deltas = normalized[tied_candidates] - normalized[target]
+                exact_squared_distances = np.einsum("ij,ij->i", deltas, deltas)
+                stable_order = np.lexsort((tied_candidates, exact_squared_distances))
+                neighbors[target, :count] = tied_candidates[stable_order[:count]]
+            elif search_width == n_locations:
+                raise RuntimeError("neighbor search failed to return the required predecessors")
+            else:
+                still_unresolved.append(int(target))
+        unresolved = np.asarray(still_unresolved, dtype=np.int64)
+        search_width = min(n_locations, 2 * search_width)
 
-        # adjust idx for the prevous removed rows
-        idx_max = idx[mask][idx_max]
-        ord[i] = idx_max
-    return ord, dists
-
-
-def find_nns_naive(
-    locs: np.ndarray, dist_fun: Callable | str = "euclidean", max_nn: int = 10, **kwargs
-) -> np.ndarray:
-    """
-    Finds the max_nn nearest neighbors preceding in the ordering.
-
-    The method is naivly implemented and will not perform well for large inputs.
-
-    Parameters
-    ----------
-    locs
-        an n x m array of ordered locations
-    dist_fun
-        a distance function
-    max_nn
-        number of nearest neighbours
-    kwargs
-        supplied dist_func
-
-    Returns
-    -------
-    np.ndarray
-        Returns an n x max_nn array holding the indices of the nearest neighbors
-        preceding in the ordering where -1 indicates missing neighbors.
-    """
-
-    n = locs.shape[0]
-    nns = np.zeros((n, max_nn), dtype=np.int64) - 1
-    for i in range(1, n):
-        nn = sklearn.neighbors.BallTree(locs[:i], metric=dist_fun, **kwargs)
-        k = np.min(min(i, max_nn))
-        nn_res = nn.query(locs[[i], :], k=k, return_distance=False)
-        nns[i, :k] = nn_res
-    return nns
-
-
-def maxmin_cpp(locs: np.ndarray) -> np.ndarray:
-    """
-    Returns a maxmin ordering based on the Euclidean distance.
-
-    Parameters
-    ----------
-    locs
-        A m by n array of m observations in an n-dimensional space
+    return neighbors
 
 
-    Returns
-    -------
-    np.ndarray
-        Returns the indices of the permutation.
+def _normalize_euclidean_coordinates(array: np.ndarray) -> np.ndarray:
+    """Translate and uniformly scale coordinates without changing rankings."""
 
-    Notes
-    -----
-    The implementation is based on the work of Schäfer et al. [1]_, Schäfer et
-    al. [2]_. The code is an adaptation of [3]_.
-
-    References
-    ----------
-    .. [1] Schäfer, F., Katzfuss, M. and Owhadi, H. Sparse Cholesky
-        Factorization by Kullback--Leibler Minimization. SIAM Journal on
-        Scientific Computing, 43(3), 2021. https://doi.org/10.1137/20M1336254
-    .. [2] Schäfer, F., Sullivan, T.J. and Owhadi, H. Compression, Inversion,
-        and Approximate PCA of Dense Kernel Matrices at Near-Linear
-        Computational Complexity. Multiscale Modeling & Simulation, 19(12),
-        2021. https://doi.org/10.1137/19M129526X
-    .. [3] https://github.com/f-t-s/
-           cholesky_by_KL_minimization/blob/f9a7d10932c422bde9f1fcfc950321c8c7b460a2/src/SortSparse.jl.
-
-    """
-
-    if not isinstance(locs, np.ndarray):
-        raise TypeError("locs must be a numpy array")
-
-    idx = _maxmin_cpp(locs)
-    return np.array(idx)
-
-
-def find_nns_l2(locs: np.ndarray, max_nn: int = 10) -> np.ndarray:
-    """
-    Finds the max_nn nearest neighbors preceding in the ordering.
-
-    The distance between neighbors is based on the Euclidien distance.
-
-    This code is copied from https://github.com/katzfuss-group/BaTraMaSpa_py/
-    blob/d75974961317a5b1e30d6f2fcc14862e1cb0535b/NNarray.py and adjusted to fit
-    the different imports. Also, compared to the original code, first column of
-    the array returned is removed which was pointing to the element itself.
-
-    Parameters
-    ----------
-    locs
-        an n x m array of ordered locations
-    max_nn
-        number of nearest neighbours
-
-    Returns
-    -------
-    np.ndarray
-        Returns an n x max_nn array holding the indices of the nearest neighbors
-        preceding in the ordering where -1 indicates missing neighbors.
-    """
-    n, d = locs.shape
-    NN = -np.ones((n, max_nn + 1), dtype=int)
-    mult = 2
-    maxVal = min(max_nn * mult + 1, n)
-    distM = scipy.spatial.distance.cdist(locs[:maxVal, :], locs[:maxVal, :])
-    odrM = np.argsort(distM)
-    for i in range(maxVal):
-        NNrow = odrM[i, :]
-        NNrow = NNrow[NNrow <= i]
-        NNlen = min(NNrow.shape[0], max_nn + 1)
-        NN[i, :NNlen] = NNrow[:NNlen]
-    queryIdx = np.arange(maxVal, n)
-    mSearch = max_nn
-    while queryIdx.size > 0:
-        maxIdx = queryIdx.max()
-        mSearch = min(maxIdx + 1, 2 * mSearch)
-        if n < 1e5:
-            index = faiss.IndexFlatL2(d)
-        else:
-            quantizer = faiss.IndexFlatL2(d)
-            index = faiss.IndexIVFFlat(quantizer, d, min(maxIdx + 1, 1024))
-            index.train(locs[: maxIdx + 1, :])
-            index.nprobe = min(maxIdx + 1, 256)
-        index.add(locs[: maxIdx + 1, :])
-        _, NNsub = index.search(locs[queryIdx, :], int(mSearch))
-        lessThanI = NNsub <= queryIdx[:, None]
-        numLessThanI = lessThanI.sum(1)
-        idxLessThanI = np.nonzero(np.greater_equal(numLessThanI, max_nn + 1))[0]
-        for i in idxLessThanI:
-            NN[queryIdx[i]] = NNsub[i, lessThanI[i, :]][: max_nn + 1]
-            if NN[queryIdx[i], 0] != queryIdx[i]:
-                try:
-                    idx = np.nonzero(NN[queryIdx[i]] == queryIdx[i])[0][0]
-                    NN[queryIdx[i], idx] = NN[queryIdx[i], 0]
-                    NN[queryIdx[i], 0] = queryIdx[i]
-                except IndexError:
-                    NN[queryIdx[i], 0] = queryIdx[i]
-        queryIdx = np.delete(queryIdx, idxLessThanI, 0)
-
-    if any(NN[:, 0] != np.arange(n)):
-        warnings.warn("There are very close locations and NN[:, 0] != np.arange(n)\n")
-    return NN.astype(np.int64)[:, 1:]
-
-
-def maxmin_pred_cpp(locs: np.ndarray, pred_locs: np.ndarray) -> np.ndarray:
-    """
-    Returns a maxmin ordering based on the Euclidean distance where the
-    locations in locs are preceeding the locations in pred_locs.
-
-    Parameters
-    ----------
-    locs
-        A m by n array of m observations in an n-dimensional space
-
-    pred_locs
-        A k by n array of k observations in an n-dimensional space
-
-
-    Returns
-    -------
-    np.ndarray
-        Returns the indices of the permutation for the cocatenated array of locs
-        and pred_locs, e.g., np.concatenate((locs, pred_locs), axis=0).
-
-    Notes
-    -----
-    The implementation is based on C++ implementation provided by Myeongjong
-    Kang which also can be found in [1]_.
-
-    References
-    ----------
-    .. [1] https://github.com/katzfuss-group/variationalVecchia/blob/
-           4ce03ddb53f3006b5cd1d1e3fe0268744e408039/external/maxmin_cpp/maxMin.cpp
-    """
-
-    if not isinstance(locs, np.ndarray):
-        raise TypeError("locs must be a numpy array")
-
-    if not isinstance(pred_locs, np.ndarray):
-        raise TypeError("pred_locs must be a numpy array")
-
-    locs_all = np.concatenate((locs, pred_locs), axis=0)
-    npred = pred_locs.shape[0]
-
-    first_idx = find_closest_to_mean(locs)
-
-    ord_list = _maxmin_ancestor_cpp(locs_all, 1.0005, first_idx, npred)[0]
-    return np.asarray(ord_list)
-
-
-@dataclass
-class AncestorOrdering:
-    maximin_order: np.ndarray
-    """
-    The indices of the permutation for the cocatenated array of locs
-        and pred_locs, e.g., np.concatenate((locs, pred_locs), axis=0).
-    """
-    sparsity: np.ndarray
-    """
-    sparsity index pairs for the inverse Cholesky factor
-    """
-    ancestor_set_reduced: np.ndarray
-    """
-    the reduced ancestor set (similar format as the sparsity index pairs)
-    """
-
-
-def maxmin_cpp_ancestor(
-    locs: np.ndarray, pred_locs: np.ndarray, rho: float
-) -> AncestorOrdering:
-    """
-    Returns a maxmin ordering based on the Euclidean distance where the
-    locations in locs are preceeding the locations in pred_locs.
-
-    Parameters
-    ----------
-    locs
-        A m by n array of m observations in an n-dimensional space
-
-    pred_locs
-        A k by n array of k observations in an n-dimensional space
-
-    rho
-        A float value controling the radius of conditioning set and reduced
-        ancestor set
-
-    Returns
-    -------
-    AncestorOrdering
-        An object holding the maximin ordering, the sparsity index pairs and the
-        reduced ancestor set.
-
-    Notes
-    -----
-    The implementation is based on C++ implementation provided by Myeongjong
-    Kang which also can be found in [1]_.
-
-    References
-    ----------
-    .. [1] https://github.com/katzfuss-group/variationalVecchia/blob/
-           4ce03ddb53f3006b5cd1d1e3fe0268744e408039/external/maxmin_cpp/maxMin.cpp
-    """
-
-    if not isinstance(locs, np.ndarray):
-        raise TypeError("locs must be a numpy array")
-
-    if not isinstance(pred_locs, np.ndarray):
-        raise TypeError("pred_locs must be a numpy array")
-
-    locs_all = np.concatenate((locs, pred_locs), axis=0)
-    npred = pred_locs.shape[0]
-
-    first_idx = find_closest_to_mean(locs)
-
-    orderObj = _maxmin_ancestor_cpp(locs_all, rho, first_idx, npred)
-    ancestorApprox = np.array([orderObj[3], orderObj[2]])
-    sparsity = ancestorApprox[:, orderObj[4]]
-    ancestorApprox = ancestorApprox[:, ancestorApprox[1] >= 0]
-    sparsity = sparsity[:, sparsity[1] >= 0]
-    maxmin_order = np.asarray(orderObj[0])
-    ordering = AncestorOrdering(
-        maximin_order=maxmin_order,
-        sparsity=sparsity,
-        ancestor_set_reduced=ancestorApprox,
-    )
-    return ordering
-
-
-def find_nns_l2_mf(locs_all: list[np.ndarray], max_nn: int = 10) -> np.ndarray:
-    """
-    Finds the max_nn nearest neighbors preceding in the ordering for
-    every fidelity, plus the max_nn nearest neighbors in in the preceding
-    fidelity
-
-    Parameters
-    ----------
-    locs_all
-        A list of observations in dimension p at different fidelities,
-        where each fidelity has n_1, ..., n_R observations. You have to
-        pass the locations for each fidelity in order from lower to
-        highest fidelity.
-    max_nn
-        The max number of nearest neighbors considered within or between
-        each fidelity (could consider different numbers of nearest neighbors
-        within and between but that is not implemented now)
-
-    Returns
-    -------
-    np.ndarray
-        Returns the indices of the nearest neighbors, where -1 mean no nearest
-        neighbors. Indices go from 0 to N = n_1 + n_2 + ... + n_R.
-        The array is then of size N by 2 max_nn
-    """
-
-    R = len(locs_all)
-    ns = np.zeros(R, dtype=int)
-    NN_list = []
-    NN_preb_list = []
-    for r, locs in enumerate(locs_all):
-        ns[r] = locs.shape[0]
-        NNr = find_nns_l2(locs, max_nn)
-        if r == 0:
-            NN_preb = -np.ones((ns[r], max_nn), dtype=int)  # no nearest neighbors on
-            # previous fidelity level for first fidelity level, use -1 for mask
-        else:
-            NNr = NNr + sum(ns[0:r])  # sum ns[0:r] because we need to
-            # start counting all fidelities til this one
-            NNr[NNr == sum(ns[0:r]) - 1] = -1  # revert ruining which are -1
-            # in previous line, kinda dumb hack but I guess it works
-            distM = scipy.spatial.distance.cdist(locs_all[r], locs_all[r - 1])
-            odrM = np.argsort(distM)
-            NN_preb = odrM[:, :max_nn] + sum(ns[0 : r - 1])  # we need to start
-            # counting all fidelities til last one.
-        NN_list.append(NNr)
-        NN_preb_list.append(NN_preb)
-
-    NN = np.vstack(NN_list)
-    NN_preb = np.vstack(NN_preb_list)
-    NN_all = np.hstack((NN, NN_preb))
-
-    return NN_all
+    shifted = array - array[0]
+    if not np.isfinite(shifted).all():
+        raise ValueError("the coordinate span is too large for stable distance calculation")
+    scale = float(np.max(np.abs(shifted)))
+    normalized = shifted if scale == 0.0 else shifted / scale
+    return np.ascontiguousarray(normalized, dtype=np.float64)

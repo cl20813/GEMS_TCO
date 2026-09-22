@@ -1,0 +1,236 @@
+{
+  "balanced_fixed_radius_maxima": [
+    {
+      "balanced_spatial_norm": 0.35355339059327373,
+      "balanced_temporal_norm": 0.35355339059327373,
+      "joint_radius": 0.5,
+      "maximum_correlation_gap": 0.11346196831739364,
+      "maximum_log_correlation_gap": 0.20710678118654757
+    },
+    {
+      "balanced_spatial_norm": 0.7071067811865475,
+      "balanced_temporal_norm": 0.7071067811865475,
+      "joint_radius": 1.0,
+      "maximum_correlation_gap": 0.12476270673722814,
+      "maximum_log_correlation_gap": 0.41421356237309515
+    },
+    {
+      "balanced_spatial_norm": 1.414213562373095,
+      "balanced_temporal_norm": 1.414213562373095,
+      "joint_radius": 2.0,
+      "maximum_correlation_gap": 0.07622953667465648,
+      "maximum_log_correlation_gap": 0.8284271247461903
+    },
+    {
+      "balanced_spatial_norm": 2.1213203435596424,
+      "balanced_temporal_norm": 2.1213203435596424,
+      "joint_radius": 3.0,
+      "maximum_correlation_gap": 0.035417472277424866,
+      "maximum_log_correlation_gap": 1.2426406871192857
+    },
+    {
+      "balanced_spatial_norm": 2.82842712474619,
+      "balanced_temporal_norm": 2.82842712474619,
+      "joint_radius": 4.0,
+      "maximum_correlation_gap": 0.014822149612087979,
+      "maximum_log_correlation_gap": 1.6568542494923806
+    }
+  ],
+  "columns_loaded_from_point_table": [
+    "date",
+    "time_index",
+    "anchor_rank",
+    "source_latitude",
+    "source_longitude"
+  ],
+  "definitions": {
+    "fitted_null_actual_correlation_difference": "R_true_joint(truth parameters) - R_separable(fitted parameters); this includes compensation by fitted ranges and advection",
+    "margin_matched_structural_gap": "exp(-hypot(s,t)) - exp(-s-t); both models use the truth ranges/advection and have identical exponential axis margins",
+    "standardized_spatial_norm": "s=||(h-vu)/ell_space||_2 using truth parameters",
+    "standardized_temporal_norm": "t=|u|/ell_time using truth parameters"
+  },
+  "interpretation": "The analytic margin-matched gap isolates the square-root geometry. The fitted-null difference is the relevant post-optimization discrepancy and may have either sign. They are intentionally reported separately.",
+  "metrics": [
+    {
+      "definition": "all five days",
+      "metric": "unordered_nondiagonal_pairs",
+      "section": "occupancy",
+      "value": 1598000.0
+    },
+    {
+      "definition": "s>0 and t>0",
+      "metric": "mixed_pair_fraction",
+      "section": "occupancy",
+      "value": 0.8760951188986232
+    },
+    {
+      "definition": "t=0",
+      "metric": "temporal_axis_pair_fraction",
+      "section": "occupancy",
+      "value": 0.12390488110137672
+    },
+    {
+      "definition": "s=0",
+      "metric": "moving_spatial_axis_pair_fraction",
+      "section": "occupancy",
+      "value": 0.0
+    },
+    {
+      "definition": "sqrt(s^2+t^2)<=4",
+      "metric": "correlation_relevant_pair_fraction",
+      "section": "occupancy",
+      "value": 0.055
+    },
+    {
+      "definition": "2*s*t/(s^2+t^2)>=0.9 among correlation-relevant pairs",
+      "metric": "near_balanced_fraction_among_relevant",
+      "section": "occupancy",
+      "value": 0.19761064967573103
+    },
+    {
+      "definition": "correlation-relevant and 2*s*t/(s^2+t^2)>=0.9",
+      "metric": "near_balanced_relevant_fraction_of_all_pairs",
+      "section": "occupancy",
+      "value": 0.010868585732165207
+    },
+    {
+      "definition": "pairs represented in the occupancy panel",
+      "metric": "figure_window_pair_fraction",
+      "section": "occupancy",
+      "value": 0.1331564455569462
+    },
+    {
+      "definition": "mean of s+t-hypot(s,t) for relevant pairs",
+      "metric": "mean_log_correlation_gap_relevant",
+      "section": "margin_matched_structural_gap",
+      "value": 0.6618739844565253
+    },
+    {
+      "definition": "same truth ranges/advection and therefore exactly matched axis margins",
+      "metric": "mean_correlation_gap_relevant",
+      "section": "margin_matched_structural_gap",
+      "value": 0.023520094662573675
+    },
+    {
+      "definition": "max of R_joint-R_separable with truth parameters shared",
+      "metric": "maximum_correlation_gap_observed",
+      "section": "margin_matched_structural_gap",
+      "value": 0.12282271863371974
+    },
+    {
+      "definition": "R_true_joint(truth)-R_separable(fitted null)",
+      "metric": "mean_signed_correlation_difference",
+      "section": "fitted_null_actual_difference",
+      "value": 0.0010423755408828644
+    },
+    {
+      "definition": "ranges and advection differ between the two models",
+      "metric": "mean_absolute_correlation_difference",
+      "section": "fitted_null_actual_difference",
+      "value": 0.001302806373811144
+    },
+    {
+      "definition": "restricted to sqrt(s^2+t^2)<=4",
+      "metric": "mean_absolute_correlation_difference_relevant",
+      "section": "fitted_null_actual_difference",
+      "value": 0.017700871394181566
+    },
+    {
+      "definition": "ranges and advection differ between the two models",
+      "metric": "rmse_correlation_difference",
+      "section": "fitted_null_actual_difference",
+      "value": 0.005406427921605232
+    },
+    {
+      "definition": "restricted to sqrt(s^2+t^2)<=4",
+      "metric": "rmse_correlation_difference_relevant",
+      "section": "fitted_null_actual_difference",
+      "value": 0.02224075193394183
+    },
+    {
+      "definition": "sign is not constrained after fitting",
+      "metric": "truth_correlation_greater_fraction",
+      "section": "fitted_null_actual_difference",
+      "value": 0.9853016270337922
+    }
+  ],
+  "pair_occupancy": {
+    "correlation_relevant_fraction": 0.055,
+    "correlation_relevant_radius": 4.0,
+    "figure_spatial_limit": 6.0,
+    "figure_temporal_limit": 3.5,
+    "figure_window_fraction": 0.1331564455569462,
+    "mixed_fraction": 0.8760951188986232,
+    "near_balanced_fraction_among_relevant": 0.19761064967573103,
+    "near_balanced_relevant_fraction_of_all_pairs": 0.010868585732165207,
+    "total_unordered_nondiagonal_pairs": 1598000
+  },
+  "parameters": {
+    "fitted_null": {
+      "advec_lat": 0.040909360846262684,
+      "advec_lon": -0.16102839686799336,
+      "nugget": 0.0,
+      "range_lat": 0.19228793934195929,
+      "range_lon": 0.26979558141675436,
+      "range_time": 3.931090484290789,
+      "variance": 9.89882600458311
+    },
+    "truth": {
+      "advec_lat": 0.08,
+      "advec_lon": -0.2,
+      "nugget": 0.0,
+      "range_lat": 0.2,
+      "range_lon": 0.3,
+      "range_time": 2.0,
+      "variance": 10.0
+    }
+  },
+  "per_day": [
+    {
+      "date": "2023-07-04",
+      "mean_absolute_fitted_correlation_difference": 0.0012955815402574307,
+      "mean_matched_correlation_gap": 0.001643952419317542,
+      "observations": 800,
+      "unordered_nondiagonal_pairs": 319600
+    },
+    {
+      "date": "2023-07-29",
+      "mean_absolute_fitted_correlation_difference": 0.0013056218627864962,
+      "mean_matched_correlation_gap": 0.001649695105807356,
+      "observations": 800,
+      "unordered_nondiagonal_pairs": 319600
+    },
+    {
+      "date": "2024-07-13",
+      "mean_absolute_fitted_correlation_difference": 0.0013089258299411562,
+      "mean_matched_correlation_gap": 0.0016577431605810428,
+      "observations": 800,
+      "unordered_nondiagonal_pairs": 319600
+    },
+    {
+      "date": "2024-07-19",
+      "mean_absolute_fitted_correlation_difference": 0.0013013814280718957,
+      "mean_matched_correlation_gap": 0.0016440944423165731,
+      "observations": 800,
+      "unordered_nondiagonal_pairs": 319600
+    },
+    {
+      "date": "2025-07-06",
+      "mean_absolute_fitted_correlation_difference": 0.0013025212079987416,
+      "mean_matched_correlation_gap": 0.001646537712823421,
+      "observations": 800,
+      "unordered_nondiagonal_pairs": 319600
+    }
+  ],
+  "response_columns_loaded": false,
+  "source_manifest": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_five_day_092226/run_manifest.json",
+  "source_point_table": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_five_day_092226/selected_flow_tube_points.csv",
+  "sqrt_removal": {
+    "exactly_separable": true,
+    "literal_result": "exp(-(s^2+t^2)) = exp(-s^2) exp(-t^2)",
+    "maximum_factorization_error_checked": 1.1102230246251565e-16,
+    "preserves_likelihood_or_optimizer_in_general": false,
+    "preserves_original_exponential_axis_margins": false,
+    "reason": "on an axis exp(-s^2) replaces exp(-s), so covariance values and the likelihood objective change even though distance ordering is monotone"
+  }
+}

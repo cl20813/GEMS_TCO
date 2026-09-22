@@ -1,0 +1,82 @@
+[build-system]
+requires = ["setuptools>=77", "wheel", "pybind11>=2.12"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "GEMS-TCO"
+version = "0.3.0"
+description = "Spatio-temporal covariance inference for GEMS total column ozone data"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+authors = [
+    { name = "Joonwon Lee" },
+]
+keywords = [
+    "Gaussian process",
+    "spatio-temporal statistics",
+    "Debiased Whittle",
+    "Vecchia approximation",
+    "GEMS",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "netCDF4",
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "scipy",
+    "torch",
+    "xarray",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "build",
+    "isort",
+    "pyflakes",
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "twine",
+]
+
+[project.urls]
+Repository = "https://github.com/cl20813/GEMS_TCO"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["GEMS_TCO*"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.black]
+target-version = ["py310"]
+line-length = 100
+
+[tool.isort]
+profile = "black"
+line_length = 100
+src_paths = ["src", "tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["src", "tests"]

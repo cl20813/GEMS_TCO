@@ -1,4 +1,4 @@
-"""Configured Debiased Whittle engine with stable legacy compatibility.
+"""Configured scalar Debiased Whittle engine.
 
 The five historical modules duplicated the same taper, DFT, expected
 periodogram, covariance kernel, parameterization, and optimizer.  Their real
@@ -9,10 +9,9 @@ differences are captured by :class:`~.filters.SpatialFilterSpec`:
 * for ``identity``, the historical per-time-slice spatial demeaning.
 
 The common numerical implementation lives in the private ``_core`` module.
-This module creates independent configured subclasses; it never mutates a
-process-wide "active filter".  Consequently several filters can be imported
-and compared safely in the same Python process, while the old module paths are
-kept as thin compatibility wrappers.
+This module creates independent configured subclasses and never mutates a
+process-wide active filter, so several filters can be compared safely in one
+Python process.
 """
 
 from __future__ import annotations
@@ -26,10 +25,9 @@ from .filters import SpatialFilterSpec, get_filter_spec
 
 @dataclass(frozen=True)
 class EngineComponents:
-    """The three legacy-compatible classes configured for one filter."""
+    """The numerical classes configured for one scalar spatial filter."""
 
     filter_spec: SpatialFilterSpec
-    comparison_class: Type
     preprocess_class: Type
     likelihood_class: Type
 
@@ -46,7 +44,7 @@ def _components_for_name(filter_name: str) -> EngineComponents:
 
     likelihood_class = type(
         f"{class_suffix}DebiasedWhittleLikelihood",
-        (common.debiased_whittle_likelihood,),
+        (common.BaseDebiasedWhittleLikelihood,),
         {
             "__module__": __name__,
             "__doc__": f"Debiased Whittle likelihood using {spec.name!r}.",
@@ -54,40 +52,28 @@ def _components_for_name(filter_name: str) -> EngineComponents:
         },
     )
     preprocess_class = type(
-        f"{class_suffix}DebiasedWhittlePreprocess",
-        (common.debiased_whittle_preprocess,),
+        f"{class_suffix}DebiasedWhittlePreprocessor",
+        (common.BaseDebiasedWhittlePreprocessor,),
         {
             "__module__": __name__,
             "__doc__": f"Grid preprocessing using {spec.name!r}.",
             "filter_spec": spec,
         },
     )
-    comparison_class = type(
-        f"{class_suffix}FullVecchiaDwLikelihoods",
-        (common.full_vecc_dw_likelihoods,),
-        {
-            "__module__": __name__,
-            "__doc__": f"Legacy full/Vecchia/DW comparison using {spec.name!r}.",
-            "filter_spec": spec,
-            "preprocess_class": preprocess_class,
-            "likelihood_class": likelihood_class,
-        },
-    )
+    # ``type`` does not register dynamically-created classes in their declared
+    # module.  Registration makes these public classes importable by name and
+    # therefore pickleable in multiprocessing and saved workflows.
+    globals()[likelihood_class.__name__] = likelihood_class
+    globals()[preprocess_class.__name__] = preprocess_class
     return EngineComponents(
         filter_spec=spec,
-        comparison_class=comparison_class,
         preprocess_class=preprocess_class,
         likelihood_class=likelihood_class,
     )
 
 
 def components_for(filter_name: str | SpatialFilterSpec) -> EngineComponents:
-    """Return immutable, legacy-compatible classes for ``filter_name``.
-
-    Both descriptive names and old aliases are accepted.  For example,
-    ``components_for("summed_first_differences")`` and
-    ``components_for("2110")`` return the same cached classes.
-    """
+    """Return immutable numerical classes configured for ``filter_name``."""
 
     spec = get_filter_spec(filter_name)
     return _components_for_name(spec.name)
@@ -101,14 +87,14 @@ class DebiasedWhittleEngine:
     spatial_filter:
         One of ``identity``, ``latitude_difference``,
         ``longitude_difference``, ``cross_difference``, or
-        ``summed_first_differences``.  Historical aliases remain accepted.
+        ``summed_first_differences``.
 
     Notes
     -----
     This facade does not change parameter order, dtype/device behavior,
     numerical jitter, tapering, optimizer flow, or default spatial increments.
-    It selects only the legacy filter-specific behavior recorded in the
-    immutable specification.
+    It selects only the filter-specific behavior recorded in the immutable
+    specification.
 
     ``cross_difference`` retains the historical ``1111`` stencil
     ``[[-1, 1], [1, -1]]``.  Under the forward-difference definitions used by
@@ -122,27 +108,29 @@ class DebiasedWhittleEngine:
 
     @property
     def filter_spec(self) -> SpatialFilterSpec:
+        """Return the immutable configuration selected for this engine."""
+
         return self._components.filter_spec
 
     @property
     def preprocess_class(self) -> Type:
+        """Return the filter-configured preprocessing class."""
+
         return self._components.preprocess_class
 
     @property
     def likelihood_class(self) -> Type:
+        """Return the filter-configured likelihood class."""
+
         return self._components.likelihood_class
 
-    @property
-    def comparison_class(self) -> Type:
-        return self._components.comparison_class
-
     def make_preprocessor(self, *args, **kwargs):
-        """Construct the legacy-compatible preprocessor for this filter."""
+        """Construct the preprocessor for this filter."""
 
         return self.preprocess_class(*args, **kwargs)
 
     def make_likelihood(self):
-        """Construct the legacy-compatible likelihood object."""
+        """Construct the likelihood object for this filter."""
 
         return self.likelihood_class()
 

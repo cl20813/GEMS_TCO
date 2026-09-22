@@ -1,10 +1,7 @@
-"""Stable package namespace for Vecchia implementations.
-
-The package is being introduced incrementally.  Existing top-level modules
-remain available so that research scripts continue to import and execute the
-same implementation during the reorganization.
-"""
+"""Supported grouped-batch and corridor-neighbor Vecchia models."""
 
 from . import corridor_neighbors
+from ._base import LBFGSFitResult
+from .grouped_batched import GroupedBatchedVecchia
 
-__all__ = ["corridor_neighbors"]
+__all__ = ["GroupedBatchedVecchia", "LBFGSFitResult", "corridor_neighbors"]

@@ -1,0 +1,18 @@
+section,metric,value,definition
+occupancy,unordered_nondiagonal_pairs,1598000,all five days
+occupancy,mixed_pair_fraction,0.876095118899,s>0 and t>0
+occupancy,temporal_axis_pair_fraction,0.123904881101,t=0
+occupancy,moving_spatial_axis_pair_fraction,0,s=0
+occupancy,correlation_relevant_pair_fraction,0.055,sqrt(s^2+t^2)<=4
+occupancy,near_balanced_fraction_among_relevant,0.197610649676,2*s*t/(s^2+t^2)>=0.9 among correlation-relevant pairs
+occupancy,near_balanced_relevant_fraction_of_all_pairs,0.0108685857322,correlation-relevant and 2*s*t/(s^2+t^2)>=0.9
+occupancy,figure_window_pair_fraction,0.133156445557,pairs represented in the occupancy panel
+margin_matched_structural_gap,mean_log_correlation_gap_relevant,0.661873984457,"mean of s+t-hypot(s,t) for relevant pairs"
+margin_matched_structural_gap,mean_correlation_gap_relevant,0.0235200946626,same truth ranges/advection and therefore exactly matched axis margins
+margin_matched_structural_gap,maximum_correlation_gap_observed,0.122822718634,max of R_joint-R_separable with truth parameters shared
+fitted_null_actual_difference,mean_signed_correlation_difference,0.00104237554088,R_true_joint(truth)-R_separable(fitted null)
+fitted_null_actual_difference,mean_absolute_correlation_difference,0.00130280637381,ranges and advection differ between the two models
+fitted_null_actual_difference,mean_absolute_correlation_difference_relevant,0.0177008713942,restricted to sqrt(s^2+t^2)<=4
+fitted_null_actual_difference,rmse_correlation_difference,0.00540642792161,ranges and advection differ between the two models
+fitted_null_actual_difference,rmse_correlation_difference_relevant,0.0222407519339,restricted to sqrt(s^2+t^2)<=4
+fitted_null_actual_difference,truth_correlation_greater_fraction,0.985301627034,sign is not constrained after fitting

@@ -1,0 +1,16 @@
+{
+  "familywise_alpha": 0.05,
+  "max_squared": {
+    "bootstrap_p_value": 0.9568608627827443,
+    "null_critical_95": 9.46806252095517,
+    "observed": 2.3847631166787595,
+    "oracle_power": 0.09672
+  },
+  "replicates": 50000,
+  "top_subspace_log_likelihood_ratio": {
+    "bootstrap_p_value": 0.31889362212755745,
+    "null_critical_95": 0.9534414116637904,
+    "observed": 0.03538766822039641,
+    "oracle_power": 0.1985
+  }
+}

@@ -1,90 +1,173 @@
 # Package refactor manifest
 
-This refactor changes package organization without intentionally changing any
-statistical or numerical behavior.  The pre-refactor source is recoverable at
-the local annotated Git tag `pre-package-refactor-2026-09-21` (commit
-`ee987c84fc4b19f901464f45a7be1de0f96225e5`).
+This refactor makes `src/GEMS_TCO` the maintained, installable research
+library rather than a compatibility archive for historical experiments. The
+pre-refactor tag is a private/local rollback snapshot only: it contains a
+historical API credential and must not be pushed, mirrored, or included in the
+clean public repository. Revoke and rotate that credential before release,
+then publish from a verified clean export or scrubbed history without old tags.
 
-## Debiased Whittle filters
+The numerical paths retained in the package are protected by deterministic
+regression tests. Historical notebooks and scripts under `Exercises/` and
+`GEMS_TCO_EDA/` were deliberately not rewritten in this change; update their
+imports when an experiment is brought back into active use.
 
-The public filter names describe the operation rather than the historical
-coefficient shorthand.
+## Maintained package layout
 
-| Legacy module suffix | Public filter name | Preserved operation |
+```text
+src/GEMS_TCO/
+├── __init__.py
+├── data/
+│   ├── loading.py
+│   └── preprocessing.py
+├── debiased_whittle/
+│   ├── engine.py
+│   ├── filters.py
+│   ├── mixed_frequency.py
+│   └── vector_gradient.py
+├── spatial/
+├── vecchia/
+│   ├── grouped_batched.py
+│   └── corridor_neighbors/
+└── orderings.py
+```
+
+There are no compatibility wrappers for retired top-level module names.
+
+## Debiased Whittle
+
+The five formerly duplicated scalar implementations now use one configured
+engine. Public filter names describe the statistical operation:
+
+| Removed suffix | Public filter name | Preserved operation |
 | --- | --- | --- |
-| `raw` | `identity` | No convolution; preserve the historical per-time-slice spatial demeaning |
-| `lat1` | `latitude_difference` | First difference in latitude |
-| `lon1` | `longitude_difference` | First difference in longitude |
-| `1111` | `cross_difference` | Historical stencil `[[-1, 1], [1, -1]]`, equal to `-D_lat D_lon` under the forward-difference definitions |
-| `2110` | `summed_first_differences` | `D_lat + D_lon` summed first differences |
+| `raw` | `identity` | No convolution; per-time-slice spatial demeaning |
+| `lat1` | `latitude_difference` | First latitude difference |
+| `lon1` | `longitude_difference` | First longitude difference |
+| `1111` | `cross_difference` | Historical stencil `[[-1, 1], [1, -1]]` |
+| `2110` | `summed_first_differences` | `D_lat + D_lon` |
 
-New code should construct
-`GEMS_TCO.debiased_whittle.DebiasedWhittleEngine` with a public filter name.
-The five historical module paths remain as compatibility wrappers.  Their
-stencils, output shapes, frequency masks, CPU dtype/device placement, jitter,
-parameter ordering, and optimizer flows are protected by characterization
-tests in `tests/test_debiased_whittle_engine.py`.  The historical ``1111``
-sign is intentionally documented rather than normalized, because changing it
-would change the preprocessing output.
+Construct scalar variants with
+`GEMS_TCO.debiased_whittle.DebiasedWhittleEngine`. The old abbreviated filter
+names and five top-level modules are not accepted.
 
-`debiased_whittle_grad_filter.py` and `debiased_whittle_mixed.py` remain
-experimental and their numerical implementations were not changed.
+The two genuinely different estimators remain separate:
 
-## Vecchia corridor configurations
+- `GEMS_TCO.debiased_whittle.mixed_frequency` combines identity-filtered low
+  frequencies with cross-differenced high frequencies.
+- `GEMS_TCO.debiased_whittle.vector_gradient` uses the two-component spatial
+  gradient and its cross-spectrum.
 
-The existing implementations remain the source of truth and are re-exported
-through descriptive paths:
+Common preprocessing, taper, covariance, expected-periodogram, and optimizer
+logic is inherited from the private `_core` implementation. Obsolete
+comparison orchestration and the undefined full/Vecchia experiment path were
+removed from the library.
 
-| Configuration | Canonical import path |
+The scalar API accepts descriptive names only. Its grid, time-axis, frequency
+mask, parameter-order, and numerical-loading assumptions are recorded in
+[`method_assumptions.md`](method_assumptions.md).
+
+## Vecchia
+
+The supported spatio-temporal Vecchia implementation is the grouped,
+GPU-batched engine plus corridor-neighbor geometries:
+
+| Role | Canonical path |
 | --- | --- |
-| Local 4/3/2 | `GEMS_TCO.vecchia.corridor_neighbors.local_lag432` |
-| Amarel 6/4/3 | `GEMS_TCO.vecchia.corridor_neighbors.amarel_lag643` |
+| Grouped block-target engine | `GEMS_TCO.vecchia.grouped_batched` |
+| Shared corridor geometry | `GEMS_TCO.vecchia.corridor_neighbors._geometry` |
+| Fixed-longitude 4/3/2 corridor | `GEMS_TCO.vecchia.corridor_neighbors.corridor_lag432` |
+| Directional 4/3/2 corridor | `GEMS_TCO.vecchia.corridor_neighbors.directional_lag432` |
+| Fixed-longitude 6/4/3 corridor | `GEMS_TCO.vecchia.corridor_neighbors.corridor_lag643` |
+| Directional 6/4/3 corridor | `GEMS_TCO.vecchia.corridor_neighbors.directional_lag643` |
+| Generalized Cauchy | `GEMS_TCO.vecchia.corridor_neighbors.generalized_cauchy` |
+| Matérn spline variants | `GEMS_TCO.vecchia.corridor_neighbors.spline` |
 
-The original `vecchia_realdata_*` module paths remain valid.  Five unused
-candidate copies/wrappers were removed after a repository-wide caller audit:
+`vecchia/_base.py` contains only behavior required by grouped fits. Broken
+point-target methods that assumed a different batch representation were not
+carried into the supported base.
 
-- `kernel_vecchia_col_batch.py`, whose only computational counterpart is
-  `matern_vecchia_col_batch.py` (the removed copy differed only in progress
-  message precision);
-- `kernels_vecchia_cluster_hybrid.py`, `kernels_vecchia_hybrid.py`, and the
-  byte-identical `kernels_vecchia_hybrid_fresh.py`, which only re-exported the
-  canonical Matérn implementations; and
-- `kernels_vecchia_same_spatial.py`, whose former implementation duplicated
-  `matern_vecchia_engine.py`.
+Retired point-target, hybrid, column-batch, and calibrated-corridor source is
+stored under `research/legacy/GEMS_TCO/vecchia/`. The former
+`vecchia_candidate` package is archived under
+`research/legacy/GEMS_TCO/vecchia_candidate/`; it is not installed.
 
-The three files left in `vecchia_candidate/` are not duplicates: the pointwise
-Cauchy model, the regular-grid reverse-L template-reuse model, and the
-missing-aware intersection model each have distinct behavior and current
-research callers.
+Public class names describe the model rather than the machine or dataset. The
+principal classes are `GroupedBatchedVecchia`, `Lag432CorridorVecchia`,
+`DirectionalLag432CorridorVecchia`, `Lag643CorridorVecchia`, and
+`DirectionalLag643CorridorVecchia`. There are no `RealData`, `Amarel`,
+`Hybrid`, or `Fit` compatibility aliases in the installed API.
+
+## Pure-spatial models
+
+Dated top-level filenames were replaced with the `GEMS_TCO.spatial` package:
+
+| Former module | Canonical module |
+| --- | --- |
+| `kernels_space_base_engine_052126` | `spatial.base` |
+| `kernels_space_iso_cluster_052426` | `spatial.isotropic` |
+| `kernels_space_aniso_cluster_060326` | `spatial.anisotropic_matern` |
+| `kernels_space_aniso_cauchy_cluster_060326` | `spatial.anisotropic_cauchy` |
+| `matern_bessel_anisotropic` | `spatial.matern_bessel` |
+| `matern_spline` | `spatial.matern_spline` |
+| `torch_bessel_full_likelihood` | `research/diagnostics/spatial/torch_matern_bessel.py` |
+
+`spatial.__init__` provides the curated model-level API. Public classes use
+`SpatialVecchia` names, and the numerical methods are named
+`profiled_negative_log_likelihood`, `estimate_gls_coefficients`,
+`make_lbfgs_optimizer`, and `fit_lbfgs`. The direct and block-Vecchia paths use
+the same standard `sqrt(2 * nu)` Matérn range convention. The `latlon` mean
+design consistently means intercept plus centered latitude and longitude;
+`latlon_hour` explicitly adds the seven hourly indicators.
 
 ## Data and diagnostics
 
-`GEMS_TCO.data.loading` and `GEMS_TCO.data.preprocessing` currently re-export
-the existing loading functions and preprocessing functions/classes.  This
-provides clearer import paths without rewriting data behavior.  The
-`research/diagnostics/` holding area is outside the installed package; it
-currently contains its policy only, because existing diagnostic code is not
-moved until callers have compatibility coverage.  Existing `GEMS_TCO.evaluate`
-callers are not migrated in this phase.
+The implementations now live directly in `GEMS_TCO.data.loading` and
+`GEMS_TCO.data.preprocessing`; the former top-level data modules were removed.
+Public classes use descriptive names: `ProcessedDataLoader`,
+`CoordinateDeviationFilter`, `GEMSOrbitReader`, `GeographicBounds`, and
+`MonthlyOrbitAggregator`. NetCDF groups are aligned by shared dimension
+indices, and processed aggregate tensors are checked against hourly
+coordinate/time order.
 
-The seven historical modules formerly stored under the literal
-`src/GEMS_TCO/not used/` directory were moved unchanged to
-`research/legacy/GEMS_TCO/not_used/`.  They are not installed.  Four are named
-by old notebooks through package paths that were already stale before this
-move; the remaining three have no repository callers.
+The package root is intentionally small and dependency-free. Experiment result
+logging was removed from the publication API because it was orchestration, not
+a statistical method.
 
-The obsolete package-internal `src/GEMS_TCO/setup.py` was removed.  The
-repository's `src/setup.py` remains solely as the native-extension build
-declaration, while project metadata and dependencies live in
-`src/pyproject.toml`.
+The former `GEMS_TCO.evaluate` diagnostic collection was moved to
+`research/diagnostics/evaluate.py`. The project-specific downloader was moved
+to `research/data_acquisition/` and no longer embeds an API credential.
+Machine-specific path constants were archived as
+`research/legacy/GEMS_TCO/configuration.py`.
 
-## Deferred work
+## Packaging and generated artifacts
 
-- remove tracked platform-specific native binaries after the new reproducible
-  C++ extension build has been exercised on every supported platform;
-- migrate the native extension declarations from the build-only `src/setup.py`
-  if a fully declarative backend is adopted later;
-- promote the three actively used `vecchia_candidate` implementations to
-  stable or explicitly experimental namespaces and migrate their callers;
-- migrate research scripts from compatibility imports before removing any
-  legacy module path.
+`pyproject.toml`, `setup.py`, `README.md`, and `LICENSE` now live at the
+repository root, following the standard `src` layout. `src/` contains package
+source only.
+
+Tracked macOS and Windows extensions and compiler intermediates (`.so`, `.pyd`,
+`.obj`, `.lib`, `.exp`) were removed. Wheels compile one private pybind11
+extension, `GEMS_TCO._maxmin`, from `cpp/maxmin_order.cpp`. Its adapted upstream
+code and license are identified in `THIRD_PARTY_NOTICES.md`.
+
+`CITATION.cff` supplies software-citation metadata, and
+`.github/workflows/tests.yml` builds and checks a wheel before running the test
+suite against the installed artifact. The workflow uses Python isolated mode
+and explicitly rejects imports from the checkout's `src` directory. Historical
+machine-specific setup and deployment notes live under
+`research/legacy/setup/` and are not maintained installation instructions.
+
+## Verification
+
+- The complete unit/regression suite passes from both the source tree and an
+  installed wheel.
+- Scalar, mixed-frequency, vector-gradient, and 4/3/2 versus 6/4/3 corridor
+  likelihood goldens are preserved.
+- Data-group alignment, invalid optimizer states, public imports, deterministic
+  orderings, mean designs, and shared Matérn conventions have focused
+  regression tests.
+- Black, isort, Pyflakes, and `git diff --check` pass for the maintained source
+  and tests.
+- The built wheel contains only maintained package modules, metadata, and the
+  single locally compiled native extension.

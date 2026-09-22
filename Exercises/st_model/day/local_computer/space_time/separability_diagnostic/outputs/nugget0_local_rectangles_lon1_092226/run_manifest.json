@@ -1,0 +1,304 @@
+{
+  "bootstrap": {
+    "familywise_alpha": 0.05,
+    "max_squared": {
+      "bootstrap_p_value": 0.04803903921921562,
+      "null_critical_95": 9.47410560934894,
+      "observed": 9.545657950962916,
+      "oracle_power": 0.15922
+    },
+    "replicates": 50000,
+    "top_subspace_log_likelihood_ratio": {
+      "bootstrap_p_value": 0.03001939961200776,
+      "null_critical_95": 1.0961355142099336,
+      "observed": 1.3713234242583834,
+      "oracle_power": 0.29048
+    }
+  },
+  "created": "2026-09-22T05:06:45",
+  "data_contract": {
+    "continuous_40_hour_process": false,
+    "coordinate_columns": [
+      "Source_Latitude",
+      "Source_Longitude",
+      "local_time_0_to_7"
+    ],
+    "dates": [
+      "2023-07-04",
+      "2023-07-29",
+      "2024-07-13",
+      "2024-07-19",
+      "2025-07-06"
+    ],
+    "independent_eight_hour_blocks": true,
+    "mean_removal": "known simulation mean at Source_Latitude",
+    "statistical_nugget": 0.0
+  },
+  "data_root": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/sim_data/july_st_circulant_realpattern_smooth0p5_nugget0_matched5_090226",
+  "figures": [
+    "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/figures/generalized_eigen_spectrum.png",
+    "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/figures/top_direction_patterns.png",
+    "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/figures/heldout_bootstrap_calibration.png",
+    "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/figures/correlation_slice_comparison.png"
+  ],
+  "interpretation_boundary": "Oracle alternative-specific pilot on one fixed flow tube; final paper claims require subset/seed convergence and a full repeated-simulation study.",
+  "moving_rectangle_diagnostic": {
+    "adjacent_time_intervals": 7,
+    "contrast_count": 350,
+    "definition": "Z(A,t)-Z(B,t)-Z(A,t+1)+Z(B,t+1)",
+    "fraction_of_full_design_kl": 0.2005800694029727,
+    "matrix_kl": 0.3954063345113923,
+    "max_g_score": 0.0033955266981164703,
+    "max_generalized_eigen_relative_residual": 2.631383985665252e-15,
+    "max_generalized_eigenvalue": 1.1211129561283906,
+    "max_null_orthonormality_error": 4.6629367034256575e-15,
+    "min_generalized_eigenvalue": 0.8962934949976618,
+    "pair_count": 50
+  },
+  "null": {
+    "family": "sigma2 * exp(-||h-vu||_anisotropic) * exp(-|u|/range_time)",
+    "fit": {
+      "attempts": [
+        {
+          "advec_lat": -0.005825817000088931,
+          "advec_lon": -0.19609148481002167,
+          "converged": true,
+          "evaluations": 228,
+          "iterations": 33,
+          "message": "CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH",
+          "objective_per_observation": 2.527799778768986,
+          "range_lat": 0.26608188533050287,
+          "range_lon": 0.28940707178218517,
+          "range_time": 4.786272711917909,
+          "start_index": 0,
+          "variance": 9.81043888207381
+        },
+        {
+          "advec_lat": 0.16513308259772244,
+          "advec_lon": -0.20410190436793887,
+          "converged": true,
+          "evaluations": 288,
+          "iterations": 38,
+          "message": "CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH",
+          "objective_per_observation": 2.526329759431234,
+          "range_lat": 0.22927005927233685,
+          "range_lon": 0.2929044049964727,
+          "range_time": 5.733264709379305,
+          "start_index": 1,
+          "variance": 9.870274421200065
+        },
+        {
+          "advec_lat": 0.1651337823751469,
+          "advec_lon": -0.20410197697143387,
+          "converged": true,
+          "evaluations": 264,
+          "iterations": 38,
+          "message": "CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH",
+          "objective_per_observation": 2.526329759436098,
+          "range_lat": 0.22927250350956513,
+          "range_lon": 0.2929052170331145,
+          "range_time": 5.733338699898297,
+          "start_index": 2,
+          "variance": 9.870302678014237
+        },
+        {
+          "advec_lat": 0.16513271589258394,
+          "advec_lon": -0.2041018410193726,
+          "converged": true,
+          "evaluations": 246,
+          "iterations": 32,
+          "message": "CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH",
+          "objective_per_observation": 2.526329759433409,
+          "range_lat": 0.22926781285999526,
+          "range_lon": 0.29290393513300184,
+          "range_time": 5.733326586667561,
+          "start_index": 3,
+          "variance": 9.870268734984785
+        },
+        {
+          "advec_lat": 0.08202052526081582,
+          "advec_lon": -0.2296629369716733,
+          "converged": true,
+          "evaluations": 318,
+          "iterations": 41,
+          "message": "CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH",
+          "objective_per_observation": 2.5426914234780176,
+          "range_lat": 0.13090129382527352,
+          "range_lon": 0.2817461039718877,
+          "range_time": 2.388131897593788,
+          "start_index": 4,
+          "variance": 9.71714970771564
+        },
+        {
+          "advec_lat": 0.1651330537123703,
+          "advec_lon": -0.20410185637720893,
+          "converged": true,
+          "evaluations": 318,
+          "iterations": 33,
+          "message": "CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH",
+          "objective_per_observation": 2.5263297594315266,
+          "range_lat": 0.22927030962668818,
+          "range_lon": 0.29290397596241835,
+          "range_time": 5.733239556818943,
+          "start_index": 5,
+          "variance": 9.870267756306571
+        },
+        {
+          "advec_lat": -0.00582611584769073,
+          "advec_lon": -0.19609146733038274,
+          "converged": true,
+          "evaluations": 366,
+          "iterations": 45,
+          "message": "CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH",
+          "objective_per_observation": 2.52779977876875,
+          "range_lat": 0.2660822070264293,
+          "range_lon": 0.2894071949801027,
+          "range_time": 4.7862841751840195,
+          "start_index": 6,
+          "variance": 9.810439227105784
+        },
+        {
+          "advec_lat": -0.005826537432901044,
+          "advec_lon": -0.19609096904449252,
+          "converged": true,
+          "evaluations": 234,
+          "iterations": 29,
+          "message": "CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH",
+          "objective_per_observation": 2.527799778772258,
+          "range_lat": 0.26608455421487204,
+          "range_lon": 0.28940738741909594,
+          "range_time": 4.786262349346835,
+          "start_index": 7,
+          "variance": 9.810443483232035
+        }
+      ],
+      "best_start_index": 1,
+      "boundary_parameters": [],
+      "bounds": {
+        "advec_lat": [
+          -0.4,
+          0.4
+        ],
+        "advec_lon": [
+          -0.8,
+          0.4
+        ],
+        "range_lat": [
+          0.03,
+          2.0
+        ],
+        "range_lon": [
+          0.03,
+          3.0
+        ],
+        "range_time": [
+          0.1,
+          10.0
+        ]
+      },
+      "objective_per_observation": 2.526329759431234,
+      "parameters": {
+        "advec_lat": 0.16513308259772244,
+        "advec_lon": -0.20410190436793887,
+        "nugget": 0.0,
+        "range_lat": 0.22927005927233685,
+        "range_lon": 0.2929044049964727,
+        "range_time": 5.733264709379305,
+        "variance": 9.870274421200065
+      }
+    },
+    "fit_seconds": 151.22139645800053,
+    "same_exponential_axis_margins_as_truth": true
+  },
+  "numerics": {
+    "dtype": "float64",
+    "eigen_seconds": 0.20461920798697975,
+    "generalized_eigen_max_null_orthonormality_error": 8.881784197001252e-15,
+    "generalized_eigen_max_relative_residual": 2.425124901271036e-15,
+    "kl_identity_absolute_error": 4.6851411639181606e-14,
+    "matrix_kl": 1.971314177367276,
+    "numerical_jitter_ratio": 1e-10,
+    "spectral_kl": 1.9713141773672291,
+    "statistical_nugget": 0.0
+  },
+  "output_dir": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226",
+  "script": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/run_nugget0_five_day.py",
+  "selected_modes": {
+    "count": 12,
+    "true_variance_greater_than_null": 11,
+    "true_variance_less_than_null": 1
+  },
+  "split": {
+    "design_dates": [
+      "2023-07-04",
+      "2023-07-29",
+      "2024-07-13"
+    ],
+    "heldout_dates": [
+      "2024-07-19",
+      "2025-07-06"
+    ],
+    "responses_used_for_null_fit_or_direction_selection": false
+  },
+  "subset": {
+    "anchor_design": "balanced_pairs",
+    "candidate_anchor_count": 5207,
+    "dimension_per_day": 800,
+    "grid_shifts_by_local_hour": [
+      [
+        0,
+        0
+      ],
+      [
+        -2,
+        3
+      ],
+      [
+        -4,
+        6
+      ],
+      [
+        -5,
+        10
+      ],
+      [
+        -7,
+        13
+      ],
+      [
+        -9,
+        16
+      ],
+      [
+        -11,
+        19
+      ],
+      [
+        -13,
+        22
+      ]
+    ],
+    "hours": 8,
+    "last_maxmin_insertion_separation_scaled": 2.7704151313476073,
+    "method": "max-min distributed local paired flow tubes for moving rectangles",
+    "paired_trajectory_design": {
+      "grid_offset": [
+        0,
+        1
+      ],
+      "nonoverlapping_endpoints": true,
+      "pair_count": 50
+    },
+    "selected_spatial_anchors": 100
+  },
+  "total_seconds": 153.09276741700887,
+  "truth": {
+    "advec_lat": 0.08,
+    "advec_lon": -0.2,
+    "nugget": 0.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "variance": 10.0
+  }
+}

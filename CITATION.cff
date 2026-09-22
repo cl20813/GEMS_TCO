@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite this software release."
+title: "GEMS-TCO"
+type: software
+authors:
+  - family-names: "Lee"
+    given-names: "Joonwon"
+version: 0.3.0
+date-released: 2026-09-21
+repository-code: "https://github.com/cl20813/GEMS_TCO"
+license: MIT
+keywords:
+  - Gaussian process
+  - spatio-temporal statistics
+  - Debiased Whittle likelihood
+  - Vecchia approximation
+  - GEMS
