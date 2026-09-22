@@ -1,22 +1,79 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=77", "wheel", "pybind11>=2.12"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "GEMS_TCO"
+name = "GEMS-TCO"
 version = "0.1.0"
-dependencies = [
-    "requests",
+description = "Spatio-temporal covariance inference for GEMS total column ozone data"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Joonwon Lee" },
 ]
+keywords = [
+    "Gaussian process",
+    "spatio-temporal statistics",
+    "Debiased Whittle",
+    "Vecchia approximation",
+    "GEMS",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "faiss-cpu",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "requests",
+    "scikit-learn",
+    "scipy",
+    "torch",
+    "tqdm",
+    "typer",
+]
+
+[project.optional-dependencies]
+dev = [
+    "build",
+    "mypy",
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "twine",
+]
+
+[project.urls]
+Repository = "https://github.com/cl20813/GEMS_TCO"
 
 [tool.setuptools]
 package-dir = {"" = "."}
+include-package-data = false
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["GEMS_TCO*"]
 exclude = [
     "GEMS_TCO.backup_426*",
-    "GEMS_TCO.not used*",
     "GEMS_TCO.GEMS_TCO.egg-info*",
 ]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
