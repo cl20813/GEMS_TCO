@@ -5,7 +5,13 @@ current, first-lag, and second-lag time layers.  Their modules document the
 fixed 4x4 target-block geometry.
 """
 
-from . import corridor_lag432, corridor_lag643, directional_lag432, directional_lag643
+from . import (
+    corridor_lag432,
+    corridor_lag643,
+    directional_lag432,
+    directional_lag643,
+    separable_exponential,
+)
 from .corridor_lag432 import Lag432CorridorVecchia
 from .corridor_lag643 import Lag643CorridorVecchia
 from .directional_lag432 import DirectionalLag432CorridorVecchia
@@ -17,12 +23,17 @@ from .generalized_cauchy import (
     NoNuggetGeneralizedCauchyLag643CorridorVecchia,
 )
 from .spline import NoNuggetSplineMaternLag643CorridorVecchia, SplineMaternLag643CorridorVecchia
+from .separable_exponential import (
+    AdvectedSeparableExponentialLag643CorridorVecchia,
+    NoNuggetAdvectedSeparableExponentialLag643CorridorVecchia,
+)
 
 __all__ = [
     "corridor_lag432",
     "corridor_lag643",
     "directional_lag432",
     "directional_lag643",
+    "separable_exponential",
     "Lag432CorridorVecchia",
     "DirectionalLag432CorridorVecchia",
     "Lag643CorridorVecchia",
@@ -33,4 +44,6 @@ __all__ = [
     "NoNuggetGeneralizedCauchyLag643CorridorVecchia",
     "SplineMaternLag643CorridorVecchia",
     "NoNuggetSplineMaternLag643CorridorVecchia",
+    "AdvectedSeparableExponentialLag643CorridorVecchia",
+    "NoNuggetAdvectedSeparableExponentialLag643CorridorVecchia",
 ]

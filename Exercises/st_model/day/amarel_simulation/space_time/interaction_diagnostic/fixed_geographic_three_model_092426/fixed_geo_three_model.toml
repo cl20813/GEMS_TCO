@@ -1,0 +1,65 @@
+[study]
+name = "fixed_geographic_three_model_092426"
+coordinate_frame = "fixed_geographic"
+discovery_day = "2024-07-01"
+evaluation_years = [2024, 2025]
+evaluation_month = 7
+evaluation_day_min = 1
+evaluation_day_max = 31
+required_time_slots = 8
+temporal_lag = 1
+
+[data]
+amarel_root = "/home/jl2815/tco/data"
+local_root = "/Users/joonwonlee/Documents/GEMS_DATA"
+latitude_min = -3.0
+latitude_max = 2.0
+longitude_min = 121.0
+longitude_max = 131.0
+use_source_coordinates_for_covariance = true
+
+[models]
+names = ["gc", "matern05", "separable"]
+gc_alpha = 0.75
+gc_beta = 1.0
+matern_smooth = 0.5
+nugget_policy = "fixed_zero"
+covariance_parameter_count = 6
+conditioning_geometry = "corridor_width_4x4_lag643"
+conditioning_lag_pattern = "6/4/3"
+reference_advec_lon_abs = 0.126
+target_chunk_size = 256
+min_target_points = 1
+
+[fit]
+signal_variance = 23.37727059896818
+range_lat = 0.8152988171176069
+range_lon = 0.9527144962204038
+range_time = 4.833004868387591
+advec_lat = -0.012629474202709818
+advec_lon = -0.19419442444408733
+lbfgs_lr = 1.0
+lbfgs_inner_max_iter = 20
+lbfgs_outer_max_steps = 50
+lbfgs_tolerance_grad = 1.0e-5
+outer_grad_tol = 1.0e-4
+require_convergence = true
+lbfgs_tolerance_change = 1.0e-9
+lbfgs_history_size = 10
+
+[diagnostic]
+wx_tolerance = 1.0e-10
+score_name = "constant_free_mean_bivariate_gaussian_contrast_score"
+primary = "bivariate_gaussian_contrast_score"
+secondary = ["V_A", "V_B", "C_AB", "rho_AB"]
+targeted_secondary = "Var_L_with_diagonal_cross_decomposition"
+
+[bootstrap]
+day_block_length = 5
+replicates = 10000
+seed = 92426
+
+[paths]
+amarel_project_root = "/home/jl2815/tco/GEMS_TCO-1"
+amarel_output_root = "/home/jl2815/tco/exercise_output/summer/fixed_geographic_three_model_092426"
+amarel_log_root = "/home/jl2815/tco/exercise_output/summer/logs"

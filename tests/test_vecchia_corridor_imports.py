@@ -52,6 +52,10 @@ class CorridorImportTests(unittest.TestCase):
                 "SplineMaternLag643CorridorVecchia",
                 "NoNuggetSplineMaternLag643CorridorVecchia",
             ),
+            "separable_exponential": (
+                "AdvectedSeparableExponentialLag643CorridorVecchia",
+                "NoNuggetAdvectedSeparableExponentialLag643CorridorVecchia",
+            ),
         }
 
         for module_name, class_names in modules_and_classes.items():
@@ -79,6 +83,9 @@ class CorridorImportTests(unittest.TestCase):
             "NoNuggetGeneralizedCauchyLag643CorridorVecchia",
             "SplineMaternLag643CorridorVecchia",
             "NoNuggetSplineMaternLag643CorridorVecchia",
+            "separable_exponential",
+            "AdvectedSeparableExponentialLag643CorridorVecchia",
+            "NoNuggetAdvectedSeparableExponentialLag643CorridorVecchia",
         }
         self.assertEqual(set(package.__all__), expected)
         for name in expected:

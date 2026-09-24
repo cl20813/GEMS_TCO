@@ -35,3 +35,6 @@ outputs/day/real_data/
 # Generated Vecchia whitening matrices can exceed GitHub's 100 MB blob limit.
 **/whitener_B.npz
 **/vecchia_whitener_B.npz
+
+# Remote snapshots for the frozen 60-day interaction diagnostic.
+Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/fixed_geographic_three_model_092426/downloaded_results/

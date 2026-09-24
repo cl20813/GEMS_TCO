@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "design_id": "fixed_geographic_ab_mirrors_lag1_v1_092426",
+  "status": "frozen_before_design_heldout_same_day_fitted_evaluation",
+  "coordinate_frame": "fixed_geographic",
+  "observation_geometry_moves_with_advection": false,
+  "discovery_day": "2024-07-01",
+  "temporal_lag": 1,
+  "model_time_origin_hours": 477700.0,
+  "model_time_convention": "match ProcessedDataLoader: round(Hours_elapsed - 477700.0) to nominal integer-hour slots before covariance fitting and scoring",
+  "q_sign": "Q_A=A_t-A_t_plus_1; Q_B=B_t-B_t_plus_1",
+  "standardized_geometry": {
+    "clockwise": [
+      [-2.0, -2.0],
+      [2.0, 2.0],
+      [-1.0, -2.0],
+      [1.0, 2.0]
+    ],
+    "counterclockwise": [
+      [-2.0, 2.0],
+      [2.0, -2.0],
+      [-1.0, 2.0],
+      [1.0, -2.0]
+    ]
+  },
+  "frozen_ranges": {
+    "latitude": 0.8152988171176069,
+    "longitude": 0.9527144962204038
+  },
+  "physical_offsets": {
+    "clockwise": [
+      [-1.6305976342352138, -1.9054289924408076],
+      [1.6305976342352138, 1.9054289924408076],
+      [-0.8152988171176069, -1.9054289924408076],
+      [0.8152988171176069, 1.9054289924408076]
+    ],
+    "counterclockwise": [
+      [-1.6305976342352138, 1.9054289924408076],
+      [1.6305976342352138, -1.9054289924408076],
+      [-0.8152988171176069, 1.9054289924408076],
+      [0.8152988171176069, -1.9054289924408076]
+    ]
+  },
+  "raw_coefficients": {
+    "d1": 0.156629367196063,
+    "d2": 0.1540219594610364
+  },
+  "contrast_coefficients_on_eight_points": {
+    "Q_A": [1.0, -1.0, -1.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+    "Q_B": [0.0, 0.0, 0.0, 0.0, 1.0, -1.0, -1.0, 1.0]
+  },
+  "point_order": [
+    "A_minus_t",
+    "A_plus_t",
+    "A_minus_t_plus_1",
+    "A_plus_t_plus_1",
+    "B_minus_t",
+    "B_plus_t",
+    "B_minus_t_plus_1",
+    "B_plus_t_plus_1"
+  ],
+  "anchor_rule": "all regular-grid centers for which all four frozen physical endpoints snap inside the fixed analysis grid",
+  "anchor_identity": "regular latitude index and regular longitude index",
+  "expected_anchor_count_by_mirror": {
+    "clockwise": 3960,
+    "counterclockwise": 3960
+  },
+  "expected_regular_grid_shape": [114, 159],
+  "expected_regular_grid_axes_sha256": "903bd52a776bebc8e2ec8619b5439dff3fb002a48270a4a9612cb097d521fa02",
+  "expected_regular_grid_extent": {
+    "latitude_first": -2.9720000000000044,
+    "latitude_last": 2.0,
+    "longitude_first": 121.04600000000188,
+    "longitude_last": 131.0
+  },
+  "expected_anchor_mapping_sha256": "af07c31e6beaef76d8cd922e4d483abf886d93f3aafbd16c8dc8a72c9e4aeca7",
+  "snapping_rule": "nearest uniform regular-grid axis using numpy.rint; reject targets farther than one-half grid step; covariance uses actual Source_Latitude and Source_Longitude at snapped cells",
+  "mean_rule": "audit max absolute W X first; use monthly-centered raw Y if below tolerance, otherwise one common daywise OLS mean with intercept, centered source latitude, and seven nominal time indicators",
+  "primary_diagnostic": "mean constant-free bivariate Gaussian contrast score evaluated with each sample-specific 2x2 covariance",
+  "statistical_unit": "day",
+  "models": {
+    "gc": "joint generalized Cauchy with alpha=0.75 and beta=1",
+    "matern05": "joint Matern with nu=0.5, equivalently exp(-joint scaled distance)",
+    "separable": "independently fitted advected-separable exponential spatial-times-temporal covariance"
+  },
+  "nugget_policy": "fixed_zero_for_all_three_models",
+  "geometry_source": "heads_vecchia_lag432_one_day_fit_summary.csv, strategy=standard_432, day_idx=0",
+  "geometry_source_sha256": "d6a36cbf06081517b630240e6d67852ec38be92a855738c8aef65fcbe7d1378b",
+  "coefficient_source": "global_two_rectangle_search/global_pair_ties.csv, first strict-tie row",
+  "coefficient_source_sha256": "5f5c6ed689495a5f44a0f2acfddc66237eced6aad96529694440e03c1cb50781",
+  "interpretation_boundary": "design-held-out but same-day fitted targeted in-sample covariance adequacy comparison among three pre-specified equal-dimensional covariance specifications; not predictive holdout and not a ranking of all members of the named covariance families"
+}
