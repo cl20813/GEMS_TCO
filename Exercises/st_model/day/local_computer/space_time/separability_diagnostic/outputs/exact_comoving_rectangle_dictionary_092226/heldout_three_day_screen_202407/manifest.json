@@ -1,0 +1,26 @@
+{
+  "seed": 20260923,
+  "selected_days": [
+    3,
+    22,
+    31
+  ],
+  "frozen_discovery_day": "2024-07-01",
+  "frozen_fit_csv": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/spectrum_diagnostics/outputs/real_july2024_st_heads_vecchia_lag432_one_day_gc_a075_b1_nugget0_061626/heads_vecchia_lag432_one_day_fit_summary.csv",
+  "coefficient_source": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/exact_comoving_rectangle_dictionary_092226/global_two_rectangle_search/global_pair_ties.csv",
+  "initial_physical_parameters_shared_across_days": {
+    "est_sigmasq": 13.059,
+    "est_range_lat": 0.2,
+    "est_range_lon": 0.25,
+    "est_range_time": 1.5,
+    "est_advec_lat": 0.0218,
+    "est_advec_lon": -0.1689
+  },
+  "optimizer": {
+    "max_steps": 4,
+    "max_eval": 20,
+    "grad_tol": 0.0001,
+    "tolerance_grad": 1e-05
+  },
+  "interpretation": "independent-day descriptive screen; not bootstrap-calibrated"
+}

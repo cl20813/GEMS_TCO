@@ -1,0 +1,21 @@
+{
+  "data_file": "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/tco_grid_24_07.pkl",
+  "fit_csv": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/spectrum_diagnostics/outputs/real_july2024_st_heads_vecchia_lag432_one_day_gc_a075_b1_nugget0_061626/heads_vecchia_lag432_one_day_fit_summary.csv",
+  "coefficient_source": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/exact_comoving_rectangle_dictionary_092226/global_two_rectangle_search/global_pair_ties.csv",
+  "generator": "finite BTTB covariance; exact zero-padded FFT matvec; fully reorthogonalized Lanczos square-root action",
+  "circulant_spectrum_clipping": false,
+  "grid_shape": [
+    237,
+    325,
+    8
+  ],
+  "grid_factors": [
+    2,
+    2
+  ],
+  "lanczos_dimension": 280,
+  "lanczos_check_dimension": 240,
+  "operator_build_seconds": 0.09301970800152048,
+  "analysis": "joint GC 4/3/2 corridor Vecchia refit plus GLS; frozen contrast",
+  "requested_replicates": 1
+}

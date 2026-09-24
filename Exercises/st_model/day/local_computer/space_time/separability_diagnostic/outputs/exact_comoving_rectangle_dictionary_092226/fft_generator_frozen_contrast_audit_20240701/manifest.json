@@ -1,0 +1,45 @@
+{
+  "data_file": "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/tco_grid_24_07.pkl",
+  "fit_csv": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/spectrum_diagnostics/outputs/real_july2024_st_heads_vecchia_lag432_one_day_gc_a075_b1_nugget0_061626/heads_vecchia_lag432_one_day_fit_summary.csv",
+  "coefficient_source": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/exact_comoving_rectangle_dictionary_092226/global_two_rectangle_search/global_pair_ties.csv",
+  "translated_samples_source": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/exact_comoving_rectangle_dictionary_092226/real_gems_pilot_20240701/translated_contrast_samples.csv",
+  "embedding_factors_all_axes": [
+    2,
+    4,
+    8
+  ],
+  "fft_grid_factors_for_covariance_audit": [
+    1,
+    1
+  ],
+  "mapping_factors": [
+    [
+      1,
+      1
+    ],
+    [
+      2,
+      2
+    ],
+    [
+      4,
+      4
+    ],
+    [
+      8,
+      8
+    ],
+    [
+      100,
+      10
+    ]
+  ],
+  "contrast_search": false,
+  "simulation": false,
+  "model_gap": {
+    "h_aa": 1.2132069050955678,
+    "h_bb": 0.25219010325730196,
+    "h_ab": 6.834488028202951,
+    "variance_l": 0.3655012856839006
+  }
+}

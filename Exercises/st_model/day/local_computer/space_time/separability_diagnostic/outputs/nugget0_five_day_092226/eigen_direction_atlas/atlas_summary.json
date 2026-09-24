@@ -1,0 +1,145 @@
+{
+  "anchor_count": 100,
+  "candidate_count": 6,
+  "candidate_relative_g_floor": 0.5,
+  "candidate_roles": [
+    {
+      "basis": "fitted_null",
+      "candidate_roles": "top_total_gt",
+      "mode": 1
+    },
+    {
+      "basis": "fitted_null",
+      "candidate_roles": "top_total_lt",
+      "mode": 5
+    },
+    {
+      "basis": "fitted_null",
+      "candidate_roles": "interaction_dominant_gt",
+      "mode": 14
+    },
+    {
+      "basis": "fitted_null",
+      "candidate_roles": "interaction_dominant_lt",
+      "mode": 39
+    },
+    {
+      "basis": "margin_matched_interaction",
+      "candidate_roles": "top_intrinsic_lt",
+      "mode": 1
+    },
+    {
+      "basis": "margin_matched_interaction",
+      "candidate_roles": "top_intrinsic_gt",
+      "mode": 48
+    }
+  ],
+  "cluster_relative_log_gap": 0.01,
+  "design_dates": [
+    "2023-07-04",
+    "2023-07-29",
+    "2024-07-13"
+  ],
+  "dimension": 800,
+  "fitted_null": {
+    "advec_lat": 0.040909360846262684,
+    "advec_lon": -0.16102839686799336,
+    "nugget": 0.0,
+    "range_lat": 0.19228793934195929,
+    "range_lon": 0.26979558141675436,
+    "range_time": 3.931090484290789,
+    "variance": 9.89882600458311
+  },
+  "fitted_null_eigenproblem": {
+    "matrix_kl": 1.5585044875881522,
+    "max_absolute_difference_from_saved_eigenvalues": 4.9824588899127775e-12,
+    "max_null_orthonormality_error": 6.8833827526759706e-15,
+    "max_relative_residual": 2.510062676604578e-15,
+    "spectral_kl": 1.5585044875879965
+  },
+  "graph_neighbor_sensitivity": [
+    4,
+    6,
+    8
+  ],
+  "heldout_dates_not_used_for_candidate_flags": [
+    "2024-07-19",
+    "2025-07-06"
+  ],
+  "inputs": {
+    "manifest": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_five_day_092226/run_manifest.json",
+    "manifest_sha256": "58651921f3d65952d02a5df38a4cbf1d1a0ab850ea0ea9d486bd9a4b89f295e1",
+    "selected_points": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_five_day_092226/selected_flow_tube_points.csv",
+    "selected_points_sha256": "bd9b8a413abfb22ae02b4484ca07e8cbfb6668137d3fc20cde75abe6d2c20d37"
+  },
+  "interaction_clusters_with_space_time_heatmaps": [
+    {
+      "basis": "fitted_null",
+      "candidate_roles": "interaction_dominant_gt",
+      "cluster_dct_high_frequency_fraction": 0.16926466433774284,
+      "cluster_dominant_graph_frequency_rank": 0,
+      "cluster_dominant_temporal_frequency": 0,
+      "cluster_early_late_temporal_similarity": -0.17689476386940198,
+      "cluster_eigenvalue_max": 1.2262377875792143,
+      "cluster_eigenvalue_min": 1.2242488888976224,
+      "cluster_graph_frequency_centroid": 0.6775885069536538,
+      "cluster_intrinsic_interaction_g": 0.012039145420526892,
+      "cluster_mean_adjacent_temporal_similarity": 0.6298966261637303,
+      "cluster_peak_energy_hour": 7,
+      "cluster_peak_hour_energy_fraction": 0.17591291458137184,
+      "cluster_temporal_frequency_centroid": 1.5551485502127331,
+      "cluster_total_g": 0.02210419988390308,
+      "modes": "13;14",
+      "near_degenerate_cluster": "gt_008"
+    },
+    {
+      "basis": "fitted_null",
+      "candidate_roles": "interaction_dominant_lt",
+      "cluster_dct_high_frequency_fraction": 0.8409772556165332,
+      "cluster_dominant_graph_frequency_rank": 10,
+      "cluster_dominant_temporal_frequency": 6,
+      "cluster_early_late_temporal_similarity": -0.04516284531819065,
+      "cluster_eigenvalue_max": 0.8347676856180384,
+      "cluster_eigenvalue_min": 0.834357433397028,
+      "cluster_graph_frequency_centroid": 0.4298505814744323,
+      "cluster_intrinsic_interaction_g": 0.03208176949615947,
+      "cluster_mean_adjacent_temporal_similarity": -0.2766060033870871,
+      "cluster_peak_energy_hour": 2,
+      "cluster_peak_hour_energy_fraction": 0.3285251905293715,
+      "cluster_temporal_frequency_centroid": 4.922415659659133,
+      "cluster_total_g": 0.015410161947685713,
+      "modes": "39;40",
+      "near_degenerate_cluster": "lt_014"
+    }
+  ],
+  "interaction_comparator": "advected separable covariance at the truth parameters",
+  "interaction_eigenproblem": {
+    "matrix_kl": 4.810249739753203,
+    "max_null_orthonormality_error": 9.103828801926284e-15,
+    "max_relative_residual": 2.4262903222796512e-15,
+    "spectral_kl": 4.8102497397531865
+  },
+  "interpretation_boundary": "Oracle, covariance-only exploration under known simulation truth.  Candidate flags organize subsequent model reduction and are not a finalized test.",
+  "maximum_decomposition_absolute_error": 0.0,
+  "pilot_dir": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_five_day_092226",
+  "response_usage": {
+    "direction_reconstruction_and_annotations_are_covariance_only": true,
+    "heldout_responses_used": false,
+    "response_columns_read": false
+  },
+  "script": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/explore_eigen_directions.py",
+  "space_time_heatmap_anchor_order": "weighted k-nearest-neighbor graph Fiedler ordering",
+  "space_time_heatmap_graph_neighbors": 6,
+  "space_time_spectrum_semantics": "Temporal-DCT by normalized-graph-Laplacian Fourier decomposition of Euclidean cluster filter-weight energy; not covariance variance or KL",
+  "time_count": 8,
+  "truth": {
+    "advec_lat": 0.08,
+    "advec_lon": -0.2,
+    "nugget": 0.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "variance": 10.0
+  },
+  "whitened_interaction_compensation_frobenius_cosine": -0.8559658973449018
+}

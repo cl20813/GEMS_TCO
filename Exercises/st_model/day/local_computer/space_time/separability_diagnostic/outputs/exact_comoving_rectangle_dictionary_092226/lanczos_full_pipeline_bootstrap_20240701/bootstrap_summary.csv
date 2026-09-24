@@ -1,0 +1,2 @@
+dgp,replicate_count,observed_statistic,bootstrap_mean,bootstrap_sd,bootstrap_q025,bootstrap_q50,bootstrap_q975,lower_tail_p_value,upper_tail_p_value
+joint,1,0.9377958412883356,1.0229354219862838,,1.0229354219862838,1.0229354219862838,1.0229354219862838,0.5,1

@@ -1,0 +1,9 @@
+atom,observation_index,time_index,anchor_index,standardized_moving_latitude,standardized_moving_longitude,coefficient
+Q_A,0,0,0,-2,-2,1
+Q_A,24,0,24,2,2,-1
+Q_A,25,1,0,-2,-2,-1
+Q_A,49,1,24,2,2,1
+Q_B,5,0,5,-1,-2,1
+Q_B,19,0,19,1,2,-1
+Q_B,30,1,5,-1,-2,-1
+Q_B,44,1,19,1,2,1

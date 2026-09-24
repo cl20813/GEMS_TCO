@@ -9,12 +9,8 @@ later made data-dependent.
 
 The default dense design is a flow-aligned tube: 100 spatial anchors are
 chosen by a deterministic max-min rule from cells observed at the
-corresponding advected locations in all five days.  The optional
-``balanced_pairs`` design keeps the same 100 x 8 dimension but arranges the
-anchors as 50 local trajectory pairs whose centres are max-min distributed.
-Those pairs support explicit moving-rectangle double differences targeted at
-the square-root interaction.  Days remain independent; they are never
-concatenated as a continuous 40-hour process.
+corresponding advected locations in all five days.  Days remain independent;
+they are never concatenated as a continuous 40-hour process.
 """
 
 from __future__ import annotations
@@ -53,11 +49,6 @@ from diagnostic_core import (
     pairwise_lags,
     solve_generalized_eigenproblem,
     standardize_directions_for_design,
-)
-from balanced_pair_design import (
-    AnchorPairMetadata,
-    build_moving_rectangle_contrast_matrix,
-    select_balanced_anchor_pairs,
 )
 
 
@@ -131,20 +122,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--spatial-anchors", type=int, default=100)
-    parser.add_argument(
-        "--anchor-design",
-        choices=("maxmin_tubes", "balanced_pairs"),
-        default="maxmin_tubes",
-        help="spatial subset design; balanced_pairs requires an even anchor count",
-    )
-    parser.add_argument(
-        "--pair-offset",
-        type=int,
-        nargs=2,
-        metavar=("ROW", "COLUMN"),
-        default=(2, 2),
-        help="grid offset between endpoints under --anchor-design balanced_pairs",
-    )
     parser.add_argument("--hours", type=int, default=8, choices=[8])
     parser.add_argument("--train-days", type=int, default=3)
     parser.add_argument("--top-modes", type=int, default=12)
@@ -695,19 +672,9 @@ def write_results_markdown(
     evaluation_dates: list[str],
     n_observations: int,
     design_description: str,
-    rectangle_manifest: dict[str, Any] | None,
 ) -> None:
     fitted = null_fit.parameters
     boundary = ", ".join(null_fit.boundary_parameters) or "none"
-    rectangle_section = ""
-    if rectangle_manifest is not None:
-        rectangle_section = (
-            "## Moving-rectangle subspace\n\n"
-            f"The {rectangle_manifest['contrast_count']} adjacent-time double differences "
-            f"retain `{rectangle_manifest['matrix_kl']:.8g}` KL, or "
-            f"`{rectangle_manifest['fraction_of_full_design_kl']:.3%}` of the "
-            "full-design KL.\n"
-        )
     text = f"""# Nugget-zero advected-separable diagnostic: pilot result
 
 ## Design
@@ -739,8 +706,6 @@ sum g(lambda)=KL differs by
 - Max-projection oracle power at alpha=0.05: `{bootstrap['max_squared']['oracle_power']:.6g}`
 - Top-subspace LLR bootstrap p-value: `{bootstrap['top_subspace_log_likelihood_ratio']['bootstrap_p_value']:.6g}`
 - Top-subspace LLR oracle power at alpha=0.05: `{bootstrap['top_subspace_log_likelihood_ratio']['oracle_power']:.6g}`
-
-{rectangle_section}
 
 These are pilot, alternative-specific results for this fixed spatial design.
 They do not establish final power for the full GEMS domain.  A
@@ -781,46 +746,14 @@ def main() -> None:
         advec_lon=truth.advec_lon,
     )
     candidates = common_flow_anchor_candidates(valid, shifts)
-    pair_metadata: AnchorPairMetadata | None = None
-    if args.anchor_design == "balanced_pairs":
-        if int(args.spatial_anchors) % 2 != 0:
-            raise ValueError("balanced_pairs requires an even number of spatial anchors")
-        anchors, pair_metadata = select_balanced_anchor_pairs(
-            candidates,
-            latitude,
-            longitude,
-            pair_count=int(args.spatial_anchors) // 2,
-            offset=tuple(int(value) for value in args.pair_offset),
-            range_lat=truth.range_lat,
-            range_lon=truth.range_lon,
-        )
-        insertion_separation = pair_metadata.insertion_separation
-        pair_rows = []
-        for pair_index, endpoints in enumerate(pair_metadata.endpoints):
-            pair_rows.append(
-                {
-                    "pair": pair_index + 1,
-                    "endpoint0_row": endpoints[0, 0],
-                    "endpoint0_column": endpoints[0, 1],
-                    "endpoint1_row": endpoints[1, 0],
-                    "endpoint1_column": endpoints[1, 1],
-                    "center_grid_row": pair_metadata.grid_centers[pair_index, 0],
-                    "center_grid_column": pair_metadata.grid_centers[pair_index, 1],
-                    "center_latitude": pair_metadata.physical_centers[pair_index, 0],
-                    "center_longitude": pair_metadata.physical_centers[pair_index, 1],
-                    "insertion_separation_scaled": pair_metadata.insertion_separation[pair_index],
-                }
-            )
-        atomic_csv(output_dir / "selected_anchor_pairs.csv", pd.DataFrame(pair_rows))
-    else:
-        anchors, insertion_separation = deterministic_maxmin(
-            candidates,
-            latitude,
-            longitude,
-            count=int(args.spatial_anchors),
-            range_lat=truth.range_lat,
-            range_lon=truth.range_lon,
-        )
+    anchors, insertion_separation = deterministic_maxmin(
+        candidates,
+        latitude,
+        longitude,
+        count=int(args.spatial_anchors),
+        range_lat=truth.range_lat,
+        range_lon=truth.range_lon,
+    )
     designs = [build_day_design(asset, anchors, shifts, latitude.shape) for asset in assets]
     atomic_csv(
         output_dir / "selected_flow_tube_points.csv",
@@ -924,68 +857,6 @@ def main() -> None:
     )
     atomic_csv(output_dir / "generalized_eigenvalues.csv", eigen_frame)
 
-    rectangle_manifest: dict[str, Any] | None = None
-    if pair_metadata is not None:
-        rectangle_operator = build_moving_rectangle_contrast_matrix(
-            pair_metadata.pair_count,
-            time_count=int(args.hours),
-        ).toarray()
-        rectangle_true = rectangle_operator @ reference_true @ rectangle_operator.T
-        rectangle_null = rectangle_operator @ reference_null @ rectangle_operator.T
-        rectangle_eigen = solve_generalized_eigenproblem(rectangle_true, rectangle_null)
-        rectangle_dimension = rectangle_operator.shape[0]
-        rectangle_frame = pd.DataFrame(
-            {
-                "rank_by_g": np.arange(1, rectangle_dimension + 1),
-                "eigenvalue": rectangle_eigen.eigenvalues,
-                "log2_eigenvalue": np.log2(rectangle_eigen.eigenvalues),
-                "g_score": rectangle_eigen.scores,
-                "cumulative_g": np.cumsum(rectangle_eigen.scores),
-                "cumulative_g_fraction": np.cumsum(rectangle_eigen.scores)
-                / rectangle_eigen.scores.sum(),
-                "variance_direction": np.where(
-                    rectangle_eigen.eigenvalues >= 1.0,
-                    "true_gt_null",
-                    "true_lt_null",
-                ),
-            }
-        )
-        atomic_csv(output_dir / "rectangle_generalized_eigenvalues.csv", rectangle_frame)
-
-        rectangle_null_variance = np.diag(rectangle_null)
-        rectangle_true_variance = np.diag(rectangle_true)
-        rectangle_ratio = rectangle_true_variance / rectangle_null_variance
-        rectangle_rows = []
-        for time_index in range(int(args.hours) - 1):
-            for pair_index in range(pair_metadata.pair_count):
-                row_index = time_index * pair_metadata.pair_count + pair_index
-                rectangle_rows.append(
-                    {
-                        "pair": pair_index + 1,
-                        "time_start": time_index,
-                        "time_end": time_index + 1,
-                        "null_variance": rectangle_null_variance[row_index],
-                        "true_variance": rectangle_true_variance[row_index],
-                        "variance_ratio": rectangle_ratio[row_index],
-                        "g_score": 0.5
-                        * (rectangle_ratio[row_index] - 1.0 - np.log(rectangle_ratio[row_index])),
-                    }
-                )
-        atomic_csv(output_dir / "moving_rectangle_contrasts.csv", pd.DataFrame(rectangle_rows))
-        rectangle_manifest = {
-            "definition": "Z(A,t)-Z(B,t)-Z(A,t+1)+Z(B,t+1)",
-            "pair_count": pair_metadata.pair_count,
-            "adjacent_time_intervals": int(args.hours) - 1,
-            "contrast_count": rectangle_dimension,
-            "matrix_kl": rectangle_eigen.matrix_kl,
-            "fraction_of_full_design_kl": rectangle_eigen.matrix_kl / eigen.matrix_kl,
-            "max_generalized_eigenvalue": float(rectangle_eigen.eigenvalues.max()),
-            "min_generalized_eigenvalue": float(rectangle_eigen.eigenvalues.min()),
-            "max_g_score": float(rectangle_eigen.scores.max()),
-            "max_generalized_eigen_relative_residual": (rectangle_eigen.max_relative_residual),
-            "max_null_orthonormality_error": (rectangle_eigen.max_null_orthonormality_error),
-        }
-
     top_modes = min(int(args.top_modes), dimension)
     selected_directions = eigen.eigenvectors[:, :top_modes]
     reference_points = designs[train_indices[0]].point_table.copy()
@@ -1084,27 +955,13 @@ def main() -> None:
             "responses_used_for_null_fit_or_direction_selection": False,
         },
         "subset": {
-            "method": (
-                "truth-flow-aligned common-valid tubes plus deterministic anisotropic max-min"
-                if pair_metadata is None
-                else "max-min distributed local paired flow tubes for moving rectangles"
-            ),
-            "anchor_design": args.anchor_design,
+            "method": "truth-flow-aligned common-valid tubes plus deterministic anisotropic max-min",
             "candidate_anchor_count": int(len(candidates)),
             "selected_spatial_anchors": int(len(anchors)),
             "hours": int(args.hours),
             "dimension_per_day": int(dimension),
             "grid_shifts_by_local_hour": shifts,
             "last_maxmin_insertion_separation_scaled": float(insertion_separation[-1]),
-            "paired_trajectory_design": (
-                None
-                if pair_metadata is None
-                else {
-                    "pair_count": pair_metadata.pair_count,
-                    "grid_offset": pair_metadata.offset,
-                    "nonoverlapping_endpoints": True,
-                }
-            ),
         },
         "truth": truth,
         "null": {
@@ -1129,7 +986,6 @@ def main() -> None:
             "true_variance_greater_than_null": int(np.sum(eigen.eigenvalues[:top_modes] > 1.0)),
             "true_variance_less_than_null": int(np.sum(eigen.eigenvalues[:top_modes] < 1.0)),
         },
-        "moving_rectangle_diagnostic": rectangle_manifest,
         "bootstrap": bootstrap,
         "figures": [str(path.resolve()) for path in figure_paths],
         "total_seconds": elapsed,
@@ -1149,7 +1005,6 @@ def main() -> None:
         evaluation_dates=manifest["split"]["heldout_dates"],
         n_observations=dimension,
         design_description=manifest["subset"]["method"],
-        rectangle_manifest=rectangle_manifest,
     )
     print(
         json.dumps(

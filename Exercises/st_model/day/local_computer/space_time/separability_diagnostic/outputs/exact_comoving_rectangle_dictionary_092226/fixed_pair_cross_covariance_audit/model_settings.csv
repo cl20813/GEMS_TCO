@@ -1,0 +1,4 @@
+model,covariance_family,variance,range_lat,range_lon,range_time,advec_lat,advec_lon,nugget,numerical_jitter_ratio,source
+1,joint_matern_half,10,0.20000000000000001,0.29999999999999999,2,0.080000000000000002,-0.20000000000000001,0,1e-10,experiment_manifest.json: truth
+M,advected_separable,10,0.20000000000000001,0.29999999999999999,2,0.080000000000000002,-0.20000000000000001,0,1e-10,experiment_manifest.json: matched_margin
+0,advected_separable,8.9624969604739437,0.13229505989419363,0.19844260405396283,1.5561520090880183,0.080000000000000002,-0.20000000000000001,0,1e-10,experiment_manifest.json: fitted_null_fixed_advection

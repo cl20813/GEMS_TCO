@@ -1,0 +1,2 @@
+dgp,grid_lat,grid_lon,grid_time,vector_size,convolution_lat,convolution_lon,convolution_time,operator_build_seconds,symmetry_relative_error,left_quadratic_form,right_quadratic_form,max_abs_fixed_contrast_variance_error
+joint,237,325,8,616200,480,660,15,0.10602637499687262,1.4742539031328695e-14,13315051.99419168,14951757.200054914,9.5479180117763462e-15

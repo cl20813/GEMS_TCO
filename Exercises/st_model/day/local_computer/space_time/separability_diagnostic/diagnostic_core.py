@@ -748,6 +748,7 @@ __all__ = [
     "NullFitResult",
     "advected_separable_correlation",
     "advected_separable_covariance",
+    "balanced_fixed_radius_gaps",
     "block_diagonal_covariance",
     "covariance_from_correlation",
     "covariance_log_likelihood_ratio",
@@ -758,6 +759,10 @@ __all__ = [
     "joint_matern_half_covariance",
     "pairwise_lags",
     "profiled_null_objective",
+    "same_margin_exponential_correlation_gap",
+    "same_margin_exponential_log_gap",
     "solve_generalized_eigenproblem",
+    "squared_exponential_correlation_from_norms",
+    "standardized_moving_lag_norms",
     "standardize_directions_for_design",
 ]

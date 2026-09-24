@@ -1,0 +1,2 @@
+truth_variance,truth_temporal_scale_tau,r_star,fitted_null_variance,axis_symmetrized_range_lat,axis_symmetrized_range_lon,null_spatial_decay_in_truth_standardized_coordinates,null_one_step_temporal_decay,numerical_jitter_ratio,coordinate_interpretation
+10,0.5,0.5449550561239036,8.9624969604739437,0.13229506463175103,0.1984425969476265,1.5117721931404513,0.64261074378334626,1e-10,truth-range-standardized moving coordinates

@@ -1,0 +1,14 @@
+quantity,value
+deltaH_AB_short,-4.151669408133122
+deltaH_AB_far,0.09940895009819245
+deltaH_AB_sum,-4.0522604580349295
+deltaH_AB_direct,-4.0522604580349322
+N,-0.19027520927526695
+V0,1.0000000000000002
+N_over_V0,-0.19027520927526689
+saved_objective,-0.19027520927526689
+deltaK_0_0,-2.6645352591003757e-15
+max_H_reconstruction_error,7.1054273576010019e-15
+max_stationarity_span,3.5527136788005009e-15
+max_even_symmetry_error,0
+max_normalization_error,2.2204460492503131e-16

@@ -1,0 +1,11 @@
+quantity,value
+r_star,0.5449550561239036
+k_delta_at_r_star,-2.5121509291131505
+negative_eigenvalue_threshold_s,0.80868143772583934
+selected_mean_half_length_s,2.5322475511229898
+path_lambda_at_selected_s,-0.19744836129925317
+discrete_selected_symmetric_H0_lambda,-0.19027520739344536
+asymptotic_lambda,-0.20547098472406419
+path_fraction_of_asymptotic_magnitude_at_selected_s,0.96095495704376488
+path_magnitude_improvement_over_discrete_at_selected_s,0.037698836354309595
+analytic_vs_saved_discrete_absolute_error,3.3306690738754696e-16

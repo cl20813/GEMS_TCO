@@ -1,0 +1,331 @@
+{
+  "analysis": "negative_two_rectangle_decomposition",
+  "basis_invariant_constrained_relative_residual": 1.40634777275552e-16,
+  "command": [
+    "/opt/anaconda3/envs/gems_gpu/bin/python",
+    "Exercises/st_model/day/local_computer/space_time/separability_diagnostic/analyze_negative_two_rectangle.py"
+  ],
+  "d12_squared_exceeds_d11_d22": true,
+  "direct_reduced_residual_norm": 1.9279638981753172e-16,
+  "filter_matrix_rank": 2,
+  "filter_reconstruction_relative_error": 0.0,
+  "filter_singular_values": [
+    0.25511267021855677,
+    0.2534715764089729,
+    1.309511923513359e-17,
+    3.760746721461008e-18,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "first_step_tie_count": 2,
+  "full_space_relative_residual_not_constrained_target": 0.6064282279289547,
+  "generalized_eigenvalues": [
+    -0.09932788211660894,
+    0.08543768110878026
+  ],
+  "git": {
+    "available": true,
+    "commit": "38acb76611bd44da37ede95762b7abbadd871eb1",
+    "tracked_changes": [
+      " M Exercises/st_model/day/local_computer/space_time/separability_diagnostic/README.md",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/analyze_balanced_mixed_lags.py",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/balanced_pair_design.py",
+      " M Exercises/st_model/day/local_computer/space_time/separability_diagnostic/diagnostic_core.py",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/RESULTS.md",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/bootstrap_summary.json",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/day_kl_comparison.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/figures/correlation_slice_comparison.png",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/figures/generalized_eigen_spectrum.png",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/figures/heldout_bootstrap_calibration.png",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/figures/top_direction_patterns.png",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/generalized_eigenvalues.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/heldout_projection_scores.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/mode_count_path/mode_count_path.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/mode_count_path/mode_count_path.png",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/mode_count_path/mode_count_path_summary.json",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/moving_rectangle_contrasts.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/null_fit_attempts.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/rectangle_generalized_eigenvalues.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/run_manifest.json",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/selected_anchor_pairs.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/selected_directions_long.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226/selected_flow_tube_points.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_five_day_092226/balanced_mixed_lag_audit/analytic_gap_vs_pair_occupancy.png",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_five_day_092226/balanced_mixed_lag_audit/pair_occupancy_by_bin.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_five_day_092226/balanced_mixed_lag_audit/per_day_summary.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_five_day_092226/balanced_mixed_lag_audit/structural_audit_summary.json",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_five_day_092226/balanced_mixed_lag_audit/summary_metrics.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/RESULTS.md",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/bootstrap_summary.json",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/day_kl_comparison.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/figures/correlation_slice_comparison.png",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/figures/generalized_eigen_spectrum.png",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/figures/heldout_bootstrap_calibration.png",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/figures/top_direction_patterns.png",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/generalized_eigenvalues.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/heldout_projection_scores.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/moving_rectangle_contrasts.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/null_fit_attempts.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/rectangle_generalized_eigenvalues.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/run_manifest.json",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/selected_anchor_pairs.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/selected_directions_long.csv",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_local_rectangles_lon1_092226/selected_flow_tube_points.csv",
+      " M Exercises/st_model/day/local_computer/space_time/separability_diagnostic/run_nugget0_five_day.py",
+      " D Exercises/st_model/day/local_computer/space_time/separability_diagnostic/tests/test_balanced_pair_design.py",
+      "?? Exercises/st_model/day/local_computer/space_time/separability_diagnostic/analyze_mixed_lag_geometry.py",
+      "?? Exercises/st_model/day/local_computer/space_time/separability_diagnostic/analyze_negative_two_rectangle.py",
+      "?? Exercises/st_model/day/local_computer/space_time/separability_diagnostic/explore_eigen_directions.py",
+      "?? Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/exact_comoving_rectangle_dictionary_092226/",
+      "?? Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_five_day_092226/eigen_direction_atlas/",
+      "?? Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_five_day_092226/mixed_lag_geometry_audit/",
+      "?? Exercises/st_model/day/local_computer/space_time/separability_diagnostic/rectangle_dictionary_core.py",
+      "?? Exercises/st_model/day/local_computer/space_time/separability_diagnostic/rectangle_dictionary_exact_grid.toml",
+      "?? Exercises/st_model/day/local_computer/space_time/separability_diagnostic/run_rectangle_dictionary_oracle.py",
+      "?? Exercises/st_model/day/local_computer/space_time/separability_diagnostic/tests/test_eigen_direction_atlas.py",
+      "?? Exercises/st_model/day/local_computer/space_time/separability_diagnostic/tests/test_negative_two_rectangle.py",
+      "?? Exercises/st_model/day/local_computer/space_time/separability_diagnostic/tests/test_rectangle_dictionary.py",
+      "?? career_materials/build_jain_global_macro_resume.py",
+      "?? career_materials/jain_global_macro/"
+    ],
+    "tracked_worktree_dirty": true
+  },
+  "inputs": [
+    {
+      "bytes": 26827,
+      "path": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/exact_comoving_rectangle_dictionary_092226/experiment_manifest.json",
+      "sha256": "5281218a728e8b941636139dc72dce64c0f89e8ae7760583e0aadaa62fe190e2"
+    },
+    {
+      "bytes": 1790,
+      "path": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/exact_comoving_rectangle_dictionary_092226/greedy_path.csv",
+      "sha256": "ac7839c6a86aece06a4f0ae925547051f82867b069d6755829376c7e6d4dda01"
+    },
+    {
+      "bytes": 864268,
+      "path": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/exact_comoving_rectangle_dictionary_092226/rectangle_dictionary_metadata.csv",
+      "sha256": "f10db3b933a987a25027de35dbd623290891e50a6f0667f8758d6c89c984f713"
+    },
+    {
+      "bytes": 6440,
+      "path": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/exact_comoving_rectangle_dictionary_092226/exact_comoving_points.csv",
+      "sha256": "da8b7ce436320cab309ecf97053fe1b457860b93482f0b2a57d1166c3674d30e"
+    }
+  ],
+  "intrinsic_attribution_sum": -0.09932788211660898,
+  "intrinsic_matrix_determinant": -0.008375935092689168,
+  "maximum_rectangle_structure_error": 0.0,
+  "null_variance_error": 2.220446049250313e-16,
+  "numerical_jitter_ratio": 1e-10,
+  "oracle_directory": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/exact_comoving_rectangle_dictionary_092226",
+  "output_directory": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/exact_comoving_rectangle_dictionary_092226/negative_two_rectangle_decomposition",
+  "output_files": [
+    {
+      "bytes": 5304,
+      "path": "REPORT.md",
+      "sha256": "ee041d27dca9db81d1ae934fec9fe47b225753c94e7179d04a5d942c756f0581"
+    },
+    {
+      "bytes": 78310,
+      "path": "figures/intrinsic_pair_contribution_heatmap.png",
+      "sha256": "5a98b40807c05e6fa8610ccaf77778cdb6714ea5beb2ff16391f60aa46710b57"
+    },
+    {
+      "bytes": 61769,
+      "path": "figures/intrinsic_time_lag_attribution.png",
+      "sha256": "fc0fcce09bf4a0be3c5d33f9cdccfc8a07d87d5738b1a4dbd0893ca12d137d51"
+    },
+    {
+      "bytes": 75464,
+      "path": "figures/negative_two_filter_heatmap.png",
+      "sha256": "2a77af76f1d2dbe113594fa26785b508de3b06650aaf38739a77ca47d65309f3"
+    },
+    {
+      "bytes": 84145,
+      "path": "figures/quadratic_term_decomposition.png",
+      "sha256": "9cfbc1f788293da54fc72038efb94b503c2e627884ca0633b0ca92fc03e32b6b"
+    },
+    {
+      "bytes": 80643,
+      "path": "figures/two_rectangle_matrices.png",
+      "sha256": "ad0ecd4d62384ccc05fe831e5085e581ae52c699a8a3e72b614ee02e7e23271f"
+    },
+    {
+      "bytes": 9524,
+      "path": "final_filter_weights.csv",
+      "sha256": "0b8dac0979eabc4e2384bb63cac9a3b5757698201f8f3fc404bb4e6d1d88846f"
+    },
+    {
+      "bytes": 136,
+      "path": "fitted_null_matrix_raw.csv",
+      "sha256": "9aaf326907e3f9495423ec01bf2214b2140cd458f05c955067d7c22768a320d4"
+    },
+    {
+      "bytes": 115,
+      "path": "fitted_null_matrix_standardized.csv",
+      "sha256": "1c3336e959dfc185ce9b8b4ee287d49ea3ea8fc3817cbe2c44f3ea0b5d8cbe1e"
+    },
+    {
+      "bytes": 140,
+      "path": "intrinsic_difference_matrix_raw.csv",
+      "sha256": "2347a894d17a9ac8e177b7127eb5e0bb31028c5aec572d2fb53d069d51e3ae08"
+    },
+    {
+      "bytes": 145,
+      "path": "intrinsic_difference_matrix_standardized.csv",
+      "sha256": "245f0f362ea52eb4d2822ae1a9a68a0c4bda54e73f27bb607a62431a059f9181"
+    },
+    {
+      "bytes": 3015,
+      "path": "intrinsic_pair_contributions.csv",
+      "sha256": "d53ea9df64fb983c87c91e6c3b23244bdc57415e462e940cc691f6d405e1e902"
+    },
+    {
+      "bytes": 292,
+      "path": "intrinsic_space_time_lag_attribution.csv",
+      "sha256": "939e1f362d1242177c5f3fe5946e5614aa6e5e04f3b47da9251dc0d8252a47f0"
+    },
+    {
+      "bytes": 215,
+      "path": "intrinsic_time_lag_attribution.csv",
+      "sha256": "ee3fbc97722e3628a836cec23f18561b30a13fbbebef9e83e781007a63f9bae1"
+    },
+    {
+      "bytes": 136,
+      "path": "matched_margin_matrix_raw.csv",
+      "sha256": "1b10e3814e9f1ef9f004a04e2169b0104b3d43e191a752a9d1b50a8ceebac95e"
+    },
+    {
+      "bytes": 139,
+      "path": "matched_margin_matrix_standardized.csv",
+      "sha256": "36da6da185231ad0e134bf15226d58ade077b6efda8a123883154fa60557fd7a"
+    },
+    {
+      "bytes": 842,
+      "path": "nonzero_final_filter_weights.csv",
+      "sha256": "e561ef2715cd48c9535dadfbb0a4dc9bfdbdc0b51cae153be609d21a56d9f417"
+    },
+    {
+      "bytes": 1121,
+      "path": "quadratic_term_decomposition.csv",
+      "sha256": "28e6aa685a241df19b0ce1ed3ab6044905106ca643c411c26d7f0178e39c1e25"
+    },
+    {
+      "bytes": 830,
+      "path": "rectangle_observation_terms.csv",
+      "sha256": "0c2ea69217e1cde56f44dc5c7257e3437d4e34ffabe273d00d474a759e154149"
+    },
+    {
+      "bytes": 761,
+      "path": "rectangle_summary.csv",
+      "sha256": "3855e4bb67ba017fa391113b2aae20d007d4a086691de84f28c48fbbaf02054d"
+    },
+    {
+      "bytes": 3367,
+      "path": "total_pair_contributions.csv",
+      "sha256": "c110c4ea70362ddcd49e9c707159ac345fce7bb3b74054513f69a920843dcf55"
+    },
+    {
+      "bytes": 347,
+      "path": "total_space_time_lag_attribution.csv",
+      "sha256": "44fb068f438f3932f72a2d421caeb5b0fd1d26b8d454a32f54a64c9d717d1a1e"
+    },
+    {
+      "bytes": 235,
+      "path": "total_time_lag_attribution.csv",
+      "sha256": "65f2c6e040461b7969fd16dc105df3009c8df3820dab3e3c661e9525a2f370b9"
+    },
+    {
+      "bytes": 136,
+      "path": "truth_matrix_raw.csv",
+      "sha256": "70c6952ac556b02c5370796ca687d4d77e4682292a6e1f27dbf6bd9747816e4b"
+    },
+    {
+      "bytes": 137,
+      "path": "truth_matrix_standardized.csv",
+      "sha256": "52851d29573c529e7dae0933591e80ce57d97230270e6d4b48b408fb359a472c"
+    }
+  ],
+  "population_covariance_analysis_not_test": true,
+  "rank_one_frobenius_energy_fraction": 0.5032267549246872,
+  "raw_rectangle_coefficients": [
+    0.12755633510927838,
+    -0.12673578820448644
+  ],
+  "response_columns_read": false,
+  "runtime_environment": {
+    "numpy_blas_configuration": "Build Dependencies:\n  blas:\n    detection method: pkgconfig\n    found: true\n    include directory: /opt/anaconda3/envs/gems_gpu/include\n    lib directory: /opt/anaconda3/envs/gems_gpu/lib\n    name: openblas\n    openblas configuration: USE_64BITINT=0 DYNAMIC_ARCH=1 DYNAMIC_OLDER= NO_CBLAS=\n      NO_LAPACK=0 NO_LAPACKE= NO_AFFINITY=1 USE_OPENMP=0 VORTEX MAX_THREADS=128\n    pc file directory: /opt/anaconda3/envs/gems_gpu/lib/pkgconfig\n    version: 0.3.29\n  lapack:\n    detection method: internal\n    found: true\n    include directory: unknown\n    lib directory: unknown\n    name: dep4341691984\n    openblas configuration: unknown\n    pc file directory: unknown\n    version: 1.26.4\nCompilers:\n  c:\n    args: -ftree-vectorize, -fPIC, -fPIE, -fstack-protector-strong, -O2, -pipe, -isystem,\n      /opt/anaconda3/envs/gems_gpu/include, -fdebug-prefix-map=/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_feerxblx2i/croot/numpy_and_numpy_base_1755590858426/work=/usr/local/src/conda/numpy-base-1.26.4,\n      -fdebug-prefix-map=/opt/anaconda3/envs/gems_gpu=/usr/local/src/conda-prefix,\n      -D_FORTIFY_SOURCE=2, -isystem, /opt/anaconda3/envs/gems_gpu/include, -mmacosx-version-min=11.1\n    commands: arm64-apple-darwin20.0.0-clang\n    linker: ld64\n    linker args: -Wl,-pie, -Wl,-headerpad_max_install_names, -Wl,-dead_strip_dylibs,\n      -Wl,-rpath,/opt/anaconda3/envs/gems_gpu/lib, -L/opt/anaconda3/envs/gems_gpu/lib,\n      -ftree-vectorize, -fPIC, -fPIE, -fstack-protector-strong, -O2, -pipe, -isystem,\n      /opt/anaconda3/envs/gems_gpu/include, -fdebug-prefix-map=/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_feerxblx2i/croot/numpy_and_numpy_base_1755590858426/work=/usr/local/src/conda/numpy-base-1.26.4,\n      -fdebug-prefix-map=/opt/anaconda3/envs/gems_gpu=/usr/local/src/conda-prefix,\n      -D_FORTIFY_SOURCE=2, -isystem, /opt/anaconda3/envs/gems_gpu/include, -mmacosx-version-min=11.1\n    name: clang\n    version: 14.0.6\n  c++:\n    args: -ftree-vectorize, -fPIC, -fPIE, -fstack-protector-strong, -O2, -pipe, -stdlib=libc++,\n      -fvisibility-inlines-hidden, -fmessage-length=0, -isystem, /opt/anaconda3/envs/gems_gpu/include,\n      -fdebug-prefix-map=/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_feerxblx2i/croot/numpy_and_numpy_base_1755590858426/work=/usr/local/src/conda/numpy-base-1.26.4,\n      -fdebug-prefix-map=/opt/anaconda3/envs/gems_gpu=/usr/local/src/conda-prefix,\n      -D_FORTIFY_SOURCE=2, -isystem, /opt/anaconda3/envs/gems_gpu/include, -mmacosx-version-min=11.1\n    commands: arm64-apple-darwin20.0.0-clang++\n    linker: ld64\n    linker args: -Wl,-pie, -Wl,-headerpad_max_install_names, -Wl,-dead_strip_dylibs,\n      -Wl,-rpath,/opt/anaconda3/envs/gems_gpu/lib, -L/opt/anaconda3/envs/gems_gpu/lib,\n      -ftree-vectorize, -fPIC, -fPIE, -fstack-protector-strong, -O2, -pipe, -stdlib=libc++,\n      -fvisibility-inlines-hidden, -fmessage-length=0, -isystem, /opt/anaconda3/envs/gems_gpu/include,\n      -fdebug-prefix-map=/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_feerxblx2i/croot/numpy_and_numpy_base_1755590858426/work=/usr/local/src/conda/numpy-base-1.26.4,\n      -fdebug-prefix-map=/opt/anaconda3/envs/gems_gpu=/usr/local/src/conda-prefix,\n      -D_FORTIFY_SOURCE=2, -isystem, /opt/anaconda3/envs/gems_gpu/include, -mmacosx-version-min=11.1\n    name: clang\n    version: 14.0.6\n  cython:\n    commands: cython\n    linker: cython\n    name: cython\n    version: 3.0.12\nMachine Information:\n  build:\n    cpu: aarch64\n    endian: little\n    family: aarch64\n    system: darwin\n  host:\n    cpu: aarch64\n    endian: little\n    family: aarch64\n    system: darwin\nPython Information:\n  path: /opt/anaconda3/envs/gems_gpu/bin/python\n  version: '3.12'\nSIMD Extensions:\n  baseline:\n  - NEON\n  - NEON_FP16\n  - NEON_VFPV4\n  - ASIMD\n  found:\n  - ASIMDHP\n  not found:\n  - ASIMDFHM",
+    "packages": {
+      "matplotlib": "3.10.6",
+      "numpy": "1.26.4",
+      "pandas": "2.3.3",
+      "scipy": "1.16.3"
+    },
+    "platform": "macOS-27.0-arm64-arm-64bit",
+    "python": "3.12.12 | packaged by Anaconda, Inc. | (main, Oct 21 2025, 20:07:49) [Clang 20.1.8 ]",
+    "python_executable": "/opt/anaconda3/envs/gems_gpu/bin/python",
+    "thread_environment": {
+      "MKL_NUM_THREADS": null,
+      "NUMEXPR_NUM_THREADS": null,
+      "OMP_NUM_THREADS": "1",
+      "OPENBLAS_NUM_THREADS": "1",
+      "VECLIB_MAXIMUM_THREADS": null
+    }
+  },
+  "selected_rectangle_ids": [
+    "s000_024_t00_07",
+    "s001_023_t01_06"
+  ],
+  "selected_rectangle_indices": [
+    650,
+    1271
+  ],
+  "selection_scope": "second rectangle is greedy-optimal conditional on the lexicographically selected first-step tie representative; not an exhaustive pair optimum",
+  "source_files": [
+    {
+      "bytes": 43583,
+      "path": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/analyze_negative_two_rectangle.py",
+      "sha256": "25cd753c357ba66c731defa5e0fa3ee0e1c73f372e220f032ff179dfbea8de37"
+    },
+    {
+      "bytes": 27845,
+      "path": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/rectangle_dictionary_core.py",
+      "sha256": "2e579e1e9c3f55f8e0e2e18f0b1ae201ec304006f9659525b8e7ab520c1c8159"
+    },
+    {
+      "bytes": 27377,
+      "path": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/diagnostic_core.py",
+      "sha256": "421ddcb4754664703b3fdb5b777901a8cbb322c7d5f83ee55754b789edfecf88"
+    },
+    {
+      "bytes": 69417,
+      "path": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/run_rectangle_dictionary_oracle.py",
+      "sha256": "8b1ac4cba5acfeb867a24989ce9b713860c80d097aa6032f672c478e9bd6d6d2"
+    },
+    {
+      "bytes": 22010,
+      "path": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/analyze_mode_count_path.py",
+      "sha256": "d0ad8e48ba733bc8fff4b355d94f62155e4d24bea0d36fee5580de8eccd5e9e8"
+    }
+  ],
+  "standardized_coefficients": [
+    0.7594069857786455,
+    -0.7429761975671926
+  ],
+  "total_attribution_sum": -0.14738758270128527,
+  "variance_metrics": {
+    "delta_compensation": -0.048059700584676124,
+    "delta_intrinsic": -0.09932788211660892,
+    "delta_total": -0.14738758270128505,
+    "g_fitted": 0.006031314008947478,
+    "g_matched": 0.002927349921358728,
+    "interaction_absolute_share": 0.6739230014913794,
+    "rho_fitted": 0.852612417298715,
+    "rho_matched": 0.8956574459788965,
+    "v0": 1.0000000000000002,
+    "v_matched": 0.9519402994153241,
+    "v_true": 0.8526124172987152
+  }
+}

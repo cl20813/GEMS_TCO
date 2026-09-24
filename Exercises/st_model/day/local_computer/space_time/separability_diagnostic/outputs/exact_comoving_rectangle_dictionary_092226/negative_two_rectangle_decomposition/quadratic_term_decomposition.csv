@@ -1,0 +1,17 @@
+matrix,component,formula,value
+truth,alpha1_squared_times_m11,alpha1^2 * M11,0.629738333813
+truth,alpha2_squared_times_m22,alpha2^2 * M22,0.586227746361
+truth,two_alpha1_alpha2_times_m12,2 * alpha1 * alpha2 * M12,-0.363353662876
+truth,total,alpha' * M * alpha,0.852612417299
+matched_margin,alpha1_squared_times_m11,alpha1^2 * M11,0.628966549749
+matched_margin,alpha2_squared_times_m22,alpha2^2 * M22,0.583004019766
+matched_margin,two_alpha1_alpha2_times_m12,2 * alpha1 * alpha2 * M12,-0.260030270099
+matched_margin,total,alpha' * M * alpha,0.951940299415
+fitted_null,alpha1_squared_times_m11,alpha1^2 * M11,0.576698970049
+fitted_null,alpha2_squared_times_m22,alpha2^2 * M22,0.552013630151
+fitted_null,two_alpha1_alpha2_times_m12,2 * alpha1 * alpha2 * M12,-0.128712600201
+fitted_null,total,alpha' * M * alpha,1
+intrinsic_difference,alpha1_squared_times_m11,alpha1^2 * M11,0.000771784064342
+intrinsic_difference,alpha2_squared_times_m22,alpha2^2 * M22,0.00322372659574
+intrinsic_difference,two_alpha1_alpha2_times_m12,2 * alpha1 * alpha2 * M12,-0.103323392777
+intrinsic_difference,total,alpha' * M * alpha,-0.0993278821166

@@ -1,0 +1,3 @@
+total_variance_branch,top_mode_count,top_modes,branch_total_kl,top20_total_kl,median_rank1_energy_fraction,median_space_time_effective_rank,median_temporal_first_difference_roughness,median_dct_high_frequency_fraction,median_effective_spatial_anchors,median_interaction_absolute_share
+true_gt_null,20,1;2;3;4;6;7;9;10;13;14;16;18;21;23;24;25;27;29;34;36,0.716547074758,0.232175625056,0.471854442736,3.68149698429,0.720388914205,0.188502600574,20.3725005653,0.541214855855
+true_lt_null,20,5;8;11;12;15;17;19;20;22;26;28;30;31;32;33;35;37;39;40;43,0.84195741283,0.190568491012,0.725986184908,2.25857594905,3.11776507257,0.969871350133,24.4019351343,0.627903201286

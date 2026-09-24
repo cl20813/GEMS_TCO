@@ -1,0 +1,34 @@
+[experiment]
+name = "exact_comoving_rectangle_dictionary_092226"
+pilot_dir = "outputs/nugget0_five_day_092226"
+output_dir = "outputs/exact_comoving_rectangle_dictionary_092226"
+
+[geometry]
+latitude_count = 5
+longitude_count = 5
+hours = 8
+standardized_latitude_min = -2.0
+standardized_latitude_max = 2.0
+standardized_longitude_min = -2.0
+standardized_longitude_max = 2.0
+
+[null_fit]
+starts = 8
+random_seed = 20260922
+max_iterations = 120
+range_lat_bounds = [0.03, 2.0]
+range_lon_bounds = [0.03, 3.0]
+range_time_bounds = [0.10, 10.0]
+
+[dictionary]
+relative_svd_tolerance = 1.0e-10
+relative_svd_tolerance_sensitivity = [1.0e-12, 1.0e-10, 1.0e-8]
+dependence_tolerance = 1.0e-10
+score_tie_tolerance = 1.0e-12
+max_single_dense_matrix_megabytes = 256
+greedy_sizes = [1, 2, 4, 8]
+
+[monte_carlo]
+replicates = 30000
+batch_size = 3000
+random_seed = 20260923

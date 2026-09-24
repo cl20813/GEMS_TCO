@@ -1,0 +1,5 @@
+mode,eigenvalue,sigma0_metric_retention,maximum_absolute_per_anchor_temporal_sum,maximum_absolute_per_time_spatial_sum,physical_rectangle_interpretation_valid,reason
+13,1.22623778758,0.381023810501,0.121077618916,0.298729136746,False,source-coordinate moving anchors drift within anchor_rank
+14,1.2242488889,0.397843523596,0.16704948676,0.0396685851073,False,source-coordinate moving anchors drift within anchor_rank
+39,0.834357433397,0.748975422855,0.129965282933,0.322917349588,False,source-coordinate moving anchors drift within anchor_rank
+40,0.834767685618,0.80075900802,0.103870065923,0.522744754771,False,source-coordinate moving anchors drift within anchor_rank

@@ -1,0 +1,9 @@
+time_index,anchor_index,latitude_grid_index,longitude_grid_index,moving_latitude,moving_longitude,standardized_moving_latitude,standardized_moving_longitude,source_latitude,source_longitude,rectangle_1_weight_contribution,rectangle_2_weight_contribution,final_weight,is_nonzero
+0,0,0,0,-0.4,-0.6,-2,-2,-0.4,-0.6,0.127556335109,-0,0.127556335109,True
+0,24,4,4,0.4,0.6,2,2,0.4,0.6,-0.127556335109,-0,-0.127556335109,True
+1,1,0,1,-0.4,-0.3,-2,-1,-0.32,-0.5,0,-0.126735788204,-0.126735788204,True
+1,23,4,3,0.4,0.3,2,1,0.48,0.1,0,0.126735788204,0.126735788204,True
+6,1,0,1,-0.4,-0.3,-2,-1,0.08,-1.5,0,0.126735788204,0.126735788204,True
+6,23,4,3,0.4,0.3,2,1,0.88,-0.9,0,-0.126735788204,-0.126735788204,True
+7,0,0,0,-0.4,-0.6,-2,-2,0.16,-2,-0.127556335109,-0,-0.127556335109,True
+7,24,4,4,0.4,0.6,2,2,0.96,-0.8,0.127556335109,-0,0.127556335109,True

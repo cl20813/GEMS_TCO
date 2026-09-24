@@ -1,0 +1,34 @@
+{
+  "data_file": "/Users/joonwonlee/Documents/GEMS_DATA/pickle_2024/tco_grid_24_07.pkl",
+  "fit_csv": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/spectrum_diagnostics/outputs/real_july2024_st_heads_vecchia_lag432_one_day_gc_a075_b1_nugget0_061626/heads_vecchia_lag432_one_day_fit_summary.csv",
+  "coefficient_source": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/exact_comoving_rectangle_dictionary_092226/global_two_rectangle_search/global_pair_ties.csv",
+  "strategy": "standard_432",
+  "day_index": 0,
+  "day": "2024-07-01",
+  "day_keys": [
+    "y24m07day01_hm00:53",
+    "y24m07day01_hm01:53",
+    "y24m07day01_hm02:53",
+    "y24m07day01_hm03:53",
+    "y24m07day01_hm04:48",
+    "y24m07day01_hm05:48",
+    "y24m07day01_hm06:48",
+    "y24m07day01_hm07:48"
+  ],
+  "monthly_mean": 257.9726104252316,
+  "coefficient_first": 0.156629367196063,
+  "coefficient_second": 0.1540219594610364,
+  "fit_parameters": {
+    "est_sigmasq": 23.37727059896818,
+    "est_range_lat": 0.8152988171176069,
+    "est_range_lon": 0.9527144962204038,
+    "est_range_time": 4.833004868387591,
+    "est_advec_lat": -0.0126294742027098,
+    "est_advec_lon": -0.1941944244440873,
+    "est_nugget": 0.0,
+    "gc_alpha": 0.75,
+    "gc_beta": 1.0,
+    "gls_lat_mean": -0.4854640662670135
+  },
+  "interpretation": "descriptive same-day fixed-contrast model check; not a calibrated test"
+}

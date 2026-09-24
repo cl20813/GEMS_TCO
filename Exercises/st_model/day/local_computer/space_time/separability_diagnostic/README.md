@@ -78,9 +78,13 @@ coordinate pattern.  A parametric bootstrap calibrates both the maximum
 squared projection and a top-subspace Gaussian likelihood ratio.
 
 This is an oracle alternative-specific simulation diagnostic.  If a future
-analysis fits both models or selects directions from the same observed
-responses being tested, every fit and selection step must be repeated inside
-each bootstrap draw, or an independent split/cross-fit must be retained.
+analysis estimates a composite null, parameter uncertainty remains even with
+an independent split.  A publication-size calibration must simulate the
+complete training and evaluation experiment and repeat mean, nugget,
+advection, range fitting, diagnostic construction, and every scale/mode rule
+inside each bootstrap replicate.  The generalized directions used here also
+depend on the known joint-Matern simulation alternative and are therefore an
+alternative-specific power diagnostic, not a universal separability test.
 
 ## Run
 
@@ -102,47 +106,97 @@ Useful smoke-test settings are:
   --output-dir /tmp/gems_separability_smoke
 ```
 
-To audit the square-root contrast without refitting or reading any response
-column, run:
+The response-free mixed-lag geometry audit is available separately:
 
 ```bash
 /opt/anaconda3/envs/gems_gpu/bin/python \
-  Exercises/st_model/day/local_computer/space_time/separability_diagnostic/analyze_balanced_mixed_lags.py
+  Exercises/st_model/day/local_computer/space_time/separability_diagnostic/analyze_mixed_lag_geometry.py
 ```
 
-This audit reports the analytic same-margin gap separately from the actual
-gap after the null has compensated through its fitted ranges and advection.
-Literally removing the outer square root gives
-`exp(-(s^2+t^2)) = exp(-s^2) exp(-t^2)`, which is separable.  It also changes
-the axis margins from exponential to squared-exponential, so it does not in
-general preserve the likelihood objective or its optimizer.  The useful
-consequence is instead geometric: at a fixed joint radius, the original
-nonseparable-versus-separable contrast is largest at balanced mixed lags
-`s=t`.
+The audit marks the structural location `s=t` at a fixed standardized joint
+radius without imposing a paired-anchor contrast.  It also records why
+replacing `sqrt(s^2+t^2)` with `s^2+t^2` changes the margins and the covariance
+objective even though it produces a separable expression.
 
-To repeat the full fit with 50 non-overlapping local trajectory pairs at the
-near-balanced `(2, 2)` grid offset, while retaining the original `n=800`
-dimension, run:
+To inspect all generalized eigen-directions before designing an interpretable
+interaction contrast, run:
 
 ```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
 /opt/anaconda3/envs/gems_gpu/bin/python \
-  Exercises/st_model/day/local_computer/space_time/separability_diagnostic/run_nugget0_five_day.py \
-  --anchor-design balanced_pairs \
-  --pair-offset 2 2 \
-  --output-dir \
-  Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226
+  Exercises/st_model/day/local_computer/space_time/separability_diagnostic/explore_eigen_directions.py
 ```
 
-The paired-anchor order supports the adjacent-time moving rectangle
+This analysis reads coordinate columns only.  It compares the fitted-null
+eigenbasis with a pure same-margin interaction eigenbasis, decomposes each
+direction into intrinsic interaction and fitted-null compensation, checks
+design-day stability and near-degenerate clusters, and attributes each
+candidate's quadratic-form discrepancy to moving spatial and temporal lag
+bins.  For interaction-dominant two-mode clusters it also writes raw
+space-time weights, rotation-invariant subspace amplitude and Gram heatmaps,
+a joint temporal-DCT by spatial graph-Fourier spectrum, and cluster-level lag
+attribution.  The heatmap's Fiedler-ordered columns are a one-dimensional
+display of irregular two-dimensional anchors, not spatial rectangles.  Its
+joint spectrum is Euclidean filter-weight energy, not a covariance-variance
+or KL decomposition, and is conditional on the chosen spatial graph.  Its
+candidate labels organize exploration; they do not select a final held-out
+test.
 
-```text
-Z(A,t) - Z(B,t) - Z(A,t+1) + Z(B,t+1).
+The rectangle-dictionary oracle is a separate experiment because the observed
+flow tube uses rounded grid shifts: equal `anchor_rank` values are not exactly
+equal physical locations in truth-moving coordinates.  Run the exact-comoving
+5-by-5 spatial grid experiment with:
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
+/opt/anaconda3/envs/gems_gpu/bin/python \
+  Exercises/st_model/day/local_computer/space_time/separability_diagnostic/run_rectangle_dictionary_oracle.py
 ```
 
-The runner saves both the individual rectangle variance ratios and the
-generalized spectrum of their joint subspace.  The KL-optimal null is refit
-for the changed geometry; parameters from the max-min-tube fit are never
-reused.
+Its settings are predeclared in `rectangle_dictionary_exact_grid.toml`.  The
+script fits a zero-nugget separable null while holding the known advection
+fixed, checks the exact matched margins, builds all 8,400 physical rectangle
+contrasts, removes dictionary redundancy by SVD, solves both signs of the
+intrinsic generalized problem, and compares single, greedy 2/4/8, dense
+dictionary, and unrestricted filters.  Existing atlas modes receive only an
+algebraic double-centering-span audit; that audit is explicitly not a claim
+that the warped flow-tube observations form fixed physical rectangles.
+
+To inspect the first signed interaction that is absent from every single
+rectangle but appears at the minimizing two-rectangle step, run:
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
+/opt/anaconda3/envs/gems_gpu/bin/python \
+  Exercises/st_model/day/local_computer/space_time/separability_diagnostic/analyze_negative_two_rectangle.py
+```
+
+This deterministic post-processing step rehydrates the oracle covariance
+matrices from its manifest, resolves the two-by-two generalized problem at
+full precision, and separates both positive diagonal terms from the negative
+cross-rectangle term.  It also saves the exact eight nonzero observation
+weights, fitted-null compensation, intrinsic and total lag attributions, and
+the constrained eigen residual.  Its pair is conditional on the declared
+greedy tie-breaking path and is not an exhaustive globally optimal pair.
+
+To replace that greedy pair by an exhaustive search over all
+`choose(8,400, 2) = 35,275,800` unordered pairs, run:
+
+```bash
+OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
+/opt/anaconda3/envs/gems_gpu/bin/python \
+  Exercises/st_model/day/local_computer/space_time/separability_diagnostic/run_global_two_rectangle_search.py
+```
+
+The search evaluates float64 blocks without retaining all pair scores,
+handles nearly singular two-column null Gram matrices separately, validates
+the screened minima with SciPy, and repeats the search with a second block
+partition.  Strict ties use the oracle's declared tolerance; a wider,
+explicitly labeled geometry-sensitivity screen records symmetry-near rotated
+copies.  The equivalence classifier is canonical under pair exchange,
+translation, endpoint reversal, and square-grid rotations/reflections.  Its
+objective is the intrinsic contrast `Sigma1-SigmaM`, normalized by `Sigma0`;
+it is not a global search for `Sigma1-Sigma0` or for projected KL.
 
 After a pilot finishes, evaluate the predeclared number-of-modes path with:
 
@@ -150,7 +204,7 @@ After a pilot finishes, evaluate the predeclared number-of-modes path with:
 /opt/anaconda3/envs/gems_gpu/bin/python \
   Exercises/st_model/day/local_computer/space_time/separability_diagnostic/analyze_mode_count_path.py \
   --pilot-dir \
-  Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_balanced_rectangles_092226
+  Exercises/st_model/day/local_computer/space_time/separability_diagnostic/outputs/nugget0_five_day_092226
 ```
 
 This recomputes directions from the design covariance only.  Held-out
@@ -161,10 +215,16 @@ Monte Carlo.  A publication test must choose `K` using a training-only rule
 such as 80% or 90% cumulative KL; choosing the smallest displayed p-value
 would introduce selection bias.
 
+The current mode path uses eigenvectors of the covariance averaged across the
+three design days.  Its cumulative fraction is therefore the KL of that
+reference average-covariance problem, not the sum of the three day-specific
+KL values.  The full-dimension LLR is basis-invariant and does not depend on
+this top-`K` approximation.
+
 Run the numerical unit tests with:
 
 ```bash
-/opt/anaconda3/envs/gems_gpu/bin/python -m pytest -q \
+/opt/anaconda3/bin/python -m pytest -q \
   Exercises/st_model/day/local_computer/space_time/separability_diagnostic/tests
 ```
 
@@ -182,14 +242,16 @@ directory.  Important files are:
 - `bootstrap_summary.json`: critical values, p-values, and oracle power.
 - `RESULTS.md`: concise interpretation and explicit limits.
 - `figures/`: covariance slices, spectrum, direction maps, and bootstrap distributions.
-- `balanced_mixed_lag_audit/`: response-free square-root geometry, selected-pair
-  occupancy, and fitted-null compensation audit.
-- `selected_anchor_pairs.csv`: deterministic local pair endpoints and max-min centres
-  for a paired design.
-- `moving_rectangle_contrasts.csv`: adjacent-time double-difference variances,
-  variance ratios, and per-contrast `g(lambda)`.
-- `rectangle_generalized_eigenvalues.csv`: full correlated rectangle-subspace
-  generalized spectrum.
+- `mixed_lag_geometry_audit/`: response-free occupancy and analytic
+  same-margin gap summaries in standardized moving-lag coordinates.
+- `eigen_direction_atlas/`: metrics for all fitted-null and same-margin
+  interaction eigen-directions, design-day stability, near-degenerate
+  clusters, raw and rotation-invariant space-time cluster heatmaps, candidate
+  weights, lag attribution, figures, and an interpretation report.
+- `../exact_comoving_rectangle_dictionary_092226/`: separate exact-grid
+  rectangle metadata, rank diagnostics, greedy paths and coefficients,
+  intrinsic-versus-fitted-null metrics, fixed-filter simulations, figures,
+  and a report.  It contains no response-based inference.
 - `mode_count_path/`: exact held-out LLR, calibration, and oracle power over a
   predeclared generalized-eigenmode count grid.
 

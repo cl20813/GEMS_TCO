@@ -1,0 +1,3 @@
+cluster,mean_retention,minimum_retention,maximum_principal_angle_degrees,squared_canonical_correlation_1,squared_canonical_correlation_2,physical_rectangle_interpretation_valid
+modes_13_14,0.389433667049,0.374616501398,52.2614518799,0.404250832699,0.374616501398,False
+modes_39_40,0.774867215437,0.592154925541,39.6895510598,0.957579505333,0.592154925541,False
