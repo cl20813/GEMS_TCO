@@ -49,10 +49,14 @@ class CorridorImportTests(unittest.TestCase):
                 "GeneralizedCauchyLag432CorridorVecchia",
             ),
             "spline": (
+                "SplineMaternLag432CorridorVecchia",
+                "NoNuggetSplineMaternLag432CorridorVecchia",
                 "SplineMaternLag643CorridorVecchia",
                 "NoNuggetSplineMaternLag643CorridorVecchia",
             ),
             "separable_exponential": (
+                "AdvectedSeparableExponentialLag432CorridorVecchia",
+                "NoNuggetAdvectedSeparableExponentialLag432CorridorVecchia",
                 "AdvectedSeparableExponentialLag643CorridorVecchia",
                 "NoNuggetAdvectedSeparableExponentialLag643CorridorVecchia",
             ),
@@ -81,9 +85,13 @@ class CorridorImportTests(unittest.TestCase):
             "NoNuggetGeneralizedCauchyLag432CorridorVecchia",
             "GeneralizedCauchyLag643CorridorVecchia",
             "NoNuggetGeneralizedCauchyLag643CorridorVecchia",
+            "SplineMaternLag432CorridorVecchia",
+            "NoNuggetSplineMaternLag432CorridorVecchia",
             "SplineMaternLag643CorridorVecchia",
             "NoNuggetSplineMaternLag643CorridorVecchia",
             "separable_exponential",
+            "AdvectedSeparableExponentialLag432CorridorVecchia",
+            "NoNuggetAdvectedSeparableExponentialLag432CorridorVecchia",
             "AdvectedSeparableExponentialLag643CorridorVecchia",
             "NoNuggetAdvectedSeparableExponentialLag643CorridorVecchia",
         }

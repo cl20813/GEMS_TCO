@@ -1,0 +1,89 @@
+{
+  "config": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/interaction_diagnostic/gc_truth_gc_vs_matern_one_day_092526/gc_truth_gc_vs_matern.toml",
+  "date": "2024-07-13",
+  "embedding_diagnostics": {
+    "central_symmetry_max_error": 0.0,
+    "construction": "zero-advection comoving FFT field sampled at s-v*(t-t0)",
+    "embedding_cells": 144276795,
+    "embedding_shape": [
+      2613,
+      3681,
+      15
+    ],
+    "generator_label": "spectrally_corrected_circulant_embedding",
+    "simulation_grid_shape": [
+      1307,
+      1841,
+      8
+    ],
+    "spectrum_max_abs_imaginary": 7.443841717989149e-09,
+    "spectrum_max_abs_imaginary_over_max_abs_real": 4.635305310943894e-17,
+    "spectrum_min_before_clipping": -414964.84736755444,
+    "spectrum_negative_count": 8478,
+    "spectrum_negative_fraction": 5.8762048325234836e-05,
+    "spectrum_negative_mass_fraction": 0.001658829045091088,
+    "variance_after_renormalization": 10.0,
+    "variance_before_renormalization": 10.016643507919607,
+    "variance_renormalization_scale": 0.998338414668901
+  },
+  "fft_mapping_audit": {
+    "fft_mapping_max_abs_latitude_error": 0.0021999999999995357,
+    "fft_mapping_max_abs_longitude_error": 0.003150000000005093
+  },
+  "frozen_design": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/fixed_geographic_three_model_092426/frozen_design.json",
+  "frozen_design_identifier": "fixed_geographic_ab_mirrors_lag1_v1_092426",
+  "git_revision": "3866c985ab307f6593669fbd461eb0aabcc4a9f2",
+  "models": [
+    "gc",
+    "matern05"
+  ],
+  "numpy_version": "1.26.4",
+  "pandas_version": "2.2.3",
+  "simulation_data": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/interaction_diagnostic/gc_truth_gc_vs_matern_one_day_092526/outputs/simulation/gc_fft_2024-07-13_gridded.pkl",
+  "simulation_truth": "/Users/joonwonlee/Documents/GEMS_TCO-1/Exercises/st_model/day/local_computer/space_time/interaction_diagnostic/gc_truth_gc_vs_matern_one_day_092526/outputs/simulation/gc_fft_2024-07-13_truth.json",
+  "source_sha256": {
+    "Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/fixed_geographic_three_model_092426/fixed_geo_three_model_core.py": "2f691e781f700cd4cc6bff357e8a48e5026721235ff57cdf8ef4b85610700e76",
+    "Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/fixed_geographic_three_model_092426/frozen_design.json": "632c83fa55341bfdff4f4cf87d9dc22bada5c8921dad8586e5a2687d3ea2729a",
+    "Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/fixed_geographic_three_model_092426/run_fixed_geo_three_model_day.py": "01a085a8d2cec9271c6e66e6c7b09953e655d7bfa1e323eed1fe94ae8ce06a79",
+    "Exercises/st_model/day/local_computer/space_time/interaction_diagnostic/gc_truth_gc_vs_matern_one_day_092526/gc_truth_gc_vs_matern.toml": "b02d54d49e7c593dfc8b9123a2bccfa1b6f25e41ad52a32d2a2e48daf264eb68",
+    "Exercises/st_model/day/local_computer/space_time/interaction_diagnostic/gc_truth_gc_vs_matern_one_day_092526/outputs/simulation/gc_fft_2024-07-13_gridded.pkl": "5b2471cc611e52ce4d8dbc9cfbbb9b2d674211471f2020a931ebc7a572d54d83",
+    "Exercises/st_model/day/local_computer/space_time/interaction_diagnostic/gc_truth_gc_vs_matern_one_day_092526/outputs/simulation/gc_fft_2024-07-13_truth.json": "b5f5593a8fef7417b1474cad03aabd3d08a4d379335ad897f4f8318baa314403",
+    "Exercises/st_model/day/local_computer/space_time/interaction_diagnostic/gc_truth_gc_vs_matern_one_day_092526/run_gc_truth_gc_vs_matern.py": "f79ed8717a194ee06774732d0c2f3453fb96fcea052b112f883b9217f1a5b205",
+    "cpp/maxmin_order.cpp": "3edf60193a8dcefad0e51c54ea7444a9625b58dfa8f74338d8f213b8f5a3b5e5",
+    "cpp/vecchia_covariance_cpu.cpp": "64e6c9f94aba05d82ec44256eeb5c034e8b3ed9f1488fc293639444d93bec089",
+    "cpp/vecchia_covariance_cuda.cpp": "a06011226cb52872924cb0e448d3b6a99a9bbd5b7a666365cbf589425e63687c",
+    "cpp/vecchia_covariance_cuda_kernel.cu": "6bc0cfcc682ce1db51a72d57d6c094cd49761fa818bc6ece59431bf109df757c",
+    "setup.py": "4792459585b433fa485c7a114a8a0fb5936d2f11fbae9edb219202d88f4a61b1",
+    "simulate_data/generate_one_day_gc_fft_local.py": "0a47bfb458955508288f073c8ef8a1dcf0f7f0216be8032a7d8e5e5da3d9ada1",
+    "src/GEMS_TCO/__init__.py": "495e1a4785a1749a0339e3f0f85d15faf31d5b8bc0a3ed5fbe8e4a8fd177aa68",
+    "src/GEMS_TCO/_vecchia_covariance_cpu.cpython-312-darwin.so": "62fedf47e39e9527d35e7055ba382171febaa6120adeffc30189eeb1b30eef1e",
+    "src/GEMS_TCO/data/__init__.py": "7eb7fb653386a9c1b5d9c745c0ed3a2661212e524a966dce721872aab4e9c1dc",
+    "src/GEMS_TCO/data/loading.py": "b60d2a3f2fef7c3d46692336eb0177bfbcceb140842ecb869cfc5b8340eb9b3f",
+    "src/GEMS_TCO/data/preprocessing.py": "bc28cc686f21e4bb0ce17888da1aa3140d5f6d64438ca120f849befbca05b3e8",
+    "src/GEMS_TCO/orderings.py": "7b212aa5bf48f474bc7513a23d11e9d44066577ff3e47614549db0375cdd43d4",
+    "src/GEMS_TCO/spatial/__init__.py": "098bf0f944cad29d17510f9bfd96cc2742f90c3104c1e1a30e3c9a6dc7b5260c",
+    "src/GEMS_TCO/spatial/matern_spline.py": "1a6c9445766de7bcffbdb981a22fb64ade0fd21bce0daa79554f32c1b16ff06d",
+    "src/GEMS_TCO/vecchia/__init__.py": "f352faf22c44a4fbd94d013f8197faf74808498d66d65ff595ee308220c8e885",
+    "src/GEMS_TCO/vecchia/_base.py": "38d117ae29a181a8b95ca6af2986853c8ea4feb2ed3c9df1194b0a2c367985a5",
+    "src/GEMS_TCO/vecchia/_native_covariance.py": "8ffa1cf24aead87210d3248d9793def19d170a3c1d7cb07aad053b38b5bcadd9",
+    "src/GEMS_TCO/vecchia/corridor_neighbors/__init__.py": "0a6e4e62aa58ef51ff4f5947408fe743fb9912df433f65c1332686b162b43509",
+    "src/GEMS_TCO/vecchia/corridor_neighbors/_geometry.py": "677d856e37fc605cbf62b7f36c0096ac2ddb1ee93137c5d5bd186d9a8a63f386",
+    "src/GEMS_TCO/vecchia/corridor_neighbors/corridor_lag432.py": "2c666f595eec3ba12df38ab5a96e3b34e3540808a417799f277f05525fa489d5",
+    "src/GEMS_TCO/vecchia/corridor_neighbors/corridor_lag643.py": "1f87cfbc4770b07bd2ffdbc9ed5c1cd20f5b47a2f9d572eb0150ba66177927cc",
+    "src/GEMS_TCO/vecchia/corridor_neighbors/directional_lag432.py": "1baa9c9da87fd4a686f064b0129c10a67c04d15ddf1c89cb14408001ffa3c776",
+    "src/GEMS_TCO/vecchia/corridor_neighbors/directional_lag643.py": "07aa24046ca7cbd63bed6650dea617a8017188d0adec30c997439ba1841c7f7a",
+    "src/GEMS_TCO/vecchia/corridor_neighbors/generalized_cauchy.py": "9c5299d021f87c1b8062f0f00ea6a9de84047bf186ada8f52e8edfeb89fadf7a",
+    "src/GEMS_TCO/vecchia/corridor_neighbors/separable_exponential.py": "c3b3965fe5c7f1d4b1a1c71be46400692ba746ca5e3eb01b33f9e6f581ce3e4c",
+    "src/GEMS_TCO/vecchia/corridor_neighbors/spline.py": "0377c137543445b5f54a72f1599e7a29e1a2279e21e12b89db9c1e76e447b650",
+    "src/GEMS_TCO/vecchia/grouped_batched.py": "3ff2f9fefd5b0b70bd5e3035f75e18565c31e56ae0d8697a41a1402153ae56d5"
+  },
+  "study": "gc_truth_gc_vs_matern_one_day_092526",
+  "study_signature": "f603c38072acafe2edfe9fa300978ff6b3595c534ac665fdebb9a3c36c5a3aac",
+  "target_chunk_sizes": {
+    "gc": 64,
+    "matern05": 64
+  },
+  "torch_version": "2.5.1",
+  "vecchia_conditioning_geometry": "corridor_width_4x4_lag432",
+  "vecchia_lag_pattern": "4/3/2"
+}

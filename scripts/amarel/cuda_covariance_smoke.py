@@ -15,7 +15,10 @@ import torch
 from GEMS_TCO.vecchia._native_covariance import (
     native_covariance,
     native_covariance_available,
+    native_generalized_cauchy_covariance,
+    native_generalized_cauchy_covariance_available,
     torch_covariance_reference,
+    torch_generalized_cauchy_covariance_reference,
 )
 
 TARGET_CAPABILITIES = {(8, 0): "A100", (8, 9): "L40S"}
@@ -38,6 +41,8 @@ def _representative_inputs(
     batch_size: int,
     points: int,
     device: torch.device,
+    *,
+    duplicate_first_pair: bool = True,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     generator = torch.Generator(device="cpu").manual_seed(20260922)
     latitude = 33.0 + 4.0 * torch.rand(
@@ -62,8 +67,14 @@ def _representative_inputs(
         device=device,
         dtype=torch.float64,
     )
-    # Exercise exact-zero distance and dummy identity rows.
-    if points > 1:
+    # Exercise exact-zero distance when requested and always exercise dummy
+    # identity rows.  Nugget-free NLL parity deliberately uses distinct
+    # coordinates: an exact duplicate leaves only the 1e-6 Cholesky jitter in
+    # that contrast direction and amplifies one-ulp forward differences by
+    # millions in the inverse-based gradient.  Exact-zero covariance/backward
+    # behavior is covered separately by the CUDA unit tests with a bounded
+    # linear upstream gradient.
+    if duplicate_first_pair and points > 1:
         coordinates[:, 1] = coordinates[:, 0]
     is_dummy = torch.zeros((batch_size, points), dtype=torch.bool, device=device)
     if points > 4:
@@ -81,7 +92,7 @@ def _representative_inputs(
     return params, coordinates, is_dummy, response
 
 
-def _correctness_check(device: torch.device) -> dict[str, float]:
+def _matern_correctness_check(device: torch.device) -> dict[str, float]:
     initial, coordinates, is_dummy, response = _representative_inputs(2, 12, device)
     torch_params = initial.clone().requires_grad_(True)
     native_params = initial.clone().requires_grad_(True)
@@ -116,6 +127,55 @@ def _correctness_check(device: torch.device) -> dict[str, float]:
     }
 
 
+def _generalized_cauchy_correctness_check(device: torch.device) -> dict[str, float]:
+    initial, coordinates, is_dummy, response = _representative_inputs(
+        2,
+        12,
+        device,
+        duplicate_first_pair=False,
+    )
+    initial = initial[:6]
+    torch_params = initial.clone().requires_grad_(True)
+    native_params = initial.clone().requires_grad_(True)
+    alpha = 0.75
+    beta = 1.0
+
+    torch_matrix = torch_generalized_cauchy_covariance_reference(
+        torch_params,
+        coordinates,
+        is_dummy,
+        alpha,
+        beta,
+    )
+    native_matrix = native_generalized_cauchy_covariance(
+        native_params,
+        coordinates,
+        is_dummy,
+        alpha,
+        beta,
+        backend="native",
+    )
+    torch_nll = _nll(torch_matrix, response, is_dummy)
+    native_nll = _nll(native_matrix, response, is_dummy)
+    torch_gradient = torch.autograd.grad(torch_nll, torch_params)[0]
+    native_gradient = torch.autograd.grad(native_nll, native_params)[0]
+
+    covariance_difference = float((native_matrix.detach() - torch_matrix.detach()).abs().max())
+    nll_difference = float((native_nll.detach() - torch_nll.detach()).abs())
+    gradient_difference = float((native_gradient - torch_gradient).abs().max())
+    eigenvalues = torch.linalg.eigvalsh(torch_matrix.detach())
+    condition_number = float((eigenvalues[:, -1] / eigenvalues[:, 0]).max())
+    torch.testing.assert_close(native_matrix, torch_matrix, rtol=2e-12, atol=2e-12)
+    torch.testing.assert_close(native_nll, torch_nll, rtol=2e-11, atol=2e-12)
+    torch.testing.assert_close(native_gradient, torch_gradient, rtol=2e-8, atol=2e-10)
+    return {
+        "covariance_max_abs_difference": covariance_difference,
+        "nll_abs_difference": nll_difference,
+        "gradient_max_abs_difference": gradient_difference,
+        "covariance_condition_number_max": condition_number,
+    }
+
+
 def _time_step(step: Callable[[], None], iterations: int, warmup: int = 3) -> float:
     for _ in range(warmup):
         step()
@@ -129,7 +189,7 @@ def _time_step(step: Callable[[], None], iterations: int, warmup: int = 3) -> fl
     return statistics.median(elapsed) * 1000.0
 
 
-def _benchmark(
+def _matern_benchmark(
     device: torch.device,
     batch_size: int,
     points: int,
@@ -149,6 +209,48 @@ def _benchmark(
             coordinates,
             is_dummy,
             smooth=0.5,
+            backend="native",
+        )
+        torch.autograd.grad(covariance.square().mean(), params)
+
+    torch_milliseconds = _time_step(torch_step, iterations)
+    native_milliseconds = _time_step(native_step, iterations)
+    return {
+        "batch_size": batch_size,
+        "points": points,
+        "iterations": iterations,
+        "torch_forward_backward_median_ms": torch_milliseconds,
+        "native_forward_backward_median_ms": native_milliseconds,
+        "speedup": torch_milliseconds / native_milliseconds,
+    }
+
+
+def _generalized_cauchy_benchmark(
+    device: torch.device,
+    batch_size: int,
+    points: int,
+    iterations: int,
+) -> dict[str, float | int]:
+    initial, coordinates, is_dummy, _ = _representative_inputs(batch_size, points, device)
+    initial = initial[:6]
+    alpha = 0.75
+    beta = 1.0
+
+    def torch_step() -> None:
+        params = initial.detach().clone().requires_grad_(True)
+        covariance = torch_generalized_cauchy_covariance_reference(
+            params, coordinates, is_dummy, alpha, beta
+        )
+        torch.autograd.grad(covariance.square().mean(), params)
+
+    def native_step() -> None:
+        params = initial.detach().clone().requires_grad_(True)
+        covariance = native_generalized_cauchy_covariance(
+            params,
+            coordinates,
+            is_dummy,
+            alpha,
+            beta,
             backend="native",
         )
         torch.autograd.grad(covariance.square().mean(), params)
@@ -187,6 +289,10 @@ def main() -> None:
                 f"GEMS_TCO._vecchia_covariance_cuda failed to import: {error}"
             ) from error
         raise RuntimeError("GEMS_TCO._vecchia_covariance_cuda is not importable")
+    if not native_generalized_cauchy_covariance_available("cuda"):
+        raise RuntimeError(
+            "the installed CUDA extension lacks generalized-Cauchy entry points"
+        )
 
     device = torch.device("cuda", torch.cuda.current_device())
     capability = torch.cuda.get_device_capability(device)
@@ -205,8 +311,15 @@ def main() -> None:
     }
     result = {
         "environment": metadata,
-        "parity": _correctness_check(device),
-        "benchmark": _benchmark(
+        "matern_parity": _matern_correctness_check(device),
+        "generalized_cauchy_parity": _generalized_cauchy_correctness_check(device),
+        "matern_benchmark": _matern_benchmark(
+            device,
+            batch_size=args.batch_size,
+            points=args.points,
+            iterations=args.iterations,
+        ),
+        "generalized_cauchy_benchmark": _generalized_cauchy_benchmark(
             device,
             batch_size=args.batch_size,
             points=args.points,

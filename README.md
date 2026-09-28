@@ -36,21 +36,22 @@ For an editable checkout with development tools:
 python -m pip install -e '.[dev]'
 ```
 
-The smoothness-0.5 Vecchia path has optional fused PyTorch C++/CUDA
-accelerators. Build the CPU extension only after PyTorch is installed in the
-active environment:
+The smoothness-0.5 Matérn and fixed-shape generalized-Cauchy Vecchia paths
+have optional fused PyTorch C++/CUDA accelerators. Build the local CPU
+extension only after PyTorch is installed in the active environment:
 
 ```bash
 GEMS_TCO_BUILD_TORCH_EXT=1 python -m pip install -e . --no-build-isolation
 ```
 
 On an NVIDIA build host, the CUDA extension is independently enabled with
-`GEMS_TCO_BUILD_CUDA_EXT=1`. A single Amarel build can target both A100 and
+`GEMS_TCO_BUILD_CUDA_EXT=1`. The local CPU binary is platform-specific and
+must not be copied to Amarel. A single Amarel build can target both A100 and
 L40S as follows (CUDA 11.8 or newer is required for L40S `sm_89`):
 
 ```bash
 TORCH_CUDA_ARCH_LIST="8.0;8.9" \
-GEMS_TCO_BUILD_TORCH_EXT=1 \
+GEMS_TCO_BUILD_TORCH_EXT=0 \
 GEMS_TCO_BUILD_CUDA_EXT=1 \
 python -m pip install -e . --no-build-isolation
 ```

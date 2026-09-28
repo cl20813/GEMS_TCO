@@ -26,6 +26,7 @@ def task_source_files() -> tuple[Path, ...]:
     study_directory = Path(__file__).resolve().parent
     project_root = study_directory.parents[6]
     relative_sources = (
+        "setup.py",
         "src/GEMS_TCO/__init__.py",
         "src/GEMS_TCO/orderings.py",
         "src/GEMS_TCO/data/__init__.py",
@@ -47,6 +48,9 @@ def task_source_files() -> tuple[Path, ...]:
         "src/GEMS_TCO/vecchia/corridor_neighbors/separable_exponential.py",
         "src/GEMS_TCO/vecchia/corridor_neighbors/spline.py",
         "cpp/maxmin_order.cpp",
+        "cpp/vecchia_covariance_cpu.cpp",
+        "cpp/vecchia_covariance_cuda.cpp",
+        "cpp/vecchia_covariance_cuda_kernel.cu",
     )
     return (
         study_directory / "fixed_geo_three_model_core.py",

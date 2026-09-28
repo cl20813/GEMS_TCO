@@ -1,0 +1,52 @@
+{
+  "cache_hits": 5,
+  "converged_at_outer_grad_tol": true,
+  "date": "2024-07-02",
+  "fit_seconds": 213.28304379200563,
+  "frozen_design_identifier": "fixed_geographic_ab_mirrors_lag1_v1_092426",
+  "frozen_design_sha256": "632c83fa55341bfdff4f4cf87d9dc22bada5c8921dad8586e5a2687d3ea2729a",
+  "git_revision": "3866c985ab307f6593669fbd461eb0aabcc4a9f2",
+  "gls_coefficients": [
+    -1.428401961174064,
+    0.5605013341146239,
+    0.31829341809346823,
+    -0.13688939567644942,
+    -0.07217554826271164,
+    0.6825795250694997,
+    0.9656520029435623,
+    1.79895176573727,
+    3.4437814958382336
+  ],
+  "gls_latitude_center": -0.4761153994063648,
+  "interpretable_parameters": {
+    "advec_lat": -0.023531807365335392,
+    "advec_lon": -0.24822670737613736,
+    "gc_alpha": 0.75,
+    "gc_beta": 1.0,
+    "nugget": 0.0,
+    "range_lat": 0.41047118351532585,
+    "range_lon": 0.5112297217609668,
+    "range_time": 3.357343432974637,
+    "signal_variance": 23.19921375894396
+  },
+  "maximum_absolute_gradient": 1.1807627345427523e-05,
+  "model": "gc",
+  "objective_evaluations": 36,
+  "precompute_seconds": 0.8567247920436785,
+  "profiled_vecchia_nll_per_target": 1.3968643314285498,
+  "raw_parameters": [
+    3.815054624846297,
+    0.670936236448993,
+    0.439026629211449,
+    -3.764172505503035,
+    -0.023531807365335392,
+    -0.24822670737613736
+  ],
+  "resolved_covariance_backend": "torch",
+  "steps_completed": 2,
+  "study_signature": "8834b8e4a89a8b673dfa3dd03f5263a6766369542b7e4fed87b5ca7e38605952",
+  "task_id": 0,
+  "vecchia_conditioning_geometry": "corridor_width_4x4_lag432",
+  "vecchia_lag_pattern": "4/3/2",
+  "vecchia_target_chunk_size": 64
+}

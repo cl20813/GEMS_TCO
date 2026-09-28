@@ -254,6 +254,27 @@ class GroupedBatchedVecchia(GroupedVecchiaBase):
             and type(self)._correlation is GroupedBatchedVecchia._correlation
         )
 
+    def _native_covariance_available_for_device(self, device: torch.device) -> bool:
+        """Return whether this model's native kernel exists on ``device``."""
+
+        return native_covariance_available(device)
+
+    def _assemble_native_covariance(
+        self,
+        params: torch.Tensor,
+        coordinates: torch.Tensor,
+        is_dummy: torch.Tensor,
+    ) -> torch.Tensor:
+        """Dispatch the model-specific fused covariance implementation."""
+
+        return native_covariance(
+            params,
+            coordinates,
+            is_dummy,
+            smooth=self.smooth,
+            backend=self.covariance_backend,
+        )
+
     def resolved_covariance_backend(self) -> str:
         """Return the backend that will be used for likelihood covariance chunks."""
 
@@ -263,7 +284,7 @@ class GroupedBatchedVecchia(GroupedVecchiaBase):
             and isinstance(first_value, torch.Tensor)
             and first_value.device.type in {"cpu", "cuda"}
             and first_value.dtype == torch.float64
-            and native_covariance_available(first_value.device)
+            and self._native_covariance_available_for_device(first_value.device)
         )
         if self.covariance_backend == "native":
             return "native" if native_ready else "unavailable"
@@ -284,17 +305,11 @@ class GroupedBatchedVecchia(GroupedVecchiaBase):
                 self.covariance_backend == "native"
                 or self.resolved_covariance_backend() == "native"
             ):
-                return native_covariance(
-                    params,
-                    coordinates,
-                    is_dummy,
-                    smooth=self.smooth,
-                    backend=self.covariance_backend,
-                )
+                return self._assemble_native_covariance(params, coordinates, is_dummy)
         elif self.covariance_backend == "native":
             raise RuntimeError(
-                "native covariance is available only for the seven-parameter "
-                "smooth=0.5 closed-form Matern model"
+                "the selected model or parameterization has no compatible "
+                "fused native covariance kernel"
             )
 
         covariance = self._batched_covariance(params, coordinates)

@@ -1,16 +1,17 @@
-#!/bin/bash
-#SBATCH --job-name=stint3_seq
-#SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/stint3_seq_%j.out
-#SBATCH --error=/home/jl2815/tco/exercise_output/summer/logs/stint3_seq_%j.err
-#SBATCH --time=12:00:00
+#!/bin/bash -l
+#SBATCH --job-name=stint3gc_seq
+#SBATCH --output=/home/jl2815/tco/exercise_output/summer/logs/stint3gc_seq_%j.out
+#SBATCH --error=/home/jl2815/tco/exercise_output/summer/logs/stint3gc_seq_%j.err
+#SBATCH --time=05:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=128G
 #SBATCH --partition=gpu
-# gpu020 is an A100 node currently listed in the mixed state. This is a node
-# choice within the gpu partition, not a second partition or an array.
-#SBATCH --nodelist=gpu020
+# Direct submission defaults to the known A100 pool. The supported submit
+# wrapper overrides this with the combined compatible pool or a single-family
+# A100/L40S pool.
+#SBATCH --nodelist=gpu[015-017,019-028]
 #SBATCH --gres=gpu:1
 
 set -euo pipefail
@@ -18,9 +19,10 @@ set -euo pipefail
 REMOTE_PROJECT="/home/jl2815/tco/GEMS_TCO-1"
 STUDY_DIR="${REMOTE_PROJECT}/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/fixed_geographic_three_model_092426"
 PYTHON_BIN="/home/jl2815/.conda/envs/faiss_env/bin/python"
-OUTPUT_ROOT="/home/jl2815/tco/exercise_output/summer/fixed_geographic_three_model_092426"
+OUTPUT_ROOT="/home/jl2815/tco/exercise_output/summer/fixed_geographic_three_model_gc128_native_092526"
 MANIFEST="${STUDY_DIR}/evaluation_dates.csv"
 RUN_MODE="${RUN_MODE:-full}"
+GPU_PROFILE="${GPU_PROFILE:-compatible}"
 
 test -x "${PYTHON_BIN}" || { echo "Missing Python: ${PYTHON_BIN}" >&2; exit 2; }
 test -f "${STUDY_DIR}/run_fixed_geo_three_model_day.py" || {
@@ -28,6 +30,9 @@ test -f "${STUDY_DIR}/run_fixed_geo_three_model_day.py" || {
   exit 2
 }
 test -f "${MANIFEST}" || { echo "Missing manifest: ${MANIFEST}" >&2; exit 2; }
+
+module use /projects/community/modulefiles
+module load cuda/12.1.0
 
 TASK_COUNT="$(${PYTHON_BIN} -c 'import pandas as pd,sys; print(len(pd.read_csv(sys.argv[1])))' "${MANIFEST}")"
 test "${TASK_COUNT}" -eq 60 || {
@@ -62,13 +67,53 @@ echo "Host: $(hostname)"
 echo "Started: $(date)"
 echo "Sequential job: ${SLURM_JOB_ID:-manual}"
 echo "Run mode: ${RUN_MODE}"
+echo "GPU profile: ${GPU_PROFILE}"
 echo "Task order: ${TASK_IDS[*]}"
 echo "Study: fixed geographic, frozen A/B, lag 1, GC/JM0.5/advected-separable"
-echo "Vecchia compute setting: corridor lag 6/4/3, target chunk size 256"
+echo "Vecchia compute setting: corridor lag 6/4/3, GC chunk 128, Matérn/separable chunk 256"
 echo "Output: ${OUTPUT_ROOT}"
 echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}"
-nvidia-smi -L
-"${PYTHON_BIN}" -c 'import torch; print("torch", torch.__version__, "built CUDA", torch.version.cuda); assert torch.cuda.is_available(); print("device", torch.cuda.get_device_name(0))'
+echo "Slurm resources: nodes=${SLURM_JOB_NUM_NODES:-unset}, tasks=${SLURM_NTASKS:-unset}, cpus=${SLURM_CPUS_PER_TASK:-unset}, mem-per-node-MB=${SLURM_MEM_PER_NODE:-unset}, time-limit=${SLURM_TIMELIMIT:-unset}"
+nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
+GPU_PROFILE="${GPU_PROFILE}" \
+"${PYTHON_BIN}" -c '
+import os
+import torch
+
+assert torch.cuda.is_available(), "CUDA is unavailable in the allocated job"
+name = torch.cuda.get_device_name(0)
+major, minor = torch.cuda.get_device_capability(0)
+capability = f"{major}.{minor}"
+profile = os.environ["GPU_PROFILE"]
+allowed = {
+    "compatible": (((8, 0), "A100"), ((8, 9), "L40S")),
+    "a100": (((8, 0), "A100"),),
+    "l40s": (((8, 9), "L40S"),),
+}
+if profile not in allowed:
+    raise SystemExit(f"unsupported GPU_PROFILE={profile!r}")
+print("torch", torch.__version__, "built CUDA", torch.version.cuda)
+print("allocated device", name, "compute capability", capability)
+if not any((major, minor) == cc and label in name.upper() for cc, label in allowed[profile]):
+    raise SystemExit(
+        f"allocated GPU {name!r} (sm_{major}{minor}) is incompatible with "
+        f"requested profile {profile!r}"
+    )
+'
+
+# Build on the allocated Linux/CUDA host. Local macOS binaries are excluded
+# from upload and are never reused on Amarel. The build script runs both the
+# Matérn and generalized-Cauchy CUDA covariance/gradient parity suites before
+# any expensive daily fit starts.
+export PYTHON="${PYTHON_BIN}"
+export MAX_JOBS="${SLURM_CPUS_PER_TASK:-12}"
+# Always compile native cubins for both production families.  The build helper
+# deliberately ignores an unrelated ambient TORCH_CUDA_ARCH_LIST.
+export GEMS_TCO_CUDA_ARCH_LIST="8.0;8.9"
+bash "${REMOTE_PROJECT}/scripts/amarel/build_and_test_cuda.sh" \
+  --batch-size 16 --points 224 --iterations 3
+"${PYTHON_BIN}" -c \
+  'from GEMS_TCO.vecchia._native_covariance import native_generalized_cauchy_covariance_available; assert native_generalized_cauchy_covariance_available("cuda"); print("GC CUDA native backend verified")'
 
 for TASK_ID in "${TASK_IDS[@]}"; do
   echo "===== task ${TASK_ID} started: $(date) ====="

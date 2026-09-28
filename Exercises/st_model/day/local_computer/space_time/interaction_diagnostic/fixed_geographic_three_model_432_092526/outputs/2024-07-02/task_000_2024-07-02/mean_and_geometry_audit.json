@@ -1,0 +1,161 @@
+{
+  "candidate_anchor_count_by_mirror": {
+    "clockwise": 3960,
+    "counterclockwise": 3960
+  },
+  "common_mean_adjustment_max_abs_q_a": 0.008217953527074329,
+  "common_mean_adjustment_max_abs_q_b": 0.008072978230869055,
+  "common_mean_adjustment_rms_over_raw_sd_q_a": 0.000457843958503476,
+  "common_mean_adjustment_rms_over_raw_sd_q_b": 0.0004456379723942847,
+  "common_mean_adjustment_rms_q_a": 0.002820701277142176,
+  "common_mean_adjustment_rms_q_b": 0.002819542179427366,
+  "common_ols_beta": [
+    -2.1750892301490548,
+    0.17832359094867445,
+    -0.034297939130774106,
+    -0.6963303955370359,
+    -0.7750586046496757,
+    -0.11133987596980922,
+    0.39534704717613,
+    1.3329111090505585,
+    3.166089486314674
+  ],
+  "common_ols_latitude_center": -0.47611539940636494,
+  "complete_contrast_fraction": 0.8137987012987012,
+  "coverage_by_mirror_and_time": {
+    "clockwise_t00_t01": {
+      "candidate_count": 3960,
+      "complete_count": 3512,
+      "complete_fraction": 0.8868686868686869
+    },
+    "clockwise_t01_t02": {
+      "candidate_count": 3960,
+      "complete_count": 3092,
+      "complete_fraction": 0.7808080808080808
+    },
+    "clockwise_t02_t03": {
+      "candidate_count": 3960,
+      "complete_count": 3004,
+      "complete_fraction": 0.7585858585858586
+    },
+    "clockwise_t03_t04": {
+      "candidate_count": 3960,
+      "complete_count": 2754,
+      "complete_fraction": 0.6954545454545454
+    },
+    "clockwise_t04_t05": {
+      "candidate_count": 3960,
+      "complete_count": 2757,
+      "complete_fraction": 0.6962121212121212
+    },
+    "clockwise_t05_t06": {
+      "candidate_count": 3960,
+      "complete_count": 3704,
+      "complete_fraction": 0.9353535353535354
+    },
+    "clockwise_t06_t07": {
+      "candidate_count": 3960,
+      "complete_count": 3931,
+      "complete_fraction": 0.9926767676767677
+    },
+    "counterclockwise_t00_t01": {
+      "candidate_count": 3960,
+      "complete_count": 3374,
+      "complete_fraction": 0.852020202020202
+    },
+    "counterclockwise_t01_t02": {
+      "candidate_count": 3960,
+      "complete_count": 2801,
+      "complete_fraction": 0.7073232323232324
+    },
+    "counterclockwise_t02_t03": {
+      "candidate_count": 3960,
+      "complete_count": 2609,
+      "complete_fraction": 0.6588383838383839
+    },
+    "counterclockwise_t03_t04": {
+      "candidate_count": 3960,
+      "complete_count": 2683,
+      "complete_fraction": 0.6775252525252525
+    },
+    "counterclockwise_t04_t05": {
+      "candidate_count": 3960,
+      "complete_count": 3172,
+      "complete_fraction": 0.8010101010101011
+    },
+    "counterclockwise_t05_t06": {
+      "candidate_count": 3960,
+      "complete_count": 3767,
+      "complete_fraction": 0.9512626262626263
+    },
+    "counterclockwise_t06_t07": {
+      "candidate_count": 3960,
+      "complete_count": 3957,
+      "complete_fraction": 0.9992424242424243
+    }
+  },
+  "empirical_mean_rule": "one_common_daywise_ols_mean_for_all_models",
+  "frozen_anchor_mapping_sha256": "af07c31e6beaef76d8cd922e4d483abf886d93f3aafbd16c8dc8a72c9e4aeca7",
+  "maximum_regular_grid_snap_error_standardized_max": 0.03011592842525935,
+  "maximum_regular_grid_snap_error_standardized_median": 0.030115928425251327,
+  "maximum_regular_grid_snap_error_standardized_p95": 0.03011592842525935,
+  "model_time_convention": "match ProcessedDataLoader: round(Hours_elapsed - 477700.0) to nominal integer-hour slots before covariance fitting and scoring",
+  "model_time_origin_hours": 477700.0,
+  "monthly_centering_mean": 257.97261042523166,
+  "per_sample_maximum_source_error_standardized_max": 0.09215701225008353,
+  "per_sample_maximum_source_error_standardized_median": 0.0554054354304635,
+  "per_sample_maximum_source_error_standardized_p95": 0.08004476901724072,
+  "potential_sample_count": 55440,
+  "raw_adjacent_time_increments_hours": [
+    1.0,
+    1.0,
+    1.0,
+    0.9166666666278616,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "raw_frame_time_hours": [
+    477744.88333333336,
+    477745.88333333336,
+    477746.88333333336,
+    477747.88333333336,
+    477748.8,
+    477749.8,
+    477750.8,
+    477751.8
+  ],
+  "regular_grid_axes_sha256": "903bd52a776bebc8e2ec8619b5439dff3fb002a48270a4a9612cb097d521fa02",
+  "regular_grid_shape": [
+    114,
+    159
+  ],
+  "regular_latitude_step": 0.04400000000000004,
+  "regular_longitude_step": 0.06299999999998818,
+  "rounded_model_adjacent_time_increments_hours": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "rounded_model_time_hours": [
+    45.0,
+    46.0,
+    47.0,
+    48.0,
+    49.0,
+    50.0,
+    51.0,
+    52.0
+  ],
+  "sample_count": 45117,
+  "source_endpoint_error_standardized_max": 0.09215701225008353,
+  "source_endpoint_error_standardized_median": 0.03260389176397534,
+  "source_endpoint_error_standardized_p95": 0.06796965700026025,
+  "wx_max_abs": 0.046084500000000084,
+  "wx_numerically_zero": false,
+  "wx_tolerance": 1e-10
+}

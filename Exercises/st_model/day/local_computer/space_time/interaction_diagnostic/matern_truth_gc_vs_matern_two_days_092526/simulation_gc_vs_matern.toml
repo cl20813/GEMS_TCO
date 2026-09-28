@@ -1,0 +1,49 @@
+[study]
+name = "matern_truth_gc_vs_matern_two_days_092526"
+coordinate_frame = "fixed_geographic"
+dates = ["2024-07-13", "2024-07-19"]
+required_time_slots = 8
+temporal_lag = 1
+
+[data]
+simulation_root = "outputs/sim_data/july_st_circulant_realpattern_smooth0p5_nugget0_matched5_090226"
+coordinate_asset = "gridded_with_irregular_source_coordinates"
+use_source_coordinates_for_covariance = true
+
+[models]
+names = ["gc", "matern05", "separable"]
+gc_alpha = 0.75
+gc_beta = 1.0
+gc_covariance_backend = "native"
+matern_smooth = 0.5
+nugget_policy = "fixed_zero"
+covariance_parameter_count = 6
+conditioning_geometry = "corridor_width_4x4_lag432"
+conditioning_lag_pattern = "4/3/2"
+reference_advec_lon_abs = 0.126
+target_chunk_sizes = { gc = 64, matern05 = 64, separable = 64 }
+min_target_points = 1
+
+[fit]
+# A common truth-based start is used for both fitted families. Shape parameters
+# remain fixed: Matérn nu=0.5 and GC alpha=0.75, beta=1.
+signal_variance = 10.0
+range_lat = 0.2
+range_lon = 0.3
+range_time = 2.0
+advec_lat = 0.08
+advec_lon = -0.2
+lbfgs_lr = 1.0
+lbfgs_inner_max_iter = 20
+lbfgs_outer_max_steps = 50
+lbfgs_tolerance_grad = 1.0e-5
+outer_grad_tol = 1.0e-4
+require_convergence = true
+lbfgs_tolerance_change = 1.0e-9
+lbfgs_history_size = 10
+
+[diagnostic]
+wx_tolerance = 1.0e-10
+primary = "bivariate_gaussian_contrast_score"
+secondary = ["V_A", "V_B", "C_AB", "rho_AB", "Var_L"]
+truth_target = "analytic_joint_matern_nu_0p5"

@@ -9,11 +9,18 @@ REMOTE_HOST="${AMAREL_HOST:-jl2815@amarel-new.hpc.rutgers.edu}"
 REMOTE_PROJECT="/home/jl2815/tco/GEMS_TCO-1"
 REMOTE_STUDY_DIR="${REMOTE_PROJECT}/Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/$(basename "${LOCAL_STUDY_DIR}")"
 REMOTE_DATA_ROOT="/home/jl2815/tco/data"
-REMOTE_OUTPUT="/home/jl2815/tco/exercise_output/summer/fixed_geographic_three_model_092426"
+REMOTE_OUTPUT="/home/jl2815/tco/exercise_output/summer/fixed_geographic_three_model_gc128_native_092526"
 LOCAL_PYTHON="${LOCAL_GEMS_PYTHON:-/opt/anaconda3/envs/faiss_env/bin/python}"
 DOWNLOAD_TAG="${DOWNLOAD_TAG:-$(date +%Y%m%d_%H%M%S)}"
 LOCAL_DOWNLOAD="${LOCAL_STUDY_DIR}/downloaded_results/${DOWNLOAD_TAG}"
 MODE="${1:-push}"
+GPU_PROFILE="${2:-compatible}"
+REMOTE_JOB_TIME="${GEMS_TCO_SLURM_TIME:-05:00:00}"
+REMOTE_JOB_MEMORY="${GEMS_TCO_SLURM_MEM:-128G}"
+REMOTE_JOB_CPUS="${GEMS_TCO_SLURM_CPUS:-12}"
+REMOTE_A100_NODELIST="${GEMS_TCO_A100_NODELIST:-gpu[015-017,019-028]}"
+REMOTE_L40S_NODELIST="${GEMS_TCO_L40S_NODELIST:-gpu[029-048]}"
+REMOTE_COMPATIBLE_NODELIST="${GEMS_TCO_COMPATIBLE_NODELIST:-gpu[015-017,019-048]}"
 PACKAGE_SYNC_ID="$(date +%Y%m%d_%H%M%S)_$$"
 REMOTE_PACKAGE_ARCHIVE="/home/jl2815/tco/.gems_tco_package_${PACKAGE_SYNC_ID}.tar.gz"
 REMOTE_PACKAGE_STAGE="/home/jl2815/tco/.gems_tco_package_${PACKAGE_SYNC_ID}"
@@ -167,20 +174,32 @@ sync_package_sources() {
        '${REMOTE_PACKAGE_STAGE}/THIRD_PARTY_NOTICES.md' \
        '${REMOTE_PROJECT}/'"
 
-  # Build only the portable max-min extension. These three study models use
-  # the exact Torch covariance path, so optional covariance extensions remain
-  # source-available but disabled for this install.  Keep PEP 517 build
-  # isolation enabled: it installs the versions declared in [build-system]
-  # (notably setuptools>=77 for the SPDX license fields) without changing the
-  # persistent Amarel environment. --no-deps applies only to runtime deps.
+  # The login-node install builds only the portable max-min extension. The
+  # Slurm GPU-job prologue later compiles and validates the CUDA covariance
+  # extension on the allocated Linux/CUDA host.  That prologue deliberately
+  # uses the active Torch environment (rather than an isolated PEP 517
+  # environment) so the CUDA build can import Torch.  Consequently its
+  # persistent Setuptools must also satisfy [build-system].  Upgrade that
+  # lightweight build dependency here, on the login node, before either the
+  # direct build_ext call or the non-isolated editable install can see the
+  # modern PEP 639 SPDX license metadata.
+  ssh "${SSH_OPTIONS[@]}" "${REMOTE_HOST}" \
+    "/home/jl2815/.conda/envs/faiss_env/bin/python -m pip install \
+       --disable-pip-version-check --upgrade 'setuptools>=77' && \
+     /home/jl2815/.conda/envs/faiss_env/bin/python -c \
+       'import setuptools; major=int(setuptools.__version__.partition(chr(46))[0]); assert major >= 77; print(setuptools.__version__)'"
+
+  # Keep PEP 517 build isolation enabled for the portable login-node install;
+  # --no-deps applies only to the package's runtime dependencies.
   ssh "${SSH_OPTIONS[@]}" "${REMOTE_HOST}" \
     "GEMS_TCO_BUILD_TORCH_EXT=0 GEMS_TCO_BUILD_CUDA_EXT=0 \
       /home/jl2815/.conda/envs/faiss_env/bin/python -m pip install \
       --no-deps -e '${REMOTE_PROJECT}'"
 
   # Verify package origin, the rebuilt Linux extension, retired-module cleanup,
-  # all three study model imports, their six-parameter Torch backends, and a
-  # finite float64 covariance/gradient calculation.
+  # all three study model imports, their source-level six-parameter fallback,
+  # and a finite float64 covariance/gradient calculation. CUDA-native GC is
+  # verified later inside the allocated GPU job.
   ssh "${SSH_OPTIONS[@]}" "${REMOTE_HOST}" \
     "cd '${REMOTE_PROJECT}' && PYTHONPATH='${REMOTE_PROJECT}/src' \
       /home/jl2815/.conda/envs/faiss_env/bin/python \
@@ -245,15 +264,27 @@ push_sources() {
 
   echo "Verified study signature: ${LOCAL_STUDY_SIGNATURE}"
   echo "Package-first update and study upload complete: ${REMOTE_STUDY_DIR}"
-  echo "Smoke test: ssh ${REMOTE_HOST} 'cd ${REMOTE_STUDY_DIR} && bash submit_fixed_geo_three_model.sh smoke'"
-  echo "Full run:   ssh ${REMOTE_HOST} 'cd ${REMOTE_STUDY_DIR} && bash submit_fixed_geo_three_model.sh full'"
+  echo "Compatible smoke: ssh ${REMOTE_HOST} 'cd ${REMOTE_STUDY_DIR} && bash submit_fixed_geo_three_model.sh smoke compatible'"
+  echo "A100 smoke: ssh ${REMOTE_HOST} 'cd ${REMOTE_STUDY_DIR} && bash submit_fixed_geo_three_model.sh smoke a100'"
+  echo "L40S smoke: ssh ${REMOTE_HOST} 'cd ${REMOTE_STUDY_DIR} && bash submit_fixed_geo_three_model.sh smoke l40s'"
+  echo "Compatible full: ssh ${REMOTE_HOST} 'cd ${REMOTE_STUDY_DIR} && bash submit_fixed_geo_three_model.sh full compatible'"
+  echo "A100 full:  ssh ${REMOTE_HOST} 'cd ${REMOTE_STUDY_DIR} && bash submit_fixed_geo_three_model.sh full a100'"
+  echo "L40S full:  ssh ${REMOTE_HOST} 'cd ${REMOTE_STUDY_DIR} && bash submit_fixed_geo_three_model.sh full l40s'"
 }
 
 submit_remote() {
   local run_mode="$1"
+  local gpu_profile="$2"
   start_ssh_master
   ssh "${SSH_OPTIONS[@]}" "${REMOTE_HOST}" \
-    "cd '${REMOTE_STUDY_DIR}' && bash submit_fixed_geo_three_model.sh '${run_mode}'"
+    "cd '${REMOTE_STUDY_DIR}' && \
+     GEMS_TCO_SLURM_TIME='${REMOTE_JOB_TIME}' \
+     GEMS_TCO_SLURM_MEM='${REMOTE_JOB_MEMORY}' \
+     GEMS_TCO_SLURM_CPUS='${REMOTE_JOB_CPUS}' \
+     GEMS_TCO_A100_NODELIST='${REMOTE_A100_NODELIST}' \
+     GEMS_TCO_L40S_NODELIST='${REMOTE_L40S_NODELIST}' \
+     GEMS_TCO_COMPATIBLE_NODELIST='${REMOTE_COMPATIBLE_NODELIST}' \
+     bash submit_fixed_geo_three_model.sh '${run_mode}' '${gpu_profile}'"
 }
 
 pull_results() {
@@ -266,13 +297,13 @@ pull_results() {
 
 case "${MODE}" in
   push) push_sources ;;
-  push-smoke) push_sources; submit_remote smoke ;;
-  push-full) push_sources; submit_remote full ;;
-  submit-smoke) submit_remote smoke ;;
-  submit-full) submit_remote full ;;
+  push-smoke) push_sources; submit_remote smoke "${GPU_PROFILE}" ;;
+  push-full) push_sources; submit_remote full "${GPU_PROFILE}" ;;
+  submit-smoke) submit_remote smoke "${GPU_PROFILE}" ;;
+  submit-full) submit_remote full "${GPU_PROFILE}" ;;
   pull) pull_results ;;
   *)
-    echo "Usage: $0 [push|push-smoke|push-full|submit-smoke|submit-full|pull]" >&2
+    echo "Usage: $0 [push|push-smoke|push-full|submit-smoke|submit-full|pull] [compatible|a100|l40s]" >&2
     exit 2
     ;;
 esac

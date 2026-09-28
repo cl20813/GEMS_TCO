@@ -27,12 +27,15 @@ if str(SRC) not in sys.path:
 
 from GEMS_TCO.data import ProcessedDataLoader
 from GEMS_TCO.vecchia.corridor_neighbors.generalized_cauchy import (
+    NoNuggetGeneralizedCauchyLag432CorridorVecchia,
     NoNuggetGeneralizedCauchyLag643CorridorVecchia,
 )
 from GEMS_TCO.vecchia.corridor_neighbors.separable_exponential import (
+    NoNuggetAdvectedSeparableExponentialLag432CorridorVecchia,
     NoNuggetAdvectedSeparableExponentialLag643CorridorVecchia,
 )
 from GEMS_TCO.vecchia.corridor_neighbors.spline import (
+    NoNuggetSplineMaternLag432CorridorVecchia,
     NoNuggetSplineMaternLag643CorridorVecchia,
 )
 
@@ -68,6 +71,14 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--output-root", type=Path)
     result.add_argument("--device", choices=("cuda", "cpu"), default="cuda")
     result.add_argument("--models", nargs="+", choices=MODEL_ORDER, default=list(MODEL_ORDER))
+    result.add_argument(
+        "--allow-model-subset",
+        action="store_true",
+        help=(
+            "allow an explicitly requested model subset for local exploratory runs; "
+            "never creates the publication task COMPLETE marker"
+        ),
+    )
     result.add_argument(
         "--prepare-only",
         action="store_true",
@@ -110,26 +121,43 @@ def _build_model(
     grid_coordinates: np.ndarray,
     config: dict[str, Any],
 ):
+    lag_pattern = str(config["models"]["conditioning_lag_pattern"])
+    if lag_pattern == "4/3/2":
+        gc_class = NoNuggetGeneralizedCauchyLag432CorridorVecchia
+        matern_class = NoNuggetSplineMaternLag432CorridorVecchia
+        separable_class = NoNuggetAdvectedSeparableExponentialLag432CorridorVecchia
+    elif lag_pattern == "6/4/3":
+        gc_class = NoNuggetGeneralizedCauchyLag643CorridorVecchia
+        matern_class = NoNuggetSplineMaternLag643CorridorVecchia
+        separable_class = NoNuggetAdvectedSeparableExponentialLag643CorridorVecchia
+    else:
+        raise ValueError(f"unsupported conditioning_lag_pattern: {lag_pattern}")
+    chunk_sizes = config["models"]["target_chunk_sizes"]
+    if model_name not in chunk_sizes:
+        raise KeyError(f"missing target chunk size for model {model_name!r}")
     options = {
         "input_map": input_map,
         "grid_coords": grid_coordinates,
         "reference_advec_lon_abs": float(config["models"]["reference_advec_lon_abs"]),
-        "target_chunk_size": int(config["models"]["target_chunk_size"]),
+        "target_chunk_size": int(chunk_sizes[model_name]),
         "min_target_points": int(config["models"]["min_target_points"]),
     }
     if model_name == "gc":
-        return NoNuggetGeneralizedCauchyLag643CorridorVecchia(
+        return gc_class(
             gc_alpha=float(config["models"]["gc_alpha"]),
             gc_beta=float(config["models"]["gc_beta"]),
+            covariance_backend=str(
+                config["models"].get("gc_covariance_backend", "auto")
+            ),
             **options,
         )
     if model_name == "matern05":
-        return NoNuggetSplineMaternLag643CorridorVecchia(
+        return matern_class(
             smooth=float(config["models"]["matern_smooth"]),
             **options,
         )
     if model_name == "separable":
-        return NoNuggetAdvectedSeparableExponentialLag643CorridorVecchia(**options)
+        return separable_class(**options)
     raise ValueError(model_name)
 
 
@@ -164,6 +192,9 @@ def _fit_one(
         return saved
 
     model_dir.mkdir(parents=True, exist_ok=True)
+    if model.device.type == "cuda":
+        torch.cuda.synchronize(model.device)
+        torch.cuda.reset_peak_memory_stats(model.device)
     started = time.perf_counter()
     model.precompute_conditioning_sets()
     precompute_seconds = time.perf_counter() - started
@@ -186,9 +217,26 @@ def _fit_one(
         max_steps=int(config["fit"]["lbfgs_outer_max_steps"]),
         grad_tol=float(config["fit"]["outer_grad_tol"]),
     )
+    if model.device.type == "cuda":
+        torch.cuda.synchronize(model.device)
     fit_seconds = time.perf_counter() - fit_started
     raw = torch.tensor(result.raw_parameters, dtype=torch.float64, device=model.device)
     beta = model.estimate_gls_coefficients(raw).detach().cpu().reshape(-1).tolist()
+    cuda_memory = (
+        {
+            "peak_cuda_memory_allocated_bytes": int(
+                torch.cuda.max_memory_allocated(model.device)
+            ),
+            "peak_cuda_memory_reserved_bytes": int(
+                torch.cuda.max_memory_reserved(model.device)
+            ),
+        }
+        if model.device.type == "cuda"
+        else {
+            "peak_cuda_memory_allocated_bytes": None,
+            "peak_cuda_memory_reserved_bytes": None,
+        }
+    )
     fit_record = {
         **reproducibility_metadata,
         "study_signature": signature,
@@ -206,6 +254,7 @@ def _fit_one(
         "precompute_seconds": precompute_seconds,
         "fit_seconds": fit_seconds,
         "resolved_covariance_backend": model.resolved_covariance_backend(),
+        **cuda_memory,
     }
     atomic_json(fit_path, clean_json(fit_record))
     if bool(config["fit"]["require_convergence"]) and not result.converged:
@@ -270,6 +319,10 @@ def main() -> None:
     else:
         device = torch.device("cpu")
     frozen_design_sha256 = sha256_file(design_path)
+    configured_chunk_sizes = {
+        model_name: int(config["models"]["target_chunk_sizes"][model_name])
+        for model_name in MODEL_ORDER
+    }
     reproducibility_metadata = {
         "task_id": int(task["task_id"]),
         "date": str(task["date"]),
@@ -277,7 +330,7 @@ def main() -> None:
         "frozen_design_sha256": frozen_design_sha256,
         "vecchia_conditioning_geometry": str(config["models"]["conditioning_geometry"]),
         "vecchia_lag_pattern": str(config["models"]["conditioning_lag_pattern"]),
-        "vecchia_target_chunk_size": int(config["models"]["target_chunk_size"]),
+        "vecchia_target_chunk_sizes_by_model": configured_chunk_sizes,
         "git_revision": _git_revision(),
     }
     manifest = {
@@ -355,6 +408,10 @@ def main() -> None:
         model_dir = task_dir / f"model_{model_name}"
         try:
             model = _build_model(model_name, model_input, grid_coordinates, config)
+            model_metadata = {
+                **reproducibility_metadata,
+                "vecchia_target_chunk_size": int(model.target_chunk_size),
+            }
             expected_parameter_count = int(config["models"]["covariance_parameter_count"])
             if model.covariance_parameter_count != expected_parameter_count:
                 raise RuntimeError(
@@ -367,7 +424,7 @@ def main() -> None:
                 config,
                 model_dir,
                 signature,
-                reproducibility_metadata,
+                model_metadata,
             )
             physical = fit_record["interpretable_parameters"]
             covariance = contrast_covariances(
@@ -380,7 +437,7 @@ def main() -> None:
             )
             predicted, score_summary = score_model(samples, covariance, model_name, design)
             score_summary = {
-                **reproducibility_metadata,
+                **model_metadata,
                 "year": int(task["year"]),
                 **score_summary,
             }
@@ -395,6 +452,12 @@ def main() -> None:
                     "fit_converged": fit_record["converged_at_outer_grad_tol"],
                     "fit_max_abs_gradient": fit_record["maximum_absolute_gradient"],
                     "fit_seconds": fit_record["fit_seconds"],
+                    "peak_cuda_memory_allocated_bytes": fit_record[
+                        "peak_cuda_memory_allocated_bytes"
+                    ],
+                    "peak_cuda_memory_reserved_bytes": fit_record[
+                        "peak_cuda_memory_reserved_bytes"
+                    ],
                     "wx_max_abs": mean_audit["wx_max_abs"],
                     "mean_rule": mean_audit["empirical_mean_rule"],
                     "potential_sample_count": mean_audit["potential_sample_count"],
@@ -432,6 +495,18 @@ def main() -> None:
         atomic_json(task_dir / "FAILED.json", {"failed_models": failures})
         raise RuntimeError(f"task {args.task_id} failed models: {failures}")
     if set(args.models) != set(MODEL_ORDER):
+        if args.allow_model_subset:
+            atomic_text(
+                task_dir / "SUBSET_COMPLETE",
+                "models=" + ",".join(args.models) + "\n",
+            )
+            LOGGER.info(
+                "Completed exploratory model subset for task %s (%s): %s",
+                args.task_id,
+                task["date"],
+                ", ".join(args.models),
+            )
+            return
         raise RuntimeError("task COMPLETE requires all three pre-specified models")
     (task_dir / "FAILED.json").unlink(missing_ok=True)
     atomic_text(task_dir / "COMPLETE", "complete\n")

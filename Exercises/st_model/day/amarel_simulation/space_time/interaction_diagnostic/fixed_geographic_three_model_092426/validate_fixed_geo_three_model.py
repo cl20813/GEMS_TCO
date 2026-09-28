@@ -91,8 +91,15 @@ def _check_amarel_compute_settings(config: dict) -> None:
         raise AssertionError("the Amarel study must use the frozen 6/4/3 corridor geometry")
     if models["conditioning_lag_pattern"] != "6/4/3":
         raise AssertionError("the Amarel study must record conditioning_lag_pattern=6/4/3")
-    if int(models["target_chunk_size"]) != 256:
-        raise AssertionError("the Amarel lag-6/4/3 study requires target_chunk_size=256")
+    chunk_sizes = {name: int(value) for name, value in models["target_chunk_sizes"].items()}
+    expected_chunk_sizes = {"gc": 128, "matern05": 256, "separable": 256}
+    if chunk_sizes != expected_chunk_sizes:
+        raise AssertionError(
+            "unexpected model-specific target chunk sizes: "
+            f"expected {expected_chunk_sizes}, found {chunk_sizes}"
+        )
+    if models.get("gc_covariance_backend") != "native":
+        raise AssertionError("the Amarel GC study must fail closed on the native CUDA backend")
 
 
 def _check_frozen_design(design: dict) -> None:

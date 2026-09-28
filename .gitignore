@@ -38,3 +38,6 @@ outputs/day/real_data/
 
 # Remote snapshots for the frozen 60-day interaction diagnostic.
 Exercises/st_model/day/amarel_simulation/space_time/interaction_diagnostic/fixed_geographic_three_model_092426/downloaded_results/
+
+# Verified local archives pulled from Amarel (results, logs, and code snapshots).
+Exercises/st_model/day/amarel_simulation/space_time/vecchia_approximation/downloaded_results/

@@ -16,6 +16,11 @@ from typing import Dict, List
 import numpy as np
 import torch
 
+from GEMS_TCO.vecchia._native_covariance import (
+    native_generalized_cauchy_covariance,
+    native_generalized_cauchy_covariance_available,
+)
+
 from .corridor_lag432 import Lag432CorridorVecchia
 from .corridor_lag643 import REFERENCE_ADVEC_LON_ABS, Lag643CorridorVecchia
 
@@ -36,6 +41,29 @@ class _STGeneralizedCauchyMixin:
         scaled = scaled_distance.clamp_min(torch.finfo(scaled_distance.dtype).eps)
         correlation = torch.pow(1.0 + torch.pow(scaled, alpha), -beta / alpha)
         return torch.where(positive, correlation, torch.ones_like(correlation))
+
+    def _supports_native_covariance(self) -> bool:
+        """GC has exact fused kernels for nugget and no-nugget variants."""
+
+        return self.covariance_parameter_count in (6, 7)
+
+    def _native_covariance_available_for_device(self, device: torch.device) -> bool:
+        return native_generalized_cauchy_covariance_available(device)
+
+    def _assemble_native_covariance(
+        self,
+        params: torch.Tensor,
+        coordinates: torch.Tensor,
+        is_dummy: torch.Tensor,
+    ) -> torch.Tensor:
+        return native_generalized_cauchy_covariance(
+            params,
+            coordinates,
+            is_dummy,
+            self.gc_alpha,
+            self.gc_beta,
+            backend=self.covariance_backend,
+        )
 
     def _nugget_from_params(self, params: torch.Tensor) -> torch.Tensor:
         return torch.exp(params[6])
@@ -79,6 +107,7 @@ class GeneralizedCauchyLag643CorridorVecchia(
         target_chunk_size: int = 128,
         min_target_points: int = 1,
         max_neighbor_search=None,
+        covariance_backend: str = "auto",
     ):
         super().__init__(
             smooth=0.5,
@@ -89,6 +118,7 @@ class GeneralizedCauchyLag643CorridorVecchia(
             target_chunk_size=target_chunk_size,
             min_target_points=min_target_points,
             max_neighbor_search=max_neighbor_search,
+            covariance_backend=covariance_backend,
         )
         self._init_st_cauchy(gc_alpha=gc_alpha, gc_beta=gc_beta)
 
@@ -110,6 +140,7 @@ class NoNuggetGeneralizedCauchyLag643CorridorVecchia(
         target_chunk_size: int = 128,
         min_target_points: int = 1,
         max_neighbor_search=None,
+        covariance_backend: str = "auto",
     ):
         super().__init__(
             smooth=0.5,
@@ -120,6 +151,7 @@ class NoNuggetGeneralizedCauchyLag643CorridorVecchia(
             target_chunk_size=target_chunk_size,
             min_target_points=min_target_points,
             max_neighbor_search=max_neighbor_search,
+            covariance_backend=covariance_backend,
         )
         self._init_st_cauchy(gc_alpha=gc_alpha, gc_beta=gc_beta)
 
@@ -141,6 +173,7 @@ class GeneralizedCauchyLag432CorridorVecchia(
         target_chunk_size: int = 128,
         min_target_points: int = 1,
         max_neighbor_search=None,
+        covariance_backend: str = "auto",
     ):
         super().__init__(
             smooth=0.5,
@@ -151,6 +184,7 @@ class GeneralizedCauchyLag432CorridorVecchia(
             target_chunk_size=target_chunk_size,
             min_target_points=min_target_points,
             max_neighbor_search=max_neighbor_search,
+            covariance_backend=covariance_backend,
         )
         self._init_st_cauchy(gc_alpha=gc_alpha, gc_beta=gc_beta)
 
@@ -172,6 +206,7 @@ class NoNuggetGeneralizedCauchyLag432CorridorVecchia(
         target_chunk_size: int = 128,
         min_target_points: int = 1,
         max_neighbor_search=None,
+        covariance_backend: str = "auto",
     ):
         super().__init__(
             smooth=0.5,
@@ -182,6 +217,7 @@ class NoNuggetGeneralizedCauchyLag432CorridorVecchia(
             target_chunk_size=target_chunk_size,
             min_target_points=min_target_points,
             max_neighbor_search=max_neighbor_search,
+            covariance_backend=covariance_backend,
         )
         self._init_st_cauchy(gc_alpha=gc_alpha, gc_beta=gc_beta)
 

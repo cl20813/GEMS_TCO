@@ -1,4 +1,4 @@
-"""Spline-Matérn variants of the 6/4/3 corridor model.
+"""Spline-Matérn variants of the 4/3/2 and 6/4/3 corridor models.
 
 Why this file exists
 --------------------
@@ -33,6 +33,7 @@ import torch
 
 from GEMS_TCO.spatial.matern_spline import _build_matern_spline_coeffs
 
+from .corridor_lag432 import Lag432CorridorVecchia
 from .corridor_lag643 import REFERENCE_ADVEC_LON_ABS, Lag643CorridorVecchia
 
 
@@ -161,7 +162,67 @@ class NoNuggetSplineMaternLag643CorridorVecchia(_STNoNuggetSplineMixin, Lag643Co
         self._init_st_spline(smooth, spline_n_points, spline_r_max)
 
 
+class SplineMaternLag432CorridorVecchia(_STMaternSplineMixin, Lag432CorridorVecchia):
+    """Corridor-width 4x4 lag-432 ST cluster Vecchia with arbitrary smoothness."""
+
+    def __init__(
+        self,
+        smooth: float,
+        input_map: dict,
+        grid_coords=None,
+        second_lag_stride: int = 2,
+        reference_advec_lon_abs: float = REFERENCE_ADVEC_LON_ABS,
+        target_chunk_size: int = 128,
+        min_target_points: int = 1,
+        max_neighbor_search=None,
+        spline_n_points: int = 1200,
+        spline_r_max: float = 20.0,
+    ):
+        super().__init__(
+            smooth=0.5,
+            input_map=input_map,
+            grid_coords=grid_coords,
+            reference_advec_lon_abs=reference_advec_lon_abs,
+            second_lag_stride=second_lag_stride,
+            target_chunk_size=target_chunk_size,
+            min_target_points=min_target_points,
+            max_neighbor_search=max_neighbor_search,
+        )
+        self._init_st_spline(smooth, spline_n_points, spline_r_max)
+
+
+class NoNuggetSplineMaternLag432CorridorVecchia(_STNoNuggetSplineMixin, Lag432CorridorVecchia):
+    """Corridor-width 4x4 lag-432 spline-Matérn model with nugget fixed at zero."""
+
+    def __init__(
+        self,
+        smooth: float,
+        input_map: dict,
+        grid_coords=None,
+        second_lag_stride: int = 2,
+        reference_advec_lon_abs: float = REFERENCE_ADVEC_LON_ABS,
+        target_chunk_size: int = 128,
+        min_target_points: int = 1,
+        max_neighbor_search=None,
+        spline_n_points: int = 1200,
+        spline_r_max: float = 20.0,
+    ):
+        super().__init__(
+            smooth=0.5,
+            input_map=input_map,
+            grid_coords=grid_coords,
+            reference_advec_lon_abs=reference_advec_lon_abs,
+            second_lag_stride=second_lag_stride,
+            target_chunk_size=target_chunk_size,
+            min_target_points=min_target_points,
+            max_neighbor_search=max_neighbor_search,
+        )
+        self._init_st_spline(smooth, spline_n_points, spline_r_max)
+
+
 __all__ = [
+    "SplineMaternLag432CorridorVecchia",
+    "NoNuggetSplineMaternLag432CorridorVecchia",
     "SplineMaternLag643CorridorVecchia",
     "NoNuggetSplineMaternLag643CorridorVecchia",
 ]

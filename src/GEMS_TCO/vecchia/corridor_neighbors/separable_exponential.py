@@ -1,4 +1,4 @@
-r"""Advected separable exponential models for the lag-643 corridor engine.
+r"""Advected separable exponential models for the lag-432 and lag-643 engines.
 
 The fitted parameterization and fixed conditioning geometry are identical to
 the joint Matérn models.  Only the covariance construction changes.  For
@@ -19,6 +19,7 @@ from __future__ import annotations
 import torch
 
 from .._base import _stable_sqrt_distance
+from .corridor_lag432 import Lag432CorridorVecchia
 from .corridor_lag643 import REFERENCE_ADVEC_LON_ABS, Lag643CorridorVecchia
 
 
@@ -182,7 +183,67 @@ class NoNuggetAdvectedSeparableExponentialLag643CorridorVecchia(
         )
 
 
+class AdvectedSeparableExponentialLag432CorridorVecchia(
+    _AdvectedSeparableExponentialMixin,
+    Lag432CorridorVecchia,
+):
+    """Seven-parameter advected-separable exponential lag-432 model."""
+
+    def __init__(
+        self,
+        input_map: dict,
+        grid_coords=None,
+        second_lag_stride: int = 2,
+        reference_advec_lon_abs: float = REFERENCE_ADVEC_LON_ABS,
+        target_chunk_size: int = 128,
+        min_target_points: int = 1,
+        max_neighbor_search=None,
+    ):
+        super().__init__(
+            smooth=0.5,
+            input_map=input_map,
+            grid_coords=grid_coords,
+            reference_advec_lon_abs=reference_advec_lon_abs,
+            second_lag_stride=second_lag_stride,
+            target_chunk_size=target_chunk_size,
+            min_target_points=min_target_points,
+            max_neighbor_search=max_neighbor_search,
+            covariance_backend="torch",
+        )
+
+
+class NoNuggetAdvectedSeparableExponentialLag432CorridorVecchia(
+    _NoNuggetAdvectedSeparableExponentialMixin,
+    Lag432CorridorVecchia,
+):
+    """Six-parameter advected-separable lag-432 model with nugget zero."""
+
+    def __init__(
+        self,
+        input_map: dict,
+        grid_coords=None,
+        second_lag_stride: int = 2,
+        reference_advec_lon_abs: float = REFERENCE_ADVEC_LON_ABS,
+        target_chunk_size: int = 128,
+        min_target_points: int = 1,
+        max_neighbor_search=None,
+    ):
+        super().__init__(
+            smooth=0.5,
+            input_map=input_map,
+            grid_coords=grid_coords,
+            reference_advec_lon_abs=reference_advec_lon_abs,
+            second_lag_stride=second_lag_stride,
+            target_chunk_size=target_chunk_size,
+            min_target_points=min_target_points,
+            max_neighbor_search=max_neighbor_search,
+            covariance_backend="torch",
+        )
+
+
 __all__ = [
+    "AdvectedSeparableExponentialLag432CorridorVecchia",
+    "NoNuggetAdvectedSeparableExponentialLag432CorridorVecchia",
     "AdvectedSeparableExponentialLag643CorridorVecchia",
     "NoNuggetAdvectedSeparableExponentialLag643CorridorVecchia",
 ]

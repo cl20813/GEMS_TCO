@@ -830,24 +830,40 @@ class VecchiaGroupedCorridorRegressionTests(unittest.TestCase):
 
     def test_no_nugget_variants_use_six_parameters_and_report_zero(self) -> None:
         from GEMS_TCO.vecchia.corridor_neighbors.generalized_cauchy import (
+            NoNuggetGeneralizedCauchyLag432CorridorVecchia,
             NoNuggetGeneralizedCauchyLag643CorridorVecchia,
         )
+        from GEMS_TCO.vecchia.corridor_neighbors.separable_exponential import (
+            NoNuggetAdvectedSeparableExponentialLag432CorridorVecchia,
+        )
         from GEMS_TCO.vecchia.corridor_neighbors.spline import (
+            NoNuggetSplineMaternLag432CorridorVecchia,
             NoNuggetSplineMaternLag643CorridorVecchia,
         )
 
         input_map, _ = self._deterministic_input()
         models = (
+            NoNuggetGeneralizedCauchyLag432CorridorVecchia(
+                1.0,
+                1.0,
+                input_map,
+            ),
             NoNuggetGeneralizedCauchyLag643CorridorVecchia(
                 1.0,
                 1.0,
                 input_map,
+            ),
+            NoNuggetSplineMaternLag432CorridorVecchia(
+                0.7,
+                input_map,
+                spline_n_points=20,
             ),
             NoNuggetSplineMaternLag643CorridorVecchia(
                 0.7,
                 input_map,
                 spline_n_points=20,
             ),
+            NoNuggetAdvectedSeparableExponentialLag432CorridorVecchia(input_map),
         )
         for model in models:
             with self.subTest(model=type(model).__name__):
@@ -856,6 +872,52 @@ class VecchiaGroupedCorridorRegressionTests(unittest.TestCase):
                 with self.assertLogs("GEMS_TCO.vecchia._base", level="WARNING") as output:
                     model._log_cholesky_failure(torch.zeros(6), "test")
                 self.assertIn("nugget=0.0000e+00", output.output[0])
+
+    def test_lag432_family_variants_keep_four_by_four_target_blocks(self) -> None:
+        from GEMS_TCO.vecchia.corridor_neighbors.generalized_cauchy import (
+            NoNuggetGeneralizedCauchyLag432CorridorVecchia,
+        )
+        from GEMS_TCO.vecchia.corridor_neighbors.separable_exponential import (
+            NoNuggetAdvectedSeparableExponentialLag432CorridorVecchia,
+        )
+        from GEMS_TCO.vecchia.corridor_neighbors.spline import (
+            NoNuggetSplineMaternLag432CorridorVecchia,
+        )
+
+        input_map, grid_coords = self._deterministic_input()
+        models = (
+            NoNuggetGeneralizedCauchyLag432CorridorVecchia(
+                0.75, 1.0, input_map, grid_coords, target_chunk_size=4
+            ),
+            NoNuggetSplineMaternLag432CorridorVecchia(
+                0.5, input_map, grid_coords, target_chunk_size=4
+            ),
+            NoNuggetAdvectedSeparableExponentialLag432CorridorVecchia(
+                input_map, grid_coords, target_chunk_size=4
+            ),
+        )
+        for model in models:
+            with self.subTest(model=type(model).__name__):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    model.precompute_conditioning_sets()
+                summary = model.cluster_summary()
+                self.assertEqual(
+                    (summary["block_shape_lat"], summary["block_shape_lon"]),
+                    (4, 4),
+                )
+                self.assertEqual(
+                    (
+                        summary["lag0_block_count"],
+                        summary["lag1_block_count"],
+                        summary["lag2_block_count"],
+                    ),
+                    (4, 3, 2),
+                )
+                self.assertEqual(summary["target_chunk_size"], 4)
+                self.assertLessEqual(
+                    max(batch.target_size for batch in model._cluster_batches),
+                    16,
+                )
 
     def test_dummy_padding_is_exactly_decoupled_for_long_tail_kernels(self) -> None:
         from GEMS_TCO.vecchia.grouped_batched import GroupedBatchedVecchia

@@ -1,5 +1,5 @@
 [study]
-name = "fixed_geographic_three_model_092426"
+name = "fixed_geographic_three_model_gc128_native_092526"
 coordinate_frame = "fixed_geographic"
 discovery_day = "2024-07-01"
 evaluation_years = [2024, 2025]
@@ -22,13 +22,14 @@ use_source_coordinates_for_covariance = true
 names = ["gc", "matern05", "separable"]
 gc_alpha = 0.75
 gc_beta = 1.0
+gc_covariance_backend = "native"
 matern_smooth = 0.5
 nugget_policy = "fixed_zero"
 covariance_parameter_count = 6
 conditioning_geometry = "corridor_width_4x4_lag643"
 conditioning_lag_pattern = "6/4/3"
 reference_advec_lon_abs = 0.126
-target_chunk_size = 256
+target_chunk_sizes = { gc = 128, matern05 = 256, separable = 256 }
 min_target_points = 1
 
 [fit]
@@ -61,5 +62,5 @@ seed = 92426
 
 [paths]
 amarel_project_root = "/home/jl2815/tco/GEMS_TCO-1"
-amarel_output_root = "/home/jl2815/tco/exercise_output/summer/fixed_geographic_three_model_092426"
+amarel_output_root = "/home/jl2815/tco/exercise_output/summer/fixed_geographic_three_model_gc128_native_092526"
 amarel_log_root = "/home/jl2815/tco/exercise_output/summer/logs"

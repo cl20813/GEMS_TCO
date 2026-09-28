@@ -1,0 +1,73 @@
+[study]
+name = "gc_truth_gc_vs_matern_one_day_092526"
+date = "2024-07-13"
+required_time_slots = 8
+temporal_lag = 1
+coordinate_frame = "fixed_geographic"
+
+[data]
+local_root = "/Users/joonwonlee/Documents/GEMS_DATA"
+use_source_coordinates_for_covariance = true
+
+[simulation]
+seed = 20250926
+signal_variance = 10.0
+# These spatial ranges match the frozen A/B design scale.  The historical
+# reference defaults (0.2, 0.3) make analytic C_AB about 0.07, too small for a
+# useful one-realization cross-term mechanism audit.
+range_lat = 0.8152988171176069
+range_lon = 0.9527144962204038
+range_time = 2.0
+advec_lat = 0.08
+advec_lon = -0.2
+nugget = 0.0
+gc_alpha = 0.75
+gc_beta = 1.0
+mean_intercept = 260.0
+mean_lat_slope = 1.0
+mean_lat_center = -0.5
+lat_factor_hr = 10
+lon_factor_hr = 10
+pad = 0.1
+# factor=2 means an odd 2n-1 circulant embedding in each dimension.
+embedding_spatial_factor = 2
+embedding_temporal_factor = 2
+max_negative_spectral_mass = 0.005
+
+[models]
+names = ["gc", "matern05"]
+gc_alpha = 0.75
+gc_beta = 1.0
+gc_covariance_backend = "native"
+matern_smooth = 0.5
+nugget_policy = "fixed_zero"
+covariance_parameter_count = 6
+conditioning_geometry = "corridor_width_4x4_lag432"
+conditioning_lag_pattern = "4/3/2"
+reference_advec_lon_abs = 0.126
+target_chunk_sizes = { gc = 64, matern05 = 64 }
+min_target_points = 1
+
+[fit]
+# Give both fitted families the exact same truth-based physical start.
+signal_variance = 10.0
+range_lat = 0.8152988171176069
+range_lon = 0.9527144962204038
+range_time = 2.0
+advec_lat = 0.08
+advec_lon = -0.2
+lbfgs_lr = 1.0
+lbfgs_inner_max_iter = 20
+lbfgs_outer_max_steps = 50
+lbfgs_tolerance_grad = 1.0e-5
+outer_grad_tol = 1.0e-4
+require_convergence = true
+lbfgs_tolerance_change = 1.0e-9
+lbfgs_history_size = 10
+
+[diagnostic]
+wx_tolerance = 1.0e-10
+primary_truth = "effective_post_clipping_fft_covariance"
+secondary_truth = "intended_analytic_generalized_cauchy_covariance"
+primary_cross_term = "C_AB"
+derived_cross_term = "2*d1*d2*C_AB"

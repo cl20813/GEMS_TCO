@@ -254,6 +254,10 @@ def _manifest(
         "complete": complete,
         "complete_all": complete,
         "models": list(MODEL_ORDER),
+        "vecchia_target_chunk_sizes_by_model": {
+            model: int(config["models"]["target_chunk_sizes"][model])
+            for model in MODEL_ORDER
+        },
         "bootstrap": config["bootstrap"],
     }
 
@@ -272,6 +276,10 @@ def main() -> None:
     )
     output_root.mkdir(parents=True, exist_ok=True)
     signature = study_signature(config_path, design_path, dates_path)
+    expected_chunk_sizes = {
+        model: int(config["models"]["target_chunk_sizes"][model])
+        for model in MODEL_ORDER
+    }
 
     completeness_rows: list[dict[str, Any]] = []
     score_frames: list[pd.DataFrame] = []
@@ -280,15 +288,22 @@ def main() -> None:
         task_complete = (task_dir / "COMPLETE").is_file()
         daily_scores = task_dir / "daily_scores.csv"
         signature_ok = False
+        chunk_settings_ok = False
         manifest_path = task_dir / "task_manifest.json"
         if manifest_path.is_file():
-            signature_ok = load_json(manifest_path).get("study_signature") == signature
+            task_manifest = load_json(manifest_path)
+            signature_ok = task_manifest.get("study_signature") == signature
+            chunk_settings_ok = (
+                task_manifest.get("vecchia_target_chunk_sizes_by_model")
+                == expected_chunk_sizes
+            )
         model_complete = {
             model: (task_dir / f"model_{model}" / "COMPLETE").is_file() for model in MODEL_ORDER
         }
         complete = (
             task_complete
             and signature_ok
+            and chunk_settings_ok
             and all(model_complete.values())
             and daily_scores.is_file()
         )
@@ -298,6 +313,7 @@ def main() -> None:
                 "date": str(row.date),
                 "task_directory_exists": task_dir.is_dir(),
                 "signature_ok": signature_ok,
+                "chunk_settings_ok": chunk_settings_ok,
                 **{f"complete_{model}": status for model, status in model_complete.items()},
                 "task_complete": task_complete,
                 "included_in_aggregate": complete,
@@ -307,6 +323,17 @@ def main() -> None:
             frame = pd.read_csv(daily_scores, float_precision="round_trip")
             if set(frame["model"]) != set(MODEL_ORDER):
                 raise ValueError(f"{daily_scores} does not contain exactly the three models")
+            actual_chunk_sizes = {
+                str(model): int(chunk_size)
+                for model, chunk_size in frame.set_index("model")[
+                    "vecchia_target_chunk_size"
+                ].items()
+            }
+            if actual_chunk_sizes != expected_chunk_sizes:
+                raise ValueError(
+                    f"{daily_scores} has target chunks {actual_chunk_sizes}, "
+                    f"expected {expected_chunk_sizes}"
+                )
             score_frames.append(frame)
 
     completeness = pd.DataFrame(completeness_rows)

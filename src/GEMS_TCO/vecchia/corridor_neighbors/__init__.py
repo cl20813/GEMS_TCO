@@ -22,9 +22,16 @@ from .generalized_cauchy import (
     NoNuggetGeneralizedCauchyLag432CorridorVecchia,
     NoNuggetGeneralizedCauchyLag643CorridorVecchia,
 )
-from .spline import NoNuggetSplineMaternLag643CorridorVecchia, SplineMaternLag643CorridorVecchia
+from .spline import (
+    NoNuggetSplineMaternLag432CorridorVecchia,
+    NoNuggetSplineMaternLag643CorridorVecchia,
+    SplineMaternLag432CorridorVecchia,
+    SplineMaternLag643CorridorVecchia,
+)
 from .separable_exponential import (
+    AdvectedSeparableExponentialLag432CorridorVecchia,
     AdvectedSeparableExponentialLag643CorridorVecchia,
+    NoNuggetAdvectedSeparableExponentialLag432CorridorVecchia,
     NoNuggetAdvectedSeparableExponentialLag643CorridorVecchia,
 )
 
@@ -42,8 +49,12 @@ __all__ = [
     "NoNuggetGeneralizedCauchyLag432CorridorVecchia",
     "GeneralizedCauchyLag643CorridorVecchia",
     "NoNuggetGeneralizedCauchyLag643CorridorVecchia",
+    "SplineMaternLag432CorridorVecchia",
+    "NoNuggetSplineMaternLag432CorridorVecchia",
     "SplineMaternLag643CorridorVecchia",
     "NoNuggetSplineMaternLag643CorridorVecchia",
+    "AdvectedSeparableExponentialLag432CorridorVecchia",
+    "NoNuggetAdvectedSeparableExponentialLag432CorridorVecchia",
     "AdvectedSeparableExponentialLag643CorridorVecchia",
     "NoNuggetAdvectedSeparableExponentialLag643CorridorVecchia",
 ]

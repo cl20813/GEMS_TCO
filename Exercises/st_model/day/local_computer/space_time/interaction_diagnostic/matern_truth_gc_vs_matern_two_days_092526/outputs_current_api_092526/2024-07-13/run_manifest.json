@@ -1,0 +1,68 @@
+{
+  "data_kind": "synthetic",
+  "dataset": "2024-07-13",
+  "frozen_design_identifier": "fixed_geographic_ab_mirrors_lag1_v1_092426",
+  "frozen_design_sha256": "632c83fa55341bfdff4f4cf87d9dc22bada5c8921dad8586e5a2687d3ea2729a",
+  "git_revision": "3866c985ab307f6593669fbd461eb0aabcc4a9f2",
+  "simulation_coordinate_asset": "gridded_with_irregular_source_coordinates",
+  "simulation_path": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/sim_data/july_st_circulant_realpattern_smooth0p5_nugget0_matched5_090226/2024_july_st_circulant/sim_july2024_st_circulant_gridded.pkl",
+  "simulation_sha256": "34bda59a9171dd6ac54e3e7d2d9c46108242895ef8cf497f18627e99f8f68e39",
+  "study_signature": "25a8eba896c9bb62976db55c4d213487a111fa76729ccb5678b4ddf31990025a",
+  "truth": {
+    "advec_lat": 0.08,
+    "advec_lon": -0.2,
+    "block_generation": "independent daily 8-hour 3D circulant embeddings",
+    "delta_lat_base": 0.044,
+    "delta_lat_hr": 0.00043999999999999996,
+    "delta_lon_base": 0.063,
+    "delta_lon_hr": 0.0063,
+    "derivation": "Exact removal of the stored N(0,1) nugget using each hour's recorded seed_nugget, followed by the original one-to-one griddification.",
+    "griddification_rule": "nearest regular grid cell, 1-to-1, then axis-wise half-cell threshold",
+    "griddification_threshold_lat": 0.022,
+    "griddification_threshold_lon": 0.0315,
+    "hours_per_day": 8,
+    "hr_pad": 0.1,
+    "input_template": "/home/jl2815/tco/data/pickle_2024/tco_grid_24_07.pkl",
+    "lat_factor_hr": 100,
+    "lat_range": [
+      -3.0,
+      2.0
+    ],
+    "lon_factor_hr": 10,
+    "lon_range": [
+      121.0,
+      131.0
+    ],
+    "matched_latent_field_source": "/Users/joonwonlee/Documents/GEMS_DATA/simulation/july_st_circulant_realpattern_smooth0p5/2024_july_st_circulant/sim_july2024_st_circulant_real_locations.pkl",
+    "maximum_reconstruction_error": 0.0,
+    "mean_intercept": 260.0,
+    "mean_lat_center": -0.5,
+    "mean_lat_slope": 1.0,
+    "n_hours": 16,
+    "nugget": 0.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "selected_dates": [
+      "2024-07-13",
+      "2024-07-19"
+    ],
+    "sigma": 3.1622776601683795,
+    "sigmasq": 10.0,
+    "smooth": 0.5,
+    "source_truth_nugget": 1.0,
+    "year": 2024
+  },
+  "truth_family": "joint_matern",
+  "truth_nugget": 0.0,
+  "truth_path": "/Users/joonwonlee/Documents/GEMS_TCO-1/outputs/sim_data/july_st_circulant_realpattern_smooth0p5_nugget0_matched5_090226/2024_july_st_circulant/sim_july2024_st_circulant_truth.json",
+  "truth_sha256": "d32c09a7cbe1d6c152865ea0a9c44804c5542f1af1ef511fc647ddd201ce7434",
+  "truth_smooth": 0.5,
+  "vecchia_conditioning_geometry": "corridor_width_4x4_lag432",
+  "vecchia_lag_pattern": "4/3/2",
+  "vecchia_target_chunk_sizes_by_model": {
+    "gc": 64,
+    "matern05": 64
+  },
+  "year": 2024
+}

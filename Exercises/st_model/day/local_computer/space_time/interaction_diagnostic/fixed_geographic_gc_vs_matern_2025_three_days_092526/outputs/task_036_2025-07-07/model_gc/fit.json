@@ -1,0 +1,59 @@
+{
+  "cache_hits": 3,
+  "converged_at_outer_grad_tol": true,
+  "date": "2025-07-07",
+  "fit_seconds": 119.10456304100808,
+  "frozen_design_identifier": "fixed_geographic_ab_mirrors_lag1_v1_092426",
+  "frozen_design_sha256": "632c83fa55341bfdff4f4cf87d9dc22bada5c8921dad8586e5a2687d3ea2729a",
+  "git_revision": "3866c985ab307f6593669fbd461eb0aabcc4a9f2",
+  "gls_coefficients": [
+    6.423030636764997,
+    1.7805811533734182,
+    -0.19382820633827558,
+    -0.39414499405981573,
+    -0.7602732480847517,
+    -1.2231003548198043,
+    -1.6932706353342009,
+    -1.2576411789771829,
+    -0.15219139236512413
+  ],
+  "gls_latitude_center": -0.5207042999924474,
+  "interpretable_parameters": {
+    "advec_lat": 0.006234073185409898,
+    "advec_lon": -0.2450828704442869,
+    "gc_alpha": 0.75,
+    "gc_beta": 1.0,
+    "nugget": 0.0,
+    "range_lat": 0.42481202915998834,
+    "range_lon": 0.6177264405289249,
+    "range_time": 2.3821208116077095,
+    "signal_variance": 18.019859132085465
+  },
+  "maximum_absolute_gradient": 4.345849880044575e-06,
+  "model": "gc",
+  "objective_evaluations": 23,
+  "peak_cuda_memory_allocated_bytes": null,
+  "peak_cuda_memory_reserved_bytes": null,
+  "precompute_seconds": 0.890561499982141,
+  "profiled_vecchia_nll_per_target": 1.245532893538904,
+  "raw_parameters": [
+    3.373184007230248,
+    0.48170957238996437,
+    0.7487978396675159,
+    -2.6994015211920037,
+    0.006234073185409898,
+    -0.2450828704442869
+  ],
+  "resolved_covariance_backend": "native",
+  "steps_completed": 1,
+  "study_signature": "95314c8521dee787ed301974af128c417a18f077c9c7675fcb6c8e0542ba8bab",
+  "task_id": 36,
+  "vecchia_conditioning_geometry": "corridor_width_4x4_lag432",
+  "vecchia_lag_pattern": "4/3/2",
+  "vecchia_target_chunk_size": 64,
+  "vecchia_target_chunk_sizes_by_model": {
+    "gc": 64,
+    "matern05": 64,
+    "separable": 64
+  }
+}
