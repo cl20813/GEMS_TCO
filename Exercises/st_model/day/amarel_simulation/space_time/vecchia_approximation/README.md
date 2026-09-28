@@ -19,20 +19,55 @@ No eigen, SLQ, Lanczos, or Ritz diagnostic is run.
 - `vecchia_adapted_fixed_lag643_core.py`: fitting backend.
 - `vecchia_real59_adapted_fixed_nll_lag643.py`: likelihood-only production run.
 - `slurm_vecchia_real59_adapted_fixed_nll_lag643.sh`: Amarel batch job.
-- `scp_vecchia_real59_adapted_fixed_nll_lag643.sh`: upload helper.
+- `run_vecchia_real59_gpu_on_amarel.sh`: upload, submit, status, and download helper.
+- `verify_vecchia_real59_nll_results.py`: completion and row-count validator.
 - `AMAREL_VECCHIA_GPU_OPTIMIZATION_MEMO_090326.txt`: fitting configuration notes.
 
-## Run
+## Fresh GPU rerun
+
+The rerun requests one A100-class GPU, 12 CPU cores, 128 GB of RAM, and a
+6-hour wall time.  It writes to a new output directory and does not import the
+older full-eigen checkpoint.  If this new job is interrupted, submitting the
+same batch file again resumes from its own per-fit checkpoint.
+
+Both fitted graphs use the same 4x4 target blocks and the same lag-6/4/3
+conditioning-block budget.  The adapted graph uses the FFT initializer's
+reference advection vector; the fixed graph uses a zero reference vector for
+neighbor selection.  The covariance advection parameters are optimized in
+both fits.
+
+From the local Mac:
 
 ```bash
-bash scp_vecchia_real59_adapted_fixed_nll_lag643.sh
-ssh jl2815@amarel-new.hpc.rutgers.edu \
-  'cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/vecchia_approximation && sbatch slurm_vecchia_real59_adapted_fixed_nll_lag643.sh'
+bash run_vecchia_real59_gpu_on_amarel.sh submit
+bash run_vecchia_real59_gpu_on_amarel.sh status
 ```
 
-If the earlier full-eigen run's fit checkpoint exists, the batch script imports
-its completed fits into the new likelihood-only output directory.  Otherwise,
-missing date/method fits are computed and checkpointed after every fit.
+Each command opens one non-multiplexed Amarel connection and should request
+the password once.  The submit connection remains open while it uploads,
+installs, verifies, and calls `sbatch`; do not run Amarel `/home/...` paths
+with a local `cd` command.
+
+If the current source is already installed and uploaded on Amarel, submit
+directly there with:
+
+```bash
+mkdir -p /home/jl2815/tco/exercise_output/fall_26/logs
+cd /home/jl2815/tco/exercise_25/st_model/day/amarel_simulation/space_time/vecchia_approximation
+sbatch slurm_vecchia_real59_adapted_fixed_nll_lag643.sh
+```
+
+After `RUN_COMPLETE.json` appears, download and validate the results locally:
+
+```bash
+bash run_vecchia_real59_gpu_on_amarel.sh pull
+```
+
+The new remote output directory is:
+
+```text
+/home/jl2815/tco/exercise_output/fall_26/vecchia_real59_adapted_fixed_nll_lag643_rerun_20260927
+```
 
 Main outputs:
 
@@ -40,5 +75,10 @@ Main outputs:
 - `daily_fit_results.csv`
 - `daily_native_nll.csv`
 - `native_nll_summary.csv`
+- `daily_winner_summary.json`
+- `paper_daily_comparison.csv`
+- `paper_nll_summary.csv`
+- `paper_nll_summary.tex`
 - `daily_native_nll.png`
 - `run_config.json`
+- `RUN_COMPLETE.json`

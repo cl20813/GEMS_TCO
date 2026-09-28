@@ -39,18 +39,28 @@ import torch
 
 
 HERE = Path(__file__).resolve().parent
-SUBMIT_DIR = Path(os.environ.get("SLURM_SUBMIT_DIR", str(HERE))).resolve()
-AMAREL_ROOT = Path("/home/jl2815/tco")
 LOCAL_SRC = Path("/Users/joonwonlee/Documents/GEMS_TCO-1/src")
-for candidate in (AMAREL_ROOT, SUBMIT_DIR, HERE, LOCAL_SRC):
-    if candidate.exists() and str(candidate) not in sys.path:
-        sys.path.insert(0, str(candidate))
+SOURCE_ROOT = Path(os.environ.get("GEMS_TCO_SRC", str(LOCAL_SRC))).resolve()
+required_source = SOURCE_ROOT / "GEMS_TCO" / "data" / "loading.py"
+if not required_source.is_file():
+    raise RuntimeError(
+        f"GEMS_TCO_SRC does not contain the required data loader: {required_source}"
+    )
+preferred_paths = [str(SOURCE_ROOT), str(HERE)]
+sys.path[:] = preferred_paths + [
+    entry for entry in sys.path if entry not in preferred_paths
+]
 
 import vecchia_adapted_fixed_lag643_core as core  # noqa: E402
 
 
 METHODS = ("adapted", "fixed")
 METHOD_ORDER = {method: index for index, method in enumerate(METHODS)}
+LAG_COUNTS = (6, 4, 3)
+if tuple(core.LAG_COUNTS) != LAG_COUNTS:
+    raise RuntimeError(
+        f"Runner requires lag counts {LAG_COUNTS}, found {tuple(core.LAG_COUNTS)}"
+    )
 COLORS = {"adapted": "#1f77b4", "fixed": "#d62728"}
 LABELS = {"adapted": "adapted corridor", "fixed": "fixed center"}
 PARAMETERS = (
@@ -74,6 +84,12 @@ RESULT_COLUMNS = (
     "max_abs_gradient",
     "init_advec_lat",
     "init_advec_lon",
+    "grid_step_lat",
+    "grid_step_lon",
+    "initializer_seconds",
+    "lag0_block_count",
+    "lag1_block_count",
+    "lag2_block_count",
     "n_target_points",
     "native_nll_per_target",
     "native_nll_total",
@@ -83,8 +99,13 @@ CHECKPOINT_NAME = "fit_checkpoint_native_nll.json"
 FIT_CSV_NAME = "daily_fit_results.csv"
 NLL_CSV_NAME = "daily_native_nll.csv"
 SUMMARY_CSV_NAME = "native_nll_summary.csv"
+WINNER_SUMMARY_NAME = "daily_winner_summary.json"
+PAPER_DAILY_CSV_NAME = "paper_daily_comparison.csv"
+PAPER_SUMMARY_CSV_NAME = "paper_nll_summary.csv"
+PAPER_SUMMARY_TEX_NAME = "paper_nll_summary.tex"
 PLOT_NAME = "daily_native_nll.png"
 CONFIG_NAME = "run_config.json"
+COMPLETE_NAME = "RUN_COMPLETE.json"
 
 # fit_one_geometry normally offers an optional conditional-eigen diagnostic.
 # This runner is likelihood-only, so disable it before any fit is constructed.
@@ -164,6 +185,12 @@ def normalize_record(record: dict[str, Any], source: Path) -> dict[str, Any]:
         "max_abs_gradient": record.get("max_abs_gradient"),
         "init_advec_lat": float(record["init_advec_lat"]),
         "init_advec_lon": float(record["init_advec_lon"]),
+        "grid_step_lat": float(record.get("grid_step_lat", np.nan)),
+        "grid_step_lon": float(record.get("grid_step_lon", np.nan)),
+        "initializer_seconds": float(record.get("initializer_seconds", np.nan)),
+        "lag0_block_count": int(record.get("lag0_block_count", LAG_COUNTS[0])),
+        "lag1_block_count": int(record.get("lag1_block_count", LAG_COUNTS[1])),
+        "lag2_block_count": int(record.get("lag2_block_count", LAG_COUNTS[2])),
         "n_target_points": n_target_points,
         "native_nll_per_target": nll_per_target,
         "native_nll_total": float(total),
@@ -238,6 +265,12 @@ def write_fit_csv(frame: pd.DataFrame, output_root: Path) -> None:
         "max_abs_gradient",
         "init_advec_lat",
         "init_advec_lon",
+        "grid_step_lat",
+        "grid_step_lon",
+        "initializer_seconds",
+        "lag0_block_count",
+        "lag1_block_count",
+        "lag2_block_count",
     ]
     output = frame.loc[:, columns].copy()
     numeric = [column for column in columns if column not in {"date", "method"}]
@@ -268,6 +301,305 @@ def add_paired_difference(frame: pd.DataFrame) -> pd.DataFrame:
     return output
 
 
+def build_winner_summary(frame: pd.DataFrame) -> dict[str, Any]:
+    totals = frame.pivot(index="date", columns="method", values="native_nll_total")
+    if not set(METHODS).issubset(totals.columns):
+        difference = pd.Series(dtype=float)
+    else:
+        target_counts = frame.pivot(
+            index="date", columns="method", values="n_target_points"
+        ).dropna()
+        unequal_targets = target_counts[
+            target_counts["adapted"] != target_counts["fixed"]
+        ]
+        if not unequal_targets.empty:
+            raise RuntimeError(
+                "Adapted and fixed fits must use the same target observations; "
+                f"mismatched dates: {list(unequal_targets.index)}"
+            )
+        difference = (totals["fixed"] - totals["adapted"]).dropna().sort_index()
+    adapted_dates = [str(date) for date in difference.index[difference > 0.0]]
+    fixed_dates = [str(date) for date in difference.index[difference < 0.0]]
+    tie_dates = [str(date) for date in difference.index[difference == 0.0]]
+    return {
+        "criterion": "fixed total native Vecchia NLL minus adapted total native Vecchia NLL",
+        "positive_means": "adapted has the lower native Vecchia NLL",
+        "n_paired_dates": int(len(difference)),
+        "adapted_wins": len(adapted_dates),
+        "fixed_wins": len(fixed_dates),
+        "exact_ties": len(tie_dates),
+        "adapted_win_dates": adapted_dates,
+        "fixed_win_dates": fixed_dates,
+        "exact_tie_dates": tie_dates,
+    }
+
+
+def build_paper_daily_comparison(frame: pd.DataFrame) -> pd.DataFrame:
+    """Return one reproducible paired-comparison row per completed date."""
+    columns = [
+        "date",
+        "year",
+        "n_target_points",
+        "adapted_native_nll_per_target",
+        "fixed_native_nll_per_target",
+        "fixed_minus_adapted_nll_per_target",
+        "adapted_native_nll_total",
+        "fixed_native_nll_total",
+        "fixed_minus_adapted_total_nll",
+        "winner",
+        "zero_initializer_case",
+        "init_advec_lat",
+        "init_advec_lon",
+        "init_advec_magnitude_coordinate_units",
+        "init_advec_magnitude_grid_cells",
+        "adapted_fit_advec_lat",
+        "adapted_fit_advec_lon",
+        "adapted_fit_advec_magnitude_grid_cells",
+        "fixed_fit_advec_lat",
+        "fixed_fit_advec_lon",
+        "fixed_fit_advec_magnitude_grid_cells",
+        "adapted_precompute_seconds",
+        "fixed_precompute_seconds",
+        "adapted_fit_seconds",
+        "fixed_fit_seconds",
+    ]
+    if frame.empty:
+        return pd.DataFrame(columns=columns)
+    duplicate = frame.duplicated(["date", "method"], keep=False)
+    if duplicate.any():
+        values = frame.loc[duplicate, ["date", "method"]].to_dict("records")
+        raise RuntimeError(f"Duplicate date-method fit rows: {values}")
+
+    rows: list[dict[str, Any]] = []
+    for date, date_rows in frame.groupby("date", sort=True):
+        indexed = date_rows.set_index("method")
+        if not set(METHODS).issubset(indexed.index):
+            continue
+        adapted = indexed.loc["adapted"]
+        fixed = indexed.loc["fixed"]
+        if int(adapted["n_target_points"]) != int(fixed["n_target_points"]):
+            raise RuntimeError(
+                f"Adapted and fixed target counts differ on {date}: "
+                f"{adapted['n_target_points']} versus {fixed['n_target_points']}"
+            )
+        for name in ("init_advec_lat", "init_advec_lon"):
+            if not np.isclose(
+                float(adapted[name]), float(fixed[name]), rtol=0.0, atol=1e-12
+            ):
+                raise RuntimeError(f"Adapted and fixed initializers differ on {date}")
+
+        n_target = int(adapted["n_target_points"])
+        adapted_total = float(adapted["native_nll_total"])
+        fixed_total = float(fixed["native_nll_total"])
+        adapted_per_target = float(adapted["native_nll_per_target"])
+        fixed_per_target = float(fixed["native_nll_per_target"])
+        delta_total = fixed_total - adapted_total
+        delta_per_target = fixed_per_target - adapted_per_target
+        if delta_total > 0.0:
+            winner = "adapted"
+        elif delta_total < 0.0:
+            winner = "fixed"
+        else:
+            winner = "tie"
+
+        lat_step = abs(float(adapted["grid_step_lat"]))
+        lon_step = abs(float(adapted["grid_step_lon"]))
+
+        def grid_magnitude(lat_value: float, lon_value: float) -> float:
+            if not (
+                math.isfinite(lat_step)
+                and math.isfinite(lon_step)
+                and lat_step > 0.0
+                and lon_step > 0.0
+            ):
+                return np.nan
+            return float(np.hypot(lat_value / lat_step, lon_value / lon_step))
+
+        init_lat = float(adapted["init_advec_lat"])
+        init_lon = float(adapted["init_advec_lon"])
+        zero_initializer_case = init_lat == 0.0 and init_lon == 0.0
+        adapted_lat = float(adapted["advec_lat"])
+        adapted_lon = float(adapted["advec_lon"])
+        fixed_lat = float(fixed["advec_lat"])
+        fixed_lon = float(fixed["advec_lon"])
+        rows.append(
+            {
+                "date": str(date),
+                "year": int(adapted["year"]),
+                "n_target_points": n_target,
+                "adapted_native_nll_per_target": adapted_per_target,
+                "fixed_native_nll_per_target": fixed_per_target,
+                "fixed_minus_adapted_nll_per_target": delta_per_target,
+                "adapted_native_nll_total": adapted_total,
+                "fixed_native_nll_total": fixed_total,
+                "fixed_minus_adapted_total_nll": delta_total,
+                "winner": winner,
+                "zero_initializer_case": zero_initializer_case,
+                "init_advec_lat": init_lat,
+                "init_advec_lon": init_lon,
+                "init_advec_magnitude_coordinate_units": float(
+                    np.hypot(init_lat, init_lon)
+                ),
+                "init_advec_magnitude_grid_cells": grid_magnitude(init_lat, init_lon),
+                "adapted_fit_advec_lat": adapted_lat,
+                "adapted_fit_advec_lon": adapted_lon,
+                "adapted_fit_advec_magnitude_grid_cells": grid_magnitude(
+                    adapted_lat, adapted_lon
+                ),
+                "fixed_fit_advec_lat": fixed_lat,
+                "fixed_fit_advec_lon": fixed_lon,
+                "fixed_fit_advec_magnitude_grid_cells": grid_magnitude(
+                    fixed_lat, fixed_lon
+                ),
+                "adapted_precompute_seconds": float(adapted["precompute_seconds"]),
+                "fixed_precompute_seconds": float(fixed["precompute_seconds"]),
+                "adapted_fit_seconds": float(adapted["fit_time_seconds"]),
+                "fixed_fit_seconds": float(fixed["fit_time_seconds"]),
+            }
+        )
+    return pd.DataFrame(rows, columns=columns)
+
+
+def build_paper_summary(daily: pd.DataFrame) -> pd.DataFrame:
+    """Build year-specific and pooled rows for the paper's main table."""
+    columns = [
+        "period",
+        "n_dates",
+        "total_target_points",
+        "adapted_wins",
+        "fixed_wins",
+        "exact_ties",
+        "zero_initializer_dates",
+        "comparison_dates",
+        "adapted_lower_comparison_dates",
+        "fixed_lower_comparison_dates",
+        "adapted_lower_fraction_comparison_dates",
+        "adapted_total_nll",
+        "fixed_total_nll",
+        "fixed_minus_adapted_total_nll",
+        "adapted_mean_daily_total_nll",
+        "fixed_mean_daily_total_nll",
+        "fixed_minus_adapted_mean_daily_total_nll",
+        "adapted_pooled_nll_per_target",
+        "fixed_pooled_nll_per_target",
+        "fixed_minus_adapted_pooled_nll_per_target",
+        "mean_daily_fixed_minus_adapted_nll_per_target",
+        "median_daily_fixed_minus_adapted_nll_per_target",
+        "q25_daily_fixed_minus_adapted_nll_per_target",
+        "q75_daily_fixed_minus_adapted_nll_per_target",
+    ]
+    if daily.empty:
+        return pd.DataFrame(columns=columns)
+
+    rows: list[dict[str, Any]] = []
+    subsets = [
+        ("July 2024", daily[daily["year"] == 2024]),
+        ("July 2025", daily[daily["year"] == 2025]),
+        ("Overall", daily),
+    ]
+    for period, subset in subsets:
+        if subset.empty:
+            continue
+        targets = int(subset["n_target_points"].sum())
+        adapted_total = float(subset["adapted_native_nll_total"].sum())
+        fixed_total = float(subset["fixed_native_nll_total"].sum())
+        delta = subset["fixed_minus_adapted_nll_per_target"].astype(float)
+        adapted_wins = int((subset["winner"] == "adapted").sum())
+        zero_initializer = subset["zero_initializer_case"].astype(bool)
+        comparison_dates = int((~zero_initializer).sum())
+        adapted_lower_comparison = int(
+            ((~zero_initializer) & (subset["fixed_minus_adapted_total_nll"] > 0.0)).sum()
+        )
+        fixed_lower_comparison = int(
+            ((~zero_initializer) & (subset["fixed_minus_adapted_total_nll"] < 0.0)).sum()
+        )
+        rows.append(
+            {
+                "period": period,
+                "n_dates": int(len(subset)),
+                "total_target_points": targets,
+                "adapted_wins": adapted_wins,
+                "fixed_wins": int((subset["winner"] == "fixed").sum()),
+                "exact_ties": int((subset["winner"] == "tie").sum()),
+                "zero_initializer_dates": int(zero_initializer.sum()),
+                "comparison_dates": comparison_dates,
+                "adapted_lower_comparison_dates": adapted_lower_comparison,
+                "fixed_lower_comparison_dates": fixed_lower_comparison,
+                "adapted_lower_fraction_comparison_dates": adapted_lower_comparison
+                / float(comparison_dates),
+                "adapted_total_nll": adapted_total,
+                "fixed_total_nll": fixed_total,
+                "fixed_minus_adapted_total_nll": fixed_total - adapted_total,
+                "adapted_mean_daily_total_nll": adapted_total / float(len(subset)),
+                "fixed_mean_daily_total_nll": fixed_total / float(len(subset)),
+                "fixed_minus_adapted_mean_daily_total_nll": (
+                    fixed_total - adapted_total
+                )
+                / float(len(subset)),
+                "adapted_pooled_nll_per_target": adapted_total / targets,
+                "fixed_pooled_nll_per_target": fixed_total / targets,
+                "fixed_minus_adapted_pooled_nll_per_target": (
+                    fixed_total - adapted_total
+                )
+                / targets,
+                "mean_daily_fixed_minus_adapted_nll_per_target": float(delta.mean()),
+                "median_daily_fixed_minus_adapted_nll_per_target": float(
+                    delta.median()
+                ),
+                "q25_daily_fixed_minus_adapted_nll_per_target": float(
+                    delta.quantile(0.25)
+                ),
+                "q75_daily_fixed_minus_adapted_nll_per_target": float(
+                    delta.quantile(0.75)
+                ),
+            }
+        )
+    return pd.DataFrame(rows, columns=columns)
+
+
+def write_paper_latex(summary: pd.DataFrame, path: Path) -> None:
+    """Write a compact table fragment that needs no nonstandard table package."""
+    lines = [
+        r"\begin{table}[t]",
+        r"\centering",
+        r"\caption{Mean daily constant-free profiled Vecchia negative log-likelihood (NLL) for the "
+        r"two conditioning constructions.}",
+        r"\label{tab:real-data-native-nll}",
+        r"\small",
+        r"\begin{tabular}{lrrrr}",
+        r"\hline",
+        r" & & \multicolumn{2}{c}{Mean daily total NLL} & Adapted lower NLL \\",
+        r"Period & Days & Adapted & Fixed & $n/N$ (\%) \\",
+        r"\hline",
+    ]
+    for row in summary.itertuples(index=False):
+        comparison_dates = int(row.comparison_dates)
+        adapted_lower = int(row.adapted_lower_comparison_dates)
+        adapted_percent = 100.0 * adapted_lower / comparison_dates
+        period = row.period
+        lines.append(
+            f"{period} & {int(row.n_dates)} & "
+            f"\\textbf{{{row.adapted_mean_daily_total_nll:,.0f}}} & "
+            f"{row.fixed_mean_daily_total_nll:,.0f} & "
+            f"{adapted_lower}/{comparison_dates} ({adapted_percent:.1f}) \\\\"
+        )
+    lines.extend(
+        [
+            r"\hline",
+            r"\end{tabular}",
+            r"\par\smallskip",
+            r"\footnotesize\textit{Note:} Daily total NLL is NLL per target multiplied by the number "
+            r"of target observations. Reported means include all dates, and text "
+            r"differences use unrounded values. In the last column, $N$ excludes the "
+            r"two zero-initializer dates (one per year), on which the two "
+            r"constructions coincide.",
+            r"\end{table}",
+            "",
+        ]
+    )
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
 def write_nll_outputs(frame: pd.DataFrame, output_root: Path) -> None:
     nll = add_paired_difference(frame)
     nll.to_csv(
@@ -277,6 +609,12 @@ def write_nll_outputs(frame: pd.DataFrame, output_root: Path) -> None:
     )
     if nll.empty:
         pd.DataFrame().to_csv(output_root / SUMMARY_CSV_NAME, index=False)
+        build_paper_daily_comparison(frame).to_csv(
+            output_root / PAPER_DAILY_CSV_NAME, index=False
+        )
+        empty_summary = build_paper_summary(pd.DataFrame())
+        empty_summary.to_csv(output_root / PAPER_SUMMARY_CSV_NAME, index=False)
+        write_paper_latex(empty_summary, output_root / PAPER_SUMMARY_TEX_NAME)
         return
     summary = (
         nll.groupby(["year", "method"], as_index=False)
@@ -296,6 +634,20 @@ def write_nll_outputs(frame: pd.DataFrame, output_root: Path) -> None:
         index=False,
         float_format="%.10g",
     )
+    paper_daily = build_paper_daily_comparison(frame)
+    paper_daily.to_csv(
+        output_root / PAPER_DAILY_CSV_NAME,
+        index=False,
+        float_format="%.10g",
+    )
+    paper_summary = build_paper_summary(paper_daily)
+    paper_summary.to_csv(
+        output_root / PAPER_SUMMARY_CSV_NAME,
+        index=False,
+        float_format="%.10g",
+    )
+    write_paper_latex(paper_summary, output_root / PAPER_SUMMARY_TEX_NAME)
+    write_json(output_root / WINNER_SUMMARY_NAME, build_winner_summary(frame))
 
 
 def plot_native_nll(frame: pd.DataFrame, output_root: Path) -> None:
@@ -413,6 +765,14 @@ def fit_day(
             method, asset, seed, init, device, fit_args
         )
         del raw
+        actual_lag_counts = tuple(
+            int(row[f"lag{lag}_block_count"]) for lag in range(3)
+        )
+        if actual_lag_counts != LAG_COUNTS:
+            raise RuntimeError(
+                f"{spec['date']} {method}: expected lag counts {LAG_COUNTS}, "
+                f"found {actual_lag_counts}"
+            )
         n_target_points = int(row["n_target_points"])
         nll_per_target = float(row["final_native_nll"])
         record = {
@@ -427,6 +787,12 @@ def fit_day(
             "max_abs_gradient": float(row["max_abs_gradient"]),
             "init_advec_lat": float(seed["seed_lat"]),
             "init_advec_lon": float(seed["seed_lon"]),
+            "grid_step_lat": float(seed["lat_step"]),
+            "grid_step_lon": float(seed["lon_step"]),
+            "initializer_seconds": float(seed["initializer_s"]),
+            "lag0_block_count": actual_lag_counts[0],
+            "lag1_block_count": actual_lag_counts[1],
+            "lag2_block_count": actual_lag_counts[2],
             "n_target_points": n_target_points,
             "native_nll_per_target": nll_per_target,
             "native_nll_total": nll_per_target * n_target_points,
@@ -453,7 +819,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--output-root",
         type=Path,
         default=Path(
-            "/home/jl2815/tco/exercise_output/summer/"
+            "/home/jl2815/tco/exercise_output/fall_26/"
             "vecchia_real59_adapted_fixed_nll_lag643"
         ),
     )
@@ -493,17 +859,26 @@ def validate_scope(records: list[dict[str, Any]], specs: list[dict[str, Any]]) -
 
 
 def write_run_config(args: argparse.Namespace, n_imported: int) -> None:
+    cuda_available = bool(torch.cuda.is_available())
     write_json(
         args.output_root / CONFIG_NAME,
         {
             "started_utc": datetime.now(timezone.utc).isoformat(),
             "host": socket.gethostname(),
             "methods": METHODS,
+            "target_block_shape": [4, 4],
+            "lag_block_counts": list(LAG_COUNTS),
             "n_dates": 59,
             "excluded_date": "2025-07-24",
             "diagnostics": [],
             "comparison": "native Vecchia NLL on each method's own graph",
             "n_imported_records": n_imported,
+            "torch_version": torch.__version__,
+            "torch_cuda_version": torch.version.cuda,
+            "cuda_available": cuda_available,
+            "cuda_device_name": torch.cuda.get_device_name(0) if cuda_available else None,
+            "gems_tco_source_root": str(core.SRC),
+            "gems_tco_package_root": str(core.ACTUAL_PACKAGE_ROOT),
             "arguments": vars(args),
         },
     )
@@ -513,6 +888,12 @@ def main() -> None:
     args = build_parser().parse_args()
     if args.device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is unavailable")
+    print(f"Runner GEMS_TCO: {core.ACTUAL_PACKAGE_ROOT}", flush=True)
+    data_loader_module = sys.modules[core.ProcessedDataLoader.__module__]
+    print(
+        f"Runner data loader: {Path(data_loader_module.__file__).resolve()}",
+        flush=True,
+    )
     args.output_root.mkdir(parents=True, exist_ok=True)
     specs = date_specs()
     records = load_records(args)
@@ -529,6 +910,30 @@ def main() -> None:
     expected_rows = len(specs) * len(METHODS)
     if len(records) != expected_rows:
         raise RuntimeError(f"Expected {expected_rows} fit rows, found {len(records)}")
+    winner_summary = build_winner_summary(results_frame(records))
+    if winner_summary["n_paired_dates"] != len(specs):
+        raise RuntimeError(
+            "Expected one adapted/fixed NLL comparison for every date, found "
+            f"{winner_summary['n_paired_dates']}"
+        )
+    write_json(
+        args.output_root / COMPLETE_NAME,
+        {
+            "completed_utc": datetime.now(timezone.utc).isoformat(),
+            "n_dates": len(specs),
+            "n_methods": len(METHODS),
+            "n_fit_rows": len(records),
+            "target_block_shape": [4, 4],
+            "lag_block_counts": list(LAG_COUNTS),
+            "device": args.device,
+            "torch_version": torch.__version__,
+            "torch_cuda_version": torch.version.cuda,
+            "cuda_device_name": (
+                torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
+            ),
+            **winner_summary,
+        },
+    )
     print(
         f"Complete: {len(specs)} dates, {len(records)} likelihood fits in "
         f"{args.output_root}",

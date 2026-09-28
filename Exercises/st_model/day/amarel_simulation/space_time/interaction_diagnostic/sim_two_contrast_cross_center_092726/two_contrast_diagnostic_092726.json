@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "study_id": "sim_two_contrast_cross_center_092726",
+  "scientific_target": "Track the daily weighted cross term 2*d1*d2*E[Q_A Q_B] and its departure from the matched separable center for the preselected two-rectangle diagnostic across the six eta simulation scenarios.",
+  "input": {
+    "scenario_config": "simulate_data/092726/st_interaction_scenarios_092726.json",
+    "amarel_data_root": "/home/jl2815/tco/exercise_output/fall_26/st_interaction_july2024_nugget0_092726",
+    "year": 2024,
+    "month": 7,
+    "expected_days": 30,
+    "hours_per_day": 8,
+    "prefer_day_checkpoints": true
+  },
+  "output": {
+    "amarel_output_root": "/home/jl2815/tco/exercise_output/fall_26/sim_two_contrast_cross_center_092726",
+    "amarel_log_root": "/home/jl2815/tco/exercise_output/fall_26/logs"
+  },
+  "geometry": {
+    "coordinate_frame": "truth_lagrangian_flow_following",
+    "temporal_lag": 1,
+    "standardized_geometry": {
+      "clockwise": [
+        [-2.0, -2.0],
+        [2.0, 2.0],
+        [-1.0, -2.0],
+        [1.0, 2.0]
+      ],
+      "counterclockwise": [
+        [-2.0, 2.0],
+        [2.0, -2.0],
+        [-1.0, 2.0],
+        [1.0, -2.0]
+      ]
+    },
+    "endpoint_order_within_time": [
+      "A_minus",
+      "A_plus",
+      "B_minus",
+      "B_plus"
+    ],
+    "point_order": [
+      "A_minus_t",
+      "A_plus_t",
+      "A_minus_t_plus_1",
+      "A_plus_t_plus_1",
+      "B_minus_t",
+      "B_plus_t",
+      "B_minus_t_plus_1",
+      "B_plus_t_plus_1"
+    ],
+    "contrast_coefficients_on_eight_points": {
+      "Q_A": [1.0, -1.0, -1.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+      "Q_B": [0.0, 0.0, 0.0, 0.0, 1.0, -1.0, -1.0, 1.0]
+    },
+    "secondary_l_coefficients": {
+      "d1": 0.156629367196063,
+      "d2": 0.1540219594610364
+    },
+    "geometry_provenance": "The standardized Q_A/Q_B pair is the representative global optimum from global_two_rectangle_search/global_pair_ties.csv. Physical offsets are recomputed as standardized offsets times each simulation truth range; real-data frozen physical offsets are intentionally not reused."
+  },
+  "diagnostic": {
+    "primary_quantity": "weighted_cross_term_and_signed_excess_over_matched_separable_center",
+    "centered_covariance_is_sensitivity_only": true,
+    "minimum_complete_samples_per_day": 100,
+    "oracle_covariance_chunk_size": 5000,
+    "write_stratum_csv": true,
+    "inference_unit": "independent simulation day",
+    "common_random_number_pairing": "Pair scenarios by date within covariance family."
+  }
+}

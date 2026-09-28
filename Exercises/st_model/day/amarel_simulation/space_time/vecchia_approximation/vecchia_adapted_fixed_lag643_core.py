@@ -67,17 +67,72 @@ from torch.nn import Parameter
 HERE = Path(__file__).resolve().parent
 LOCAL_REPO = Path("/Users/joonwonlee/Documents/GEMS_TCO-1")
 LOCAL_SRC = LOCAL_REPO / "src"
-AMAREL_SRC = Path("/home/jl2815/tco")
-SRC = AMAREL_SRC if (AMAREL_SRC / "GEMS_TCO").exists() else LOCAL_SRC
-for path in (SRC, HERE):
-    if str(path) not in sys.path:
-        sys.path.insert(0, str(path))
+AMAREL_PROJECT_SRC = Path("/home/jl2815/tco/GEMS_TCO-1/src")
+CONFIGURED_SRC = Path(os.environ["GEMS_TCO_SRC"]) if os.environ.get("GEMS_TCO_SRC") else None
 
-from GEMS_TCO.data_loader import load_data_dynamic_processed  # noqa: E402
-from GEMS_TCO.vecchia_cluster import StrategyClusterVecchiaFit  # noqa: E402
-from GEMS_TCO.vecchia_realdata_adapted_corridor_width_4x4_lag643 import (  # noqa: E402
-    AdaptedRealDataCorridorWidth4x4Lag643VecchiaFit,
+
+def is_complete_source(source: Path) -> bool:
+    return (
+        source / "GEMS_TCO" / "data" / "loading.py"
+    ).is_file() and (
+        source
+        / "GEMS_TCO"
+        / "vecchia"
+        / "corridor_neighbors"
+        / "directional_lag643.py"
+    ).is_file()
+
+
+if CONFIGURED_SRC is not None:
+    # A production job must use exactly the deployment selected by its Slurm
+    # script.  Falling back here can silently import /home/jl2815/tco/GEMS_TCO,
+    # whose legacy API does not contain GEMS_TCO.data.
+    SRC = CONFIGURED_SRC.resolve()
+    if not is_complete_source(SRC):
+        raise RuntimeError(
+            "Configured GEMS_TCO_SRC is incomplete: "
+            f"{SRC}; expected data/loading.py and directional_lag643.py"
+        )
+else:
+    SRC = next(
+        (
+            candidate.resolve()
+            for candidate in (AMAREL_PROJECT_SRC, LOCAL_SRC)
+            if is_complete_source(candidate)
+        ),
+        None,
+    )
+    if SRC is None:
+        raise RuntimeError(
+            "No complete maintained GEMS_TCO source tree was found. Set "
+            "GEMS_TCO_SRC to a source directory containing GEMS_TCO/data and "
+            "GEMS_TCO/vecchia/corridor_neighbors."
+        )
+preferred_paths = [str(SRC.resolve()), str(HERE)]
+sys.path[:] = preferred_paths + [
+    entry for entry in sys.path if entry not in preferred_paths
+]
+
+import GEMS_TCO  # noqa: E402
+from GEMS_TCO.data.loading import ProcessedDataLoader  # noqa: E402
+from GEMS_TCO.vecchia.corridor_neighbors.directional_lag643 import (  # noqa: E402
+    DirectionalLag643CorridorVecchia,
 )
+from GEMS_TCO.vecchia.grouped_batched import GroupedBatchedVecchia  # noqa: E402
+
+EXPECTED_PACKAGE_ROOT = (SRC / "GEMS_TCO").resolve()
+ACTUAL_PACKAGE_ROOT = Path(GEMS_TCO.__file__).resolve().parent
+if ACTUAL_PACKAGE_ROOT != EXPECTED_PACKAGE_ROOT:
+    raise RuntimeError(
+        "Imported GEMS_TCO from an unexpected source: "
+        f"{ACTUAL_PACKAGE_ROOT}; expected {EXPECTED_PACKAGE_ROOT}"
+    )
+
+
+# Experiment-local aliases keep the historical analysis code readable while
+# using the maintained package API.
+StrategyClusterVecchiaFit = GroupedBatchedVecchia
+AdaptedRealDataCorridorWidth4x4Lag643VecchiaFit = DirectionalLag643CorridorVecchia
 DTYPE = torch.double
 BLOCK_SHAPE = (4, 4)
 LAG_COUNTS = (6, 4, 3)
@@ -217,15 +272,13 @@ def load_selection(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
 
 
 def load_real_asset(spec: dict[str, Any], args: argparse.Namespace) -> DayAsset:
-    loader = load_data_dynamic_processed(str(args.real_data_root))
-    frames, _, _, monthly_mean = loader.load_maxmin_ordered_data_bymonthyear(
-        lat_lon_resolution=[1, 1],
-        mm_cond_number=1,
-        years_=[str(spec["year"])],
-        months_=[int(spec["month"])],
-        lat_range=parse_pair(args.lat_range, float),
-        lon_range=parse_pair(args.lon_range, float),
-        is_whittle=True,
+    loader = ProcessedDataLoader(args.real_data_root)
+    frames, _, _, monthly_mean = loader.load_monthly_grids(
+        years=[str(spec["year"])],
+        months=[int(spec["month"])],
+        latitude_range=parse_pair(args.lat_range, float),
+        longitude_range=parse_pair(args.lon_range, float),
+        compute_ordering=False,
     )
     if not frames:
         raise RuntimeError(f"No real data loaded for {spec['date']} from {args.real_data_root}")
@@ -235,16 +288,14 @@ def load_real_asset(spec: dict[str, Any], args: argparse.Namespace) -> DayAsset:
         raise RuntimeError(f"Expected {args.hours_per_day} real slots on {spec['date']}, got {len(day_keys)}")
     base = frames[day_keys[0]][["Latitude", "Longitude"]].to_numpy(dtype=np.float64)
     assert_grid_order(frames, day_keys, base)
-    start = all_keys.index(day_keys[0])
-    if all_keys[start : start + len(day_keys)] != day_keys:
-        raise RuntimeError(f"Selected real keys are not contiguous for {spec['date']}")
-    source_map, _ = loader.load_working_data(
-        frames,
-        monthly_mean=float(monthly_mean),
-        idx_for_datamap=[start, start + len(day_keys)],
-        ord_mm=None,
+    day_frames = {key: frames[key] for key in day_keys}
+    source_map, _ = loader.build_model_tensors(
+        day_frames,
+        ozone_mean=float(monthly_mean),
+        time_slice=(0, len(day_keys)),
+        spatial_order=None,
         dtype=DTYPE,
-        keep_ori=bool(args.keep_exact_loc),
+        use_source_coordinates=bool(args.keep_exact_loc),
     )
     if sorted(source_map) != day_keys:
         raise RuntimeError("Real-data loader returned unexpected hourly keys")
@@ -412,7 +463,7 @@ def load_synthetic_asset(spec: dict[str, Any], args: argparse.Namespace) -> DayA
     )
 
 
-class FixedCenterLag643VecchiaFit(StrategyClusterVecchiaFit):
+class FixedCenterLag643VecchiaFit(DirectionalLag643CorridorVecchia):
     """Lag-643 graph whose past conditioning centers remain at the target."""
 
     def __init__(
@@ -420,7 +471,7 @@ class FixedCenterLag643VecchiaFit(StrategyClusterVecchiaFit):
         smooth: float,
         input_map: dict[str, torch.Tensor],
         grid_coords: np.ndarray,
-        daily_stride: int,
+        second_lag_stride: int,
         target_chunk_size: int,
         min_target_points: int,
     ):
@@ -428,14 +479,9 @@ class FixedCenterLag643VecchiaFit(StrategyClusterVecchiaFit):
             smooth=smooth,
             input_map=input_map,
             grid_coords=grid_coords,
-            block_shape=BLOCK_SHAPE,
-            strategy="center_tapered",
-            lag0_block_count=LAG_COUNTS[0],
-            lag1_block_count=LAG_COUNTS[1],
-            lag2_block_count=LAG_COUNTS[2],
-            daily_stride=daily_stride,
-            lag1_lon_offset=1e-12,
-            lag2_lon_offset=2e-12,
+            reference_advec_lat=0.0,
+            reference_advec_lon=0.0,
+            second_lag_stride=second_lag_stride,
             target_chunk_size=target_chunk_size,
             min_target_points=min_target_points,
         )
@@ -468,7 +514,7 @@ class UnionLag643VecchiaFit(AdaptedRealDataCorridorWidth4x4Lag643VecchiaFit):
         grid_coords: np.ndarray,
         reference_advec_lat: float,
         reference_advec_lon: float,
-        daily_stride: int,
+        second_lag_stride: int,
         target_chunk_size: int,
         min_target_points: int,
     ):
@@ -479,7 +525,7 @@ class UnionLag643VecchiaFit(AdaptedRealDataCorridorWidth4x4Lag643VecchiaFit):
             grid_coords=grid_coords,
             reference_advec_lat=reference_advec_lat,
             reference_advec_lon=reference_advec_lon,
-            daily_stride=daily_stride,
+            second_lag_stride=second_lag_stride,
             target_chunk_size=target_chunk_size,
             min_target_points=min_target_points,
         )
@@ -643,7 +689,7 @@ def build_geometry_model(
         smooth=float(args.smooth),
         input_map=mapped,
         grid_coords=asset.grid_coords,
-        daily_stride=int(args.daily_stride),
+        second_lag_stride=int(args.daily_stride),
         target_chunk_size=target_chunk_size,
         min_target_points=int(args.min_target_points),
     )
@@ -696,11 +742,11 @@ def conditioning_block_summary(model: StrategyClusterVecchiaFit, n_times: int) -
             total_counts.append(len(refs))
             lag1_counts.append(sum(int(t == time_idx - 1) for t, _ in refs) if time_idx > 0 else 0)
             lag2_counts.append(
-                sum(int(t == time_idx - int(model.daily_stride)) for t, _ in refs)
-                if time_idx >= int(model.daily_stride)
+                sum(int(t == time_idx - int(model.second_lag_stride)) for t, _ in refs)
+                if time_idx >= int(model.second_lag_stride)
                 else 0
             )
-            if time_idx >= int(model.daily_stride):
+            if time_idx >= int(model.second_lag_stride):
                 mature_counts.append(len(refs))
     return {
         "mean_condition_blocks": float(np.mean(total_counts)),
@@ -1166,34 +1212,37 @@ def fit_one_geometry(
         )
         for index, value in enumerate(raw_init)
     ]
-    optimizer = model.set_optimizer(
+    optimizer = model.make_lbfgs_optimizer(
         params,
         lr=float(args.lbfgs_lr),
         max_iter=int(args.lbfgs_eval),
         max_eval=int(args.lbfgs_eval),
+        tolerance_grad=float(args.grad_tol),
+        tolerance_change=1e-9,
         history_size=int(args.lbfgs_history),
     )
     t1 = time.perf_counter()
     if args.suppress_fit_prints:
         with contextlib.redirect_stdout(io.StringIO()):
-            returned, step_index = model.fit_vecc_lbfgs(
+            fit_result = model.fit_lbfgs(
                 params, optimizer, max_steps=int(args.lbfgs_steps), grad_tol=float(args.grad_tol)
             )
     else:
-        returned, step_index = model.fit_vecc_lbfgs(
+        fit_result = model.fit_lbfgs(
             params, optimizer, max_steps=int(args.lbfgs_steps), grad_tol=float(args.grad_tol)
         )
     fit_s = time.perf_counter() - t1
-    raw_final = [float(param.detach().item()) for param in params]
+    raw_final = [float(value) for value in fit_result.raw_parameters]
     params_tensor = torch.as_tensor(raw_final, dtype=DTYPE, device=device)
     with torch.no_grad():
-        final_nll = float(model.vecchia_batched_likelihood(params_tensor).detach().cpu().item())
-        beta = model.get_gls_beta(params_tensor).detach()
+        final_nll = float(
+            model.profiled_negative_log_likelihood(params_tensor).detach().cpu().item()
+        )
+        beta = model.estimate_gls_coefficients(params_tensor).detach()
     gls_beta = [float(value) for value in beta.reshape(-1).cpu().tolist()]
     estimate = raw_to_physical(raw_final)
     if nugget_is_fixed:
         estimate["nugget"] = float(args.fixed_nugget)
-    gradients = [abs(float(param.grad.detach().item())) for param in params if param.grad is not None]
     row: dict[str, Any] = {
         "dataset_id": asset.dataset_id,
         "data_kind": asset.data_kind,
@@ -1222,9 +1271,9 @@ def fit_one_geometry(
         "nugget_mode": "fixed" if nugget_is_fixed else "estimated",
         "fixed_nugget": float(args.fixed_nugget) if nugget_is_fixed else np.nan,
         "final_native_nll": final_nll,
-        "fit_returned_nll": float(returned[-1]),
-        "outer_steps": int(step_index) + 1,
-        "max_abs_gradient": max(gradients) if gradients else np.nan,
+        "fit_returned_nll": float(fit_result.final_nll),
+        "outer_steps": int(fit_result.steps_completed),
+        "max_abs_gradient": float(fit_result.max_abs_gradient),
         "gls_beta": gls_beta,
         "precompute_s": precompute_s,
         "fit_s": fit_s,
@@ -2631,7 +2680,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output-root",
         type=Path,
-        default=Path("/home/jl2815/tco/exercise_output/summer/vecchia_three_geometry_lag643_090126"),
+        default=Path("/home/jl2815/tco/exercise_output/fall_26/vecchia_three_geometry_lag643_090126"),
     )
     parser.add_argument("--hours-per-day", type=int, default=8)
     parser.add_argument("--lat-range", default="-3,2")

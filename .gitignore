@@ -32,6 +32,11 @@ outputs/day/simulation/
 outputs/day/real/
 outputs/day/real_data/
 
+# Amarel-generated controlled interaction assets are downloaded here.  Keep
+# the dated generator/config/runbook tracked, but never stage multi-GB pickles.
+simulate_data/092726/st_interaction_july2024_nugget0_092726/
+simulate_data/092726/st_interaction_july2024_nugget0_092726_pilot/
+
 # Generated Vecchia whitening matrices can exceed GitHub's 100 MB blob limit.
 **/whitener_B.npz
 **/vecchia_whitener_B.npz

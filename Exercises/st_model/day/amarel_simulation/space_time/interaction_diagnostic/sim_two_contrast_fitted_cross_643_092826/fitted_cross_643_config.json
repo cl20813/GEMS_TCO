@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "study_name": "sim_two_contrast_fitted_cross_643_092826",
+  "scientific_target": "Compare empirical and fitted Var(L), then decompose their difference into the Q_A diagonal, Q_B diagonal, and Q_A-Q_B cross contributions.",
+  "input": {
+    "scenario_config": "simulate_data/092726/st_interaction_scenarios_092726.json",
+    "amarel_data_root": "/home/jl2815/tco/exercise_output/fall_26/st_interaction_july2024_nugget0_092726",
+    "local_data_root": "/Users/joonwonlee/Documents/GEMS_TCO-1/simulate_data",
+    "year": 2024,
+    "month": 7,
+    "expected_days": 30,
+    "hours_per_day": 8
+  },
+  "output": {
+    "amarel_root": "/home/jl2815/tco/exercise_output/fall_26/sim_two_contrast_fitted_cross_643_092826",
+    "log_root": "/home/jl2815/tco/exercise_output/fall_26/logs"
+  },
+  "fit": {
+    "model_rule": "matched_family_joint",
+    "matern_smooth": 0.5,
+    "gc_alpha": 1.0,
+    "gc_beta": 5.0,
+    "nugget": 0.0,
+    "conditioning_geometry": "direction_adapted_corridor_width_4x4_lag643",
+    "lag_pattern": "6/4/3",
+    "target_chunk_size": {
+      "matern": 256,
+      "generalized_cauchy": 128
+    },
+    "min_target_points": 1,
+    "lbfgs_lr": 1.0,
+    "lbfgs_inner_max_iter": 20,
+    "lbfgs_outer_max_steps": 50,
+    "lbfgs_tolerance_grad": 1e-5,
+    "lbfgs_tolerance_change": 1e-9,
+    "lbfgs_history_size": 10,
+    "outer_grad_tol": 1e-4,
+    "require_convergence": true,
+    "initial_signal_variance": 10.0,
+    "initial_effective_range_lat": 0.2,
+    "initial_effective_range_lon": 0.3,
+    "initial_effective_range_time": 2.0
+  },
+  "initializer": {
+    "method": "M3_masked_fft_plus_safeguarded_Q3",
+    "maximum_latitude_offset_cells": 20,
+    "maximum_longitude_offset_cells": 20,
+    "minimum_pair_count": 1000,
+    "smooth_bandwidth_degrees": 0.063,
+    "maximum_subgrid_condition_number": 100.0
+  },
+  "diagnostic": {
+    "oracle_design": "../sim_two_contrast_cross_center_092726/two_contrast_diagnostic_092726.json",
+    "model_covariance_chunk_size": 20000,
+    "primary_total": "empirical_l_variance_minus_fitted_l_variance",
+    "primary_cross_attribution": "empirical_l_cross_term_minus_fitted_l_cross_term",
+    "variance_definition": "known_zero_mean_second_moment_for_zero_sum_contrast_with_centered_sensitivity",
+    "statistical_unit": "independently_simulated_day"
+  }
+}

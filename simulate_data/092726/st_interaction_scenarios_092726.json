@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "suite_name": "st_interaction_july2024_nugget0_092726",
+  "scientific_target": "Change only the Lagrangian space-time coupling while holding variance, effective e-fold ranges, advection, nugget, mean, observation geometry, and replicate seeds fixed.",
+  "factorial_design": {
+    "covariance_families": ["matern", "generalized_cauchy"],
+    "interaction_eta_levels": [0.0, 0.5, 1.0],
+    "n_scenarios": 6
+  },
+  "calendar": {
+    "year": 2024,
+    "month": 7,
+    "start_day": 1,
+    "n_days": 30,
+    "hours_per_day": 8
+  },
+  "shared_parameters": {
+    "sigmasq": 10.0,
+    "range_lat": 0.2,
+    "range_lon": 0.3,
+    "range_time": 2.0,
+    "advec_lat": 0.08,
+    "advec_lon": -0.2,
+    "nugget": 0.0,
+    "mean_intercept": 260.0,
+    "mean_lat_slope": 1.0,
+    "mean_lat_center": -0.5
+  },
+  "random_design": {
+    "base_seed": 2024070100,
+    "common_random_numbers": true,
+    "seed_rule": "base_seed + 1000 * year + day_of_month"
+  },
+  "grid": {
+    "native_delta_lat": 0.044,
+    "native_delta_lon": 0.063,
+    "lat_factor_hr": 100,
+    "lon_factor_hr": 10,
+    "pad": 0.1,
+    "embedding_spatial_factor": 2,
+    "embedding_temporal_factor": 2,
+    "max_negative_spectral_mass": 0.0005,
+    "max_relative_covariance_distortion_bound": 0.0001
+  },
+  "coupling_definition": {
+    "space_distance": "d_s^2=((h_lat-v_lat*u)/range_lat)^2+((h_lon-v_lon*u)/range_lon)^2",
+    "time_distance": "d_t=abs(u)/range_time",
+    "separable": "C_sep=sigmasq*R(d_s)*R(d_t)",
+    "joint": "C_joint=sigmasq*R(sqrt(d_s^2+d_t^2))",
+    "mixture": "C_eta=(1-eta)*C_sep+eta*C_joint",
+    "controlled_margins": "For every eta, C(h,0) and C(v*u,u) are exactly unchanged within covariance family."
+  },
+  "scenarios": [
+    {
+      "scenario_id": "matern05_lagrangian_separable_eta0",
+      "family": "matern",
+      "matern_nu": 0.5,
+      "interaction_eta": 0.0,
+      "role": "within-family Lagrangian separability null; advection-only Eulerian interaction"
+    },
+    {
+      "scenario_id": "matern05_lagrangian_mixture_eta0p5",
+      "family": "matern",
+      "matern_nu": 0.5,
+      "interaction_eta": 0.5,
+      "role": "within-family intermediate Lagrangian interaction"
+    },
+    {
+      "scenario_id": "matern05_lagrangian_joint_eta1",
+      "family": "matern",
+      "matern_nu": 0.5,
+      "interaction_eta": 1.0,
+      "role": "within-family nonseparable Lagrangian interaction"
+    },
+    {
+      "scenario_id": "gencauchy_a1_b5_lagrangian_separable_eta0",
+      "family": "generalized_cauchy",
+      "cauchy_a": 1.0,
+      "cauchy_b": 5.0,
+      "normalize_to_efold_range": true,
+      "interaction_eta": 0.0,
+      "role": "matched-family Lagrangian separability null; advection-only Eulerian interaction"
+    },
+    {
+      "scenario_id": "gencauchy_a1_b5_lagrangian_mixture_eta0p5",
+      "family": "generalized_cauchy",
+      "cauchy_a": 1.0,
+      "cauchy_b": 5.0,
+      "normalize_to_efold_range": true,
+      "interaction_eta": 0.5,
+      "role": "matched-family intermediate Lagrangian interaction"
+    },
+    {
+      "scenario_id": "gencauchy_a1_b5_lagrangian_joint_eta1",
+      "family": "generalized_cauchy",
+      "cauchy_a": 1.0,
+      "cauchy_b": 5.0,
+      "normalize_to_efold_range": true,
+      "interaction_eta": 1.0,
+      "role": "matched-family nonseparable Lagrangian interaction"
+    }
+  ]
+}
